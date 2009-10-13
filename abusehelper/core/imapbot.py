@@ -43,11 +43,15 @@ class IMAP(threado.ThreadedStream):
                 event = events.Event()
 
                 for key, value in groupdict.items():
+                    if key is None:
+                        continue
                     if value is None:
                         continue
                     event.add(key, value)
 
                 for key, value in row.items():
+                    if key is None:
+                        continue
                     key = util.guess_encoding(key).lower().strip()
                     value = util.guess_encoding(value).strip()
                     if not value or value == "-":
