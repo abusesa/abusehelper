@@ -71,5 +71,6 @@ def dshield(inner, asn):
     finally:
         opened.close()
 
-for event in dshield(3249): # dshield("3249") works too, doesn't matter
-    print event.attrs
+if __name__ == "__main__":
+    for event in dshield(3249): # dshield("3249") works too, doesn't matter
+        print event.attrs

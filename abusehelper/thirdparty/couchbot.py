@@ -7,7 +7,7 @@ def events_to_couchdb(inner, url, db_name):
     server = couchdb.client.Server(url)
     try:
         db = server.create(db_name)
-    except couchdb.client.PreconditionFailed:
+    except (couchdb.client.PreconditionFailed, couchdb.client.ResourceConflict):
         db = server[db_name]
 
     while True:
