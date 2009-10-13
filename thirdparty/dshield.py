@@ -63,7 +63,7 @@ def dshield(inner, asn):
 
             # Convert the row to an event, send it forwards in the
             # pipeline. Forcefully encode the values to unicode.
-            event = Event()
+            event = events.Event()
             for key, value in row.items():
                 if value is None:
                     continue
