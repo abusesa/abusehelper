@@ -3,7 +3,8 @@ import urllib
 import urllib2
 import urlparse
 
-from idiokit import util, threado, events
+from idiokit import threado, util
+from abusehelper.core import events
 
 def sanitize_ip(ip):
     # Remove leading zeros from (strings resembling) IPv4 addresses.

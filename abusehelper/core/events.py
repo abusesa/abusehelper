@@ -1,5 +1,5 @@
-import threado
-from xmlcore import Element
+from idiokit import threado
+from idiokit.xmlcore import Element
 
 EVENT_NS = "idiokit#event"
 

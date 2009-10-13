@@ -1,5 +1,6 @@
 import couchdb.client
-from idiokit import threado, events
+from idiokit import threado
+from abusehelper.core import events
 
 @threado.stream
 def events_to_couchdb(inner, url, db_name):
