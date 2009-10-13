@@ -1,7 +1,8 @@
 import re
+import events
 
-from idiokit import threado, util, events
-from idiokit.xmpp import XMPP, Element
+from idiokit import threado, util
+from idiokit.xmpp import XMPP
 from idiokit.irc import IRC
 
 @threado.stream

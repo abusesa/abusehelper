@@ -3,7 +3,8 @@ import csv
 import urllib2
 import imaplib
 import email.parser
-from idiokit import threado, util, events
+import events
+from idiokit import threado, util
 
 class IMAP(threado.ThreadedStream):
     def __init__(self, server, user, password, imapfilter, 

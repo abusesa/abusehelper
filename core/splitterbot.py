@@ -2,8 +2,9 @@ import uuid
 import rules
 import logging
 import time
+import events
 
-from idiokit import threado, events, pep
+from idiokit import threado, pep
 from idiokit.xmpp import XMPP
 from idiokit.core import XMPPError
 
