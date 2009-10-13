@@ -11,8 +11,9 @@ import xml.etree.cElementTree as ET
 from collections import defaultdict
 import shelve
 
-import couchdb.client
-from idiokit import threado, events, util
+from abusehelper.thirdparty.couchbot import events_to_couchdb
+from idiokit import threado, util
+from abusehelper.core import events
 
 def gen_text(obj):
     return obj.text.replace('\n', '').replace('\t', '').replace('\r', '')
@@ -26,31 +27,6 @@ def parse_nvd_data(inner, fob):
         yield
 
 @threado.stream
-def events_to_couchdb(inner, url, db_name, primary=None):
-    server = couchdb.client.Server(url)
-    try:
-        db = server.create(db_name)
-    except (couchdb.client.PreconditionFailed, couchdb.client.ResourceConflict):
-        db = server[db_name]
-
-    while True:
-        primary, event = yield inner
-
-        doc = dict()
-        for key, values in event.attrs.items():
-            doc[key] = list(values)
-
-        if primary:
-            old_doc = db.get(primary)
-            if not old_doc:
-                db[primary] = doc
-            else:
-                old_doc.update(doc)
-                db[primary] = old_doc
-        else:
-            db.create(doc)
-
-@threado.stream
 def do_nvd_entry(inner):
     while True:
         e = yield inner
@@ -59,7 +35,7 @@ def do_nvd_entry(inner):
         m.add('feedsource', 'nvd')
         m.add('feedtype', 'Vulnerability')
         cveid = e.get('id')
-        print cveid
+        m._id = cveid
 
         for s in 'published-datetime', 'last-modified-datetime', 'security-protection', 'summary', 'severity':
             try:
@@ -106,7 +82,7 @@ def do_nvd_entry(inner):
             if cweid:
                 m.add("cwe-id", cweid)
 
-        inner.send(cveid, m)
+        inner.send(m)
 
 def main():
     
