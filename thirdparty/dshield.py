@@ -2,18 +2,16 @@ import csv
 import urllib
 import urllib2
 import urlparse
-import socket
 
 from idiokit import util, threado, events
 
 def sanitize_ip(ip):
-    # DShield uses leading zeros for IP addresses. Get rid of them by
-    # trying to parse and then unparse the ip back.
-    if ip is None:
-        return 
+    # Remove leading zeros from (strings resembling) IPv4 addresses.
+    if not isinstance(ip, basestring):
+        return ip
     try:
-        return socket.inet_ntoa(socket.inet_aton(ip))
-    except socket.error:
+        return ".".join(map(str, map(int, ip.split("."))))
+    except ValueError:
         pass
     return ip
 
@@ -56,7 +54,7 @@ def dshield(inner, asn):
                 # StopIteration is OK, means that we've reached the
                 # end of reader.
                 break
-
+            
             # DShield uses leading zeros for IP addresses. Try to
             # parse and then unparse the ip back, to get rid of those.
             row["ip"] = sanitize_ip(row.get("ip", None))
@@ -67,7 +65,7 @@ def dshield(inner, asn):
             for key, value in row.items():
                 if value is None:
                     continue
-                event.add(key, util.guess_encoding(value))
+                event.add(key, util.guess_encoding(value).strip())
             inner.send(event)
     finally:
         opened.close()
