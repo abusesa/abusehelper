@@ -3,7 +3,7 @@ import csv
 import urllib2
 import imaplib
 import email.parser
-import events
+from abusehelper.core import events
 from idiokit import threado, util
 
 class IMAP(threado.ThreadedStream):

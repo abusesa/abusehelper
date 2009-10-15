@@ -1,6 +1,6 @@
 import re
-import events
 
+from abusehelper.core import events
 from idiokit import threado, util
 from idiokit.xmpp import XMPP
 from idiokit.irc import IRC

@@ -1,9 +1,8 @@
 import uuid
-import rules
 import logging
 import time
-import events
 
+from abusehelper.core import rules, events
 from idiokit import threado, pep
 from idiokit.xmpp import XMPP
 from idiokit.core import XMPPError

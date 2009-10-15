@@ -1,5 +1,5 @@
 import splitterbot
-from rules import *
+from abusehelper.core.rules import *
 
 ruleset = RuleSet()
 ruleset.add("ips-from-finland@conference.example.com", 
