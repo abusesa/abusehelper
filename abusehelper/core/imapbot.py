@@ -59,23 +59,31 @@ class IMAP(threado.ThreadedStream):
                 self.inner.send(event)
         finally:
             opened.close()
-            
+
     def find_payload(self, num, path=()):
         path = list(path) + [0]
         while True:
             path[-1] += 1
             path_str = ".".join(map(str, path))
-            fetch = "(BODY.PEEK[%s.MIME])" % path_str
 
+            body_rex_str = r"\s*%s\s+\(BODY\[%s.MIME\]\s+" % (num, path_str)
+            body_rex = re.compile(body_rex_str, re.I)
+
+            fetch = "(BODY.PEEK[%s.MIME])" % path_str
             result, data = self.mailbox.fetch(num, fetch)
-            if not data or not isinstance(data[0], tuple) or len(data[0]) < 2:
+
+            # Filter away parts that don't closely enough resemble tuple
+            # ("<MSGNUM> (BODY[<MSGPATH>.MIME] {<SIZE>}", "<MIMEHEADERS>")
+            data = [x for x in data if isinstance(x, tuple) and len(x) >= 2]
+            data = [x[1] for x in data if body_rex.match(x[0])]
+            if not data:
                 return
 
-            header = self.email_parser.parsestr(data[0][1], headersonly=True)
-            disposition = header.get_params(list(), "content-disposition")
+            header = self.email_parser.parsestr(data[0], headersonly=True)
+            disposition = header.get_params((), "content-disposition")
             if ("attachment", "") in disposition:
                 continue
-
+            
             if header.is_multipart():
                 for result in self.find_payload(num, path):
                     yield result
