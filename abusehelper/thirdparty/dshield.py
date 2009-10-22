@@ -3,7 +3,7 @@ import urllib
 import urllib2
 import urlparse
 
-from idiokit import threado, util
+from idiokit import threado, util, threadpool
 from abusehelper.core import events
 
 def sanitize_ip(ip):
@@ -15,12 +15,6 @@ def sanitize_ip(ip):
     except ValueError:
         pass
     return ip
-
-@threado.thread
-def call_in_thread(inner, func, *args, **keys):
-    # Launch a thread, call the given function with the given
-    # arguments. Send out the result or the exception.
-    inner.send(func(*args, **keys))
 
 @threado.stream
 def dshield(inner, asn):
@@ -34,7 +28,7 @@ def dshield(inner, asn):
     url = urlparse.urlunparse(parsed)
 
     try:
-        opened = yield call_in_thread(urllib2.urlopen, url)
+        opened = yield threadpool.run(urllib2.urlopen, url)
     except urllib2.URLError, error:
         if hasattr(error, "code"):
             print "Site borked! HTTP error:", error.core
@@ -50,7 +44,7 @@ def dshield(inner, asn):
         reader = csv.DictReader(filtered, headers, delimiter="\t")
         while True:
             try:
-                row = yield call_in_thread(reader.next)
+                row = yield threadpool.run(reader.next)
             except StopIteration:
                 # StopIteration is OK, means that we've reached the
                 # end of reader.
