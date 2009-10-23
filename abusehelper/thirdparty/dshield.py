@@ -2,6 +2,9 @@ import csv
 import urllib
 import urllib2
 import urlparse
+import zlib
+import gzip
+import cStringIO as StringIO
 
 from idiokit import threado, util, threadpool
 from abusehelper.core import events
@@ -16,6 +19,20 @@ def sanitize_ip(ip):
         pass
     return ip
 
+def read_data(fileobj, compression=9):
+    stringio = StringIO.StringIO()
+    compressed = gzip.GzipFile(None, "wb", compression, stringio)
+
+    while True:
+        data = fileobj.read(2**16)
+        if not data:
+            break
+        compressed.write(data)
+    compressed.close()
+
+    stringio.seek(0)
+    return gzip.GzipFile(fileobj=stringio)
+
 @threado.stream
 def dshield(inner, asn):
     # The current DShield csv fields, in order.
@@ -27,33 +44,18 @@ def dshield(inner, asn):
     parsed[4] = urllib.urlencode({ "as" : str(asn) })
     url = urlparse.urlunparse(parsed)
 
-    try:
-        opened = yield threadpool.run(urllib2.urlopen, url)
-    except urllib2.URLError, error:
-        if hasattr(error, "code"):
-            print "Site borked! HTTP error:", error.core
-            raise
-        if hasattr(error, "reason"):
-            print "Server borked! reason:", error.reason
-            raise
+    opened = yield threadpool.run(urllib2.urlopen, url)
+    data = yield threadpool.run(read_data, opened)
 
     try:
         # Lazily filter away empty lines and lines starting with '#'
-        filtered = (x for x in opened if x.strip() and not x.startswith("#"))
-
+        filtered = (x for x in data if x.strip() and not x.startswith("#"))
         reader = csv.DictReader(filtered, headers, delimiter="\t")
-        while True:
-            try:
-                row = yield threadpool.run(reader.next)
-            except StopIteration:
-                # StopIteration is OK, means that we've reached the
-                # end of reader.
-                break
-            
+        for row in reader:
             # DShield uses leading zeros for IP addresses. Try to
             # parse and then unparse the ip back, to get rid of those.
             row["ip"] = sanitize_ip(row.get("ip", None))
-
+            
             # Convert the row to an event, send it forwards in the
             # pipeline. Forcefully encode the values to unicode.
             event = events.Event()
@@ -63,6 +65,7 @@ def dshield(inner, asn):
                     continue
                 event.add(key, util.guess_encoding(value).strip())
             inner.send(event)
+            yield
     finally:
         opened.close()
 
