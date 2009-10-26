@@ -1,3 +1,5 @@
+from __future__ import with_statement
+import threading
 from idiokit import threado, util
 from idiokit.xmlcore import Element
 
@@ -179,6 +181,7 @@ class RuleSet(object):
         return result
 
     def __init__(self):
+        self.lock = threading.Lock()
         self.rules = set()
 
     def __eq__(self, other):
@@ -192,27 +195,27 @@ class RuleSet(object):
             return result
         return not result
 
-    @util.synchronized
     def add(self, tag, rule):
         tagged_rule = _TaggedRule(tag, rule)
-        self.rules.add(tagged_rule)
+        with self.lock:
+            self.rules.add(tagged_rule)
         return tagged_rule
 
-    @util.synchronized
     def discard(self, tagged_rule):
-        self.rules.discard(tagged_rule)
+        with self.lock:
+            self.rules.discard(tagged_rule)
 
-    @util.synchronized
     def tags_for(self, item):
-        return set(rule.tag for rule in self.rules if rule(item))
+        with self.lock:
+            return set(rule.tag for rule in self.rules if rule(item))
 
-    @util.synchronized
     def tags(self):
-        return set(rule.tag for rule in self.rules)
+        with self.lock:
+            return set(rule.tag for rule in self.rules)
 
-    @util.synchronized
     def to_element(self):
         element = Element("ruleset", xmlns=RULESET_NS)
-        for rule in sorted(self.rules, key=lambda x: x.tag):
-            element.add(rule.to_element())
+        with self.lock:
+            for rule in sorted(self.rules, key=lambda x: x.tag):
+                element.add(rule.to_element())
         return element
