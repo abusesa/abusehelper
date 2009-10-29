@@ -65,14 +65,16 @@ class Txt2Collab(object):
             self.collab.setMeta(page,meta)
         #uploading log
         try:
-            data = self.collab.getAttachment(page,file)
+#            import pdb;pdb.set_trace()
+            data = self.collab.getAttachment(page,self.filename)
         except WikiFault:
             data = ""
         for k,v in self.events:
-#            v += '\n'
+            v += '\n'
             data += v.encode('utf-8')
         self.events = list()
-        self.collab.putAttachment(page,file,data,overwrite=True)
+
+        self.collab.putAttachment(page,self.filename,data,overwrite=True)
 
 @threado.stream
 def myqueue(inner, row):
