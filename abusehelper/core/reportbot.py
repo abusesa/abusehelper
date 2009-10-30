@@ -32,6 +32,8 @@ class Mailer(object):
             values = attrs.get(key, None)
             if values:
                 row.append(values.pop())
+            else:
+                row.append("")
 
         for key, values in attrs.items():
             for value in values:
