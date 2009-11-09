@@ -29,14 +29,19 @@ def DSHIELD(inner, aslist, poll_frequency=10.0):
 
 if __name__ == "__main__":
     import getpass
+    from idiokit import threado
     from idiokit.xmpp import XMPP
     from abusehelper.core import events
+    from abusehelper.thirdparty import dshieldbot
 
-    id = raw_input("Username: ")
-    xmpp = XMPP(id, getpass.getpass())
+    jid = raw_input("Username: ")
+
+    xmpp = XMPP(jid, getpass.getpass())
     xmpp.connect()
     room = xmpp.muc.join("abusehelper.dshield")
 
-    bot = DSHIELD([1111, 1112], poll_frequency=10)
+    asns = [1111, 1112]
+    bot = dshieldbot.DSHIELD(asns, poll_frequency=10.0)
+
     for _ in bot | events.events_to_elements() | room | threado.throws():
         pass
