@@ -55,9 +55,10 @@ class Whois(threado.GeneratorStream):
         print "Updating prefix-to-whois-server dictionary."
         prefixes = yield self.load_prefixes()
 
-        print "Initializing server queues."
+        print "Initializing WHOIS server queues:"
         servers = dict()
         for server in set(prefixes.values()):
+            print " *", server
             server_queue = self._server_queue(server)
             servers[server] = server_queue
             services.bind(self, server_queue)
@@ -116,7 +117,7 @@ class Whois(threado.GeneratorStream):
             server = prefixes.get(prefix, None)
             if server is None:
                 inner.finish(None)
-                
+
             lookup = threado.Channel()
             self.lookups[ip] = lookup
             server.send(ip, lookup)
@@ -206,11 +207,11 @@ class WhoisService(services.Service):
         events = dict()
 
         @threado.stream
-        def _collect(_inner, ip):
+        def collect(collect_inner, ip):
             lookup = self.whois.lookup(ip)
             try:
                 while not lookup.was_source:
-                    item = yield inner, lookup
+                    item = yield collect_inner, lookup
             except:
                 channel.rethrow()
             else:
@@ -224,9 +225,9 @@ class WhoisService(services.Service):
                     continue
                 for ip in event.attrs.get("ip", ()):
                     if ip not in events:
-                        _collect(ip)
+                        collect(ip)
+                    events.setdefault(ip, set()).add(event)
                     break
-                events.setdefault(ip, set()).add(event)
             
             for ip, item in channel:
                 ip_events = events.pop(ip, ())
@@ -299,7 +300,7 @@ class WhoisService(services.Service):
         return WhoisSession(self)
 
 @threado.stream
-def service_main(inner):
+def main(inner):
     import settings
     from idiokit.xmpp import connect
     
