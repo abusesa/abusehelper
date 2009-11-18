@@ -1,269 +1,316 @@
 import re
 import time
+import heapq
+import urllib2
+import services
 
-from urllib import urlopen
-from xml.dom.minidom import parseString
-
-from idiokit import util, threado, sockets
-
-source = "http://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.xml"
-prefix2whois = dict()
-
-def getText(elementlist):
-    text = ""
-    for element in elementlist:
-        for node in element.childNodes:
-            if node.nodeType == node.TEXT_NODE:
-                text += node.data
-    return text
-
-def handle(xml):
-    records = xml.getElementsByTagName("record")
-    for record in records:
-        handleRecord(record)
-
-def handleRecord(record):
-    prefix = getText(record.getElementsByTagName("prefix"))
-    whois = getText(record.getElementsByTagName("whois"))
-    if prefix and whois:
-        prefix2whois[prefix] = whois
-
-def getWhoisServer(ip):
-    prefix = ip.split(".")[0].rjust(3, "0") + "/8"
-    return prefix2whois.get(prefix, None)
-
-print "Updating prefix-to-whois-server dictionary"
-handle(parseString(urlopen(source).read()))
-
-mail_re    = re.compile('([\w\-.%]+@(?:[\w\-%]+\.)+[\w\-%]+)', re.S)
-maildom_re = re.compile('(@(?:[\w\-%]+\.)+[\w\-%]+)', re.S)
+from xml.etree.ElementTree import fromstring
+from idiokit import timer, util, threado, sockets
+from abusehelper.core import events
 
 class WhoisItem(object):
-    def __init__(self, ip, whoisServer, data):
+    MAIL_REX = re.compile('([\w\-.%]+@(?:[\w\-%]+\.)+[\w\-%]+)', re.S)
+
+    def __init__(self, ip, whois_server, data):
         self.ip = ip
-        self.whoisServer = whoisServer
-        self.data = data
+        self.whois_server = whois_server
         self.attrs = dict()
         self.addresses = set()
+        self._parse(data)
 
-        self.parse(data)
-
-    def parse(self, data):
-        for line in data.split("\n"):
-            if len(line.split(":", 2)) != 2:
+    def _parse(self, data):
+        for line in data.splitlines():
+            parts = line.split(":", 2)
+            if len(parts) != 2:
                 continue
 
-            key, value = line.split(":", 2)
+            key, value = parts
             key = key.strip()
             value = value.strip()
+
             self.attrs.setdefault(key, list()).append(value)
-            result = mail_re.findall(value)
+            result = self.MAIL_REX.findall(value)
             for address in result:
-                if self.whoisServer.split(".")[1] + "." in address:
+                if self.whois_server.split(".")[1] + "." in address:
                     continue
                 if 'arin.net' in address or "ripe.net" in address:
                     continue
                 self.addresses.add(address)
 
-class Whois(threado.ThreadedStream):
-    def __init__(self, cacheTime = 60*60.0):
-        threado.ThreadedStream.__init__(self)
-        
-        self.cache = util.TimedCache(cacheTime)
-        self.pending = set()
+class Whois(threado.GeneratorStream):
+    PREFIX_SOURCE = "http://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.xml"
 
-    def send(self, *args, **keys):
-        threado.ThreadedStream.send(self, *args, **keys)
+    def __init__(self, cache_time=60*60.0):
+        threado.GeneratorStream.__init__(self)
+
+        self.cache_time = cache_time
+
+        self.prefixes = threado.Channel()
+        self.expirations = list()
+        self.lookups = dict()
+
         self.start()
 
-    def throw(self, *args, **keys):
-        threado.ThreadedStream.throw(self, *args, **keys)
-        self.start()
+    def run(self):
+        print "Updating prefix-to-whois-server dictionary."
+        prefixes = yield self.load_prefixes()
 
-    def rethrow(self, *args, **keys):
-        threado.ThreadedStream.rethrow(self, *args, **keys)
-        self.start()
+        print "Initializing server queues."
+        servers = dict()
+        for server in set(prefixes.values()):
+            server_queue = self._server_queue(server)
+            servers[server] = server_queue
+            services.bind(self, server_queue)
+        for prefix, server in prefixes.items():
+            prefixes[prefix] = servers[server]
+        self.prefixes.finish(prefixes)
 
-    def _iteration(self, pending):
-        for ip in list(pending):
-            item = self.cache.get(ip, None)
-            if item is not None:
-                self.inner.send(item)
-                pending.discard(ip)
+        print "Running."
+        while True:
+            yield self.inner.sub(timer.sleep(1.0))
+            
+            purge_count = 0
 
-        if not pending:
-            return pending
+            current_time = time.time()
+            while self.expirations:
+                expire_time, ip = self.expirations[0]
+                if expire_time > current_time:
+                    break
+                heapq.heappop(self.expirations)
+                self.lookups.pop(ip, None)
+                purge_count += 1
 
-        for ip in pending:
-            whoisServer = getWhoisServer(ip) 
-            if whoisServer is None:
-                return None
+            if purge_count > 0:
+                cache_size = len(self.expirations)
+                print "Purged %d item(s) from the cache (%d left)." % (purge_count, cache_size)
+
+    @threado.stream
+    def load_prefixes(inner, self):
+        opened = yield inner.thread(urllib2.urlopen, self.PREFIX_SOURCE)
+        data = yield inner.thread(opened.read)
+
+        prefixes = dict()
+
+        etree = fromstring(data)
+        for record in etree.findall("{http://www.iana.org/assignments}record"):
+            prefix = record.find("{http://www.iana.org/assignments}prefix")
+            whois = record.find("{http://www.iana.org/assignments}whois")
+            if None in (prefix, whois):
+                continue
+            prefixes[prefix.text.strip()] = whois.text.strip()
+
+        inner.finish(prefixes)
+
+    def lookup(self, ip):
+        lookup = self._lookup(ip)
+        services.bind(self, lookup)
+        return lookup
+
+    @threado.stream
+    def _lookup(inner, self, ip):
+        while not self.prefixes.was_source:
+            prefixes = yield inner, self.prefixes
+
+        if ip not in self.lookups:
+            prefix = ip.split(".")[0].rjust(3, "0") + "/8"
+            server = prefixes.get(prefix, None)
+            if server is None:
+                inner.finish(None)
+                
+            lookup = threado.Channel()
+            self.lookups[ip] = lookup
+            server.send(ip, lookup)
+            services.bind(server, lookup)
+        lookup = self.lookups[ip]
+
+        while not lookup.was_source:
+            result = yield inner, lookup
+        inner.finish(result)
+
+    @threado.stream
+    def _server_queue(inner, self, server):
+        while True:
+            ip, lookup = yield inner
 
             socket = sockets.Socket()
-            socket.connect((whoisServer, 43))
+            yield socket.connect((server, 43))
+            socket.send(ip + "\n")
 
-            item = None
-
+            buffer = list()
             try:
-                socket.send(ip + "\n")
-
-                buffer = ""
-                try:
-                    for data in socket:
-                        buffer += data
-                except sockets.error:
-                    pass
-
-                item = WhoisItem(ip, whoisServer, buffer)
-                self.cache.set(item.ip, item)
-                self.inner.send(item)
+                while True:
+                    data = yield socket
+                    buffer.append(data)
+            except sockets.error:
+                pass
             finally:
-                socket.close()
- 
-    def run(self):
-        while True:
-            ip = self.inner.next()
-            self._iteration([ip])
+                yield socket.close()
+    
+            item = WhoisItem(ip, server, "".join(buffer))
+            lookup.finish(item)
 
-from idiokit import threado, threadpool
-from abusehelper.core import events, rules
-import services
-
-class GotRoom(Exception):
-    pass
-
-class Connection(object):
-    def __init__(self, source, destination):
-        self.source = source
-        self.destination = destination
-
-    def disconnect(self):
-        self.source._disconnect(self)
-
-class Room(threado.GeneratorStream):
-    def __init__(self, room, whois):
-        threado.GeneratorStream.__init__(self, fast=True)
-        self.room = room
-        self.whois = whois
-        self.listeners = dict()
-        self.start()
-
-    def run(self):
-        room = self.room
-        pipe = events.events_to_elements() | room | events.stanzas_to_events()
-
-        try:
-            while True:
-                yield self.inner, pipe
-
-                for event in self.inner.iter():
-                    pipe.send(event)
-
-                for event in pipe.iter():
-                    if "ip" in event.attrs:
-                        ip = event.attrs["ip"].pop()
-                        self.whois.send(ip)
-                        yield self.whois
-                        item = self.whois.next()
-
-                        for address in item.addresses:
-                            event.add("email", address)
-                    for listener, connections in self.listeners.iteritems():
-                        for connection in connections:
-                            connection.destination.send(event)
-                            break
-        finally:
-            room.exit()
-
-    def connect(self, room):
-        connection = Connection(self, room)
-        self.listeners.setdefault(room, set()).add(connection)
-        return connection
-
-    def _disconnect(self, connection):
-        if connection.destination not in self.listeners:
-            return
-        connections = self.listeners[connection.destination]
-        connections.discard(connection)
-        if not connections:
-            self.listeners.pop(connection.destination)
-
-class RoomGraph(threado.GeneratorStream):
-    def __init__(self, xmpp):
-        threado.GeneratorStream.__init__(self)
-        self.xmpp = xmpp
-        self.whois = Whois()
-        self.rooms = dict()
-        self.start()
-
-    @threado.stream
-    def get_room(inner, self, name):
-        room = yield threadpool.run(self.xmpp.muc.join, name)
-        room = Room(room, self.whois)
-        services.bind(self, room)
-        raise GotRoom(room)
-            
-    @threado.stream
-    def room(inner, self, name):
-        if name not in self.rooms:
-            self.rooms[name] = self.get_room(name)
-        try:
-            yield self.rooms[name]
-        except GotRoom, got_room:
-            inner.send(got_room.args[0])
+            expire_time = time.time() + self.cache_time
+            heapq.heappush(self.expirations, (expire_time, ip))
 
 class WhoisSession(services.Session):
-    def __init__(self, graph):
+    def __init__(self, service):
         services.Session.__init__(self)
-        self.graph = graph
-        self.connection = None
+        self.service = service
 
     @threado.stream
     def config(inner, self, conf):
-        old_connection = self.connection
-
-        if conf is not None:
-            dst_room = yield self.graph.room(conf["dst"])
-            src_room = yield self.graph.room(conf["src"])
-
-            self.connection = src_room.connect(dst_room)
-            inner.send(conf)
-                                               
-        if old_connection:
-            old_connection.disconnect()
+        yield
+        if conf is None:
+            self.service.disconnect(self)
+        else:
+            self.service.connect(self, conf["src"], conf["dst"])
+        inner.finish(conf)
 
 class WhoisService(services.Service):
     def __init__(self, xmpp):
         services.Service.__init__(self)
-        self.graph = RoomGraph(xmpp)
-        services.bind(self, self.graph)
 
+        self.xmpp = xmpp
+
+        self.rooms = dict()
+        self.sessions = dict()
+        self.connections = dict()
+        self.whois = Whois()
+        services.bind(self, self.whois)
+
+        self.start()
+
+    @threado.stream_fast
+    def check(inner, self, src):
+        while True:
+            yield inner
+
+            if src in self.connections:
+                map(inner.send, inner)
+            else:
+                list(inner)
+
+    @threado.stream_fast
+    def forward(inner, self, src):
+        while True:
+            yield inner
+
+            rooms = map(self.rooms.get, self.connections.get(src, ()))
+            for item in inner:
+                for room, _ in rooms:
+                    room.send(item)
+
+    @threado.stream_fast
+    def augment(inner, self):
+        channel = threado.Channel()
+        events = dict()
+
+        @threado.stream
+        def _collect(_inner, ip):
+            lookup = self.whois.lookup(ip)
+            try:
+                while not lookup.was_source:
+                    item = yield inner, lookup
+            except:
+                channel.rethrow()
+            else:
+                channel.send(ip, item)
+
+        while True:
+            yield inner, channel
+
+            for event in inner:
+                if "email" in event.attrs:
+                    continue
+                for ip in event.attrs.get("ip", ()):
+                    if ip not in events:
+                        _collect(ip)
+                    break
+                events.setdefault(ip, set()).add(event)
+            
+            for ip, item in channel:
+                ip_events = events.pop(ip, ())
+                if item is None or not item.addresses:
+                    continue
+                for event in ip_events:
+                    for address in item.addresses:
+                        event.add("email", address)
+                inner.send(event)
+
+    @threado.stream
+    def _room(inner, self, src):
+        room = yield self.xmpp.muc.join(src)
+        yield inner.sub(events.events_to_elements()
+                        | room
+                        | self.check(src)
+                        | events.stanzas_to_events()
+                        | self.augment()
+                        | self.forward(src))
+
+    def connect(self, session, src, dst):
+        self._inc(src)
+        dst_room = self._inc(dst)
+        dsts = self.connections.setdefault(src, dict())
+        _, refcount = dsts.get(dst, (None, 0))
+        dsts[dst] = dst_room, refcount+1
+
+        if session in self.sessions:
+            old_src, old_dst = self.sessions[session]
+            self._disconnect(old_src, old_dst)
+        self.sessions[session] = src, dst
+
+    def disconnect(self, session):
+        if session not in self.sessions:
+            return
+        src, dst = self.sessions.pop(session)
+        self._disconnect(src, dst)
+
+    def _disconnect(self, src, dst):
+        dsts = self.connections[src]
+        dsts[dst] -= 1
+        if dsts[dst] <= 0:
+            del dsts[dst]
+
+        self._dec(src)
+        self._dec(dst)
+
+    def _inc(self, room_name):
+        if room_name not in self.rooms:
+            room = self._room(room_name)
+            self.rooms[room_name] = room, 0
+            services.bind(self, room)
+            self.send()
+        room, refcount = self.rooms[room_name]
+        self.rooms[room_name] = room, refcount+1
+        return room
+
+    def _dec(self, room_name):
+        if room_name not in self.rooms:
+            return
+        room, refcount = self.rooms[room_name]
+        refcount -= 1
+        if refcount > 0:
+            self.rooms[room_name] = room, refcount
+        else:
+            room.finish()
+            del self.rooms[room_name]
+            
     def session(self):
-        return WhoisSession(self.graph)
+        return WhoisSession(self)
 
 @threado.stream
-def main(inner):
+def service_main(inner):
     import settings
     from idiokit.xmpp import connect
     
     print "Connecting XMPP server"
     xmpp = yield connect(settings.username, settings.password)
     print "Joining lobby", settings.service_room
-    lobby = yield services.join_lobby(xmpp, settings.service_room)
-    print "Offering Whois service"
-
+    lobby = yield services.join_lobby(xmpp, settings.service_room, "whois")
+    print "Offering WHOIS service"
+    
     offer = yield lobby.offer("whois", WhoisService(xmpp))
     yield inner.sub(offer)
 
 if __name__ == "__main__":
-    for _ in main(): print _
-
-#if __name__ == "__main__":
-#    import sys
-#
-#    whois = Whois()
-#    for ip in sys.argv[1:]:
-#        whois.send(ip)
-#
-#    for item in whois:
-#        print item.ip, item.addresses
+    threado.run(main())
