@@ -6,7 +6,7 @@ import zlib
 import gzip
 import cStringIO as StringIO
 
-from idiokit import threado, util, threadpool
+from idiokit import threado, util, timer
 from abusehelper.core import events
 
 def sanitize_ip(ip):
@@ -39,13 +39,13 @@ def dshield(inner, asn):
     headers = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
 
     # Probably a kosher-ish way to create an ASN specific URL.
-    parsed = urlparse.urlparse("https://secure.dshield.org/asdetailsascii.html")
+    parsed = urlparse.urlparse("http://dshield.org/asdetailsascii.html")
     parsed = list(parsed)
     parsed[4] = urllib.urlencode({ "as" : str(asn) })
     url = urlparse.urlunparse(parsed)
 
-    opened = yield threadpool.run(urllib2.urlopen, url)
-    data = yield threadpool.run(read_data, opened)
+    opened = yield inner.thread(urllib2.urlopen, url)
+    data = yield inner.thread(read_data, opened)
 
     try:
         # Lazily filter away empty lines and lines starting with '#'
@@ -69,6 +69,35 @@ def dshield(inner, asn):
     finally:
         opened.close()
 
+@threado.stream
+def dshieldbot(inner, aslist, poll_frequency=10.0):
+    aslist = list(set(map(int, aslist)))
+    aslist.sort()
+
+    while True:
+        for asn in aslist:
+            print "Fetching ASN", asn
+
+            yield inner.sub(dshield(asn))
+
+            print "ASN", asn, "done"
+
+        yield timer.sleep(poll_frequency)
+
+@threado.stream
+def main(inner):
+    import getpass
+    from idiokit.xmpp import connect
+
+    jid = raw_input("Username: ")
+    password = getpass.getpass()
+
+    xmpp = yield connect(jid, password)
+    room = yield xmpp.muc.join("abusehelper.dshield", "dshieldbot")
+
+    asns = [1111, 1112]
+    bot = dshieldbot(asns, poll_frequency=10.0)
+    yield inner.sub(bot | events.events_to_elements() | room | threado.throws())
+
 if __name__ == "__main__":
-    for event in dshield(3249): # dshield("3249") works too, doesn't matter
-        print event.attrs
+    threado.run(main())
