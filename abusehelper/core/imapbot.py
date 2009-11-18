@@ -4,12 +4,12 @@ import urllib2
 import imaplib
 import email.parser
 from abusehelper.core import events
-from idiokit import threado, util
+from idiokit import threado, util, timer
 
-class IMAP(threado.ThreadedStream):
+class IMAP(threado.GeneratorStream):
     def __init__(self, server, user, password, imapfilter, 
                  url_rex="http://\S+", filename_rex=".*"):
-        threado.ThreadedStream.__init__(self)
+        threado.GeneratorStream.__init__(self)
 
         self.mailbox = imaplib.IMAP4_SSL(server)
         self.mailbox.login(user, password)
@@ -113,24 +113,20 @@ class IMAP(threado.ThreadedStream):
 
     def run(self):
         while True:
-            try:
-                item = self.inner.next(self.poll_frequency)
-            except threado.Timeout:
-                pass
-            self.poll()
+            yield self.inner.sub(timer.sleep(self.poll_frequency))
+            yield self.inner.thread(self.poll)
 
-def main():
-    from idiokit.xmpp import XMPP
+@threado.stream
+def main(inner):
+    from idiokit.xmpp import connect
 
     imap = IMAP("mail.example.com", "mailuser", "mailpassword",
                 '(FROM "eventfeed.com" BODY "http://" UNSEEN)',
                 url_rex=r"http://\S+", filename_rex=r"(?P<eventfile>.*)")
-    xmpp = XMPP("user@example.com", "password")
-    xmpp.connect()
+    xmpp = yield connect("user@example.com", "password")
 
-    room = xmpp.muc.join("room@conference.example.com", "imapbot")
-    for _ in imap | events.events_to_elements() | room | threado.throws():
-        pass
+    room = yield xmpp.muc.join("room@conference.example.com", "imapbot")
+    yield inner.sub(imap | events.events_to_elements() | room | threado.throws())
 
 if __name__ == "__main__":
-    main()
+    threado.run(main())

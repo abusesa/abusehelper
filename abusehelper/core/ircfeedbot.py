@@ -2,7 +2,7 @@ import re
 
 from abusehelper.core import events
 from idiokit import threado, util
-from idiokit.xmpp import XMPP
+from idiokit.xmpp import connect
 from idiokit.irc import IRC
 
 @threado.stream
@@ -41,24 +41,23 @@ def parse(inner):
 
         inner.send(event)
 
-def main():
+@threado.stream
+def main(inner):
     channel = "#ircfeedbot"
 
     irc = IRC("irc.example.com", 6667, ssl=False)
-    nick = irc.connect("ircbot", password=None)
+    nick = yield irc.connect("ircbot", password=None)
     irc.join(channel)
 
-    xmpp = XMPP("username@example.com", "password")
-    xmpp.connect()
-    room = xmpp.muc.join("room@conference.example.com", nick)
+    xmpp = yield connect("username@example.com", "password")
+    room = yield xmpp.muc.join("room@conference.example.com", nick)
 
-    pipeline = (irc 
-                | filter(channel, "feedbot") 
-                | parse() 
-                | events.events_to_elements()
-                | room 
-                | threado.throws())
-    for msg in pipeline: pass
+    yield inner.sub(irc 
+                    | filter(channel, "feedbot") 
+                    | parse() 
+                    | events.events_to_elements()
+                    | room 
+                    | threado.throws())
 
 if __name__ == "__main__":
-    main()
+    threado.run(main())

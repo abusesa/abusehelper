@@ -46,7 +46,7 @@ def stanzas_to_events(inner):
     while True:
         yield inner
 
-        for element in inner.iter():
+        for element in inner:
             for child in element.children():
                 event = Event.from_element(child)
                 if event is not None:
@@ -57,7 +57,7 @@ def events_to_elements(inner, include_body=True):
     while True:
         yield inner
 
-        for event in inner.iter():
+        for event in inner:
             if include_body:
                 fields = list()
                 for key, values in event.attrs.items():
