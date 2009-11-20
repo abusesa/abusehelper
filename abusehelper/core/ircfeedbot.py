@@ -6,7 +6,7 @@ from idiokit.xmpp import connect
 from idiokit.irc import IRC
 
 @threado.stream
-def filter(inner, channel, nick):
+def filter(inner, channel, nick=None):
     while True:
         prefix, command, params = yield inner
 
@@ -16,7 +16,7 @@ def filter(inner, channel, nick):
             continue
 
         sender = prefix.split("@", 1)[0].split("!", 1)[0]
-        if sender == nick:
+        if nick is None or sender == nick:
             inner.send(params[-1])
 
 @threado.stream
@@ -41,23 +41,44 @@ def parse(inner):
 
         inner.send(event)
 
-@threado.stream
-def main(inner):
-    channel = "#ircfeedbot"
+def main(xmpp_jid,
+         xmpp_password,
+         xmpp_room,
+         irc_host,
+         irc_channel,
+         irc_port=6667, 
+         irc_feed_nick=None,
+         irc_own_nick="ircbot", 
+         irc_password=None, 
+         irc_use_ssl=False):
 
-    irc = IRC("irc.example.com", 6667, ssl=False)
-    nick = yield irc.connect("ircbot", password=None)
-    irc.join(channel)
+    @threado.stream
+    def bot(inner):
+        irc = IRC(irc_host, irc_port, ssl=irc_use_ssl)
+        nick = yield irc.connect(irc_own_nick, password=irc_password)
+        irc.join(irc_channel)
 
-    xmpp = yield connect("username@example.com", "password")
-    room = yield xmpp.muc.join("room@conference.example.com", nick)
+        xmpp = yield connect(xmpp_jid, xmpp_password)
+        room = yield xmpp.muc.join(xmpp_room, nick)
 
-    yield inner.sub(irc 
-                    | filter(channel, "feedbot") 
-                    | parse() 
-                    | events.events_to_elements()
-                    | room 
-                    | threado.throws())
+        yield inner.sub(irc 
+                        | filter(irc_channel, irc_feed_nick) 
+                        | parse() 
+                        | events.events_to_elements()
+                        | room 
+                        | threado.throws())
+    threado.run(bot())
+main.xmpp_jid_help = "the XMPP username (e.g. user@xmpp.example.com)"
+main.xmpp_password_help = "the XMPP password"
+main.xmpp_room_help = "the XMPP room where the feed is forwarded"
+main.irc_host_help = "the IRC server hostname"
+main.irc_channel_help = "the IRC feed channel"
+main.irc_feed_nick_help = "listen this IRC nick (default: listen everybody)"
+main.irc_use_ssl_help = "connect the IRC server using SSL (default: no SSL)"
+main.irc_port_help = "the IRC port to connect to (default: %default)"
+main.irc_own_nick_help = "the IRC own nickname used (default: %default)"
+main.irc_password_help = "the IRC password used (default: no password)"
 
 if __name__ == "__main__":
-    threado.run(main())
+    import opts
+    opts.optparse(main)
