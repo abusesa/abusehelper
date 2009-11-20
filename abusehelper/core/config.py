@@ -281,32 +281,25 @@ class Setup(threado.GeneratorStream):
                 mailer.rethrow()
             raise
 
-@threado.stream
-def main_wiki(inner, url):
-    import settings
+def main(xmpp_jid, service_room, customer_file, xmpp_password=None):
+    import getpass
     from idiokit.xmpp import connect
-    
-    xmpp = yield inner.sub(connect(settings.username, settings.password))
-    xmpp.core.presence()
-    lobby = yield inner.sub(services.join_lobby(xmpp, settings.service_room, 
-                                                "config"))
 
-    yield inner.sub(WikiConfigFollower(settings.wiki_url, 
-                                       settings.wiki_username, 
-                                       settings.wiki_password,
-                                       settings.wiki_category) | Setup(lobby))
+    if not xmpp_password:
+        xmpp_password = getpass.getpass("XMPP password: ")
 
-@threado.stream
-def main(inner, filename):
-    import settings
-    from idiokit.xmpp import connect
-    
-    xmpp = yield inner.sub(connect(settings.username, settings.password))
-    xmpp.core.presence()
-    lobby = yield inner.sub(services.join_lobby(xmpp, settings.service_room, 
-                                                "config"))
-    yield inner.sub(ConfigFollower(filename) | Setup(lobby))
+    @threado.stream
+    def bot(inner):
+        xmpp = yield connect(xmpp_jid, xmpp_password)
+        xmpp.core.presence()
+        lobby = yield services.join_lobby(xmpp, service_room, "config")
+        yield inner.sub(ConfigFollower(customer_file) | Setup(lobby))
+    return bot()
+main.customer_file_help = "the customer database file"
+main.service_room_help = "the room where the services are collected"
+main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
+main.xmpp_password_help = "the XMPP password"
 
 if __name__ == "__main__":
-    import sys
-    threado.run(main(sys.argv[1]))
+    import opts
+    threado.run(opts.optparse(main))

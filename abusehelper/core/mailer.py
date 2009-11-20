@@ -357,24 +357,39 @@ class MailerService(services.Service):
     def session(self):
         return MailerSession(self, self.from_addr)
 
-@threado.stream
-def main(inner):
-    import settings
+def main(xmpp_jid, service_room, mail_host, mail_sender, 
+         xmpp_password=None, mail_port=25,
+         mail_username=None, mail_password=None):
+    import getpass
     from idiokit.xmpp import connect
-    
-    print "Connecting XMPP server"
-    xmpp = yield inner.sub(connect(settings.username, settings.password))
-    xmpp.core.presence()
-    print "Joining lobby", settings.service_room
-    lobby = yield inner.sub(services.join_lobby(xmpp, settings.service_room, 
-                                                "mailer"))
-    print "Offering Mailer service"
-    mailer = MailerService(xmpp,
-                           settings.mail_host, settings.mail_port,
-                           settings.mail_sender,
-                           settings.mail_username, settings.mail_password)
-    offer = yield inner.sub(lobby.offer("mailer", mailer))
-    yield inner.sub(offer)
+
+    if not xmpp_password:
+        xmpp_password = getpass.getpass("XMPP password: ")
+    if mail_username and not mail_password:
+        mail_password = getpass.getpass("SMTP password: ")
+
+    @threado.stream
+    def bot(inner):
+        print "Connecting XMPP server with JID", xmpp_jid
+        xmpp = yield connect(xmpp_jid, xmpp_password)
+        xmpp.core.presence()
+        print "Joining lobby", service_room
+        lobby = yield services.join_lobby(xmpp, service_room, "dshield")
+        print "Offering Mailer service"
+        mailer = MailerService(xmpp, mail_host, mail_port, mail_sender,
+                               mail_username, mail_password)
+        offer = yield lobby.offer("mailer", mailer)
+        yield inner.sub(offer)
+    return bot()
+main.service_room_help = "the room where the services are collected"
+main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
+main.xmpp_password_help = "the XMPP password"
+main.mail_host_help = "hostname of the SMTP service used for sending mails"
+main.mail_port_help = "port of the SMTP service used for sending mails"
+main.mail_sender_help = "from whom it looks like the mails came from"
+main.mail_username_help = "username for the authenticated SMTP service"
+main.mail_password_help = "password for the authenticated SMTP service"
 
 if __name__ == "__main__":
-    threado.run(main())
+    import opts
+    threado.run(opts.optparse(main))

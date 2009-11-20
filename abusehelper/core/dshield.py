@@ -1,5 +1,3 @@
-from __future__ import with_statement
-
 import csv
 import urllib
 import time
@@ -160,22 +158,29 @@ class DShieldService(services.Service):
     def session(self):
         return DShieldSession(self)
 
-@threado.stream
-def main(inner):
-    import settings
+def main(xmpp_jid, service_room, dshield_room, xmpp_password=None):
+    import getpass
     from idiokit.xmpp import connect
 
-    print "Connecting XMPP server"
-    xmpp = yield inner.sub(connect(settings.username, settings.password))
-    xmpp.core.presence()
-    print "Joining lobby", settings.service_room
-    lobby = yield inner.sub(services.join_lobby(xmpp, settings.service_room, 
-                                                "dshield"))
-    print "Offering DShield service"
+    if not xmpp_password:
+        xmpp_password = getpass.getpass("XMPP password: ")
 
-    room = yield inner.sub(xmpp.muc.join(settings.dshield_room))
-    offer = yield inner.sub(lobby.offer("dshield", DShieldService(xmpp, room)))
-    yield inner.sub(offer)
+    @threado.stream
+    def bot(inner):
+        print "Connecting XMPP server with JID", xmpp_jid
+        xmpp = yield connect(xmpp_jid, xmpp_password)
+        xmpp.core.presence()
+        print "Joining lobby", service_room
+        lobby = yield services.join_lobby(xmpp, service_room, "dshield")
+        print "Offering DShield service"
+        offer = yield lobby.offer("dshield", DShieldService(xmpp, room))
+        yield inner.sub(offer)
+    return bot()
+main.service_room_help = "the room where the services are collected"
+main.dshield_room_help = "the room where the DShield reports are fed"
+main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
+main.xmpp_password_help = "the XMPP password"
 
 if __name__ == "__main__":
-    threado.run(main())
+    import opts
+    threado.run(opts.optparse(main))
