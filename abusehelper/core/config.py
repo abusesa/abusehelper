@@ -84,6 +84,7 @@ class ConfigFollower(threado.GeneratorStream):
             asn = row["asn"]
             ranges = row["ip-range"]
             addresses = row["dshield addresses"] or row["addresses"]
+            addresses = frozenset(x.strip() for x in addresses.split(","))
             template = row["dshield template"]
             pgp = row["pgp"]
 
@@ -230,14 +231,16 @@ class Setup(threado.GeneratorStream):
             updated, discarded = yield self.inner
 
             for item in updated:
-                print "+", item.asn, "filter="+repr(item.filter), item.addresses, item.template
+                print "+", item.asn, "filter="+repr(item.filter),
+                print item.addresses, item.template
                 if item not in setups:
                     setups[item] = self.setup(self.lobby)
                     services.bind(self, setups[item])
                 setups[item].send(item)
 
             for item in discarded:
-                print "-", item.asn, "filter="+repr(item.filter), item.addresses, item.template
+                print "-", item.asn, "filter="+repr(item.filter), 
+                print item.addresses, item.template
                 if item not in setups:
                     continue
                 setups.pop(item).finish()
@@ -261,7 +264,7 @@ class Setup(threado.GeneratorStream):
                 asn_room = "asn" + item.asn
 
                 dshield_conf = yield dshield.config(asn=item.asn)
-                mailer_conf = dict(to=["root"], 
+                mailer_conf = dict(to=item.addresses,
                                    room=asn_room,
                                    subject="Report for ASN"+item.asn,
                                    template=item.template,
