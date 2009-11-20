@@ -374,7 +374,7 @@ def main(xmpp_jid, service_room, mail_host, mail_sender,
         xmpp = yield connect(xmpp_jid, xmpp_password)
         xmpp.core.presence()
         print "Joining lobby", service_room
-        lobby = yield services.join_lobby(xmpp, service_room, "dshield")
+        lobby = yield services.join_lobby(xmpp, service_room, "mailer")
         print "Offering Mailer service"
         mailer = MailerService(xmpp, mail_host, mail_port, mail_sender,
                                mail_username, mail_password)
