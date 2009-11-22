@@ -172,6 +172,8 @@ def main(xmpp_jid, service_room, dshield_room, xmpp_password=None):
         xmpp.core.presence()
         print "Joining lobby", service_room
         lobby = yield services.join_lobby(xmpp, service_room, "dshield")
+        print "Joining DShield room", dshield_room
+        room = yield xmpp.muc.join(dshield_room)
         print "Offering DShield service"
         offer = yield lobby.offer("dshield", DShieldService(xmpp, room))
         yield inner.sub(offer)
