@@ -167,7 +167,7 @@ def main(xmpp_jid, service_room, dshield_room, xmpp_password=None):
 
     @threado.stream
     def bot(inner):
-        print "Connecting XMPP server with JID", xmpp_jid
+        print "Connecting XMPP server with JID", xmpp_jid,xmpp_password
         xmpp = yield connect(xmpp_jid, xmpp_password)
         xmpp.core.presence()
         print "Joining lobby", service_room
