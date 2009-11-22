@@ -6,4 +6,5 @@ setup(name="abusehelper",
                 "abusehelper.thirdparty",
                 "abusehelper.year3000",
                 "idiokit"],
+      data_files=[ ("/etc/abusehelper/",["example.cfg"]) ]
       )
