@@ -80,5 +80,5 @@ main.irc_own_nick_help = "the IRC own nickname used (default: %default)"
 main.irc_password_help = "the IRC password used (default: no password)"
 
 if __name__ == "__main__":
-    import opts
+    from abusehelper.core import opts
     opts.optparse(main)

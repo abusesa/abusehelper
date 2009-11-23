@@ -1,6 +1,5 @@
 from idiokit import threado
-from abusehelper.core import events, rules
-import services
+from abusehelper.core import events, rules, services
 
 class Connection(object):
     def __init__(self, source, destination, rule):
@@ -131,5 +130,5 @@ main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
 
 if __name__ == "__main__":
-    import opts
+    from abusehelper.core import opts
     threado.run(opts.optparse(main))

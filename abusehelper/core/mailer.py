@@ -5,9 +5,8 @@ import copy
 import collections
 from cStringIO import StringIO
 
-from abusehelper.core import events
 from idiokit import threado, timer
-import services
+from abusehelper.core import events, services
 
 # Some XML output helpers
 def node_id_and_text(doc, parent, nodename, text='', **kw):
@@ -392,5 +391,5 @@ main.submission_username_help = "username for the authenticated SMTP service"
 main.submission_password_help = "password for the authenticated SMTP service"
 
 if __name__ == "__main__":
-    import opts
+    from abusehelper.core import opts
     threado.run(opts.optparse(main))
