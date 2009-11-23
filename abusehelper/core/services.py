@@ -1,11 +1,12 @@
 import sys
 import uuid
 import random
+import contextlib
 from idiokit import threado
 from idiokit.jid import JID
 from idiokit.xmlcore import Element
 
-SERVICE_NS = "idiokit#service"
+SERVICE_NS = "abusehelper#service"
 
 def bind(parent, child):
     def _bind(source):
@@ -53,6 +54,7 @@ class Lobby(threado.GeneratorStream):
         self.jids = dict()
         self.services = dict()
         self.catalogue = dict()
+        self.waiters = dict()
 
         for participant in self.room.participants:
             self._update_catalogue(participant.name, participant.payload)
@@ -60,6 +62,55 @@ class Lobby(threado.GeneratorStream):
         self.xmpp.core.add_iq_handler(self.handle_iq, "start", SERVICE_NS)
         self.xmpp.core.add_iq_handler(self.handle_iq, "config", SERVICE_NS)
         self.start()
+
+    @threado.stream
+    def session(inner, self, service_id):
+        matches = list()
+        for jid, service_ids in self.catalogue.items():
+            if service_id in service_ids:
+                matches.append(jid)
+
+        if matches:
+            jid = random.choice(matches)
+        else:
+            channel = threado.Channel()
+            self.waiters.setdefault(service_id, set()).add(channel)
+
+            try:
+                while not channel.was_source:
+                    jid = yield inner, channel
+            finally:
+                waiters = self.waiters.get(service_id, set())
+                waiters.discard(channel)
+                if not waiters:
+                    self.waiters.pop(service_id, None)
+
+        start = Element("start", xmlns=SERVICE_NS, id=service_id)
+        result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
+
+        for start in result.children("start", SERVICE_NS).with_attrs("id"):
+            session_id = start.get_attr("id")
+            session = RemoteSession(self.xmpp, jid, session_id)
+            session.start()
+            bind(self, session)
+
+            sessions = self.jids.setdefault(jid, dict())
+            sessions[session_id] = session
+            session | self._catch(jid, session_id)
+            inner.finish(session)
+        else:
+            raise SessionError("No service ID received")
+
+    def _update_catalogue(self, jid, payload):
+        self.catalogue.setdefault(jid, set())
+        for services in payload.named("services", SERVICE_NS):
+            for service in services.children("service").with_attrs("id"):
+                service_id = service.get_attr("id")
+                self.catalogue[jid].add(service_id)
+
+                waiters = self.waiters.get(service_id, set())
+                for channel in waiters:
+                    channel.send(jid)
 
     def handle_iq(self, iq, payload):
         if not iq.with_attrs("from", type="set"):
@@ -113,39 +164,6 @@ class Lobby(threado.GeneratorStream):
             sessions = self.jids[jid]
             for session_id in list(sessions):
                 self._discard_session(jid, session_id, reason)
-
-    def _update_catalogue(self, jid, payload):
-        self.catalogue.setdefault(jid, set())
-        for services in payload.named("services", SERVICE_NS):
-            for service in services.children("service").with_attrs("id"):
-                service_id = service.get_attr("id")
-                self.catalogue[jid].add(service_id)
-
-    @threado.stream
-    def session(inner, self, service_id):
-        matches = list()
-        for jid, service_ids in self.catalogue.items():
-            if service_id in service_ids:
-                matches.append(jid)
-        if not matches:
-            raise SessionError("No service '%s' found" % service_id)
-        jid = random.choice(matches)
-
-        start = Element("start", xmlns=SERVICE_NS, id=service_id)
-        result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
-
-        for start in result.children("start", SERVICE_NS).with_attrs("id"):
-            session_id = start.get_attr("id")
-            session = RemoteSession(self.xmpp, jid, session_id)
-            session.start()
-            bind(self, session)
-
-            sessions = self.jids.setdefault(jid, dict())
-            sessions[session_id] = session
-            session | self._catch(jid, session_id)
-            inner.finish(session)
-        else:
-            raise SessionError("No service ID received")
 
     def _update_presence(self):
         services = Element("services", xmlns=SERVICE_NS)
