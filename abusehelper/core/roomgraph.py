@@ -119,11 +119,12 @@ def main(xmpp_jid, service_room, xmpp_password=None):
         print "Connecting XMPP server with JID", xmpp_jid
         xmpp = yield connect(xmpp_jid, xmpp_password)
         xmpp.core.presence()
+
         print "Joining lobby", service_room
         lobby = yield services.join_lobby(xmpp, service_room, "roomgraph")
+
         print "Offering RoomGraph service"
-        offer = yield lobby.offer("roomgraph", RoomGraphService(xmpp))
-        yield inner.sub(offer)
+        yield inner.sub(lobby.offer("roomgraph", RoomGraphService(xmpp)))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"

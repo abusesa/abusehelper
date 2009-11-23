@@ -170,13 +170,15 @@ def main(xmpp_jid, service_room, dshield_room, xmpp_password=None):
         print "Connecting XMPP server with JID", xmpp_jid
         xmpp = yield connect(xmpp_jid, xmpp_password)
         xmpp.core.presence()
-        print "Joining lobby", service_room
-        lobby = yield services.join_lobby(xmpp, service_room, "dshield")
+
         print "Joining DShield room", dshield_room
         room = yield xmpp.muc.join(dshield_room)
+
+        print "Joining lobby", service_room
+        lobby = yield services.join_lobby(xmpp, service_room, "dshield")
+
         print "Offering DShield service"
-        offer = yield lobby.offer("dshield", DShieldService(xmpp, room))
-        yield inner.sub(offer)
+        yield inner.sub(lobby.offer("dshield", DShieldService(xmpp, room)))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.dshield_room_help = "the room where the DShield reports are fed"

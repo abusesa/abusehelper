@@ -3,7 +3,7 @@ import uuid
 import random
 from idiokit import threado
 from idiokit.jid import JID
-from idiokit.xmlcore import Element, Query
+from idiokit.xmlcore import Element
 
 SERVICE_NS = "idiokit#service"
 
@@ -160,36 +160,31 @@ class Lobby(threado.GeneratorStream):
         body.text = name + " - " + message
         self.room.send(body)
 
-    def offer(self, service_id, service):
+    @threado.stream
+    def offer(inner, self, service_id, service):
         service.start()
-        offer = service.offer()
-        self.services[service_id] = service, offer
-        bind(self, offer)
-        bind(service, offer)
+        self.services[service_id] = service
+        bind(self, service)
 
         self._update_presence()
         self._log("offering service '%s'" % service_id)
-        
-        @threado.stream
-        def _cleanup(inner):
-            try:
-                while True:
-                    yield inner
-            finally:
-                self._log("retired service '%s'" % service_id)
-                self._update_presence()
-        return offer | _cleanup()
+
+        try:
+            yield inner.sub(service)
+        finally:
+            self._log("retired service '%s'" % service_id)
+            self._update_presence()
 
     @threado.stream
     def _start(inner, self, jid, service_id):
-        service, offer = self.services.get(service_id, None)
+        service = self.services.get(service_id, None)
         if service is None:
             raise SessionError("Service '%s' not available" % service_id)
 
         session_id = uuid.uuid4().hex
         session = service.session()
         session.start()
-        bind(offer, session)
+        bind(service, session)
 
         sessions = self.jids.setdefault(jid, dict())
         sessions[session_id] = session
@@ -259,11 +254,6 @@ class Session(threado.GeneratorStream):
         inner.finish(conf)
 
 class Service(threado.GeneratorStream):
-    @threado.stream
-    def offer(inner, self):
-        while True:
-            yield inner
-
     def session(self):
         return Session()
 
