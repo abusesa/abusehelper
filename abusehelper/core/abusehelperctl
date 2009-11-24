@@ -1,0 +1,82 @@
+#!/bin/sh
+
+myerr() {
+ echo "$*" >&2
+ exit 1
+}
+
+create_logdir() {
+  #doublecheck
+  [ $(basename ${LOGDIR}) = "abusehelper" ] || \
+      myerr "Logdir needs to end 'abusehelper' subdir."
+
+
+  mkdir ${LOGDIR} || myerr "Could not create logdir."
+  echo "Created ${LOGDIR}..."
+
+  chown ${USER} ${LOGDIR} || myerr "Could not chown to ${USER}"
+  echo "chowned to ${USER}..."
+  
+  chmod 700 ${LOGDIR}
+}
+INSTALLROOT=""
+LOGDIR=${INSTALLROOT}/var/log/abusehelper
+
+USER=abusehel
+
+
+
+case "$1" in
+    start)
+
+	[ $(basename ${LOGDIR}) = "abusehelper" ] || \
+            myerr "Logdir needs to end 'abusehelper' subdir."
+
+	[ -d ${LOGDIR} ] || create_logdir
+
+        # bot stubs live in 'per need' directories. Default could be /etc/abusehelper/cert-ee
+        # non-default could be /etc/abusehelper/mymalwareinvestigation
+	for i in ${INSTALLROOT}/etc/abusehelper/*/*.bot
+	do
+	    basename=$(basename $i)
+	    dirname=$(dirname $i)
+	    bootstrap=$(basename ${dirname})
+	    module=$(echo $basename | sed -e 's/.bot//g')
+	    ini=${dirname}/startup.cfg
+
+	    echo "Starting $module..."
+	    su -c "python -u -m $module --ini-file=$ini >>${LOGDIR}/${basename}.log" ${USER} &
+	done
+	;;
+
+    stop)
+	for i in $(ps aux|fgrep 'python -u -m abusehelper'|fgrep -v 'su -c' | \
+	    fgrep -v fgrep |awk  '{print $2}')
+	do
+	    echo "kill $i"
+            su -c "kill $i" ${USER}
+	done
+
+	sleep 2
+     
+	# Next iteration instead of two loops:
+	# kill -CONT $pid 1> /dev/null 2>&1
+	# if [ $? -eq 0 ]; then
+	#    sleep 2
+	#    kill -9 $pid
+	for i in $(ps aux|fgrep 'python -u -m abusehelper'|fgrep -v 'su -c'| \
+	    fgrep -v fgrep |awk  '{print $2}')
+	do
+	    echo "kill -9 $i"
+            su -c "kill -9 $i" ${USER}
+	done
+	;;
+
+    status)
+	ps aux|fgrep 'python -u -m abusehelper' |fgrep -v 'su -c'|fgrep -v fgrep | \
+	    fgrep -v 'sh -c'| tr -s " "  |cut -d" " -f 2,14-15
+
+	;;
+    *)
+	myerr "Usage: $0 <start|stop|status>"
+esac
