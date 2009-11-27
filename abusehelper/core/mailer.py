@@ -326,6 +326,7 @@ class MailerService(services.Service):
             # Try to connect to the SMTP server if we're haven't done that yet
             while server is None:
                 try:
+                    print "Connecting %s port %d" % (self.host, self.port)
                     server = yield self.inner.thread(self.get_smtp)
                 except:
                     print "Error connecting SMTP server, retrying in 10 seconds"
@@ -346,9 +347,7 @@ class MailerService(services.Service):
                     except:
                         pass
                     server = None
-                    
-                    print "Reconnecting SMTP server in 10 seconds"
-                    yield self.inner.sub(sleep_and_collect(10.0))
+                    break
                 else:
                     queue.popleft()
                     print "Sent message to %s" % to_addr
@@ -356,7 +355,7 @@ class MailerService(services.Service):
     def session(self):
         return MailerSession(self, self.from_addr)
 
-def main(xmpp_jid, service_room, smtp_server, mail_sender, 
+def main(xmpp_jid, service_room, smtp_host, mail_sender, 
          xmpp_password=None, smtp_port=25,
          submission_username=None, submission_password=None):
     import getpass
@@ -377,14 +376,14 @@ def main(xmpp_jid, service_room, smtp_server, mail_sender,
         lobby = yield services.join_lobby(xmpp, service_room, "mailer")
 
         print "Offering Mailer service"
-        mailer = MailerService(xmpp, smtp_server, smtp_port, mail_sender,
+        mailer = MailerService(xmpp, smtp_host, smtp_port, mail_sender,
                                submission_username, submission_password)
         yield inner.sub(lobby.offer("mailer", mailer))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
-main.smtp_server_help = "hostname of the SMTP service used for sending mails"
+main.smtp_host_help = "hostname of the SMTP service used for sending mails"
 main.smtp_port_help = "port of the SMTP service used for sending mails"
 main.mail_sender_help = "from whom it looks like the mails came from"
 main.submission_username_help = "username for the authenticated SMTP service"
