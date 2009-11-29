@@ -22,6 +22,10 @@ def kill_processes(processes, sig):
                 raise
 
 def main(config_filename):
+    def signal_handler(sig, frame):
+        sys.exit(1)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     conf_parser = ConfigParser.SafeConfigParser()
 
     conf_file = open(config_filename, "r")
@@ -41,7 +45,7 @@ def main(config_filename):
         while all_running(processes.values()):
             time.sleep(0.1)
     finally:
-        kill_processes(processes.values(), signal.SIGINT)
+        kill_processes(processes.values(), signal.SIGTERM)
         for _, process in processes.items():
             process.wait()
 main.config_filename_help = ("launch processes based in this INI file, "+
