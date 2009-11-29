@@ -23,7 +23,7 @@ def kill_processes(processes, sig):
 
 def main(config_filename):
     def signal_handler(sig, frame):
-        sys.exit(1)
+        sys.exit()
     signal.signal(signal.SIGTERM, signal_handler)
 
     conf_parser = ConfigParser.SafeConfigParser()
