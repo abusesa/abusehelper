@@ -12,12 +12,12 @@ create_logdir() {
       myerr "Logdir needs to end 'abusehelper' subdir."
 
   mkdir ${LOGDIR} || myerr "Could not create logdir."
-  echo "Created ${LOG}..."
+  echo "Created ${LOGDIR}..."
 
   chown ${USER} ${LOGDIR} || myerr "Could not chown to ${USER}"
   echo "chowned to ${USER}..."
   
-  chmod 700 ${LOG}
+  chmod 700 ${LOGDIR}
 }
 INSTALLROOT=""
 # The native logging will be improved next. Now we just dump stdout &stderr
