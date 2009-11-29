@@ -36,7 +36,7 @@ def main(config_filename):
 
     processes = dict()
     for section in conf_parser.sections():
-        process = subprocess.Popen([sys.executable, "-m", section,
+        process = subprocess.Popen([sys.executable, "-u", "-m", section,
                                     "--ini-file", config_filename,
                                     "--ini-section", section])
         processes[section] = process
