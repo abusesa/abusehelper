@@ -48,5 +48,5 @@ main.config_filename_help = ("launch processes based in this INI file, "+
                              "one per section ([DEFAULT] section not included)")
 
 if __name__ == "__main__":
-    import opts
+    from abusehelper.core import opts
     opts.optparse(main)
