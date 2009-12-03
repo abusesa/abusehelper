@@ -242,7 +242,7 @@ class Setup(threado.GeneratorStream):
                 print item.addresses, item.template
                 if item not in setups:
                     continue
-                setups.pop(item).finish()
+                setups.pop(item).throw(threado.Finished())
     
     @threado.stream
     def setup(inner, self, lobby):
@@ -260,7 +260,7 @@ class Setup(threado.GeneratorStream):
                 if not inner.was_source:
                     continue
 
-                asn_room = "asn" + item.asn
+                asn_room = "regret.asn" + item.asn
 
                 dshield_conf = yield dshield.config(asn=item.asn)
                 mailer_conf = dict(to=item.addresses,
