@@ -50,7 +50,11 @@ def main(xmpp_jid,
          irc_feed_nick=None,
          irc_own_nick="ircbot", 
          irc_password=None, 
-         irc_use_ssl=False):
+         irc_use_ssl=False,
+         log_file=None):
+    from abusehelper.core import log
+
+    logger = log.config_logger("ircfeedbot", filename=log_file)
 
     @threado.stream
     def bot(inner):

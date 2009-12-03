@@ -298,12 +298,14 @@ class WhoisService(services.Service):
     def session(self):
         return WhoisSession(self)
 
-def main(xmpp_jid, service_room, xmpp_password=None):
+def main(xmpp_jid, service_room, xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
 
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
+
+    logger = log.config_logger("whois", filename=log_file)
 
     @threado.stream
     def bot(inner):
@@ -313,13 +315,14 @@ def main(xmpp_jid, service_room, xmpp_password=None):
 
         print "Joining lobby", service_room
         lobby = yield services.join_lobby(xmpp, service_room, "whois")
+        logger.addHandler(log.RoomHandler(lobby.room))
 
-        print "Offering WHOIS service"
         yield inner.sub(lobby.offer("whois", WhoisService(xmpp)))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
+main.log_file_help = "log to the given file instead of the console"
 
 if __name__ == "__main__":
     from abusehelper.core import opts

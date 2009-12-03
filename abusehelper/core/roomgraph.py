@@ -106,12 +106,15 @@ class RoomGraphService(services.Service):
     def session(self):
         return RoomGraphSession(self.graph)
 
-def main(xmpp_jid, service_room, xmpp_password=None):
+def main(xmpp_jid, service_room, xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
+    from abusehelper.core import log
 
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
+
+    logger = log.config_logger("roomgraph", filename=log_file)
 
     @threado.stream
     def bot(inner):
@@ -122,12 +125,13 @@ def main(xmpp_jid, service_room, xmpp_password=None):
         print "Joining lobby", service_room
         lobby = yield services.join_lobby(xmpp, service_room, "roomgraph")
 
-        print "Offering RoomGraph service"
+        logger.addHandler(log.RoomHandler(lobby.room))
         yield inner.sub(lobby.offer("roomgraph", RoomGraphService(xmpp)))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
+main.log_file_help = "log to the given file instead of the console"
 
 if __name__ == "__main__":
     from abusehelper.core import opts

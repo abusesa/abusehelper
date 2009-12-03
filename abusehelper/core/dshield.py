@@ -36,20 +36,22 @@ def read_data(fileobj, compression=6):
 
 @threado.stream
 def dshield(inner, asn, url="http://dshield.org/asdetailsascii.html"):
+    asn = str(asn)
+    
     # The current DShield csv fields, in order.
     headers = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
 
     # Probably a kosher-ish way to create an ASN specific URL.
     parsed = urlparse.urlparse(url)
     parsed = list(parsed)
-    parsed[4] = urllib.urlencode({ "as" : str(asn) })
+    parsed[4] = urllib.urlencode({ "as" : asn })
     url = urlparse.urlunparse(parsed)
 
-    print "ASN" + str(asn) + ": connecting", time.time()
+    print "ASN%s: connecting" % asn
     opened = yield inner.thread(urllib2.urlopen, url)
-    print "ASN" + str(asn) + ": downloading", time.time()
+    print "ASN%s: downloading" % asn
     data = yield inner.thread(read_data, opened)
-    print "ASN" + str(asn) + ": downloaded", time.time()
+    print "ASN%s: downloaded" % asn
 
     count = 0
     try:
@@ -57,16 +59,12 @@ def dshield(inner, asn, url="http://dshield.org/asdetailsascii.html"):
         filtered = (x for x in data if x.strip() and not x.startswith("#"))
         reader = csv.DictReader(filtered, headers, delimiter="\t")
         for row in reader:
-            # DShield uses leading zeros for IP addresses. Try to
-            # parse and then unparse the ip back, to get rid of those.
             row["ip"] = sanitize_ip(row.get("ip", None))
 
-            if count % 100 == 0:
-                print "ASN" + str(asn) + ": fed", count, "events", time.time()
             count += 1
+            if count % 100 == 0:
+                print "ASN%s: fed %d events" % (asn, count)
             
-            # Convert the row to an event, send it forwards in the
-            # pipeline. Forcefully encode the values to unicode.
             event = events.Event()
             event.add('asn', str(asn))
             event.add('feed', 'dshield')
@@ -77,7 +75,7 @@ def dshield(inner, asn, url="http://dshield.org/asdetailsascii.html"):
             inner.send(event)
             yield
     finally:
-        print "ASN" + str(asn) + ": done", time.time()
+        print "ASN%s: done with %d events" % (asn, count)
         opened.close()
 
 from idiokit import timer
@@ -158,12 +156,16 @@ class DShieldService(services.Service):
     def session(self):
         return DShieldSession(self)
 
-def main(xmpp_jid, service_room, dshield_room, xmpp_password=None):
+def main(xmpp_jid, service_room, dshield_room, 
+         xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
-
+    from abusehelper.core import log
+    
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
+
+    logger = log.config_logger("dshield", filename=log_file)
 
     @threado.stream
     def bot(inner):
@@ -171,19 +173,20 @@ def main(xmpp_jid, service_room, dshield_room, xmpp_password=None):
         xmpp = yield connect(xmpp_jid, xmpp_password)
         xmpp.core.presence()
 
+        print "Joining lobby", service_room
+        lobby = yield services.join_lobby(xmpp, service_room, "dshield")
+        logger.addHandler(log.RoomHandler(lobby.room))
+
         print "Joining DShield room", dshield_room
         room = yield xmpp.muc.join(dshield_room)
 
-        print "Joining lobby", service_room
-        lobby = yield services.join_lobby(xmpp, service_room, "dshield")
-
-        print "Offering DShield service"
         yield inner.sub(lobby.offer("dshield", DShieldService(xmpp, room)))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.dshield_room_help = "the room where the DShield reports are fed"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
+main.log_file_help = "log to the given file instead of the console"
 
 if __name__ == "__main__":
     from abusehelper.core import opts

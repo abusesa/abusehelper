@@ -172,12 +172,6 @@ class Lobby(threado.GeneratorStream):
             services.add(element)
         self.xmpp.core.presence(services, to=self.room.nick_jid)
 
-    def _log(self, message, *name):
-        name = ".".join([self.room.nick_jid.resource] + list(name))
-        body = Element("body")
-        body.text = name + " - " + message
-        self.room.send(body)
-
     @threado.stream
     def offer(inner, self, service_id, service):
         service.start()
@@ -185,12 +179,12 @@ class Lobby(threado.GeneratorStream):
         bind(self, service)
 
         self._update_presence()
-        self._log("offering service '%s'" % service_id)
+        print "Offering service '%s'" % service_id
 
         try:
             yield inner.sub(service)
         finally:
-            self._log("retired service '%s'" % service_id)
+            print "Retired service '%s'" % service_id
             self._update_presence()
 
     @threado.stream
@@ -257,14 +251,18 @@ class RemoteSession(threado.GeneratorStream):
         raise SessionError("No config info received")       
 
 class Session(threado.GeneratorStream):
-    def run(self):
+    def __init__(self):
+        threado.GeneratorStream.__init__(self)
+        self | self._config_cleanup()
+    
+    @threado.stream
+    def _config_cleanup(inner, self):
         try:
             while True:
-                yield self.inner
-        except Unavailable:
-            return
+                msg = yield inner
+                inner.send(msg)
         finally:
-            yield self.config(None)
+            yield inner.sub(self.config(None))
 
     @threado.stream
     def config(inner, self, conf):
@@ -273,7 +271,7 @@ class Session(threado.GeneratorStream):
 
 class Service(threado.GeneratorStream):
     def session(self):
-        return Session()
+        return Session(self)
 
 @threado.stream
 def join_lobby(inner, xmpp, name, nick=None):

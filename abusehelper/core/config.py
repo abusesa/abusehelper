@@ -283,24 +283,34 @@ class Setup(threado.GeneratorStream):
                 mailer.rethrow()
             raise
 
-def main(xmpp_jid, service_room, customer_file, xmpp_password=None):
+def main(xmpp_jid, service_room, customer_file, 
+         xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
-
+    from abusehelper.core import log
+    
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
 
+    logger = log.config_logger("config", filename=log_file)
+
     @threado.stream
     def bot(inner):
+        print "Connecting XMPP server with JID", xmpp_jid
         xmpp = yield connect(xmpp_jid, xmpp_password)
         xmpp.core.presence()
+
+        print "Joining lobby", service_room
         lobby = yield services.join_lobby(xmpp, service_room, "config")
+        logger.addHandler(log.RoomHandler(lobby.room))
+
         yield inner.sub(ConfigFollower(customer_file) | Setup(lobby))
     return bot()
 main.customer_file_help = "the customer database file"
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
+main.log_file_help = "log to the given file instead of the console"
 
 if __name__ == "__main__":
     from abusehelper.core import opts
