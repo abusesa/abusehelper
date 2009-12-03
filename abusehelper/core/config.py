@@ -219,9 +219,11 @@ class WikiConfigFollower(ConfigFollower):
         return update, discard
 
 class Setup(threado.GeneratorStream):
-    def __init__(self, lobby):
+    def __init__(self, lobby, asn_room_prefix, mail_interval):
         threado.GeneratorStream.__init__(self)
         self.lobby = lobby
+        self.asn_room_prefix = asn_room_prefix
+        self.mail_interval = mail_interval
         self.start()
 
     def run(self):
@@ -260,14 +262,14 @@ class Setup(threado.GeneratorStream):
                 if not inner.was_source:
                     continue
 
-                asn_room = "regret.asn" + item.asn
+                asn_room = self.asn_room_prefix + item.asn
 
                 dshield_conf = yield dshield.config(asn=item.asn)
                 mailer_conf = dict(to=item.addresses,
                                    room=asn_room,
                                    subject="Report for ASN"+item.asn,
                                    template=item.template,
-                                   time_interval=15.0)
+                                   time_interval=self.mail_interval)
                 yield inner.sub(mailer.config(**mailer_conf))
 
                 roomgraph_conf = dict(src=dshield_conf["room"], 
@@ -283,8 +285,8 @@ class Setup(threado.GeneratorStream):
                 mailer.rethrow()
             raise
 
-def main(xmpp_jid, service_room, customer_file, 
-         xmpp_password=None, log_file=None):
+def main(xmpp_jid, service_room, customer_file, asn_room_prefix,
+         xmpp_password=None, log_file=None, mail_interval=24*60*60.0):
     import getpass
     from idiokit.xmpp import connect
     from abusehelper.core import log
@@ -304,11 +306,14 @@ def main(xmpp_jid, service_room, customer_file,
         lobby = yield services.join_lobby(xmpp, service_room, "config")
         logger.addHandler(log.RoomHandler(lobby.room))
 
-        yield inner.sub(ConfigFollower(customer_file) | Setup(lobby))
+        yield inner.sub(ConfigFollower(customer_file) 
+                        | Setup(lobby, asn_room_prefix, mail_interval))
     return bot()
 main.customer_file_help = "the customer database file"
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
+main.asn_room_prefix = "prefix for rooms created for each ASN"
+main.mail_interval_help = "mailing interval, in seconds (default: %default)"
 main.xmpp_password_help = "the XMPP password"
 main.log_file_help = "log to the given file instead of the console"
 
