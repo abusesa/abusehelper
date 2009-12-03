@@ -25,7 +25,7 @@ def bind(parent, child):
 class SessionError(Exception):
     pass
 
-class Unavailable(Exception):
+class Unavailable(threado.Finished):
     pass
 
 @threado.stream
@@ -251,19 +251,6 @@ class RemoteSession(threado.GeneratorStream):
         raise SessionError("No config info received")       
 
 class Session(threado.GeneratorStream):
-    def __init__(self):
-        threado.GeneratorStream.__init__(self)
-        self | self._config_cleanup()
-    
-    @threado.stream
-    def _config_cleanup(inner, self):
-        try:
-            while True:
-                msg = yield inner
-                inner.send(msg)
-        finally:
-            yield inner.sub(self.config(None))
-
     @threado.stream
     def config(inner, self, conf):
         yield
