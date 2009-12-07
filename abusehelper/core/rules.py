@@ -1,6 +1,5 @@
 from __future__ import with_statement
 from idiokit.xmlcore import Element
-from abusehelper import serialize
 
 RULE_NS = "abusehelper#rule"
 
