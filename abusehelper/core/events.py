@@ -1,7 +1,7 @@
 from idiokit import threado
 from idiokit.xmlcore import Element
 
-EVENT_NS = "idiokit#event"
+EVENT_NS = "abusehelper#event"
 
 class Event(object):
     @classmethod
