@@ -1,9 +1,8 @@
 from __future__ import with_statement
-import threading
-from idiokit import threado, util
 from idiokit.xmlcore import Element
+from abusehelper import serialize
 
-RULESET_NS = "idiokit#ruleset"
+RULE_NS = "abusehelper#rule"
 
 class RuleError(Exception):
     pass
@@ -142,80 +141,3 @@ class CONTAINS(_Rule):
             if not event.contains_key_value(key, value):
                 return False
         return True
-
-class _TaggedRule(_Rule):
-    @classmethod
-    def from_element(cls, element, _rules):
-        if element.name != "rule" or len(element.children()) != 1:
-            raise RuleError(element)
-        tag = element.get_attr("tag", None)
-        if tag is None:
-            raise RuleError(element)
-        return cls(tag, *_find_rules(element.children(), _rules))
-
-    def __init__(self, tag, child):
-        _Rule.__init__(self, tag, child)
-        self.tag = tag
-        self.child = child
-
-    def to_element(self):
-        rule_element = Element("rule", tag=self.tag)
-        rule_element.add(self.child.to_element())
-        return rule_element
-
-    def __call__(self, item):
-        return self.child(item)
-
-class RuleSet(object):
-    _rules = [NOT, AND, OR, CONTAINS]
-
-    @classmethod
-    def from_element(cls, element):
-        if not element.named("ruleset", RULESET_NS):
-            raise RuleError(element)
-
-        result = cls()
-        for child in element.children():
-            rule = _TaggedRule.from_element(child, cls._rules)
-            result.add(rule.tag, rule.child)
-        return result
-
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.rules = set()
-
-    def __eq__(self, other):
-        if other.__class__ is not self.__class__:
-            return NotImplemented
-        return self.rules == other.rules
-
-    def __ne__(self, other):
-        result = self.__eq__(other)
-        if result is NotImplemented:
-            return result
-        return not result
-
-    def add(self, tag, rule):
-        tagged_rule = _TaggedRule(tag, rule)
-        with self.lock:
-            self.rules.add(tagged_rule)
-        return tagged_rule
-
-    def discard(self, tagged_rule):
-        with self.lock:
-            self.rules.discard(tagged_rule)
-
-    def tags_for(self, item):
-        with self.lock:
-            return set(rule.tag for rule in self.rules if rule(item))
-
-    def tags(self):
-        with self.lock:
-            return set(rule.tag for rule in self.rules)
-
-    def to_element(self):
-        element = Element("ruleset", xmlns=RULESET_NS)
-        with self.lock:
-            for rule in sorted(self.rules, key=lambda x: x.tag):
-                element.add(rule.to_element())
-        return element
