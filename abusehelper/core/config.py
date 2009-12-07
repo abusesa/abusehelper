@@ -1,7 +1,7 @@
 import os
 import csv
 from idiokit import threado, timer
-from abusehelper.core import events, services
+from abusehelper.core import rules, events, services
 
 def csv_rows(data):
     lines = [line for line in data.splitlines()
@@ -170,7 +170,7 @@ class Setup(threado.GeneratorStream):
 
                 roomgraph_conf = dict(src=dshield_conf["room"], 
                                       dst=asn_room,
-                                      filter=item.asn)
+                                      filter=rules.CONTAINS(asn=item.asn))
                 yield roomgraph.config(**roomgraph_conf)
         except:
             if dshield is not None:

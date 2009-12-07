@@ -90,7 +90,7 @@ class RoomGraphSession(services.Session):
         if conf is not None:
             dst_room = yield inner.sub(self.graph.room(conf["dst"]))
             src_room = yield inner.sub(self.graph.room(conf["src"]))
-            filter = rules.CONTAINS(asn=conf["filter"])
+            filter = conf["filter"]
             self.connection = src_room.connect(dst_room, filter)
                                                
         if old_connection:
