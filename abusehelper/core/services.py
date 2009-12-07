@@ -5,6 +5,7 @@ import contextlib
 from idiokit import threado
 from idiokit.jid import JID
 from idiokit.xmlcore import Element
+from abusehelper.core import serialize
 
 SERVICE_NS = "abusehelper#service"
 
@@ -214,14 +215,18 @@ class Lobby(threado.GeneratorStream):
             raise SessionError("Invalid session ID")
         session = sessions[session_id]
 
-        try:
-            result = yield inner.sub(session.config(eval(config.text)))
-        except:
-            session.rethrow()
-            raise
+        for child in config.children():
+            try:
+                result = yield inner.sub(session.config(serialize.load(child)))
+            except:
+                session.rethrow()
+                raise
+            break
+        else:
+            raise SessionError("Invalid config")
 
         element = Element("config", xmlns=SERVICE_NS, id=session_id)
-        element.text = repr(result)
+        element.add(serialize.dump(result))
         inner.send(element)
 
     @threado.stream
@@ -244,10 +249,12 @@ class RemoteSession(threado.GeneratorStream):
     @threado.stream
     def config(inner, self, **keys):
         config = Element("config", xmlns=SERVICE_NS, id=self.session_id)
-        config.text = repr(keys)
+        config.add(serialize.dump(dict(keys)))
+
         result = yield inner.sub(self.xmpp.core.iq_set(config, to=self.jid))
         for config in result.children("config", SERVICE_NS).with_attrs("id"):
-            inner.finish(eval(config.text))
+            for child in config.children():
+                inner.finish(serialize.load(child))
         raise SessionError("No config info received")       
 
 class Session(threado.GeneratorStream):
