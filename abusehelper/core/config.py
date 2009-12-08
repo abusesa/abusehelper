@@ -1,7 +1,7 @@
 import os
 import csv
 from idiokit import threado, timer
-from abusehelper.core import rules, events, services
+from abusehelper.core import rules, services
 
 def csv_rows(data):
     lines = [line for line in data.splitlines()
@@ -13,7 +13,7 @@ def csv_rows(data):
     for row in reader:
         row = [x.strip() for x in row]
         result = dict(map(None, first, row))
-        result["ip-range"] = ""
+        result["netblocks"] = ""
         result["dshield addresses"] = ""
         result["dshield template"] = "dshield_template_fi"
         result["pgp"] = ""
@@ -70,35 +70,50 @@ class ConfigFollower(threado.GeneratorStream):
 
         for row in csv_rows(data):
             asn = row["asn"]
-            ranges = row["ip-range"]
+            netblocks = row["netblocks"]
             addresses = row["dshield addresses"] or row["addresses"]
             addresses = frozenset(x.strip() for x in addresses.split(","))
             template = row["dshield template"]
             pgp = row["pgp"]
 
+            ruleset = set()
+            for netblock in netblocks.split(","):
+                if not netblock.strip():
+                    continue
+                bites = netblock.split("/", 1)
+                ip = bites[0].strip()
+                if len(bites) == 1:
+                    bits = 32
+                else:
+                    bits = int(bites[1].strip())
+                ruleset.add(rules.NETBLOCK(ip, bits, ["ip"]))
+            ruleset = frozenset(ruleset)
+                
             if addresses and template:
-                if ranges:
-                    defaults.setdefault(asn, list()).append(ranges)
+                defaults.setdefault(asn, set()).update(ruleset)
 
-                key = asn, ranges, addresses
+                key = asn, ruleset, addresses
                 if key in self.confs:
                     item, _, _ = self.confs[key]
                 else:
-                    item = Config(asn, ranges, addresses)
+                    item = Config(asn, None, addresses)
                 confs[key] = item, template, pgp
 
         update = set()
         discard = set(self.confs[key][0] for key in set(self.confs)-set(confs))
         for key, (item, template, pgp) in confs.iteritems():
-            asn, ranges, addresses = key
+            asn, ruleset, addresses = key
 
-            if not ranges:
-                default = ",".join(defaults.get(asn, list()))
-                if default:
-                    default = "not (" + default + ")"
-                if item.filter != default:
-                    update.add(item)
-                item.filter = default
+            rule = rules.CONTAINS(asn=asn)
+            if len(ruleset) > 1:
+                rule = rules.AND(rule, rules.OR(*ruleset))
+            elif len(ruleset) == 1:
+                rule = rules.AND(rule, *ruleset)
+            elif defaults[asn]:
+                rule = rules.AND(rule, rules.NOT(rules.OR(*defaults[asn])))
+            if rule != item.filter:
+                item.filter = rule
+                update.add(item)
 
             if template != item.template:
                 item.template = template
@@ -170,7 +185,7 @@ class Setup(threado.GeneratorStream):
 
                 roomgraph_conf = dict(src=dshield_conf["room"], 
                                       dst=asn_room,
-                                      filter=rules.CONTAINS(asn=item.asn))
+                                      filter=item.filter)
                 yield roomgraph.config(**roomgraph_conf)
         except:
             if dshield is not None:
