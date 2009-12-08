@@ -230,11 +230,10 @@ class WhoisService(services.Service):
             
             for ip, item in channel:
                 ip_events = events.pop(ip, ())
-                if item is None or not item.addresses:
-                    continue
-                for event in ip_events:
-                    for address in item.addresses:
-                        event.add("email", address)
+                if item is not None:
+                    for event in ip_events:
+                        for address in item.addresses:
+                            event.add("email", address)
                 inner.send(event)
 
     @threado.stream
@@ -301,7 +300,8 @@ class WhoisService(services.Service):
 def main(xmpp_jid, service_room, xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
-
+    from abusehelper.core import log
+    
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
 
