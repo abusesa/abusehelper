@@ -2,6 +2,7 @@
 
 import csv
 import copy
+import time
 import collections
 from cStringIO import StringIO
 
@@ -105,40 +106,82 @@ def xml_report(rows):
 
     return doc.toxml()
 
+@threado.stream
+def ticker(inner):
+    sleeper = threado.Channel()
+
+    while True:
+        try:
+            item = yield inner, sleeper
+        except:
+            sleeper.throw()
+            raise
+
+        if sleeper.has_result():
+            inner.send()
+        if inner.was_source:
+            times = item
+
+        current_time = time.time() + 0.01
+
+        next = set([interval - (current_time - offset) % interval 
+                    for (offset, interval) in times])
+        print next
+        if next:
+            sleeper = timer.sleep(min(next))
+        else:
+            sleeper = threado.Channel()
+
 class MailerSession(services.Session):
     def __init__(self, service, from_addr):
         services.Session.__init__(self)
 
-        self.keys = list()
-        self.rows = list()
+        self.events = dict()
 
         self.service = service
         self.from_addr = from_addr
         self.room_jid = None
 
     def add_event(self, event):
-        row, self.keys = normalise(event, self.keys)
-        self.rows.append(row)
+        emails = event.attrs.get("email", list())
+        if not emails:
+            self.events.setdefault(None, list()).append(event)
+        else:
+            for email in emails:
+                self.events.setdefault(email, list()).append(event)
 
-    def create_reports(self):
-        if not self.rows:
-            return None
+    def create_reports(self, to, cc):
+        if not self.events:
+            return
 
-        string = StringIO()
-        encoder = lambda x: x.encode("utf-8")
+        default = self.events.pop(None, ())
+        for email in to:
+            self.events.setdefault(email, list()).extend(default)
 
-        writer = csv.writer(string, delimiter='|', quoting=csv.QUOTE_NONE)
-        writer.writerow(map(encoder, self.keys))
-        for row in self.rows:
-            row += ("",) * (len(self.keys)-len(row))
-            writer.writerow(map(encoder, row))
-        csv_data = string.getvalue()
+        for email, events in self.events.iteritems():
+            keys = list()
+            rows = list()
+            for event in events:
+                row, keys = normalise(event, keys)
+                rows.append(row)
 
-        xml_data = xml_report(self.rows)
+            string = StringIO()
+            encoder = lambda x: x.encode("utf-8")
+            
+            writer = csv.writer(string, delimiter='|', quoting=csv.QUOTE_NONE)
+            writer.writerow(map(encoder, keys))
+            for row in rows:
+                row += ("",) * (len(keys)-len(row))
+                writer.writerow(map(encoder, row))
+            csv_data = string.getvalue()
 
-        self.rows = list()
-        self.keys = list()
-        return csv_data, xml_data
+            xml_data = xml_report(rows)
+
+            if email in to:
+                yield [email], cc, (csv_data, xml_data)
+            else:
+                yield [email], to + cc, (csv_data, xml_data)
+        self.events.clear()
 
     def prepare_mail(self, csv_data, xml_data, to, cc, subject, template):
         from email.header import Header
@@ -193,32 +236,31 @@ class MailerSession(services.Session):
             yield from_addr[1], to[1], msg_data
 
     def run(self):
-        to, cc, subject, template, interval, room = yield self.inner
+        to, cc, subject, template, times, room = yield self.inner
         event_stream = room | events.stanzas_to_events()
 
-        sleeper = timer.sleep(interval)
+        alarm_ticker = ticker()
+        alarm_ticker.send(times)
         try:
             while True:
-                item = yield self.inner, event_stream, sleeper
+                item = yield self.inner, event_stream, alarm_ticker
 
-                if event_stream.was_source:
+                if alarm_ticker.was_source:
+                    for to, cc, data in self.create_reports(to, cc):
+                        csv_data, xml_data = data
+                        prepare = self.prepare_mail(csv_data, xml_data, 
+                                                    to, cc, subject, template)
+                        for from_addr, to_addr, msg_str in prepare:
+                            self.service.send(from_addr, to_addr, msg_str)
+                elif event_stream.was_source:
                     self.add_event(item)
                 elif self.inner.was_source:
-                    to, cc, subject, template, interval, new_room = item
+                    to, cc, subject, template, times, new_room = item
                     if new_room != room:
                         room.exit()
                         room = new_room
                         event_stream = room | events.stanzas_to_events()
-                else:
-                    sleeper = timer.sleep(interval)
-                    data = self.create_reports()
-                    if data is None:
-                        continue
-                    csv_data, xml_data = data
-                    prepare = self.prepare_mail(csv_data, xml_data, 
-                                                to, cc, subject, template)
-                    for from_addr, to_addr, msg_str in prepare:
-                        self.service.send(from_addr, to_addr, msg_str)
+                    alarm_ticker.send(times)
         except services.Unavailable:
             room.exit()
         except:
@@ -232,17 +274,17 @@ class MailerSession(services.Session):
             cc = conf.get("cc", [])
             subject = conf["subject"]
             template = conf["template"]
-            time_interval = conf["time_interval"]
+            times = conf["times"]
             room_jid = conf["room"]
             print "Joining room %s" % room_jid
-            
+
             if self.room_jid is None or self.room_jid != room_jid:
                 room = yield inner.sub(self.service.xmpp.muc.join(room_jid))
                 self.room_jid = room_jid
                 print "Joined room %s" % room_jid
             else:
                 room = self.room
-            self.send(to, cc, subject, template, time_interval, room)
+            self.send(to, cc, subject, template, times, room)
         else:
             self.finish()
         inner.finish(conf)

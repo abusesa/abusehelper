@@ -180,7 +180,7 @@ class Setup(threado.GeneratorStream):
                                    room=asn_room,
                                    subject="Report for ASN"+item.asn,
                                    template=item.template,
-                                   time_interval=self.mail_interval)
+                                   times=[(0.0, self.mail_interval)])
                 yield inner.sub(mailer.config(**mailer_conf))
 
                 roomgraph_conf = dict(src=dshield_conf["room"], 
