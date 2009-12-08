@@ -92,7 +92,7 @@ class AND(_Rule):
         for child in self.children:
             if not child(*args, **keys):
                 return False
-            return True
+        return True
 AND.serialize_register()
 
 class CONTAINS(_Rule):
@@ -135,16 +135,26 @@ class NETBLOCK(_Rule):
 
     @classmethod
     def dump_rule(cls, dump, name, rule):
-        return Element(name, ip=rule.ip, mask=rule.mask, key=rule.key)
+        element = Element(name, ip=rule.ip, bits=rule.bits)
+        if rule.keys is not None:
+            element.add(serialize.dump_list(dump, "keys", rule.keys))
+        return element
 
     @classmethod
     def load_rule(cls, load, element):
         ip = element.get_attr("ip", None)
-        mask = element.get_attr("mask", None)
-        if None in (ip, mask):
+        bits = element.get_attr("bits", None)
+        if None in (ip, bits):
             raise RuleError(element)
-        key = element.get_attr("keys", None)
-        return cls(ip, mask, key)
+        try:
+            bits = int(bits)
+        except ValueError:
+            raise RuleError(element)
+        
+        keys = None
+        for child in element.children():
+            keys = serialize.load_list(child)
+        return cls(ip, bits, keys)
 
     def ip_to_num(self, ip):
         try:
@@ -170,7 +180,7 @@ class NETBLOCK(_Rule):
         if self.keys is None:
             keys = event.attrs.keys()
         else:
-            keys = set(self.keys)
+            keys = self.keys
 
         for key in keys:
             values = event.attrs.get(key, ())
