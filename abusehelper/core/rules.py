@@ -153,7 +153,7 @@ class NETBLOCK(_Rule):
         
         keys = None
         for child in element.children():
-            keys = serialize.load_list(child)
+            keys = serialize.load_list(load, child)
         return cls(ip, bits, keys)
 
     def ip_to_num(self, ip):
