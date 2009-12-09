@@ -56,6 +56,7 @@ def optparse(func, argv=list(sys.argv[1:])):
                       metavar="ini_section")
 
     long_names = dict()
+    actions = dict()
     for key in args:
         long = getattr(func, key + "_long", long_name(key))
         long_names[key] = long
@@ -77,6 +78,7 @@ def optparse(func, argv=list(sys.argv[1:])):
             kwargs["default"] = default
             kwargs["action"] = getattr(func, key + "_action", action)
             kwargs["type"] = getattr(func, key + "_type", type)
+            actions[key] = kwargs["action"]
 
         option = parser.add_option(*names, **kwargs)
 
@@ -87,16 +89,22 @@ def optparse(func, argv=list(sys.argv[1:])):
         config = SafeConfigParser()
         config.read([options.ini_file])
 
-        section_name = options.ini_section
-        if config.has_section(section_name):
-            section = dict(config.items(section_name))
-        else:
-            section = config.defaults()
-
+        section = options.ini_section
         argv = list(argv)
         for key in args:
-            if key in section:
-                argv.insert(0, "--%s=%s" % (long_names[key], section[key]))
+            if not config.has_option(section, key):
+                continue
+
+            action = actions.get(key, None)
+            if action == "store_true":
+                if config.getboolean(section, key):
+                    argv.insert(0, "--%s" % long_names[key])
+            elif action == "store_false":
+                if not config.getboolean(section, key):
+                    argv.insert(0, "--%s" % long_names[key])
+            else:
+                value = config.get(section, key) 
+                argv.insert(0, "--%s=%s" % (long_names[key], value))
         options, params = parser.parse_args(argv)
 
     arglist = list()
