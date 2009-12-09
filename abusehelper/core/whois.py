@@ -5,7 +5,7 @@ import urllib2
 
 from xml.etree.ElementTree import fromstring
 from idiokit import timer, threado, sockets
-from abusehelper.core import events, services
+from abusehelper.core import events, roomfarm, services
 
 class WhoisItem(object):
     MAIL_REX = re.compile('([\w\-.%]+@(?:[\w\-%]+\.)+[\w\-%]+)', re.S)
@@ -156,49 +156,41 @@ class WhoisSession(services.Session):
     def __init__(self, service):
         services.Session.__init__(self)
         self.service = service
+        self.previous = None, None
 
     @threado.stream
     def config(inner, self, conf):
-        yield
+        self.service.srcs.dec(self.previous)
+
         if conf is None:
-            self.service.disconnect(self)
+            self.service.rooms(self)
+            self.previous = None, None
         else:
-            self.service.connect(self, conf["src"], conf["dst"])
+            src = conf["src"]
+            _, dst_room = self.service.rooms(self, src, conf["dst"])
+            self.service.srcs.inc(src, dst_room)
+            self.previous = src, dst_room
+        yield
         inner.finish(conf)
 
-class WhoisService(services.Service):
+class WhoisService(roomfarm.RoomFarm):
     def __init__(self, xmpp):
-        services.Service.__init__(self)
+        roomfarm.RoomFarm.__init__(self, xmpp)
 
-        self.xmpp = xmpp
+        self.srcs = roomfarm.Counter()
 
-        self.rooms = dict()
-        self.sessions = dict()
-        self.connections = dict()
         self.whois = Whois()
         services.bind(self, self.whois)
-
-        self.start()
 
     @threado.stream_fast
     def check(inner, self, src):
         while True:
             yield inner
 
-            if src in self.connections:
-                map(inner.send, inner)
-            else:
+            if not self.srcs.get(src):
                 list(inner)
-
-    @threado.stream_fast
-    def forward(inner, self, src):
-        while True:
-            yield inner
-
-            rooms = map(self.rooms.get, self.connections.get(src, ()))
-            for item in inner:
-                for room, _ in rooms:
-                    room.send(item)
+            else:
+                map(inner.send, inner)
 
     @threado.stream_fast
     def augment(inner, self):
@@ -236,63 +228,25 @@ class WhoisService(services.Service):
                             event.add("email", address)
                 inner.send(event)
 
+    @threado.stream_fast
+    def distribute(inner, self, src):
+        while True:
+            yield inner
+
+            rooms = self.srcs.get(src)
+            for item in inner:
+                for room in rooms:
+                    room.send(item)
+
     @threado.stream
-    def _room(inner, self, src):
-        room = yield self.xmpp.muc.join(src)
+    def handle_room(inner, self, src):
+        room = yield inner.sub(self.xmpp.muc.join(src))
         yield inner.sub(events.events_to_elements()
                         | room
                         | self.check(src)
                         | events.stanzas_to_events()
                         | self.augment()
-                        | self.forward(src))
-
-    def connect(self, session, src, dst):
-        self._inc(src)
-        dst_room = self._inc(dst)
-        dsts = self.connections.setdefault(src, dict())
-        _, refcount = dsts.get(dst, (None, 0))
-        dsts[dst] = dst_room, refcount+1
-
-        if session in self.sessions:
-            old_src, old_dst = self.sessions[session]
-            self._disconnect(old_src, old_dst)
-        self.sessions[session] = src, dst
-
-    def disconnect(self, session):
-        if session not in self.sessions:
-            return
-        src, dst = self.sessions.pop(session)
-        self._disconnect(src, dst)
-
-    def _disconnect(self, src, dst):
-        dsts = self.connections[src]
-        dsts[dst] -= 1
-        if dsts[dst] <= 0:
-            del dsts[dst]
-
-        self._dec(src)
-        self._dec(dst)
-
-    def _inc(self, room_name):
-        if room_name not in self.rooms:
-            room = self._room(room_name)
-            self.rooms[room_name] = room, 0
-            services.bind(self, room)
-            self.send()
-        room, refcount = self.rooms[room_name]
-        self.rooms[room_name] = room, refcount+1
-        return room
-
-    def _dec(self, room_name):
-        if room_name not in self.rooms:
-            return
-        room, refcount = self.rooms[room_name]
-        refcount -= 1
-        if refcount > 0:
-            self.rooms[room_name] = room, refcount
-        else:
-            room.finish()
-            del self.rooms[room_name]
+                        | self.distribute(src))
             
     def session(self):
         return WhoisSession(self)

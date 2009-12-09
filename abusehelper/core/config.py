@@ -174,19 +174,18 @@ class Setup(threado.GeneratorStream):
                     continue
 
                 asn_room = self.asn_room_prefix + item.asn
+                dshield_room = asn_room + ".dshield"
 
-                dshield_conf = yield dshield.config(asn=item.asn)
-                mailer_conf = dict(to=item.addresses,
-                                   room=asn_room,
-                                   subject="Report for ASN"+item.asn,
-                                   template=item.template,
-                                   times=[(0.0, self.mail_interval)])
-                yield inner.sub(mailer.config(**mailer_conf))
-
-                roomgraph_conf = dict(src=dshield_conf["room"], 
-                                      dst=asn_room,
-                                      filter=item.filter)
-                yield roomgraph.config(**roomgraph_conf)
+                yield roomgraph.config(src=dshield_room,
+                                       dst=asn_room,
+                                       filter=item.filter)
+                yield mailer.config(to=item.addresses,
+                                    room=asn_room,
+                                    subject="Report for ASN"+item.asn,
+                                    template=item.template,
+                                    times=[(0.0, self.mail_interval)])
+                yield dshield.config(asn=item.asn,
+                                     room=dshield_room)
         except:
             if dshield is not None:
                 dshield.rethrow()

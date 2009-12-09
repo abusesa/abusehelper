@@ -7,7 +7,7 @@ import collections
 from cStringIO import StringIO
 
 from idiokit import threado, timer
-from abusehelper.core import events, services
+from abusehelper.core import events, roomfarm, services
 
 # Some XML output helpers
 def node_id_and_text(doc, parent, nodename, text='', **kw):
@@ -137,10 +137,11 @@ class MailerSession(services.Session):
         services.Session.__init__(self)
 
         self.events = dict()
+        self.configs = threado.Channel()
 
         self.service = service
         self.from_addr = from_addr
-        self.room_jid = None
+        self.room_name = None
 
     def add_event(self, event):
         emails = event.attrs.get("email", list())
@@ -236,15 +237,21 @@ class MailerSession(services.Session):
             yield from_addr[1], to[1], msg_data
 
     def run(self):
-        to, cc, subject, template, times, room = yield self.inner
-        event_stream = room | events.stanzas_to_events()
-
         alarm_ticker = ticker()
-        alarm_ticker.send(times)
-        try:
-            while True:
-                item = yield self.inner, event_stream, alarm_ticker
 
+        while True:
+            while True:
+                item = yield self.inner, self.configs
+                if self.inner.was_source:
+                    self.add_event(item)
+                elif item is not None:
+                    to, cc, subject, template, times = item
+                    break
+
+            alarm_ticker.send(times)
+            while True:
+                item = yield self.inner, self.configs, alarm_ticker
+                
                 if alarm_ticker.was_source:
                     for to, cc, data in self.create_reports(to, cc):
                         csv_data, xml_data = data
@@ -252,41 +259,34 @@ class MailerSession(services.Session):
                                                     to, cc, subject, template)
                         for from_addr, to_addr, msg_str in prepare:
                             self.service.send(from_addr, to_addr, msg_str)
-                elif event_stream.was_source:
-                    self.add_event(item)
                 elif self.inner.was_source:
-                    to, cc, subject, template, times, new_room = item
-                    if new_room != room:
-                        room.exit()
-                        room = new_room
-                        event_stream = room | events.stanzas_to_events()
+                    self.add_event(item)
+                elif item is not None:
+                    to, cc, subject, template, times = item
                     alarm_ticker.send(times)
-        except services.Unavailable:
-            room.exit()
-        except:
-            room.exit()
-            raise
+                else:
+                    alarm_ticker.send([])
+                    break
         
     @threado.stream
     def config(inner, self, conf):
-        if conf is not None:
+        self.service.srcs.dec(self.room_name, self)
+
+        if conf is None:
+            self.service.rooms(self)
+            self.configs.send(None)
+        else:
             to = conf.get("to", [])
             cc = conf.get("cc", [])
             subject = conf["subject"]
             template = conf["template"]
             times = conf["times"]
-            room_jid = conf["room"]
-            print "Joining room %s" % room_jid
+            self.room_name = conf["room"]
 
-            if self.room_jid is None or self.room_jid != room_jid:
-                room = yield inner.sub(self.service.xmpp.muc.join(room_jid))
-                self.room_jid = room_jid
-                print "Joined room %s" % room_jid
-            else:
-                room = self.room
-            self.send(to, cc, subject, template, times, room)
-        else:
-            self.finish()
+            self.service.rooms(self, self.room_name)
+            self.service.srcs.inc(self.room_name, self)
+            self.configs.send(to, cc, subject, template, times)
+        yield
         inner.finish(conf)
 
 def normalise(event, keys):
@@ -315,11 +315,11 @@ def normalise(event, keys):
 
     return tuple(row), keys
 
-class MailerService(services.Service):
+class MailerService(roomfarm.RoomFarm):
     def __init__(self, xmpp, host, port, from_addr, username="", password=""):
-        services.Service.__init__(self)
-        self.xmpp = xmpp
+        roomfarm.RoomFarm.__init__(self, xmpp)
 
+        self.srcs = roomfarm.Counter()
         self.from_addr = from_addr
 
         self.host = host
@@ -327,6 +327,25 @@ class MailerService(services.Service):
         self.username = username
         self.password = password
 
+    @threado.stream
+    def handle_room(inner, self, name):
+        print "Joining room", name
+        room = yield inner.sub(self.xmpp.muc.join(name))
+        print "Joined room", name
+        yield inner.sub(room
+                        | events.stanzas_to_events()
+                        | self.distribute(name))
+
+    @threado.stream_fast
+    def distribute(inner, self, name):
+        while True:
+            yield inner
+
+            dsts = self.srcs.get(name)
+            for event in inner:
+                for dst in dsts:
+                    dst.send(event)
+        
     def get_smtp(self):
         import smtplib
 

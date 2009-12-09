@@ -81,83 +81,95 @@ def dshield(inner, asn, url="http://dshield.org/asdetailsascii.html"):
 from idiokit import timer
 import time
 import heapq
-from abusehelper.core import services
+from abusehelper.core import roomfarm, services
 
 class DShieldSession(services.Session):
     def __init__(self, service):
         services.Session.__init__(self)
         self.service = service
-        self.asn = None
+        self.previous = None, None
     
     @threado.stream
     def config(inner, self, conf):
-        asn = None if conf is None else conf.get("asn", None)
-        if asn != self.asn:
-            if asn is not None:
-                self.service.add_asn(asn)
-            if self.asn is not None:
-                self.service.remove_asn(self.asn)
-            self.asn = asn
+        if conf is None:
+            asn = None
+            room = self.service.rooms(self)
+        else:
+            asn = conf["asn"]
+            room = self.service.rooms(self, conf["room"])
+            self.service.add_asn(asn, room)
+
+        self.service.remove_asn(*self.previous)
+        self.previous = asn, room
+
         yield
-        conf = dict(asn=asn, room=unicode(self.service.room.room_jid))
         inner.finish(conf)
 
-class DShieldService(services.Service):
-    def __init__(self, xmpp, room, update_interval=300.0):
-        services.Service.__init__(self)
+class DShieldService(roomfarm.RoomFarm):
+    def __init__(self, xmpp, update_interval=300.0):
+        roomfarm.RoomFarm.__init__(self, xmpp)
 
-        self.xmpp = xmpp
-        self.room = room
         self.update_interval = update_interval
 
-        self.asns = dict()
+        self.asns = roomfarm.Counter()
         self.heap = list()
 
-    def add_asn(self, asn):
-        self.asns[asn] = self.asns.get(asn, 0) + 1
-        if self.asns[asn] == 1:
+    def add_asn(self, asn, room):
+        if not self.asns.get(asn):
             heapq.heappush(self.heap, (time.time(), asn))
             self.send()
+        self.asns.inc(asn, room)
 
-    def remove_asn(self, asn):
-        count = self.asns.get(asn, 0) - 1
-        if count <= 0:
-            self.asns.pop(asn, None)
-            self.send()
-        else:
-            self.asns[asn] = count
-
-    def run(self):
-        yield self.inner.sub(self._run()
-                             | events.events_to_elements()
-                             | self.room
-                             | threado.throws())
+    def remove_asn(self, asn, room):
+        self.asns.dec(asn, room)
 
     @threado.stream
-    def _run(inner, self):
+    def p(inner, self):
+        while True:
+            element = yield inner
+            print element
+
+    @threado.stream
+    def handle_room(inner, self, name):
+        print "Joining room", name
+        room = yield inner.sub(self.xmpp.muc.join(name))
+        print "Joined room", name
+        yield inner.sub(events.events_to_elements()
+                        | room
+                        | threado.throws())
+
+    @threado.stream_fast
+    def distribute(inner, self, asn):
+        while True:
+            yield inner
+
+            rooms = self.asns.get(asn)
+            for event in inner:
+                for room in rooms:
+                    room.send(event)
+
+    def run(self):
         while True:
             if not self.heap:
-                yield inner
+                yield self.inner
                 continue
 
             current_time = time.time()
             expire_time, asn = self.heap[0]
             if expire_time > current_time:
-                yield inner, timer.sleep(expire_time-current_time)
-            elif self.asns.get(asn, 0) <= 0:
+                yield self.inner, timer.sleep(expire_time-current_time)
+            elif not self.asns.get(asn):
                 heapq.heappop(self.heap)
-                self.asns.pop(asn, None)
             else:
                 heapq.heappop(self.heap)
-                yield inner.sub(dshield(asn))
+                yield self.inner.sub(dshield(asn) | self.distribute(asn))
                 expire_time = time.time() + self.update_interval
                 heapq.heappush(self.heap, (expire_time, asn))
 
     def session(self):
         return DShieldSession(self)
 
-def main(xmpp_jid, service_room, dshield_room, 
-         xmpp_password=None, log_file=None):
+def main(xmpp_jid, service_room, xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
     from abusehelper.core import log
@@ -177,13 +189,9 @@ def main(xmpp_jid, service_room, dshield_room,
         lobby = yield services.join_lobby(xmpp, service_room, "dshield")
         logger.addHandler(log.RoomHandler(lobby.room))
 
-        print "Joining DShield room", dshield_room
-        room = yield xmpp.muc.join(dshield_room)
-
-        yield inner.sub(lobby.offer("dshield", DShieldService(xmpp, room)))
+        yield inner.sub(lobby.offer("dshield", DShieldService(xmpp)))
     return bot()
 main.service_room_help = "the room where the services are collected"
-main.dshield_room_help = "the room where the DShield reports are fed"
 main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
 main.log_file_help = "log to the given file instead of the console"
