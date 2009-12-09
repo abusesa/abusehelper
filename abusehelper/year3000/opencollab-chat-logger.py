@@ -1,24 +1,12 @@
-# -*- coding: latin-1 -*-
-
+from idiokit import threado,xmpp
+import sys
 import re
-import getpass
 from opencollab.wiki import CLIWiki,WikiFault
 from opencollab.meta import Meta
-import xmlrpclib
-import sys
-from idiokit import threado, util, throttle
-from idiokit.xmpp import XMPP, Element
-from idiokit.core import JID
-from abusehelper.core import events
-
+from idiokit.jid import JID
 import time
-
-
-from abusehelper.core import events
-from idiokit.core import XMPPError
-from idiokit.xmpp import XMPP, Element
-from idiokit import threado
-
+from idiokit import timer
+import abusehelper.thirdparty.urlre as urlre
 
 class Txt2Collab(object):
     def __init__(self,collab,basePage,filename,overwrite=True,
@@ -29,7 +17,7 @@ class Txt2Collab(object):
         self.events = list()
         self.overwrite = overwrite
         self.timestampformat = timestampformat
-
+        self.urlrows = set()
     def add(self,event):
         self.events.append(event)
 
@@ -38,6 +26,7 @@ class Txt2Collab(object):
             return
         date = time.strftime(self.timestampformat,time.gmtime())
         page = "%s/%s" % (self.basePage, date)
+
 
         #does base exist
         try:
@@ -49,8 +38,8 @@ class Txt2Collab(object):
 <<Include(^CollabChatLog/2.*,,sort=descending,items=1,editlink)>>
 
 = Past Topics =
-
-<<MetaTable(CollabChatLog Attachment=/.*/, >>Date, ||Date||CollabChatLog Attachment||)>>
+ 
+<<MetaTable(CollabChatLog Attachment=/.*/, >>Date, ||Date||CollabChatLog Attachment||<gwikiname=\"URLS\" gwikistyle=\"list\">url||)>>
 """
 
             self.collab.putPage(self.basePage,txt)
@@ -65,36 +54,45 @@ class Txt2Collab(object):
             self.collab.setMeta(page,meta)
         #uploading log
         try:
-#            import pdb;pdb.set_trace()
             data = self.collab.getAttachment(page,self.filename)
         except WikiFault:
             data = ""
+        meta = Meta()
         for k,v in self.events:
             v += '\n'
-            data += v.encode('utf-8')
-        self.events = list()
+            v = re.sub(urlre.xmpp_url_all_re,"",v)
+            if urlre.url_all_re.search(v):
+                meta['url'].add('%s' % (v))
 
+            data += v.encode('utf-8')
+
+        if len(meta) > 0:
+            self.collab.setMeta(page,meta)
+
+        self.events = list()
         self.collab.putAttachment(page,self.filename,data,overwrite=True)
 
-@threado.stream
-def myqueue(inner, row):
-    #for testing
-    while True:
-        mytime = time.strftime('%H-%M-%S')
-        inner.send(None, mytime+'blah')
-        inner.send(None, mytime+'bleh')
-        time.sleep(2)
-        yield
 
-@threado.thread
+@threado.stream
+def logger(inner,txt2collab, base_time, interval):
+    sleeper = timer.sleep(interval / 2.0)
+    
+    while True:
+        event = yield inner,sleeper
+        if sleeper.was_source:
+            sleeper = timer.sleep(interval)
+            txt2collab.log()
+        else:
+            print 'adding', event
+            txt2collab.add(event)
+
+@threado.stream
 def roomparser(inner,srcjid_re):
     srcjid_re = re.compile(srcjid_re)
     while True:
-        try:
-            message = inner.next(1)
-        except threado.Timeout:
-            pass
-        else:
+        message = yield inner
+        print message.serialize()
+        if True:
             if message.children("x", "jabber:x:delay"):
                 continue
             if message.children("delay", "urn:xmpp:delay"):
@@ -115,41 +113,24 @@ def roomparser(inner,srcjid_re):
                 inner.send(sender, message)
 
 
-@threado.thread
-def logger(inner, txt2collab, base_time, interval):
-    while True:
-        delay = interval - (time.time() - base_time) % interval
-        try:
-            event = inner.next(delay)
-        except threado.Timeout:
-            txt2collab.log()
-        else:
-            txt2collab.add(event)
-
-
-
-def main():
+@threado.stream
+def main(inner,username,password):
     collabinstance = sys.argv[1]
     delay = float(sys.argv[2])
     if re.search('[^a-z|0-9|\.]',collabinstance):
         print 'non-allowed chars in collab instance'
         sys.exit(1)
 
-    username = raw_input("Collab username: ")
-    password = getpass.getpass()
-
-    
+        
     xmppuser = '%s@clarifiednetworks.com' % (re.sub('@','%',username))
     xmppmucs = "conference.clarifiednetworks.com"
     room = "%s@%s" % (collabinstance,xmppmucs)
-    
-    xmpp = XMPP(xmppuser,password)
-    xmpp.connect()
-    xmpp.core.presence()
-    room = xmpp.muc.join(room,"/collablogger")
-
-
-    collab = CLIWiki('https://www.clarifiednetworks.com/collab/%s/' % 
+    print 'joined room'
+    myxmpp = yield xmpp.connect(xmppuser,password)
+    myxmpp.core.presence()
+    room = yield myxmpp.muc.join(room,"/collablogger")
+                                                      
+    collab = CLIWiki('https://www.clarifiednetworks.com/collab/%s/' %
                      (collabinstance))
     collab.authenticate(username=username,password=password)
 
@@ -158,13 +139,16 @@ def main():
     
     txt2collab = Txt2Collab(collab,basePage,attachFilename,
                             timestampformat="%Y-%m-%d")
-    
     srcjid_filter = "conference.clarifiednetworks.com"
-    for _ in room |roomparser(srcjid_filter)| logger(txt2collab,0,delay) | threado.throws():
-        pass
+
+    yield inner.sub(room |roomparser(srcjid_filter)|
+                    logger(txt2collab,0,delay) )
+        
 if __name__ == "__main__":
-    main()
+    import getpass
 
-
-
-
+    username = raw_input("Collab & XMPP Username (without the @domain): ")
+    password = getpass.getpass()
+    
+    threado.run(main(username, password))
+                
