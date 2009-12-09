@@ -124,12 +124,6 @@ class DShieldService(roomfarm.RoomFarm):
         self.asns.dec(asn, room)
 
     @threado.stream
-    def p(inner, self):
-        while True:
-            element = yield inner
-            print element
-
-    @threado.stream
     def handle_room(inner, self, name):
         print "Joining room", name
         room = yield inner.sub(self.xmpp.muc.join(name))
