@@ -122,11 +122,9 @@ def ticker(inner):
         if inner.was_source:
             times = item
 
-        current_time = time.time() + 0.01
-
+        current_time = time.time()
         next = set([interval - (current_time - offset) % interval 
                     for (offset, interval) in times])
-        print next
         if next:
             sleeper = timer.sleep(min(next))
         else:
@@ -234,7 +232,7 @@ class MailerSession(services.Session):
 
         msg_data = msg.as_string()
         for to in to_addrs + cc_addrs:
-            yield from_addr[1], to[1], msg_data
+            yield from_addr[1], to[1], subject, msg_data
 
     def run(self):
         alarm_ticker = ticker()
@@ -251,14 +249,14 @@ class MailerSession(services.Session):
             alarm_ticker.send(times)
             while True:
                 item = yield self.inner, self.configs, alarm_ticker
-                
+
                 if alarm_ticker.was_source:
                     for to, cc, data in self.create_reports(to, cc):
                         csv_data, xml_data = data
                         prepare = self.prepare_mail(csv_data, xml_data, 
                                                     to, cc, subject, template)
-                        for from_addr, to_addr, msg_str in prepare:
-                            self.service.send(from_addr, to_addr, msg_str)
+                        for from_addr, to_addr, subject, msg_str in prepare:
+                            self.service.send(from_addr, to_addr, subject, msg_str)
                 elif self.inner.was_source:
                     self.add_event(item)
                 elif item is not None:
@@ -397,7 +395,8 @@ class MailerService(roomfarm.RoomFarm):
 
             while queue:
                 # Send the oldest mail
-                from_addr, to_addr, msg_str = queue[0]
+                from_addr, to_addr, subject, msg_str = queue[0]
+                print "Sending message %r to %s" % (subject, to_addr)
                 try:
                     yield self.inner.thread(server.sendmail, from_addr, 
                                             to_addr, msg_str)
