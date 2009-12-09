@@ -37,7 +37,7 @@ def save_event(conn, room, event):
     conn.commit()
 
 def events_from_db(conn, room_id=None):
-    query = ("SELECT events.id, events.timestamp, attrs.key, attrs.value "+
+    query = ("SELECT events.id, events.room, events.timestamp, attrs.key, attrs.value "+
              "FROM attrs "+
              "INNER JOIN events ON events.id=attrs.eventid ")
     args = list()
@@ -51,17 +51,22 @@ def events_from_db(conn, room_id=None):
     attrs = dict()
     previous_id = None
     previous_ts = None
-    for eventid, timestamp, key, value in conn.execute(query, args):
-        if previous_id != eventid:
+    previous_room = None
+    for id, room, ts, key, value in conn.execute(query, args):
+        if previous_id != id:
             if previous_id is not None:
-                yield previous_ts, room_id, attrs
+                yield previous_ts, previous_room, attrs
             attrs = dict()
 
-        previous_id = eventid
-        previous_ts = timestamp
+        previous_id = id
+        previous_ts = ts
+        previous_room = room
 
         attrs.setdefault(key, list())
         attrs[key].append(value)
+
+    if previous_id is not None:
+        yield previous_ts, previous_room, attrs
 
 def parse_command(message):
     parts = message.text.split()
