@@ -1,37 +1,34 @@
-import string
-from random import Random
-import time
 import sqlite3
+import time
 from idiokit.xmpp import connect, Element
 from idiokit.jid import JID
-from idiokit import threado, util
+from idiokit import threado
 from abusehelper.core import roomfarm, events, services
 
-def open_db(path=':memory:'):
+def open_db(path=None):
+    if path is None:
+        path = ":memory:"
     conn = sqlite3.connect(path)
 
     c = conn.cursor()
     c.execute('create table if not exists events \
-               (id TEXT, date TEXT, room TEXT)')
+               (id integer primary key, timestamp integer, room text)')
     c.execute('create table if not exists attrs \
-               (key TEXT, value TEXT, event TEXT)')
+               (eventid integer, key text, value text)')
     conn.commit()
     return conn
 
 def save_event(conn, room, event):
-    id = ''.join(Random().sample(string.letters+string.digits, 10))
-
     c = conn.cursor()
-    c.execute('select * from events where id="%s"' % (id))
 
-    event_time = unicode(time.strftime("%Y-%m-%d %H:%M:%S"))
-    room_id = unicode(room.room_jid)
-
-    c.execute("insert into events values (?, ?, ?)", (id, event_time, room_id))
+    c.execute("insert into events(timestamp, room) values (?, ?)",
+              (time.time(), unicode(room.room_jid)))
+    eventid = c.lastrowid
 
     for key, values in event.attrs.items():
         for value in values:
-            c.execute("insert into attrs values (?, ?, ?)", (key, value, id))
+            c.execute("insert into attrs(eventid, key, value) values (?, ?, ?)",
+                      (eventid, key, value))
 
     conn.commit()
 
@@ -39,20 +36,20 @@ def events_from_db(conn, room_id=None):
     c = conn.cursor()
 
     if room_id:
-        c.execute('select * from events where room="%s"' % room_id)
+        c.execute('select * from events where room=?', (room_id,))
     else:
         c.execute('select * from events')
 
-    for id, time, room in c:
+    for eventid, timestamp, room in c:
         attrs = dict()
 
         d = conn.cursor()
-        d.execute('select key, value from attrs where event="%s"' % id)
+        d.execute('select key, value from attrs where eventid=?', (eventid,))
         for key, value in d:
             attrs.setdefault(key, list())
             attrs[key].append(value)
 
-        yield time, room, attrs
+        yield timestamp, room, attrs
 
 def parse_command(message):
     parts = message.text.split()
@@ -72,7 +69,6 @@ def parse_command(message):
             values.add(pair[0])
 
     return command, keyed, values
-
 
 class HistorianSession(services.Session):
     def __init__(self, service):
@@ -151,8 +147,10 @@ class HistorianService(roomfarm.RoomFarm):
                                 break
 
                         if send:
+                            ts = time.strftime("%Y-%m-%d %H:%M:%S", 
+                                               time.localtime(etime))
                             body = Element("body")
-                            body.text = "%s %s\n" % (etime, eroom)
+                            body.text = "%s %s\n" % (ts, eroom)
                             for event_key, event_values in attrs.items():
                                 vals = ", ".join(event_values)
                                 body.text += "%s: %s\n" % (event_key, vals)
@@ -161,11 +159,15 @@ class HistorianService(roomfarm.RoomFarm):
 
             inner.send(elements)
 
-def main(xmpp_jid, service_room, db_file, xmpp_password=None):
+def main(xmpp_jid, service_room, 
+         db_file=None, xmpp_password=None, log_file=None):
     import getpass
+    from abusehelper.core import log
 
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
+
+    logger = log.config_logger("historian", filename=log_file)
 
     @threado.stream
     def bot(inner):
@@ -176,12 +178,15 @@ def main(xmpp_jid, service_room, db_file, xmpp_password=None):
         print "Joining lobby", service_room
         lobby = yield services.join_lobby(xmpp, service_room, "historian")
 
-        yield inner.sub(lobby.offer("historian", \
-                        HistorianService(xmpp, db_file)))
+        service = HistorianService(xmpp, db_file)
+        yield inner.sub(lobby.offer("historian", service))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP username (e.g. user@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
+main.db_file_help = ("write the history data into the given file "+
+                     "(default: keep the history only in memory)")
+main.log_file_help = "log to the given file instead of the console"
 
 if __name__ == "__main__":
     from abusehelper.core import opts

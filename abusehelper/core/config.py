@@ -156,12 +156,31 @@ class Setup(threado.GeneratorStream):
                 if item not in setups:
                     continue
                 setups.pop(item).throw(threado.Finished())
+
+    @threado.stream
+    def historian(inner, self, lobby):
+        while True:
+            historian = yield inner.sub(lobby.session("historian"))
+
+            while True:
+                try:
+                    rooms = yield inner, historian
+                except:
+                    if historian.was_source:
+                        break
+                    historian.rethrow()
+                    raise
+
+                if historian.was_source:
+                    continue
+                yield historian.config(rooms=rooms)
     
     @threado.stream
     def setup(inner, self, lobby):
         dshield = None
         roomgraph = None
         mailer = None
+        historian = self.historian(lobby)
 
         try:
             dshield = yield lobby.session("dshield")
@@ -176,6 +195,7 @@ class Setup(threado.GeneratorStream):
                 asn_room = self.asn_room_prefix + item.asn
                 dshield_room = asn_room + ".dshield"
 
+                historian.send(asn_room, dshield_room)
                 yield roomgraph.config(src=dshield_room,
                                        dst=asn_room,
                                        filter=item.filter)
@@ -185,7 +205,7 @@ class Setup(threado.GeneratorStream):
                                     template=item.template,
                                     times=[(0.0, self.mail_interval)])
                 yield dshield.config(asn=item.asn,
-                                     room=dshield_room)
+                                     room=dshield_room)                
         except:
             if dshield is not None:
                 dshield.rethrow()
@@ -193,6 +213,7 @@ class Setup(threado.GeneratorStream):
                 roomgraph.rethrow()
             if mailer is not None:
                 mailer.rethrow()
+            historian.rethrow()
             raise
 
 def main(xmpp_jid, service_room, customer_file, asn_room_prefix,
