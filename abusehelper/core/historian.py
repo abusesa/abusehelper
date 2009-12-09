@@ -11,45 +11,57 @@ def open_db(path=None):
     conn = sqlite3.connect(path)
 
     c = conn.cursor()
-    c.execute('create table if not exists events \
-               (id integer primary key, timestamp integer, room text)')
-    c.execute('create table if not exists attrs \
-               (eventid integer, key text, value text)')
+    c.execute("CREATE TABLE IF NOT EXISTS events "+
+              "(id INTEGER PRIMARY KEY, timestamp INTEGER, room TEXT)")
+    c.execute("CREATE INDEX IF NOT EXISTS events_id_index ON events(id)")
+
+    c.execute("CREATE TABLE IF NOT EXISTS attrs "+
+              "(eventid INTEGER, key TEXT, value TEXT)")
+    c.execute("CREATE INDEX IF NOT EXISTS attrs_eventid_index ON attrs(eventid)")
+
     conn.commit()
     return conn
 
 def save_event(conn, room, event):
     c = conn.cursor()
 
-    c.execute("insert into events(timestamp, room) values (?, ?)",
-              (time.time(), unicode(room.room_jid)))
+    c.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
+              (int(time.time()), unicode(room.room_jid)))
     eventid = c.lastrowid
 
     for key, values in event.attrs.items():
         for value in values:
-            c.execute("insert into attrs(eventid, key, value) values (?, ?, ?)",
+            c.execute("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
                       (eventid, key, value))
 
     conn.commit()
 
 def events_from_db(conn, room_id=None):
-    c = conn.cursor()
+    query = ("SELECT events.id, events.timestamp, attrs.key, attrs.value "+
+             "FROM attrs "+
+             "INNER JOIN events ON events.id=attrs.eventid ")
+    args = list()
+    
+    if room_id is not None:
+        query += "WHERE events.room=? "
+        args.append(room_id)
+        
+    query += "ORDER BY attrs.eventid;"
 
-    if room_id:
-        c.execute('select * from events where room=?', (room_id,))
-    else:
-        c.execute('select * from events')
+    attrs = dict()
+    previous_id = None
+    previous_ts = None
+    for eventid, timestamp, key, value in conn.execute(query, args):
+        if previous_id != eventid:
+            if previous_id is not None:
+                yield previous_ts, room_id, attrs
+            attrs = dict()
 
-    for eventid, timestamp, room in c:
-        attrs = dict()
+        previous_id = eventid
+        previous_ts = timestamp
 
-        d = conn.cursor()
-        d.execute('select key, value from attrs where eventid=?', (eventid,))
-        for key, value in d:
-            attrs.setdefault(key, list())
-            attrs[key].append(value)
-
-        yield timestamp, room, attrs
+        attrs.setdefault(key, list())
+        attrs[key].append(value)
 
 def parse_command(message):
     parts = message.text.split()
@@ -126,6 +138,7 @@ class HistorianService(roomfarm.RoomFarm):
                     if not command or command != "historian":
                         continue
 
+                    print "Got command", repr(body.text)
                     rjid = unicode(room.room_jid)
 
                     for etime, eroom, attrs in events_from_db(self.conn, rjid):
