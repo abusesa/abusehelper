@@ -11,8 +11,10 @@ def open_db(path=':memory:'):
     conn = sqlite3.connect(path)
 
     c = conn.cursor()
-    c.execute('create table if not exists events (id TEXT, date TEXT, room TEXT)')
-    c.execute('create table if not exists attrs (key TEXT, value TEXT, event TEXT)')
+    c.execute('create table if not exists events \
+               (id TEXT, date TEXT, room TEXT)')
+    c.execute('create table if not exists attrs \
+               (key TEXT, value TEXT, event TEXT)')
     conn.commit()
     return conn
 
@@ -25,13 +27,11 @@ def save_event(conn, room, event):
     event_time = unicode(time.strftime("%Y-%m-%d %H:%M:%S"))
     room_id = unicode(room.room_jid)
 
-    c.execute("insert into events values ('%s', '%s','%s')" % (id, event_time, room_id))
+    c.execute("insert into events values (?, ?, ?)", (id, event_time, room_id))
 
     for key, values in event.attrs.items():
         for value in values:
-            c.execute("insert into attrs values ('%s', '%s','%s')" % (key, value, id))
-
-    print "collected:", room.room_jid, time.time()
+            c.execute("insert into attrs values (?, ?, ?)", (key, value, id))
 
     conn.commit()
 
@@ -101,18 +101,18 @@ class HistorianService(roomfarm.RoomFarm):
         yield inner.sub(room
                         | self.command_parser(room)
                         | events.stanzas_to_events()
-                        | self.collect()
+                        | self.collect(room)
                         | threado.throws())
 
     def session(self):
         return HistorianSession(self)
 
     @threado.stream
-    def collect(inner, self):
+    def collect(inner, self, room):
         while True:
             event = yield inner
 
-            save_event(self.conn, self.room, event)
+            save_event(self.conn, room, event)
             inner.send(event)
 
     @threado.stream
@@ -130,9 +130,9 @@ class HistorianService(roomfarm.RoomFarm):
                     if not command or command != "historian":
                         continue
 
-                    room_jid = unicode(room.room_jid)
+                    rjid = unicode(room.room_jid)
 
-                    for event_time, event_room, attrs in events_from_db(self.conn): #, room_jid):
+                    for etime, eroom, attrs in events_from_db(self.conn, rjid):
                         send = False
 
                         #simple OR
@@ -142,7 +142,7 @@ class HistorianService(roomfarm.RoomFarm):
                                     send = True
                                     break
 
-                            for value in keys.get(event_key, set()):
+                            for value in keyed.get(event_key, set()):
                                 if value in event_values:
                                     send = True
                                     break
@@ -152,9 +152,10 @@ class HistorianService(roomfarm.RoomFarm):
 
                         if send:
                             body = Element("body")
-                            body.text = "%s\n" % event_time
+                            body.text = "%s %s\n" % (etime, eroom)
                             for event_key, event_values in attrs.items():
-                                body.text += "%s: %s\n" % (event_key, ", ".join(event_values))
+                                vals = ", ".join(event_values)
+                                body.text += "%s: %s\n" % (event_key, vals)
                             room.send(body)
                             yield
 
@@ -175,7 +176,8 @@ def main(xmpp_jid, service_room, db_file, xmpp_password=None):
         print "Joining lobby", service_room
         lobby = yield services.join_lobby(xmpp, service_room, "historian")
 
-        yield inner.sub(lobby.offer("historian", HistorianService(xmpp, db_file)))
+        yield inner.sub(lobby.offer("historian", \
+                        HistorianService(xmpp, db_file)))
     return bot()
 main.service_room_help = "the room where the services are collected"
 main.xmpp_jid_help = "the XMPP username (e.g. user@xmpp.example.com)"
