@@ -2,78 +2,138 @@ import sqlite3
 import time
 from idiokit.xmpp import connect, Element
 from idiokit.jid import JID
-from idiokit import threado
+from idiokit import threado, timer
 from abusehelper.core import roomfarm, events, services
 
-def open_db(path=None):
-    if path is None:
-        path = ":memory:"
-    conn = sqlite3.connect(path)
+class HistoryDB(threado.GeneratorStream):
+    def __init__(self, path=None, keeptime=None):
+        threado.GeneratorStream.__init__(self)
 
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS events "+
-              "(id INTEGER PRIMARY KEY, timestamp INTEGER, room TEXT)")
-    c.execute("CREATE INDEX IF NOT EXISTS events_id_index ON events(id)")
+        if path is None:
+            path = ":memory:"
+        self.conn = sqlite3.connect(path)
 
-    c.execute("CREATE TABLE IF NOT EXISTS attrs "+
-              "(eventid INTEGER, key TEXT, value TEXT)")
-    c.execute("CREATE INDEX IF NOT EXISTS attrs_eventid_index ON attrs(eventid)")
+        cursor = self.conn.cursor()
 
-    conn.commit()
-    return conn
-
-def save_event(conn, room, event):
-    c = conn.cursor()
-
-    c.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
-              (int(time.time()), unicode(room.room_jid)))
-    eventid = c.lastrowid
-
-    for key, values in event.attrs.items():
-        for value in values:
-            c.execute("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
-                      (eventid, key, value))
-
-    conn.commit()
-
-def events_from_db(conn, room_id=None):
-    query = ("SELECT events.id, events.room, events.timestamp, attrs.key, attrs.value "+
-             "FROM attrs "+
-             "INNER JOIN events ON events.id=attrs.eventid ")
-    args = list()
-    
-    if room_id is not None:
-        query += "WHERE events.room=? "
-        args.append(room_id)
+        cursor.execute("CREATE TABLE IF NOT EXISTS events "+
+                       "(id INTEGER PRIMARY KEY, timestamp INTEGER, room INTEGER)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_id_index ON events(id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_room_ts_index ON events(room, timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_room_index ON events(room)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_ts_index ON events(timestamp)")
         
-    query += "ORDER BY attrs.eventid;"
+        cursor.execute("CREATE TABLE IF NOT EXISTS attrs "+
+                       "(eventid INTEGER, key TEXT, value TEXT)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS attrs_eventid_index ON attrs(eventid)")
 
-    attrs = dict()
-    previous_id = None
-    previous_ts = None
-    previous_room = None
-    for id, room, ts, key, value in conn.execute(query, args):
-        if previous_id != id:
-            if previous_id is not None:
-                yield previous_ts, previous_room, attrs
-            attrs = dict()
+        self.conn.commit()
+        self.keeptime = keeptime
+        self.cursor = self.conn.cursor()
 
-        previous_id = id
-        previous_ts = ts
-        previous_room = room
+        self.start()
 
-        attrs.setdefault(key, list())
-        attrs[key].append(value)
+    def collect(self, room_name):
+        collect = self._collect(room_name)
+        services.bind(self, collect)
+        return collect
 
-    if previous_id is not None:
-        yield previous_ts, previous_room, attrs
+    @threado.stream_fast
+    def _collect(inner, self, room_name):
+        while True:
+            yield inner
+                
+            for event in inner:
+                self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
+                                    (int(time.time()), room_name))
+                eventid = self.cursor.lastrowid
+        
+                for key, values in event.attrs.items():
+                    self.cursor.executemany("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
+                                            [(eventid, key, value) for value in values])
 
-def parse_command(message):
+    def run(self, interval=1.0):
+        try:
+            while True:
+                yield self.inner.sub(timer.sleep(interval))
+                list(self.inner)
+
+                if self.keeptime is not None:
+                    cutoff = int(time.time() - self.keeptime)
+                    
+                    max_id = self.cursor.execute("SELECT MAX(events.id) FROM events "+
+                                                 "WHERE events.timestamp <= ?", (cutoff,))
+                    
+                    max_id = list(max_id)[0][0]
+                    if max_id is not None:
+                        self.cursor.execute("DELETE FROM events WHERE events.id <= ?",
+                                            (max_id,))
+                        self.cursor.execute("DELETE FROM attrs WHERE attrs.eventid <= ?",
+                                            (max_id,))
+                self.conn.commit()
+                self.cursor = self.conn.cursor()
+        finally:
+            self.conn.commit()
+            self.conn.close()
+
+    def close(self):
+        self.throw(threado.Finished())
+
+    def find(self, room_name=None, start=None, end=None):
+        query = ("SELECT events.id, events.room, events.timestamp, attrs.key, attrs.value "+
+                 "FROM attrs "+
+                 "INNER JOIN events ON events.id=attrs.eventid ")
+        args = list()
+        where = list()
+    
+        if room_name is not None:
+            where.append("events.room = ?")
+            args.append(room_name)
+
+        if None not in (start, end):
+            where.append("events.timestamp BETWEEN ? AND ?")
+            args.append(start)
+            args.append(end)
+        elif start is not None:
+            where.append("events.timestamp >= ?")
+            args.append(start)
+        elif end is not None:
+            where.append("events.timestamp < ?")
+            args.append(end)
+
+        if where:
+            query += "WHERE " + " AND ".join(where) + " "
+        
+        query += "ORDER BY events.id"
+
+        event = events.Event()
+        previous_id = None
+        previous_ts = None
+        previous_room = None
+        for id, room, ts, key, value in self.conn.execute(query, args):
+            if previous_id != id:
+                if previous_id is not None:
+                    yield previous_ts, previous_room, event
+                event = events.Event()
+
+            previous_id = id
+            previous_ts = ts
+            previous_room = room
+
+            event.add(key, value)
+
+        if previous_id is not None:
+            yield previous_ts, previous_room, event
+
+def format_time(timestamp):
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+
+def parse_command(message, name):
     parts = message.text.split()
     if not len(parts) >= 2:
-        return None, dict(), set()
-
+        return None
     command = parts[0][1:]
+    if command != name:
+        return None
 
     keyed = dict()
     values = set()
@@ -85,7 +145,14 @@ def parse_command(message):
         elif len(pair) == 1:
             values.add(pair[0])
 
-    return command, keyed, values
+    def _match(event):
+        for event_key, event_values in event.attrs.iteritems():
+            if event_values & values:
+                return True
+            if event_values & keyed.get(event_key, set()):
+                return True
+        return False
+    return _match
 
 class HistorianSession(services.Session):
     def __init__(self, service):
@@ -96,16 +163,15 @@ class HistorianSession(services.Session):
     def config(inner, self, conf):
         if conf:
             self.service.rooms(self, *conf['rooms'])
-
+        else:
+            self.service.rooms(self)
         yield
         inner.finish(conf)
 
 class HistorianService(roomfarm.RoomFarm):
     def __init__(self, xmpp, db_file):
         roomfarm.RoomFarm.__init__(self, xmpp)
-
-        self.xmpp = xmpp
-        self.conn = open_db(db_file)
+        self.db = HistoryDB(db_file)
 
     @threado.stream
     def handle_room(inner, self, name):
@@ -114,68 +180,45 @@ class HistorianService(roomfarm.RoomFarm):
         yield inner.sub(room
                         | self.command_parser(room)
                         | events.stanzas_to_events()
-                        | self.collect(room)
+                        | self.db.collect(unicode(room.room_jid))
                         | threado.throws())
 
     def session(self):
         return HistorianSession(self)
 
-    @threado.stream
-    def collect(inner, self, room):
-        while True:
-            event = yield inner
-
-            save_event(self.conn, room, event)
-            inner.send(event)
-
-    @threado.stream
+    @threado.stream_fast
     def command_parser(inner, self, room):
         while True:
-            elements = yield inner
+            yield inner
 
-            for message in elements.named("message").with_attrs("from"):
-                sender = JID(message.get_attr("from"))
-                if sender == room.nick_jid:
-                    continue
+            for elements in inner:
+                inner.send(elements)
 
-                for body in message.children("body"):
-                    command, keyed, values = parse_command(body)
-                    if not command or command != "historian":
+                for message in elements.named("message").with_attrs("from"):
+                    sender = JID(message.get_attr("from"))
+                    if sender == room.nick_jid:
                         continue
 
-                    print "Got command", repr(body.text)
-                    rjid = unicode(room.room_jid)
+                    for body in message.children("body"):
+                        matcher = parse_command(body, "historian")
+                        if matcher is None:
+                            continue
 
-                    for etime, eroom, attrs in events_from_db(self.conn, rjid):
-                        send = False
+                        print "Got command", repr(body.text)
+                        rjid = unicode(room.room_jid)
+                        
+                        for etime, eroom, event in self.db.find(rjid):
+                            yield
 
-                        #simple OR
-                        for event_key, event_values in attrs.items():
-                            for value in values:
-                                if value in event_values:
-                                    send = True
-                                    break
+                            if not matcher(event):
+                                continue
 
-                            for value in keyed.get(event_key, set()):
-                                if value in event_values:
-                                    send = True
-                                    break
-
-                            if send:
-                                break
-
-                        if send:
-                            ts = time.strftime("%Y-%m-%d %H:%M:%S", 
-                                               time.localtime(etime))
                             body = Element("body")
-                            body.text = "%s %s\n" % (ts, eroom)
-                            for event_key, event_values in attrs.items():
+                            body.text = "%s %s\n" % (format_time(etime), eroom)
+                            for event_key, event_values in event.attrs.items():
                                 vals = ", ".join(event_values)
                                 body.text += "%s: %s\n" % (event_key, vals)
                             room.send(body)
-                            yield
-
-            inner.send(elements)
 
 def main(xmpp_jid, service_room, 
          db_file=None, xmpp_password=None, log_file=None):
