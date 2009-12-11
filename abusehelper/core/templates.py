@@ -1,13 +1,10 @@
-import csv
-import UserDict
+# -*- coding: utf-8 -*-
 
+import csv
+import codecs
 from cStringIO import StringIO
-from email.header import Header
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
+from idiokit.util import guess_encoding
 from email.mime.text import MIMEText
-from email.charset import Charset, QP
-from email.utils import formatdate, make_msgid, getaddresses, formataddr
 from email.encoders import encode_base64
 
 class Formatter(object):
@@ -21,38 +18,46 @@ class Constant(object):
     def format(self, obj, events):
         return self.value
 
-class AttachAndEmbed(object):
-    def __init__(self, formatter):
+class AttachAndEmbedUnicode(object):
+    def __init__(self, formatter, subtype="plain"):
         self.formatter = formatter
+        self.subtype = subtype
 
-    def format(self, msg, events, filename, *args):
-        data = self.formatter.format(msg, events, *args)
+    def format(self, parts, events, filename, *args):
+        data = self.formatter.format(parts, events, *args)
 
-        part = MIMEBase('text', "plain")
-        part.set_payload(data)
+        part = MIMEText(data.encode("utf-8"), self.subtype, "utf-8")
         encode_base64(part)
-        part.add_header('Content-Disposition', 
-                        'attachment; filename="%s"' % filename)
-        msg.attach(part)        
-        
+        part.add_header("Content-Disposition", 
+                        "attachment", 
+                        filename=filename)
+
+        parts.append(part)
         return data
 
-class Attach(AttachAndEmbed):
+class AttachUnicode(AttachAndEmbedUnicode):
     def format(self, *args, **keys):
-        AttachAndEmbed.format(self, *args, **keys)
-        return ""
+        AttachAndEmbedUnicode.format(self, *args, **keys)
+        return u""
 
-class EventDict(object):
-    def __init__(self, event):
+class _EventDict(object):
+    def __init__(self, event, encoder=unicode):
         self.event = event
+        self.encoder = encoder
 
     def __getitem__(self, key):
         values = self.event.attrs.get(key, None)
         if not values:
-            return ""
-        return list(values)[0]
+            return self.encoder(u"")
+        return self.encoder(u"äää")#list(values)[0])
 
 class CSVFormatter(object):
+    def _encode(self, string):
+        return string.encode("utf-8")
+
+    def _decode(self, string):
+        return string.decode("utf-8")
+
     def parse_fields(self, fields):
         for field in fields:
             split = field.split("=", 1)
@@ -69,14 +74,14 @@ class CSVFormatter(object):
         writer.writerow([key for (key, _) in fields])
 
         for event in events:
-            event = EventDict(event)
+            event = _EventDict(event, self._encode)
             writer.writerow([format % event for (_, format) in fields])
 
-        return stringio.getvalue()
+        return self._decode(stringio.getvalue())
 
 class Template(object):
     def __init__(self, data, **formatters):
-        self.data = data
+        self.data = guess_encoding(data)
         self.formatters = formatters
 
         self.obj = None
@@ -86,7 +91,6 @@ class Template(object):
         self.obj = obj
         self.events = events
         try:
-            print repr(self.data)
             return self.data % self
         finally:
             self.events = None
@@ -95,8 +99,8 @@ class Template(object):
     def __getitem__(self, key):
         for row in csv.reader([key]):
             if not row:
-                return ""
+                return u""
             row = [x.strip() for x in row]
             formatter = self.formatters[row[0]]
             return formatter.format(self.obj, self.events, *row[1:])
-        return ""
+        return u""
