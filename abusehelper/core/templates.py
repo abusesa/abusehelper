@@ -49,7 +49,7 @@ class _EventDict(object):
         values = self.event.attrs.get(key, None)
         if not values:
             return self.encoder(u"")
-        return self.encoder(u"äää")#list(values)[0])
+        return self.encoder(list(values)[0])
 
 class CSVFormatter(object):
     def _encode(self, string):
