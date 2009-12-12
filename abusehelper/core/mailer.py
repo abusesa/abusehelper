@@ -1,110 +1,22 @@
-# -*- coding: utf-8 -*-
-
-import csv
-import copy
 import time
 import collections
-from cStringIO import StringIO
 
 from idiokit import threado, timer
-from abusehelper.core import events, roomfarm, services
+from abusehelper.core import events, roomfarm, services, templates
 
-# Some XML output helpers
-def node_id_and_text(doc, parent, nodename, text='', **kw):
-    node = doc.createElement(nodename)
-    for key, value in kw.items():
-        node.setAttribute(key, value)
-    parent.appendChild(node)
+def next_time(time_string):
+    parsed = list(time.strptime(time_string, "%H:%M"))
+    now = time.localtime()
 
-    if text:
-        text = doc.createTextNode(text)
-        node.appendChild(text)
+    current = list(now)
+    current[3:6] = parsed[3:6]
 
-    return node
-
-def xml_report(rows):
-    """
-    Make a IODEF XML output string out of the normalised rows given
-
-    Produces valid IODEF with regards to:
-    http://xml.coverpages.org/draft-ietf-inch-iodef-14.txt
-    """
-    from xml.dom.minidom import Document, DocumentType, getDOMImplementation
-
-    # First, make the header
-    impl = getDOMImplementation()
-    doc = impl.createDocument(None, 'IODEF-Document', None)
-    top = doc.documentElement
-    top.setAttribute('lang', 'en')
-    top.setAttribute('version', "1.00")
-    top.setAttribute('xmlns', "urn:ietf:params:xml:ns:iodef-1.0")
-    top.setAttribute('xmlns:xsi', 
-                     "http://www.w3.org/2001/XMLSchema-instance")
-    top.setAttribute('xsi:schemaLocation',
-                     "https://www.cert.fi/autoreporter/IODEF-Document.xsd")
-
-    def ts_to_xml(ts):
-        return ts.replace(' ', 'T') + '+00:00'
-
-    for row in rows:
-        asn, ip, timestamp, ptr, cc, inc_type, ticket_nro, info = row
-
-        irt_name, irt_email, irt_phone, irt_url = '', '', '', ''
-        # May be defined per feed?
-        impact = 'unknown'
-        # Category required
-        category = 'unknown'
-
-        # Hardcoded purpose string, for now
-        inc_tag = node_id_and_text(doc, top, 
-                                   'Incident', purpose='mitigation')
-
-        node_id_and_text(doc, inc_tag, 'IncidentID', 
-                         ticket_nro, name=irt_url)
-        node_id_and_text(doc, inc_tag, 'ReportTime', 
-                         timestamp)
-                         #ts_to_xml(timestamp))
-
-        inc_ass = node_id_and_text(doc, inc_tag, 'Assessment')
-        node_id_and_text(doc, inc_ass, 'Impact', info,
-                         lang='en', type=impact)
-
-        # Provide contact details as described in config
-        if irt_name or irt_email or irt_phone:
-            contact = node_id_and_text(doc, inc_tag, 'Contact',
-                                       role="creator", type="organization")
-        if irt_name:
-            node_id_and_text(doc, contact, 'ContactName', irt_name)
-        if irt_email:
-            node_id_and_text(doc, contact, 'Email', irt_email)
-        if irt_phone:
-            node_id_and_text(doc, contact, 'Telephone', irt_phone)
-
-        event = node_id_and_text(doc, inc_tag, 'EventData')
-
-        # These are some default values for all entries, for now
-        node_id_and_text(doc, event, 'Description', inc_type)
-        node_id_and_text(doc, event, 'Expectation', action="investigate")
-        event = node_id_and_text(doc, event, 'EventData')
-        event = node_id_and_text(doc, event, 'Flow')
-
-        # Target system information is provided, whenever available
-        system = node_id_and_text(doc, event, 'System', 
-                                  category=category)
-
-        # Only show node if data exists
-        if ptr or ip or asn:
-            node = node_id_and_text(doc, system, 'Node')
-        if ptr:
-            node_id_and_text(doc, node, 'NodeName', ptr)
-        if ip:
-            node_id_and_text(doc, node, 'Address', ip, 
-                             category='ipv4-addr')
-        if asn:
-            node_id_and_text(doc, node, 'Address', asn, 
-                             category='asn')
-
-    return doc.toxml()
+    current_time = time.time()
+    delta = time.mktime(current) - current_time
+    if delta <= 0.0:
+        current[2] += 1
+        return time.mktime(current) - current_time
+    return delta
 
 @threado.stream
 def ticker(inner):
@@ -122,11 +34,8 @@ def ticker(inner):
         if inner.was_source:
             times = item
 
-        current_time = time.time()
-        next = set([interval - (current_time - offset) % interval 
-                    for (offset, interval) in times])
-        if next:
-            sleeper = timer.sleep(min(next))
+        if times:
+            sleeper = timer.sleep(min(map(next_time, times)))
         else:
             sleeper = threado.Channel()
 
@@ -150,46 +59,25 @@ class MailerSession(services.Session):
                 self.events.setdefault(email, list()).append(event)
 
     def create_reports(self, to, cc):
-        if not self.events:
-            return
-
         default = self.events.pop(None, ())
         for email in to:
             self.events.setdefault(email, list()).extend(default)
 
         for email, events in self.events.iteritems():
-            keys = list()
-            rows = list()
-            for event in events:
-                row, keys = normalise(event, keys)
-                rows.append(row)
-
-            string = StringIO()
-            encoder = lambda x: x.encode("utf-8")
-            
-            writer = csv.writer(string, delimiter='|', quoting=csv.QUOTE_NONE)
-            writer.writerow(map(encoder, keys))
-            for row in rows:
-                row += ("",) * (len(keys)-len(row))
-                writer.writerow(map(encoder, row))
-            csv_data = string.getvalue()
-
-            xml_data = xml_report(rows)
-
+            if not events:
+                continue
             if email in to:
-                yield [email], cc, (csv_data, xml_data)
+                yield [email], cc, events
             else:
-                yield [email], to + cc, (csv_data, xml_data)
+                yield [email], to + cc, events
         self.events.clear()
 
-    def prepare_mail(self, csv_data, xml_data, to, cc, subject, template):
+    def prepare_mail(self, events, to, cc, subject, template):
         from email.header import Header
         from email.mime.multipart import MIMEMultipart
-        from email.mime.base import MIMEBase
         from email.mime.text import MIMEText
         from email.charset import Charset, QP
         from email.utils import formatdate, make_msgid, getaddresses, formataddr
-        from email.encoders import encode_base64
         
         ENCODING = "utf-8"
         
@@ -214,25 +102,27 @@ class MailerSession(services.Session):
         del msg['Content-Transfer-Encoding']
         msg['Content-Transfer-Encoding'] = '7bit'
 
-        msg.attach(MIMEText(template, "plain", "utf-8"))
+        parts = list()
+        data = template.format(parts, events)
 
-        part = MIMEBase('text', "plain")
-        part.set_payload(csv_data)
-        encode_base64(part)
-        part.add_header('Content-Disposition', 
-                        'attachment; filename="report.csv"')
-        msg.attach(part)
-
-        part = MIMEBase('text', "xml")
-        part.set_payload(xml_data)
-        encode_base64(part)
-        part.add_header('Content-Disposition', 
-                        'attachment; filename="report.xml"')
-        msg.attach(part)
+        msg.attach(MIMEText(data.encode("utf-8"), "plain", "utf-8"))
+        for part in parts:
+            msg.attach(part)
 
         msg_data = msg.as_string()
         for to in to_addrs + cc_addrs:
             yield from_addr[1], to[1], subject, msg_data
+
+    def create_template(self, template):
+        csv = templates.CSVFormatter()
+        attach_csv = templates.AttachUnicode(csv)
+        embed_csv = templates.AttachAndEmbedUnicode(csv)
+
+        template = templates.Template(template, 
+                                      csv=csv,
+                                      attach_csv=attach_csv,
+                                      attach_and_embed_csv=embed_csv)
+        return template
 
     def run(self):
         alarm_ticker = ticker()
@@ -244,6 +134,7 @@ class MailerSession(services.Session):
                     self.add_event(item)
                 elif item is not None:
                     to, cc, subject, template, times = item
+                    template = self.create_template(template)
                     break
 
             alarm_ticker.send(times)
@@ -251,16 +142,16 @@ class MailerSession(services.Session):
                 item = yield self.inner, self.configs, alarm_ticker
 
                 if alarm_ticker.was_source:
-                    for to, cc, data in self.create_reports(to, cc):
-                        csv_data, xml_data = data
-                        prepare = self.prepare_mail(csv_data, xml_data, 
-                                                    to, cc, subject, template)
+                    print "KEKK"
+                    for to, cc, data in self.create_reports(to, cc):                        
+                        prepare = self.prepare_mail(data, to, cc, subject, template)
                         for from_addr, to_addr, subject, msg_str in prepare:
                             self.service.send(from_addr, to_addr, subject, msg_str)
                 elif self.inner.was_source:
                     self.add_event(item)
                 elif item is not None:
                     to, cc, subject, template, times = item
+                    template = self.create_template(template)
                     alarm_ticker.send(times)
                 else:
                     alarm_ticker.send([])
@@ -286,32 +177,6 @@ class MailerSession(services.Session):
             self.configs.send(to, cc, subject, template, times)
         yield
         inner.finish(conf)
-
-def normalise(event, keys):
-    attrs = copy.deepcopy(event.attrs)
-    row = list()
-
-    if u'dshield' in attrs.get('feed', ['']):
-        keys = ('asn', 'ip', 'timestamp', 'ptr', 
-                'cc', 'type', 'ticket', 'info')
-        row.extend([attrs['asn'].pop(), attrs['ip'].pop(), 
-                    attrs['updated'].pop(), '', '', 'scanners', 
-                    '0', "firstseen: %s lastseen: %s" % 
-                    (attrs['firstseen'].pop(), attrs['lastseen'].pop())])
-    else:
-        for key in keys:
-            values = attrs.get(key, None)
-            if values:
-                row.append(values.pop())
-            else:
-                row.append("")
-
-        for key, values in attrs.items():
-            for value in values:
-                keys.append(key)
-                row.append(value)
-
-    return tuple(row), keys
 
 class MailerService(roomfarm.RoomFarm):
     def __init__(self, xmpp, host, port, from_addr, username="", password=""):
