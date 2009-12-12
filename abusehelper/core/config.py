@@ -32,7 +32,7 @@ def parse_netblock(string):
 class CustomerDB(object):
     def __init__(self, filename):
         self.filename = os.path.abspath(filename)
-        self.was_opened = False
+        self.was_opened = True
         self.last_mod = None
         self.customers = list()
 
@@ -50,9 +50,9 @@ class CustomerDB(object):
             config = opts.ConfigParser(self.filename)
         except IOError, ioe:
             if self.was_opened:
-                print >> sys.stderr, "Couldn't open customer file %r", 
-                print >> sys.stderr, self.filename
+                print >> sys.stderr, "Couldn't open customer file %r" % self.filename
                 self.was_opened = False
+                self.customers = list()
                 return True
             return False
 
