@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
 import csv
-import codecs
 from cStringIO import StringIO
 from idiokit.util import guess_encoding
 from email.mime.text import MIMEText
