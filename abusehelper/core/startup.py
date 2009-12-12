@@ -4,7 +4,7 @@ import time
 import errno
 import signal
 import subprocess
-import ConfigParser
+from abusehelper.core import opts
 
 def all_running(processes):
     for process in processes:
@@ -26,13 +26,7 @@ def main(config_filename):
         sys.exit()
     signal.signal(signal.SIGTERM, signal_handler)
 
-    conf_parser = ConfigParser.SafeConfigParser()
-
-    conf_file = open(config_filename, "r")
-    try:
-        conf_parser.readfp(conf_file)
-    finally:
-        conf_file.close()
+    conf_parser = opts.ConfigParser(config_filename)
 
     processes = dict()
     for section in conf_parser.sections():
@@ -52,5 +46,4 @@ main.config_filename_help = ("launch processes based in this INI file, "+
                              "one per section ([DEFAULT] section not included)")
 
 if __name__ == "__main__":
-    from abusehelper.core import opts
     opts.optparse(main)

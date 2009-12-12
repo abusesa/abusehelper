@@ -4,6 +4,18 @@ import inspect
 from optparse import OptionParser
 from ConfigParser import SafeConfigParser
 
+class ConfigParser(SafeConfigParser):
+    def __init__(self, filename):
+        filename = os.path.abspath(filename)
+        directory, _ = os.path.split(filename)
+        SafeConfigParser.__init__(self, dict(__dir__=directory))
+
+        opened = open(filename, "r")
+        try:
+            self.readfp(opened)
+        finally:
+            opened.close()
+
 def long_name(key):
     return key.replace("_", "-").lower()
 
@@ -86,8 +98,7 @@ def optparse(func, argv=list(sys.argv[1:])):
 
     # Open and parse the INI configuration file, if given.
     if options.ini_file is not None:
-        config = SafeConfigParser()
-        config.read([options.ini_file])
+        config = ConfigParser(options.ini_file)
 
         section = options.ini_section
         argv = list(argv)
