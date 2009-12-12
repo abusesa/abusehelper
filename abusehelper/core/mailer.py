@@ -142,7 +142,6 @@ class MailerSession(services.Session):
                 item = yield self.inner, self.configs, alarm_ticker
 
                 if alarm_ticker.was_source:
-                    print "KEKK"
                     for to, cc, data in self.create_reports(to, cc):                        
                         prepare = self.prepare_mail(data, to, cc, subject, template)
                         for from_addr, to_addr, subject, msg_str in prepare:
