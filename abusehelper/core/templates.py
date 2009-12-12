@@ -5,7 +5,6 @@ import codecs
 from cStringIO import StringIO
 from idiokit.util import guess_encoding
 from email.mime.text import MIMEText
-from email.encoders import encode_base64
 
 class Formatter(object):
     def format(self, result, events, *args):
@@ -27,7 +26,6 @@ class AttachAndEmbedUnicode(object):
         data = self.formatter.format(parts, events, *args)
 
         part = MIMEText(data.encode("utf-8"), self.subtype, "utf-8")
-        encode_base64(part)
         part.add_header("Content-Disposition", 
                         "attachment", 
                         filename=filename)
