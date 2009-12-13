@@ -41,9 +41,9 @@ def ticker(inner):
 
 class MailerSession(services.Session):
     def __init__(self, service, from_addr):
-        services.Session.__init__(self)
+        services.Session.__init__(self, fast=True)
 
-        self.events = dict()
+        self.events = collections.defaultdict(events.EventCollector)
         self.configs = threado.Channel()
 
         self.service = service
@@ -51,25 +51,27 @@ class MailerSession(services.Session):
         self.room_name = None
 
     def add_event(self, event):
-        emails = event.attrs.get("email", list())
-        if not emails:
-            self.events.setdefault(None, list()).append(event)
-        else:
-            for email in emails:
-                self.events.setdefault(email, list()).append(event)
+        emails = event.attrs.get("email", [None])
+        for email in emails:
+            self.events[email].append(event)
 
     def create_reports(self, to, cc):
-        default = self.events.pop(None, ())
-        for email in to:
-            self.events.setdefault(email, list()).extend(default)
+        emails = collections.defaultdict(events.EventList)
+        emails.update((key, value.purge())
+                      for (key, value) 
+                      in self.events.iteritems())
 
-        for email, events in self.events.iteritems():
-            if not events:
+        default = emails.pop(None)
+        for email in to:
+            emails[email].extend(default)
+
+        for email, event_list in emails.iteritems():
+            if not event_list:
                 continue
             if email in to:
-                yield [email], cc, events
+                yield [email], cc, event_list
             else:
-                yield [email], to + cc, events
+                yield [email], to + cc, event_list
         self.events.clear()
 
     def prepare_mail(self, events, to, cc, subject, template):
@@ -128,33 +130,24 @@ class MailerSession(services.Session):
         alarm_ticker = ticker()
 
         while True:
-            while True:
-                item = yield self.inner, self.configs
-                if self.inner.was_source:
-                    self.add_event(item)
-                elif item is not None:
-                    to, cc, subject, template, times = item
-                    template = self.create_template(template)
-                    break
+            yield self.inner, self.configs, alarm_ticker
 
-            alarm_ticker.send(times)
-            while True:
-                item = yield self.inner, self.configs, alarm_ticker
-
-                if alarm_ticker.was_source:
-                    for to, cc, data in self.create_reports(to, cc):                        
-                        prepare = self.prepare_mail(data, to, cc, subject, template)
-                        for from_addr, to_addr, subject, msg_str in prepare:
-                            self.service.send(from_addr, to_addr, subject, msg_str)
-                elif self.inner.was_source:
-                    self.add_event(item)
-                elif item is not None:
-                    to, cc, subject, template, times = item
+            for config in self.configs:
+                if config is None:
+                    alarm_ticker.send([])
+                else:
+                    to, cc, subject, template, times = config
                     template = self.create_template(template)
                     alarm_ticker.send(times)
-                else:
-                    alarm_ticker.send([])
-                    break
+
+            for event in self.inner:
+                self.add_event(event)
+
+            for _ in alarm_ticker:
+                for to, cc, data in self.create_reports(to, cc):                        
+                    prepare = self.prepare_mail(data, to, cc, subject, template)
+                    for from_addr, to_addr, subject, msg_str in prepare:
+                        self.service.send(from_addr, to_addr, subject, msg_str)
         
     @threado.stream
     def config(inner, self, conf):
