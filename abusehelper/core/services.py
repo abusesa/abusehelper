@@ -131,24 +131,25 @@ class Lobby(threado.GeneratorStream):
     def run(self):
         yield self.inner.sub(self.room | self._run())
 
-    @threado.stream
+    @threado.stream_fast
     def _run(inner, self):
         while True:
-            elements = yield inner
+            yield inner
 
-            for message in elements.named("message").with_attrs("from"):
-                for end in message.children("end", SERVICE_NS).with_attrs("id"):
-                    jid = JID(message.get_attr("from"))
-                    session_id = end.get_attr("id")
-                    self._discard_session(jid, session_id)
+            for elements in inner:
+                for message in elements.named("message").with_attrs("from"):
+                    for end in message.children("end", SERVICE_NS).with_attrs("id"):
+                        jid = JID(message.get_attr("from"))
+                        session_id = end.get_attr("id")
+                        self._discard_session(jid, session_id)
 
-            presences = elements.named("presence").with_attrs("from")
-            for presence in presences:
-                jid = JID(presence.get_attr("from"))
-                if presence.with_attrs(type="unavailable"):
-                    self._discard_jid(jid, Unavailable())
-                else:
-                    self._update_catalogue(jid, presence.children())
+                presences = elements.named("presence").with_attrs("from")
+                for presence in presences:
+                    jid = JID(presence.get_attr("from"))
+                    if presence.with_attrs(type="unavailable"):
+                        self._discard_jid(jid, Unavailable())
+                    else:
+                        self._update_catalogue(jid, presence.children())
 
     def _discard_session(self, jid, session_id, reason=threado.Finished()):
         if jid in self.jids:
