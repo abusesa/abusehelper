@@ -26,7 +26,7 @@ def main(config_file, enable=None, disable=None):
         sys.exit()
     signal.signal(signal.SIGTERM, signal_handler)
 
-    conf_parser = opts.ConfigParser(config_file)
+    config = opts.ConfigParser(config_file)
 
     if enable is not None:
         enable = set(x.strip() for x in enable.split(","))
@@ -34,12 +34,17 @@ def main(config_file, enable=None, disable=None):
         disable = set(x.strip() for x in disable.split(","))
 
     processes = dict()
-    for section in conf_parser.sections():
+    for section in config.sections():
         if disable is not None and section in disable:
             continue
         if enable is not None and section not in enable:
             continue
-        process = subprocess.Popen([sys.executable, "-u", "-m", section,
+        if not config.has_option(section, "module"):
+            continue
+        module = config.get(section, "module")
+
+        process = subprocess.Popen([sys.executable, "-u", 
+                                    "-m", module,
                                     "--ini-file", config_file,
                                     "--ini-section", section])
         processes[section] = process
