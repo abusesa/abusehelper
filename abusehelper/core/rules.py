@@ -128,11 +128,12 @@ class CONTAINS(_Rule):
 CONTAINS.serialize_register()
 
 import struct
-from socket import inet_aton, error
+from socket import inet_pton, AF_INET, AF_INET6, error
+
+class NETBLOCKError(Exception):
+    pass
 
 class NETBLOCK(_Rule):
-    unpack_ip = struct.Struct("!I").unpack
-
     @classmethod
     def dump_rule(cls, dump, name, rule):
         element = Element(name, ip=rule.ip, bits=rule.bits)
@@ -156,14 +157,21 @@ class NETBLOCK(_Rule):
             keys = serialize.load_list(load, child)
         return cls(ip, bits, keys)
 
-    def ip_to_num(self, ip):
+    _unpack_ipv4 = struct.Struct("!I").unpack
+    _unpack_ipv6 = struct.Struct("!QQ").unpack
+    def parse_ip(self, ip):
         try:
-            packed = inet_aton(ip)
+            packed = inet_pton(AF_INET, ip)
+            return 4, self._unpack_ipv4(packed)[0]
         except error:
-            return None
-        return self.unpack_ip(packed)[0]
+            try:
+                packed = inet_pton(AF_INET6, ip)
+                hi, lo = self._unpack_ipv6(packed)
+                return 6, ((hi << 64) | lo)
+            except error:
+                return None
 
-    def __init__(self, ip, bits, keys=None):
+    def __init__(self, ip, bits, keys=["ip"]):
         if keys is not None:
             keys = frozenset(keys)
 
@@ -173,8 +181,17 @@ class NETBLOCK(_Rule):
         self.bits = bits
         self.keys = keys
 
-        self.mask = ((1<<32)-1) ^ ((1<<(32-bits))-1)
-        self.ip_num = self.ip_to_num(ip) & self.mask
+        parsed = self.parse_ip(ip)
+        if parsed is None:
+            raise NETBLOCKError("could not parse IP %r" % ip)
+        self.version, self.ip_num = parsed
+        assert self.version in (4, 6)
+
+        if self.version == 4:
+            self.mask = ((1<<32)-1) ^ ((1<<(32-bits))-1)
+        elif self.version == 6:
+            self.mask = ((1<<128)-1) ^ ((1<<(128-bits))-1)
+        self.ip_num &= self.mask
 
     def __call__(self, event):
         if self.keys is None:
@@ -185,8 +202,11 @@ class NETBLOCK(_Rule):
         for key in keys:
             values = event.attrs.get(key, ())
             for value in values:
-                ip_num = self.ip_to_num(value)
-                if ip_num is None:
+                parsed = self.parse_ip(value)
+                if parsed is None:
+                    continue
+                version, ip_num = parsed
+                if version != self.version:
                     continue
                 if ip_num & self.mask == self.ip_num:
                     return True
@@ -200,25 +220,33 @@ class MockEvent(object):
         self.attrs = dict(keys)
 
 class NetblockTests(unittest.TestCase):
+    def test_match_ipv6(self):
+        rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
+        assert rule(MockEvent(ip=["2001:0db8:aaaa:bbbb:cccc::"]))
+
+    def test_non_match_ipv6(self):
+        rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
+        assert not rule(MockEvent(ip=["::1"]))
+
     def test_match_arbitrary_key(self):
-        rule = NETBLOCK("1.2.3.4", 24)
+        rule = NETBLOCK("1.2.3.4", 24, keys=None)
         assert rule(MockEvent(somekey=["1.2.3.255"]))
 
     def test_non_match_arbitrary_key(self):
-        rule = NETBLOCK("1.2.3.4", 24)
+        rule = NETBLOCK("1.2.3.4", 24, keys=None)
         assert not rule(MockEvent(somekey=["1.2.4.255"]))
 
-    def test_match_given_key(self):
-        rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
+    def test_match_ip_key(self):
+        rule = NETBLOCK("1.2.3.4", 24)
         assert rule(MockEvent(somekey=["4.5.6.255"], ip=["1.2.3.255"]))
 
-    def test_nonmatch_given_key(self):
+    def test_nonmatch_ip_key(self):
         rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
         assert not rule(MockEvent(somekey=["4.5.6.255"], ip=["1.2.4.255"]))
 
     def test_non_match_non_ip_data(self):
         rule = NETBLOCK("1.2.3.4", 24)
-        assert not rule(MockEvent(somekey=["this is just some data"]))
+        assert not rule(MockEvent(ip=["this is just some data"]))
 
 if __name__ == "__main__":
     unittest.main()
