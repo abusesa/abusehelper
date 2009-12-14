@@ -1,6 +1,4 @@
-#!/bin/sh -x
-
-
+#!/bin/sh 
 myerr() {
  echo "$*" >&2
  exit 1
@@ -28,7 +26,7 @@ LOG="${LOGDIR}/abusehelper.log"
 
 USER="abusehel"
 
-CFG="/etc/abusehelper/startup.cfg"
+CFG="/etc/abusehelper/config.ini"
 AHCMD="python -u -m abusehelper.core.startup"
 STARTCMD="${AHCMD} ${CFG}"
 
@@ -49,9 +47,16 @@ case "$1" in
 	pkill -f "${STARTCMD}"
 	;;
 
+    restart)
+	$0 stop
+	sleep 3
+	$0 start
+	;;
     status)
 	pgrep -l -f "python -u -m abusehelper"
-
+	;;
+    init)
+	echo 'nothing yet'
 	;;
     *)
 	myerr "Usage: $0 <start|stop|status>"
