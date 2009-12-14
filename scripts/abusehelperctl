@@ -67,7 +67,9 @@ case "$1" in
 	$0 start
 	;;
     status)
-	pgrep -l -f "python -u -m abusehelper"
+	ps aux|fgrep 'abusehelper'|fgrep 'python' |fgrep -v ${SU}|fgrep -v fgrep | \
+	        fgrep -v 'sh -c'| tr -s " "  
+
 	;;
     init)
 	echo 'nothing yet'
