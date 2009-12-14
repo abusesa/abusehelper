@@ -61,7 +61,7 @@ class MailerSession(services.Session):
                       for (key, value) 
                       in self.events.iteritems())
 
-        default = emails.pop(None)
+        default = emails.pop(None, events.EventList())
         for email in to:
             emails[email].extend(default)
 
