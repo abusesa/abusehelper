@@ -30,7 +30,14 @@ CFG="/etc/abusehelper/config.ini"
 AHCMD="python -u -m abusehelper.core.startup"
 STARTCMD="${AHCMD} ${CFG}"
 
-
+case $(uname) in
+    Darwin)
+	SU="su -"
+	;;
+    *)
+	SU="su"
+	;;
+esac
 
 case "$1" in
     start)
@@ -40,11 +47,18 @@ case "$1" in
 
 	[ -d ${LOGDIR} ] || create_logdir
 
-        su -c "${STARTCMD} >${LOG} 2>&1" ${USER} &
+        ${SU} ${USER} -c "${STARTCMD} >${LOG} 2>&1" &
 	;;
 
     stop)
-	pkill -f "${STARTCMD}"
+	for i in $(ps aux|fgrep "${STARTCMD}"|fgrep -v ${SU} | \
+	    fgrep -v fgrep |fgrep -v bas | awk  '{print $2}')
+	do
+	    echo "kill $i"
+            ${SU} ${USER} -c "kill $i"
+	done
+
+	#pkill -f "${STARTCMD}"
 	;;
 
     restart)
