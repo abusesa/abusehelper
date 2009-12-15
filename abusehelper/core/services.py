@@ -295,7 +295,7 @@ class Service(threado.GeneratorStream):
             type, exc, tb = sys.exc_info()
 
             for session in self.sessions.values():
-                session.rethrow()
+                session.throw(Stop())
             for session in self.sessions.values():
                 while not session.has_result():
                     try:
