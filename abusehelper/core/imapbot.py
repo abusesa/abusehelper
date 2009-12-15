@@ -62,7 +62,6 @@ def find_payload(mailbox, num, path=()):
 
 @threado.stream
 def fetch_url(inner, url, filename_rex):
-    print "Fetching url", url
     opened = urllib2.urlopen(url)
 
     try:
@@ -175,8 +174,8 @@ class ImapbotService(roomfarm.RoomFarm):
             self.rooms(inner)
 
 def main(name, xmpp_jid, service_room, mail_server, mail_user,
-         xmpp_password=None, mail_password=None, filter=None, url_rex=None,
-         filename_rex=None, log_file=None):
+         xmpp_password=None, mail_password=None, state_file=None,
+         filter=None, url_rex=None, filename_rex=None, log_file=None):
 
     import getpass
     from idiokit.xmpp import connect
@@ -184,7 +183,9 @@ def main(name, xmpp_jid, service_room, mail_server, mail_user,
 
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
-        mail_password = xmpp_password
+
+    if not mail_password:
+        mail_password = getpass.getpass("Mail password: ")
 
     logger = log.config_logger(name, filename=log_file)
 
