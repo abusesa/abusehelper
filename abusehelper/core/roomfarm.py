@@ -42,10 +42,8 @@ class Counter(object):
             yield key, set(values)
 
 class RoomFarm(services.Service):
-    def __init__(self, xmpp):
-        services.Service.__init__(self)
-
-        self.xmpp = xmpp
+    def __init__(self, *args, **keys):
+        services.Service.__init__(self, *args, **keys)
 
         self.room_handlers = dict()
         self.room_counter = Counter()
@@ -54,7 +52,7 @@ class RoomFarm(services.Service):
     def _check_room(self, name):
         if self.room_counter.contains(name):
             return
-        if name in self.room_handlers:
+        if name not in self.room_handlers:
             return
         self.room_handlers.pop(name).throw(threado.Finished())        
 
