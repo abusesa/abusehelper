@@ -1,8 +1,8 @@
 import sys
 import uuid
 import random
-import contextlib
 from idiokit import threado
+from idiokit.core import XMPPError
 from idiokit.jid import JID
 from idiokit.xmlcore import Element
 from abusehelper.core import serialize
@@ -22,6 +22,14 @@ def bind(parent, child):
                 parent.rethrow()
     parent.add_finish_callback(_bind)
     child.add_finish_callback(_bind)
+
+@threado.stream
+def mask_errors(inner):
+    try:
+        while True:
+            yield inner
+    except:
+        pass
 
 class SessionError(Exception):
     pass
@@ -51,12 +59,12 @@ class Lobby(threado.GeneratorStream):
         self.start()
 
     @threado.stream
-    def session(inner, self, service_id, *path, **conf):
+    def _try_session(inner, self, service_id, *path, **conf):
         matches = list()
         for jid, service_ids in self.catalogue.items():
             if service_id in service_ids:
                 matches.append(jid)
-
+                
         if matches:
             jid = random.choice(matches)
         else:
@@ -81,11 +89,26 @@ class Lobby(threado.GeneratorStream):
         conf_element.add(serialize.dump(conf))
         start.add(conf_element)
 
-        result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
+        try:
+            result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
+        except XMPPError, error:
+            if error.type != "cancel":
+                raise
+            inner.finish()
+        inner.finish(jid, result)
+
+    @threado.stream
+    def session(inner, self, service_id, *path, **conf):
+        while True:
+            result = yield self._try_session(service_id, *path, **conf)
+            if result is not None:
+                break
+        jid, result = result
+
         for start in result.children("start", SERVICE_NS).with_attrs("id"):
             session_id = start.get_attr("id")
             session = self._catch(jid, session_id)
-            bind(self, session)
+            bind(self, session | mask_errors())
 
             sessions = self.jids.setdefault(jid, dict())
             sessions[session_id] = session
