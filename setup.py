@@ -6,4 +6,5 @@ setup(name="abusehelper",
                 "abusehelper.thirdparty",
                 "abusehelper.year3000",
                 "idiokit"],
+      scripts=["scripts/abusehelperctl"]
       )
