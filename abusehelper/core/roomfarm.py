@@ -54,7 +54,7 @@ class RoomFarm(services.Service):
             return
         if name not in self.room_handlers:
             return
-        self.room_handlers.pop(name).throw(threado.Finished())        
+        self.room_handlers.pop(name).throw(threado.Finished())
 
     def rooms(self, key, *names):
         for name in names:

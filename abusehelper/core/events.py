@@ -78,7 +78,22 @@ def events_to_elements(inner, include_body=True):
 class EventCollector(object):
     def __init__(self, compresslevel=6):
         self.stringio = StringIO()
+        self.compresslevel = compresslevel
         self.gz = gzip.GzipFile(None, "w", compresslevel, self.stringio)
+
+    def __setstate__(self, (compresslevel, data)):
+        self.stringio = StringIO()
+        self.stringio.write(data)
+        self.compresslevel = compresslevel
+        self.gz = gzip.GzipFile(None, "a", compresslevel, self.stringio)
+
+    def __getstate__(self):
+        self.gz.flush()
+        self.gz.close()
+        state = self.compresslevel, self.stringio.getvalue()
+        self.stringio.close()
+        self.__setstate__(state)
+        return state
         
     def append(self, event):
         self.gz.write(repr(event.attrs) + os.linesep)

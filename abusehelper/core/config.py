@@ -7,9 +7,6 @@ import traceback
 from idiokit import threado, timer
 from abusehelper.core import opts, rules, services
 
-class Cancel(Exception):
-    pass
-
 class frozendict(dict):
     def __init__(self, *args, **keys):
         dict.__init__(self, *args, **keys)
@@ -91,10 +88,11 @@ class Customer(object):
             self.feeds[feed] = feed_template, feed_times, feed_emails, feed_pgp
 
 class Config(threado.GeneratorStream):
-    def __init__(self, lobby, filename, room_prefix, template_dir, 
+    def __init__(self, name, lobby, filename, room_prefix, template_dir, 
                  interval=1.0):
         threado.GeneratorStream.__init__(self)
 
+        self.name = name
         self.lobby = lobby
         self.interval = interval
         self.room_prefix = room_prefix
@@ -128,7 +126,7 @@ class Config(threado.GeneratorStream):
                     self.confs[key] = self.setup(*key)
                     services.bind(self, self.confs[key])
                 for key in set(self.confs) - confs:
-                    self.confs.pop(key).throw(Cancel())
+                    self.confs.pop(key).throw(threado.Finished())
 
             yield self.inner, timer.sleep(self.interval)
 
@@ -176,46 +174,44 @@ class Config(threado.GeneratorStream):
                         print >> sys.stderr, "Couldn't open template %r" % template
                         continue
 
+                    path = self.name, customer.name, feed
                     asn_room = self.room_prefix + "." + feed + ".asn" + unicode(asn)
                     mail_room = asn_room + "." + name
 
-                    yield "historian", frozendict(rooms=(asn_room, mail_room))
-                    yield "roomgraph", frozendict(src=asn_room,
-                                                  dst=mail_room,
-                                                  filter=rule)
-                    yield "mailer", frozendict(to=emails, 
-                                               room=mail_room,
-                                               subject="Report for ASN" + unicode(asn),
-                                               template=template,
-                                               times=times)
-                    yield feed, frozendict(asn=asn, room=asn_room)
+                    yield "historian", path, frozendict(rooms=(asn_room, mail_room))
+                    yield "roomgraph", path, frozendict(src=asn_room,
+                                                        dst=mail_room,
+                                                        rule=rule)
+                    yield "mailer", path, frozendict(to=emails, 
+                                                     room=mail_room,
+                                                     subject=("Report for ASN" + 
+                                                              unicode(asn)),
+                                                     template=template,
+                                                     times=times)
+                    yield feed, path, frozendict(asn=asn, room=asn_room)
 
     @threado.stream
-    def setup(inner, self, service, conf):
-        try:
-            while True:
-                print "waiting for", service
-                session = yield inner.sub(self.lobby.session(service))
+    def setup(inner, self, service, path, conf):
+        while True:
+            print "waiting for", repr(service), "session", repr(path)
+            session = yield inner.sub(self.lobby.session(service, *path, **conf))
+            if session is None:
+                break
 
-                try:
-                    yield inner.sub(session.config(**conf))
-                    print "sent", service, "conf:"
-                    for key, value in conf.iteritems():
-                        print "", repr(key), "=", repr(value)
+            print "sent", repr(service), "session", repr(path), "conf:"
+            for key, value in conf.iteritems():
+                print "", repr(key), "=", repr(value)
+                
+            try:
+                yield inner.sub(session)
+            except services.Stop:
+                print "lost connection to", repr(service), "session", repr(path)
+            else:
+                print "ended connection to", repr(service), "session", repr(path)
+                break
 
-                    yield inner, session
-                except:
-                    if inner.was_source:
-                        session.send(threado.Finished())
-                        raise
-                    print "lost connection to", service, ":\n", traceback.format_exc()
-                else:
-                    print "lost connection to", service
-        except Cancel:
-            pass
-
-def main(xmpp_jid, service_room, customer_file, template_dir,
-         xmpp_password=None, log_file=None):
+def main(name, xmpp_jid, service_room, customer_file, template_dir,
+         service_name=None, xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
     from abusehelper.core import log
@@ -223,7 +219,7 @@ def main(xmpp_jid, service_room, customer_file, template_dir,
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
 
-    logger = log.config_logger("config2", filename=log_file)
+    logger = log.config_logger(name, filename=log_file)
 
     @threado.stream
     def bot(inner):
@@ -232,10 +228,10 @@ def main(xmpp_jid, service_room, customer_file, template_dir,
         xmpp.core.presence()
 
         print "Joining lobby", service_room
-        lobby = yield services.join_lobby(xmpp, service_room, "config2")
+        lobby = yield services.join_lobby(xmpp, service_room, name)
         logger.addHandler(log.RoomHandler(lobby.room))
 
-        config = Config(lobby, customer_file, service_room, template_dir)
+        config = Config(name, lobby, customer_file, service_room, template_dir)
         yield inner.sub(lobby | config)
     return bot()
 main.customer_file_help = "the customer database file"

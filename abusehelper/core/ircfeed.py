@@ -40,34 +40,12 @@ def parse(inner):
 
         inner.send(event)
 
-class IRCFeedSession(services.Session):
-    def __init__(self, service):
-        services.Session.__init__(self)
-        self.service = service
-        self.previous = None
-
-    @threado.stream
-    def config(inner, self, conf):
-        self.dsts.dec(self.previous)
-
-        if conf is None:
-            self.service.rooms(self)
-            self.previous = None
-        else:
-            room = self.service.rooms(self, conf["room"])
-            self.dsts.inc(room)
-            self.previous = room
-
-        yield
-        inner.finish(conf)
-
 class IRCFeedService(roomfarm.RoomFarm):
     def __init__(self, xmpp, 
                  host, port, channel, own_nick, feed_nick, password, use_ssl):
-        roomfarm.RoomFarm.__init__(self, xmpp)
+        roomfarm.RoomFarm.__init__(self)
 
-        self.dsts = roomfarm.Counter()
-
+        self.xmpp = xmpp
         self.host = host
         self.port = port
         self.channel = channel
@@ -76,36 +54,61 @@ class IRCFeedService(roomfarm.RoomFarm):
         self.password = password
         self.use_ssl = use_ssl
 
+        self.dsts = roomfarm.Counter()
+
     @threado.stream_fast
     def distribute(inner, self):
         while True:
             yield inner
 
-            for event in self.inner:
+            for event in inner:
                 for room, _ in self.dsts:
                     room.send(event)
 
     @threado.stream
     def handle_room(inner, self, name):
+        print "Joining room", repr(name)
         room = yield inner.sub(self.xmpp.muc.join(name))
-        yield inner.sub(events.events_to_elements()
-                        | room
-                        | threado.throws())
+        print "Joined room", repr(name)
+        try:
+            yield inner.sub(events.events_to_elements()
+                            | room
+                            | threado.throws())
+        finally:
+            print "Left room", repr(name)
 
-    def run(self):
-        irc = IRC(self.host, self.port, ssl=self.use_ssl)
-        print "Connecting IRC server", self.host, "port", self.port
-        yield irc.connect(self.own_nick, password=self.password)
-        print "Connected IRC server", self.host, "port", self.port
-        irc.join(self.channel)
-        print "Joined IRC channel", self.channel
+    @threado.stream
+    def session(inner, self, state, room, **keys):
+        room = self.rooms(inner, room)
+        self.dsts.inc(room)
+        try:
+            while True:
+                yield inner
+        except services.Stop:
+            inner.finish()
+        finally:
+            self.dsts.dec(room)
+            self.rooms(inner)
 
-        yield self.inner.sub(irc 
-                             | filter(self.channel, self.feed_nick) 
-                             | parse()
-                             | self.distribute())
+    @threado.stream
+    def main(inner, self, state):
+        try:
+            irc = IRC(self.host, self.port, ssl=self.use_ssl)
+            print "Connecting IRC server", self.host, "port", self.port
+            yield inner.sub(irc.connect(self.own_nick, password=self.password))
+            print "Connected IRC server", self.host, "port", self.port
+            irc.join(self.channel)
+            print "Joined IRC channel", self.channel
+            
+            yield inner.sub(irc 
+                            | filter(self.channel, self.feed_nick) 
+                            | parse()
+                            | self.distribute())
+        except services.Stop:
+            inner.finish()
 
-def main(xmpp_jid,
+def main(name,
+         xmpp_jid,
          xmpp_password,
          service_room,
          irc_host,
@@ -123,7 +126,7 @@ def main(xmpp_jid,
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
 
-    logger = log.config_logger("ircfeed", filename=log_file)
+    logger = log.config_logger(name, filename=log_file)
 
     @threado.stream
     def bot(inner):
@@ -132,14 +135,14 @@ def main(xmpp_jid,
         xmpp.core.presence()
 
         print "Joining lobby", service_room
-        lobby = yield services.join_lobby(xmpp, service_room, "ircfeed")
+        lobby = yield services.join_lobby(xmpp, service_room, name)
         logger.addHandler(log.RoomHandler(lobby.room))
 
         service = IRCFeedService(xmpp, irc_host, irc_port, 
                                  irc_channel, irc_own_nick, irc_feed_nick, 
                                  irc_password, irc_use_ssl)
-        yield inner.sub(lobby.offer("ircfeed", service))
-    threado.run(bot())
+        yield inner.sub(lobby.offer(name, service))
+    return bot()
 main.xmpp_jid_help = "the XMPP username (e.g. user@xmpp.example.com)"
 main.xmpp_password_help = "the XMPP password"
 main.service_room_help = "the room where the services are collected"
@@ -153,4 +156,4 @@ main.irc_password_help = "the IRC password used (default: no password)"
 
 if __name__ == "__main__":
     from abusehelper.core import opts
-    opts.optparse(main)
+    threado.run(opts.optparse(main), throw_on_signal=services.Stop())

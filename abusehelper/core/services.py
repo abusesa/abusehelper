@@ -14,7 +14,7 @@ def bind(parent, child):
         try:
             result = source.result()
             if source is parent:
-                child.throw(threado.Finished(result))
+                child.throw(threado.Finished())
         except:
             if source is parent:
                 child.rethrow()
@@ -26,29 +26,16 @@ def bind(parent, child):
 class SessionError(Exception):
     pass
 
-class Unavailable(threado.Finished):
+class Stop(Exception):
     pass
 
-@threado.stream
-def iq_handler(inner, xmpp, element):
-    try:
-        try:
-            result = yield inner
-        except SessionError:
-            raise
-        except:
-            _, exc, tb = sys.exc_info()
-            raise SessionError("Session handling failed: " + repr(exc))
-    except SessionError, se:
-        msg = se.args[0]
-        error = xmpp.core.build_error("cancel", "session-failure", msg)
-        xmpp.core.iq_error(element, error)
-    else:
-        xmpp.core.iq_result(element, result)
+class Unavailable(Stop):
+    pass
 
 class Lobby(threado.GeneratorStream):
     def __init__(self, xmpp, room):
         threado.GeneratorStream.__init__(self)
+
         self.xmpp = xmpp
         self.room = room
 
@@ -61,11 +48,10 @@ class Lobby(threado.GeneratorStream):
             self._update_catalogue(participant.name, participant.payload)
 
         self.xmpp.core.add_iq_handler(self.handle_iq, "start", SERVICE_NS)
-        self.xmpp.core.add_iq_handler(self.handle_iq, "config", SERVICE_NS)
         self.start()
 
     @threado.stream
-    def session(inner, self, service_id):
+    def session(inner, self, service_id, *path, **conf):
         matches = list()
         for jid, service_ids in self.catalogue.items():
             if service_id in service_ids:
@@ -87,20 +73,25 @@ class Lobby(threado.GeneratorStream):
                     self.waiters.pop(service_id, None)
 
         start = Element("start", xmlns=SERVICE_NS, id=service_id)
-        result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
+        if path:
+            path_element = Element("path")
+            path_element.add(serialize.dump(path))
+            start.add(path_element)
+        conf_element = Element("config")
+        conf_element.add(serialize.dump(conf))
+        start.add(conf_element)
 
+        result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
         for start in result.children("start", SERVICE_NS).with_attrs("id"):
             session_id = start.get_attr("id")
-            session = RemoteSession(self.xmpp, jid, session_id)
-            session.start()
+            session = self._catch(jid, session_id)
             bind(self, session)
 
             sessions = self.jids.setdefault(jid, dict())
             sessions[session_id] = session
-            session | self._catch(jid, session_id)
             inner.finish(session)
         else:
-            raise SessionError("No service ID received")
+            raise SessionError("No session ID received")
 
     def _update_catalogue(self, jid, payload):
         self.catalogue.setdefault(jid, set())
@@ -119,13 +110,24 @@ class Lobby(threado.GeneratorStream):
         jid = JID(iq.get_attr("from"))
         if jid.bare() != self.room.room_jid:
             return False
+        if not payload.named("start").with_attrs("id"):
+            return False
 
-        if payload.named("start").with_attrs("id"):
-            service_id = payload.get_attr("id")
-            self._start(jid, service_id) | iq_handler(self.xmpp, iq)
-        if payload.named("config").with_attrs("id"):
-            session_id = payload.get_attr("id")
-            self._config(jid, session_id, payload) | iq_handler(self.xmpp, iq)
+        service_id = payload.get_attr("id")
+        try:
+            try:
+                result = self._start(jid, service_id, payload)
+            except SessionError:
+                raise
+            except:
+                _, exc, tb = sys.exc_info()
+                raise SessionError("Session handling failed: " + repr(exc))
+        except SessionError, se:
+            msg = se.args[0]
+            error = self.xmpp.core.build_error("cancel", "session-failure", msg)
+            self.xmpp.core.iq_error(iq, error)
+        else:
+            self.xmpp.core.iq_result(iq, result)
         return True
 
     def run(self):
@@ -151,7 +153,7 @@ class Lobby(threado.GeneratorStream):
                     else:
                         self._update_catalogue(jid, presence.children())
 
-    def _discard_session(self, jid, session_id, reason=threado.Finished()):
+    def _discard_session(self, jid, session_id, reason=Stop()):
         if jid in self.jids:
             sessions = self.jids[jid]
             if session_id in sessions:
@@ -160,13 +162,13 @@ class Lobby(threado.GeneratorStream):
             if not sessions:
                 del self.jids[jid]
 
-    def _discard_jid(self, jid, reason=threado.Finished()):
+    def _discard_jid(self, jid, reason=Stop()):
         self.catalogue.pop(jid, None)
         if jid in self.jids:
             sessions = self.jids[jid]
             for session_id in list(sessions):
                 self._discard_session(jid, session_id, reason)
-
+                
     def _update_presence(self):
         services = Element("services", xmlns=SERVICE_NS)
         for service_id, service in self.services.items():
@@ -189,46 +191,29 @@ class Lobby(threado.GeneratorStream):
             print "Retired service '%s'" % service_id
             self._update_presence()
 
-    @threado.stream
-    def _start(inner, self, jid, service_id):
+    def _start(self, jid, service_id, element):
         service = self.services.get(service_id, None)
         if service is None:
             raise SessionError("Service '%s' not available" % service_id)
 
+        path = None
+        for child in element.children("path").children():
+            path = serialize.load(child)
+            break
+
+        for child in element.children("config").children():
+            conf = serialize.load(child)
+            break
+        else:
+            raise SessionError("Did not get session configuration")
+
         session_id = uuid.uuid4().hex
-        session = service.session()
-        session.start()
-        bind(service, session)
+        session = service.open_session(path, conf)
 
         sessions = self.jids.setdefault(jid, dict())
         sessions[session_id] = session
         session | self._catch(jid, session_id)
-
-        inner.send(Element("start", xmlns=SERVICE_NS, id=session_id))
-        yield
-
-    @threado.stream
-    def _config(inner, self, jid, session_id, config):
-        if jid not in self.jids:
-            raise SessionError("Invalid session ID")        
-        sessions = self.jids[jid]
-        if session_id not in sessions:
-            raise SessionError("Invalid session ID")
-        session = sessions[session_id]
-
-        for child in config.children():
-            try:
-                result = yield inner.sub(session.config(serialize.load(child)))
-            except:
-                session.rethrow()
-                raise
-            break
-        else:
-            raise SessionError("Invalid config")
-
-        element = Element("config", xmlns=SERVICE_NS, id=session_id)
-        element.add(serialize.dump(result))
-        inner.send(element)
+        return Element("start", xmlns=SERVICE_NS, id=session_id)
 
     @threado.stream
     def _catch(inner, self, jid, session_id):
@@ -240,33 +225,141 @@ class Lobby(threado.GeneratorStream):
             self.xmpp.core.message(jid, end)
             self._discard_session(jid, session_id)
 
-class RemoteSession(threado.GeneratorStream):
-    def __init__(self, xmpp, jid, session_id):
-        threado.GeneratorStream.__init__(self)
-        self.xmpp = xmpp
-        self.jid = jid
-        self.session_id = session_id
+import shelve
+from idiokit import timer
 
-    @threado.stream
-    def config(inner, self, **keys):
-        config = Element("config", xmlns=SERVICE_NS, id=self.session_id)
-        config.add(serialize.dump(dict(keys)))
-
-        result = yield inner.sub(self.xmpp.core.iq_set(config, to=self.jid))
-        for config in result.children("config", SERVICE_NS).with_attrs("id"):
-            for child in config.children():
-                inner.finish(serialize.load(child))
-        raise SessionError("No config info received")       
-
-class Session(threado.GeneratorStream):
-    @threado.stream
-    def config(inner, self, conf):
-        yield
-        inner.finish(conf)
+class MemoryShelve(dict):
+    def sync(self):
+        pass
+    def close(self):
+        self.clear()
 
 class Service(threado.GeneratorStream):
-    def session(self):
-        return Session(self)
+    def __init__(self, state_file=None):
+        threado.GeneratorStream.__init__(self)
+
+        self.sessions = dict()
+        self.shutting_down = False
+
+        if state_file is None:
+            self.db = MemoryShelve()
+        else:
+            self.db = shelve.open(state_file, protocol=-1)
+        self.root_key = ""
+
+    def path_key(self, path):
+        bites = list()
+        for bite in path:
+            if isinstance(bite, unicode):
+                bite = bite.encode("utf-8")
+            bites.append(bite.replace("/", r"\/"))
+        return "/" + "/".join(bites)
+
+    def run(self):
+        state = self.db.get(self.root_key, None)
+        try:
+            state = yield self.inner.sub(self.kill_sessions()
+                                         | self.main(state))
+
+            if state is None:
+                self.db.pop(self.root_key, None)
+            else:
+                print "Saving the main state"
+                self.db[self.root_key] = state
+
+            for path, session in self.sessions.iteritems():
+                try:
+                    state = session.result()
+                except:
+                    pass
+                else:
+                    print "Saving the state for session", repr(path)
+                    key = self.path_key(path)
+                    if state is None:
+                        self.db.pop(key, None)
+                    else:
+                        self.db[key] = state
+            for key, session in self.sessions.iteritems():
+                session.result()
+        finally:
+            self.db.close()
+
+    @threado.stream
+    def kill_sessions(inner, self):
+        try:
+            while True:
+                item = yield inner
+                inner.send(item)
+        except:
+            self.shutting_down = True
+            type, exc, tb = sys.exc_info()
+
+            for session in self.sessions.values():
+                session.rethrow()
+            for session in self.sessions.values():
+                while not session.has_result():
+                    try:
+                        yield session
+                    except:
+                        pass
+            raise type, exc, tb
+
+    def open_session(self, path, conf):
+        assert not self.shutting_down
+
+        if path is None:
+            session = self.session(None, **conf)
+        elif path in self.sessions:
+            old_session = self.sessions.pop(path)
+            old_session.throw(Stop())
+            session = self.wait(old_session, conf)
+            self.sessions[path] = session
+        else:
+            key = self.path_key(path)
+            session = self.session(self.db.get(key, None), **conf)
+            self.sessions[path] = session
+        bind(self, session)
+        return session
+
+    @threado.stream
+    def wait(inner, self, session, conf):
+        state = yield session
+        state = yield inner.sub(self.session(state, **conf))
+        inner.finish(state)
+
+    def delete_session(self, path):
+        assert not self.shutting_down
+
+        if path is None:
+            return
+        if path not in self.sessions:
+            return
+        old_session = self.sessions.pop(path)
+        session = self.scrap(old_session)
+        self.sessions[path] = session
+        return session
+
+    @threado.stream
+    def scrap(inner, self, session):
+        yield session
+        del session
+        inner.finish()
+
+    @threado.stream
+    def main(inner, self, state):
+        try:
+            while True:
+                yield inner
+        except Stop:
+            inner.finish()
+
+    @threado.stream
+    def session(inner, self, state, **keys):
+        try:
+            while True:
+                yield inner
+        except Stop:
+            inner.finish()
 
 @threado.stream
 def join_lobby(inner, xmpp, name, nick=None):
