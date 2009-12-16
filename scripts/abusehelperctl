@@ -16,10 +16,14 @@ create_logdir() {
   echo "chowned to ${USER}..."
   
   chmod 700 ${LOGDIR}
+
 }
+
+PYTHON="python"
+UNAME=$(uname)
+
+
 INSTALLROOT=""
-# The native logging will be improved next. Now we just dump stdout &stderr
-# to a single file.
 
 LOGDIR="${INSTALLROOT}/var/log/abusehelper"
 LOG="${LOGDIR}/abusehelper.log"
@@ -27,18 +31,26 @@ LOG="${LOGDIR}/abusehelper.log"
 USER="abusehel"
 
 CFG="/etc/abusehelper/config.ini"
-AHCMD="python -u -m abusehelper.core.startup"
+AHCMD="${PYTHON} -m abusehelper.core.startup" 
 STARTCMD="${AHCMD} ${CFG}"
 
-case $(uname) in
-    Darwin)
+# Default, ${STARTCMD} = ${STOPCMD}. OpenBSD behaves slightly differently.
+STOPCMD="${STARTCMD}" 
+
+case "${UNAME}" in
+    "Darwin")
 	SU="su -"
+	;;
+    "OpenBSD")
+        [ ! -f "/usr/local/bin/python2.5" ] && myerror "python2.5 not found"
+        SU="su -" 
+        PYTHON="python2.5" 
+        STOPCMD="${PYTHON} -u -m -c $CFG"
 	;;
     *)
 	SU="su"
 	;;
 esac
-
 case "$1" in
     start)
 
@@ -51,14 +63,12 @@ case "$1" in
 	;;
 
     stop)
-	for i in $(ps aux|fgrep "${STARTCMD}"|fgrep -v ${SU} | \
+	for i in $(ps auxww|fgrep "${STOPCMD}"|fgrep -v "${SU}" | \
 	    fgrep -v fgrep |fgrep -v bas | awk  '{print $2}')
 	do
 	    echo "kill $i"
             ${SU} ${USER} -c "kill $i"
 	done
-
-	#pkill -f "${STARTCMD}"
 	;;
 
     restart)
@@ -67,12 +77,9 @@ case "$1" in
 	$0 start
 	;;
     status)
-	ps aux|fgrep 'abusehelper'|fgrep 'python' |fgrep -v ${SU}|fgrep -v fgrep | \
-	        fgrep -v 'sh -c'| tr -s " "  
-
-	;;
-    init)
-	echo 'nothing yet'
+	ps auxww|fgrep 'abusehelper'|fgrep "${PYTHON}" | \
+            fgrep -v "${SU}"|fgrep -v fgrep | \
+	    fgrep -v 'sh -c' | tr -s " "  
 	;;
     *)
 	myerr "Usage: $0 <start|stop|status>"
