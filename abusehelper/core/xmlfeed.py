@@ -12,8 +12,7 @@ from idiokit import threado, util
 from abusehelper.core import events, services, dedup, cymru
 
 @threado.stream
-def xmlfeed(inner, dedup, opener, 
-            url="http://xmlfeed.example.com/"):
+def xmlfeed(inner, dedup, opener, url):
     try:
         fileobj = opener.open(url)
     except urllib2.HTTPError, e:
@@ -50,27 +49,15 @@ def xmlfeed(inner, dedup, opener,
     fileobj.close()
 
 @threado.stream
-def asn_filter(inner, asn_list):
-    while True:
-        for event in inner:
-            #event_asn = list(event.attrs.get('url', [None]))[0]
-            #if event_asn and event_asn in asn_list:
-            #    event.add('asn', str(event_asn))
-            #    inner.send(event)
-            inner.send(event)
-            yield
-        yield inner
-
-@threado.stream
 def event_extras(inner, opener):
     while True:
         for event in inner:
             url = list(event.attrs.get('url', [None]))[0]
-            type = list(event.attrs.get('datasource', [None]))[0]
-            if not url or not type:
+            datasource = list(event.attrs.get('datasource', [None]))[0]
+            if not url or not datasource:
                 continue
 
-            type = type[0].upper() + type[1:]
+            datasource = datasource[0].upper() + datasource[1:]
 
             try:
                 fileobj = opener.open(url)
@@ -81,7 +68,7 @@ def event_extras(inner, opener):
 
             ft = 0
             table = list()
-            span = '<span class="title">%s</span>' % type
+            span = '<span class="title">%s</span>' % datasource 
 
             for line in data.split("\n"):
                 line = line.lstrip()
@@ -108,10 +95,11 @@ import cookielib
 from abusehelper.core import roomfarm, services
 
 class XmlFeedService(roomfarm.RoomFarm):
-    def __init__(self, xmpp, state_file=None, poll_interval=60*60.0):
+    def __init__(self, xmpp, url, state_file=None, poll_interval=60*60.0):
         roomfarm.RoomFarm.__init__(self, state_file)
 
         self.xmpp = xmpp
+        self.url = url
         self.poll_interval = poll_interval
         self.expire_time = float()
 
@@ -138,8 +126,6 @@ class XmlFeedService(roomfarm.RoomFarm):
             yield inner
 
             for event in inner:
-                print event.attrs
-
                 asn = list(event.attrs.get('asn', [None]))[0]
                 if not asn:
                     continue
@@ -148,22 +134,25 @@ class XmlFeedService(roomfarm.RoomFarm):
                     room.send(event)
 
     @threado.stream
+    def _main(inner, self, global_dedup):
+        while True:
+            current_time = time.time()
+            if self.expire_time > current_time:
+                yield inner.sub(timer.sleep(self.expire_time-current_time))
+            else:
+                yield inner.sub(xmlfeed(global_dedup, self.opener, self.url))
+                self.expire_time = time.time() + self.poll_interval
+
+    @threado.stream
     def main(inner, self, global_dedup=None):
         if global_dedup is None:
             global_dedup = dedup.Dedup()
 
         try:
-            while True:
-                current_time = time.time()
-                if self.expire_time > current_time:
-                    yield inner, timer.sleep(self.expire_time-current_time)
-                else:
-                    yield inner.sub(xmlfeed(global_dedup, self.opener) 
-                                    | cymru.CymruWhois()
-                                    | asn_filter(self.asns.keys.keys())
-                                    | event_extras(self.opener)
-                                    | self.distribute())
-                    self.expire_time = time.time() + self.poll_interval
+            yield inner.sub(self._main(global_dedup) 
+                            | cymru.CymruWhois()
+                            | event_extras(self.opener)
+                            | self.distribute())
         except services.Stop:
             inner.finish(global_dedup)
 
@@ -183,9 +172,8 @@ class XmlFeedService(roomfarm.RoomFarm):
             self.asns.dec(asn, room)
             self.rooms(inner)
 
-def main(name, xmpp_jid, service_room, 
-         poll_interval=0.15*60.0, state_file=None, 
-         xmpp_password=None, log_file=None):
+def main(name, xmpp_jid, service_room, feed_url, poll_interval=0.15*60.0, 
+         state_file=None, xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
     from abusehelper.core import log
@@ -205,9 +193,7 @@ def main(name, xmpp_jid, service_room,
         lobby = yield inner.sub(services.join_lobby(xmpp, service_room, name))
         logger.addHandler(log.RoomHandler(lobby.room))
 
-        service = XmlFeedService(xmpp, state_file, poll_interval)
-        service.session(None, "007", "keklol")
-        service.session(None, "009", "keklol")
+        service = XmlFeedService(xmpp, feed_url, state_file, poll_interval)
         yield inner.sub(lobby.offer(name, service))
     return bot()
 main.service_room_help = "the room where the services are collected"
