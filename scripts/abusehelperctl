@@ -21,21 +21,11 @@ create_logdir() {
 
 PYTHON="python"
 UNAME=$(uname)
-
-
+CFG="/etc/abusehelper/config.ini"
 INSTALLROOT=""
-
 LOGDIR="${INSTALLROOT}/var/log/abusehelper"
 LOG="${LOGDIR}/abusehelper.log"
-
 USER="abusehel"
-
-CFG="/etc/abusehelper/config.ini"
-AHCMD="${PYTHON} -m abusehelper.core.startup" 
-STARTCMD="${AHCMD} ${CFG}"
-
-# Default, ${STARTCMD} = ${STOPCMD}. OpenBSD behaves slightly differently.
-STOPCMD="${STARTCMD}" 
 
 case "${UNAME}" in
     "Darwin")
@@ -45,12 +35,19 @@ case "${UNAME}" in
         [ ! -f "/usr/local/bin/python2.5" ] && myerror "python2.5 not found"
         SU="su -" 
         PYTHON="python2.5" 
-        STOPCMD="${PYTHON} -u -m -c $CFG"
+        STOPCMD="${PYTHON} -m -c $CFG"
 	;;
     *)
 	SU="su"
 	;;
 esac
+
+AHCMD="${PYTHON} -m abusehelper.core.startup" 
+STARTCMD="${AHCMD} ${CFG}"
+
+# Default, ${STARTCMD} = ${STOPCMD}. OpenBSD behaves slightly differently.
+[ -z "${STOPCMD}" ] && STOPCMD="${STARTCMD}" 
+
 case "$1" in
     start)
 
