@@ -1,98 +1,97 @@
-import csv
-import urllib
+import re
+import cgi
+import sys
 import time
 import urllib2
 import urlparse
-import time
-import gzip
 import cStringIO as StringIO
-import xml.etree.ElementTree as etree
+import xml.etree.cElementTree as etree
 
-from idiokit import threado, util
-from abusehelper.core import events, services, dedup, cymru
+from idiokit import threado, timer
+from abusehelper.core import events, services, roomfarm, dedup, cymru
+
+@threado.stream
+def fetch_url(inner, opener, url):
+    fileobj = yield inner.thread(opener.open, url)
+    list(inner)
+    try:
+        data = yield inner.thread(fileobj.read)
+    finally:
+        fileobj.close()
+    list(inner)
+    inner.finish(data)
+
+TABLE_REX = re.compile("</h3>\s*(<table>.*?</table)", re.I)
+
+@threado.stream
+def fetch_extras(inner, opener, url):
+    try:
+        data = yield inner.sub(fetch_url(opener, url))
+    except Exception, exc:
+        inner.finish(list())
+
+    match = TABLE_REX.search(data)
+    if match is None:
+        inner.finish(list())
+
+    table = etree.XML(match.groups(1))
+    keys = [th.text for th in table.findall("thead/tr/th")]
+    values = [th.text for th in table.findall("tbody/tr/td")]
+    inner.finish(zip(keys, values))
+
+ATOM_NS = "http://www.w3.org/2005/Atom"
+DC_NS = "http://purl.org/dc/elements/1.1"
 
 @threado.stream
 def xmlfeed(inner, dedup, opener, url):
     try:
-        fileobj = opener.open(url)
-    except urllib2.HTTPError, e:
+        print "Downloading the report"
+        data = yield inner.sub(fetch_url(opener, url))
+    except Exception, exc:
+        print >> sys.stderr, "Failed to download the report:", exc
         return
+    print "Downloaded the report"
 
-    for xmlevent, elem in etree.iterparse(fileobj):
-        if elem.tag.endswith('updated'):
-            event = events.Event()
-            event.add('feed', 'xmlfeed')
-            event.add('updated', elem.text)
-        elif elem.tag.endswith('subject'):
-            event.add('ip', elem.text)
-        elif elem.attrib.get('rel', '') == 'detail':
-            url = elem.attrib.get('href', None)
-            parts = url.split("?")
+    count = 0
+    for _, elem in etree.iterparse(StringIO.StringIO(data)):
+        yield
+        list(inner)
 
-            if not url or len(parts) < 2 or (dedup and not dedup.add(url)):
+        if elem.tag != etree.QName(ATOM_NS, "entry"):
+            continue
+        if not dedup.add(etree.tostring(elem)):
+            continue
+        
+        event = events.Event()
+        event.add("feed", "xmlfeed")
+
+        updated = elem.find(str(etree.QName(ATOM_NS, "updated")))
+        if updated is not None:
+            event.add("updated", updated.text)
+
+        subject = elem.find(str(etree.QName(DC_NS, "subject")))
+        if subject is not None:
+            event.add("ip", subject.text)
+
+        for link in elem.findall(str(etree.QName(ATOM_NS, "link"))):
+            if link.attrib.get("rel", None) != "detail":
+                continue
+            url = link.attrib.get("href", None)
+            if not url:
                 continue
 
-            event.add('url', url)
+            #extras = yield inner.sub(fetch_extras(opener, url))
+            event.add("url", url)
 
-            parts = parts[1].split("&")
-            for part in parts:
-                pair = part.split("=")
-                if len(pair) < 2:
-                    continue
+            parsed = urlparse.urlparse(url)
+            for key, value in cgi.parse_qsl(parsed.query):
+                event.add(key, value)
 
-                event.add(pair[0], pair[1])
-
-            inner.send(event)
-            yield
-
-    yield
-    fileobj.close()
-
-@threado.stream
-def event_extras(inner, opener):
-    while True:
-        for event in inner:
-            url = list(event.attrs.get('url', [None]))[0]
-            datasource = list(event.attrs.get('datasource', [None]))[0]
-            if not url or not datasource:
-                continue
-
-            datasource = datasource[0].upper() + datasource[1:]
-
-            try:
-                fileobj = opener.open(url)
-            except urllib2.HTTPError, e:
-                continue
-
-            data = fileobj.read()
-
-            ft = 0
-            table = list()
-            span = '<span class="title">%s</span>' % datasource 
-
-            for line in data.split("\n"):
-                line = line.lstrip()
-
-                if ft == 0 and line.startswith(span):
-                    ft = 1
-                elif ft == 1 and line.startswith('<table>'):
-                    ft = 2
-                    table.append(line)
-                elif ft == 2 and line:
-                    table.append(line)
-                    if line.startswith('</table>'):
-                        break
-
-            event.add('extras', "\n".join(table))
-            inner.send(event)
-            yield
-
-        yield inner
-
-from idiokit import timer
-import time
-import cookielib
-from abusehelper.core import roomfarm, services
+        inner.send(event)
+        if count % 100 == 0:
+            print "Fed", count, "new events so far"
+        count += 1
+    print "Finished feeding, got", count, "new events"
 
 class XmlFeedService(roomfarm.RoomFarm):
     def __init__(self, xmpp, url, state_file=None, poll_interval=60*60.0):
@@ -101,11 +100,8 @@ class XmlFeedService(roomfarm.RoomFarm):
         self.xmpp = xmpp
         self.url = url
         self.poll_interval = poll_interval
-        self.expire_time = float()
 
-        jar = cookielib.FileCookieJar("cookies")
-        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(jar))
-
+        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
         self.asns = roomfarm.Counter()
 
     @threado.stream
@@ -126,22 +122,15 @@ class XmlFeedService(roomfarm.RoomFarm):
             yield inner
 
             for event in inner:
-                asn = list(event.attrs.get('asn', [None]))[0]
-                if not asn:
-                    continue
-
-                for room in self.asns.get(asn):
-                    room.send(event)
+                for asn in event.attrs.get("asn", ()):
+                    for room in self.asns.get(asn):
+                        room.send(event)
 
     @threado.stream
     def _main(inner, self, global_dedup):
         while True:
-            current_time = time.time()
-            if self.expire_time > current_time:
-                yield inner.sub(timer.sleep(self.expire_time-current_time))
-            else:
-                yield inner.sub(xmlfeed(global_dedup, self.opener, self.url))
-                self.expire_time = time.time() + self.poll_interval
+            yield inner.sub(xmlfeed(global_dedup, self.opener, self.url))
+            yield inner.sub(timer.sleep(self.poll_interval))
 
     @threado.stream
     def main(inner, self, global_dedup=None):
@@ -149,17 +138,15 @@ class XmlFeedService(roomfarm.RoomFarm):
             global_dedup = dedup.Dedup()
 
         try:
-            yield inner.sub(self._main(global_dedup) 
+            yield inner.sub(self._main(global_dedup)
                             | cymru.CymruWhois()
-                            | event_extras(self.opener)
                             | self.distribute())
         except services.Stop:
             inner.finish(global_dedup)
 
     @threado.stream
     def session(inner, self, state, asn, room):
-        if not self.asns.get(asn):
-            self.send()
+        asn = unicode(asn)
 
         room = self.rooms(inner, room)
         self.asns.inc(asn, room)
@@ -204,5 +191,3 @@ main.log_file_help = "log to the given file instead of the console"
 if __name__ == "__main__":
     from abusehelper.core import opts
     threado.run(opts.optparse(main), throw_on_signal=services.Stop())
-
-
