@@ -21,7 +21,7 @@ def fetch_url(inner, opener, url):
     list(inner)
     inner.finish(data)
 
-TABLE_REX = re.compile("</h3>\s*(<table>.*?</table)", re.I)
+TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I)
 
 @threado.stream
 def fetch_extras(inner, opener, url):
