@@ -3,6 +3,8 @@ import cgi
 import sys
 import time
 import urllib2
+import httplib
+import socket
 import urlparse
 import cStringIO as StringIO
 import xml.etree.cElementTree as etree
@@ -10,34 +12,43 @@ import xml.etree.cElementTree as etree
 from idiokit import threado, timer
 from abusehelper.core import events, services, roomfarm, dedup, cymru
 
+class FetchUrlFailed(Exception):
+    pass
+
 @threado.stream
 def fetch_url(inner, opener, url):
-    fileobj = yield inner.thread(opener.open, url)
-    list(inner)
     try:
-        data = yield inner.thread(fileobj.read)
-    finally:
-        fileobj.close()
+        fileobj = yield inner.thread(opener.open, url)
+        list(inner)
+        try:
+            data = yield inner.thread(fileobj.read)
+        finally:
+            fileobj.close()
+    except (urllib2.URLError, httplib.HTTPException, socket.error), error:
+        raise FetchUrlFailed, error
     list(inner)
     inner.finish(data)
 
-TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I)
+TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I | re.S)
 
 @threado.stream
 def fetch_extras(inner, opener, url):
     try:
         data = yield inner.sub(fetch_url(opener, url))
-    except Exception, exc:
+    except FetchUrlFailed:
         inner.finish(list())
 
     match = TABLE_REX.search(data)
     if match is None:
         inner.finish(list())
 
-    table = etree.XML(match.groups(1))
-    keys = [th.text for th in table.findall("thead/tr/th")]
-    values = [th.text for th in table.findall("tbody/tr/td")]
-    inner.finish(zip(keys, values))
+    table = etree.XML(match.group(1))
+    keys = [th.text or "" for th in table.findall("thead/tr/th")]
+    keys = map(str.strip, keys)
+    values = [th.text or "" for th in table.findall("tbody/tr/td")]
+    values = map(str.strip, values)
+    items = [item for item in zip(keys, values) if all(item)]
+    inner.finish(items)
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
 DC_NS = "http://purl.org/dc/elements/1.1"
@@ -47,7 +58,7 @@ def xmlfeed(inner, dedup, opener, url):
     try:
         print "Downloading the report"
         data = yield inner.sub(fetch_url(opener, url))
-    except Exception, exc:
+    except FetchUrlFailed:
         print >> sys.stderr, "Failed to download the report:", exc
         return
     print "Downloaded the report"
@@ -80,17 +91,21 @@ def xmlfeed(inner, dedup, opener, url):
             if not url:
                 continue
 
-            #extras = yield inner.sub(fetch_extras(opener, url))
             event.add("url", url)
+
+            extras = yield inner.sub(fetch_extras(opener, url))
+            for key, value in extras:
+                event.add(key, value)
 
             parsed = urlparse.urlparse(url)
             for key, value in cgi.parse_qsl(parsed.query):
                 event.add(key, value)
 
         inner.send(event)
+
+        count += 1
         if count % 100 == 0:
             print "Fed", count, "new events so far"
-        count += 1
     print "Finished feeding, got", count, "new events"
 
 class XmlFeedService(roomfarm.RoomFarm):
@@ -130,7 +145,7 @@ class XmlFeedService(roomfarm.RoomFarm):
     def _main(inner, self, global_dedup):
         while True:
             yield inner.sub(xmlfeed(global_dedup, self.opener, self.url))
-            yield inner.sub(timer.sleep(self.poll_interval))
+            yield inner, timer.sleep(self.poll_interval)
 
     @threado.stream
     def main(inner, self, global_dedup=None):
@@ -159,7 +174,7 @@ class XmlFeedService(roomfarm.RoomFarm):
             self.asns.dec(asn, room)
             self.rooms(inner)
 
-def main(name, xmpp_jid, service_room, feed_url, poll_interval=0.15*60.0, 
+def main(name, xmpp_jid, service_room, feed_url, poll_interval=60.0*60.0, 
          state_file=None, xmpp_password=None, log_file=None):
     import getpass
     from idiokit.xmpp import connect
