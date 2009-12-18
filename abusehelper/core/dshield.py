@@ -135,7 +135,7 @@ class DShieldService(roomfarm.RoomFarm):
             current_time = time.time()
             expire_time, asn = self.heap[0]
             if expire_time > current_time:
-                yield inner.sub(timer.sleep(expire_time-current_time))
+                yield inner, timer.sleep(expire_time-current_time)
             elif not self.asns.get(asn):
                 heapq.heappop(self.heap)
             else:
