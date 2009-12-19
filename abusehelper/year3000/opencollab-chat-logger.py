@@ -125,11 +125,11 @@ def main(inner,username,password):
     xmppuser = '%s@clarifiednetworks.com' % (re.sub('@','%',username))
     xmppmucs = "conference.clarifiednetworks.com"
     room = "%s@%s" % (collabinstance,xmppmucs)
-    print 'joined room'
+
     myxmpp = yield xmpp.connect(xmppuser,password)
     myxmpp.core.presence()
     room = yield myxmpp.muc.join(room,"/collablogger")
-                                                      
+    print 'joined room'                                                      
     collab = CLIWiki('https://www.clarifiednetworks.com/collab/%s/' %
                      (collabinstance))
     collab.authenticate(username=username,password=password)
