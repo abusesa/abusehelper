@@ -31,7 +31,7 @@ def main(room, xmpp_jid, xmpp_password=None, log_file=None, debug=False):
     from abusehelper.core import log
     
     if not xmpp_password:
-.        xmpp_password = getpass.getpass("XMPP password: ")
+        xmpp_password = getpass.getpass("XMPP password: ")
 
     logger = log.config_logger('roomreader', filename=log_file)
     
