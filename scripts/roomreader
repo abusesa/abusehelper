@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Roomreader is a simple client for reading messages in multiple rooms.
 Roomreader can print messages to stdout (default) or to a log file.
 """
