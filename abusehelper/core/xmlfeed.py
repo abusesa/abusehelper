@@ -58,8 +58,8 @@ def xmlfeed(inner, dedup, opener, url):
     try:
         print "Downloading the report"
         data = yield inner.sub(fetch_url(opener, url))
-    except FetchUrlFailed:
-        print >> sys.stderr, "Failed to download the report:", exc
+    except FetchUrlFailed, fuf:
+        print >> sys.stderr, "Failed to download the report:", fuf
         return
     print "Downloaded the report"
 
