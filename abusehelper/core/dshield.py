@@ -1,13 +1,13 @@
+import sys
 import csv
-import urllib
 import time
+import socket
 import urllib2
+import httplib
 import urlparse
-import time
-import gzip
-import cStringIO as StringIO
+import urllib
 
-from idiokit import threado, util
+from idiokit import threado
 from abusehelper.core import events, services, dedup, cymru
 
 def sanitize_ip(ip):
@@ -20,19 +20,28 @@ def sanitize_ip(ip):
         pass
     return ip
 
-def read_data(fileobj, compression=6):
-    stringio = StringIO.StringIO()
-    compressed = gzip.GzipFile(None, "wb", compression, stringio)
+class FetchUrlFailed(Exception):
+    pass
 
-    while True:
-        data = fileobj.read(2**16)
-        if not data:
-            break
-        compressed.write(data)
-    compressed.close()
+@threado.stream
+def fetch_url(inner, url, opener=None):
+    if opener is None:
+        opener = urllib2.build_opener()
 
-    stringio.seek(0)
-    return gzip.GzipFile(fileobj=stringio)
+    try:
+        fileobj = yield inner.thread(opener.open, url)
+        list(inner)
+
+        reader = inner.thread(fileobj.read)
+        try:
+            while not reader.has_result():
+                yield inner, reader
+        finally:
+            fileobj.close()
+
+        inner.finish(fileobj.info(), reader.result())
+    except (urllib2.URLError, httplib.HTTPException, socket.error), error:
+        raise FetchUrlFailed, error
 
 @threado.stream
 def dshield(inner, asn, dedup, 
@@ -49,16 +58,23 @@ def dshield(inner, asn, dedup,
     parsed[4] = urllib.urlencode({ "as" : asn })
     url = urlparse.urlunparse(parsed)
 
-    print "ASN%s: connecting" % asn
-    opened = yield inner.thread(urllib2.urlopen, url)
     print "ASN%s: downloading" % asn
-    data = yield inner.thread(read_data, opened)
+    try:
+        info, data = yield inner.sub(fetch_url(url))
+    except FetchUrlFailed, fuf:
+        print >> sys.stderr, "ASN%s: downloading failed:" % asn, fuf
+        return
     print "ASN%s: downloaded" % asn
+
+    charset = info.getparam("charset")
+    if charset is None:
+        print >> sys.stderr, "ASN%s: no character set given for the data" % asn
+        return
 
     count = 0
     try:
         # Lazily filter away empty lines and lines starting with '#'
-        filtered = (x for x in data 
+        filtered = (x for x in data.splitlines()
                     if x.strip() and not x.startswith("#") and dedup.add(x))
         reader = csv.DictReader(filtered, headers, delimiter="\t")
         for row in reader:
@@ -66,7 +82,7 @@ def dshield(inner, asn, dedup,
 
             count += 1
             if count % 100 == 0:
-                print "ASN%s: fed %d events" % (asn, count)
+                print "ASN%s: fed %d new events so far" % (asn, count)
             
             event = events.Event()
             event.add("feed", "dshield")
@@ -77,17 +93,15 @@ def dshield(inner, asn, dedup,
             for key, value in row.items():
                 if value is None:
                     continue
-                event.add(key, util.guess_encoding(value).strip())
+                event.add(key, value.decode(charset))
             inner.send(event)
             yield
             list(inner)
     finally:
-        print "ASN%s: done with %d events" % (asn, count)
-        opened.close()
+        print "ASN%s: done with %d new events" % (asn, count)
 
+import collections
 from idiokit import timer
-import time
-import heapq
 from abusehelper.core import roomfarm, services
 
 class DShieldService(roomfarm.RoomFarm):
@@ -100,7 +114,7 @@ class DShieldService(roomfarm.RoomFarm):
         self.use_cymru_whois = use_cymru_whois
 
         self.asns = roomfarm.Counter()
-        self.heap = list()
+        self.times = collections.deque()
 
     @threado.stream
     def handle_room(inner, self, name):
@@ -128,22 +142,22 @@ class DShieldService(roomfarm.RoomFarm):
     @threado.stream
     def _main(inner, self, global_dedup):
         while True:
-            if not self.heap:
+            if not self.times:
                 yield inner
                 continue
 
             current_time = time.time()
-            expire_time, asn = self.heap[0]
+            expire_time, asn = self.times[0]
             if expire_time > current_time:
                 yield inner, timer.sleep(expire_time-current_time)
             elif not self.asns.get(asn):
-                heapq.heappop(self.heap)
+                self.times.popleft()
             else:
-                heapq.heappop(self.heap)
+                self.times.popleft()
                 yield inner.sub(dshield(asn, global_dedup,
                                         use_cymru_whois=self.use_cymru_whois))
                 expire_time = time.time() + self.poll_interval
-                heapq.heappush(self.heap, (expire_time, asn))        
+                self.times.append((expire_time, asn))
 
     @threado.stream
     def main(inner, self, global_dedup=None):
@@ -165,7 +179,7 @@ class DShieldService(roomfarm.RoomFarm):
     def session(inner, self, state, asn, room):
         asn = str(asn)
         if not self.asns.get(asn):
-            heapq.heappush(self.heap, (time.time(), asn))
+            self.times.append((time.time(), asn))
             self.send()
         room = self.rooms(inner, room)
         self.asns.inc(asn, room)
