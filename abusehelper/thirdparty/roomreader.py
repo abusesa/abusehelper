@@ -20,12 +20,12 @@ def xmpp_to_stdout(inner,own_jid,debug):
                 continue
             
             for body in message.children("body"):
-                text = "<%s> %s" % (sender.resource, body.text)
+                text = "<%s@%s/%s> %s" % (sender.node, sender.domain, sender.resource, body.text)
                 print text
         if debug:
             print repr(elements.serialize())
 
-def main(room, xmpp_jid, xmpp_password=None, log_file=None, debug=False):
+def main(rooms, xmpp_jid, xmpp_password=None, log_file=None, debug=False):
     import getpass
     from idiokit.xmpp import connect
     from abusehelper.core import log
@@ -33,21 +33,26 @@ def main(room, xmpp_jid, xmpp_password=None, log_file=None, debug=False):
     if not xmpp_password:
         xmpp_password = getpass.getpass("XMPP password: ")
 
-    logger = log.config_logger('roomreader', filename=log_file)
+    if log_file:
+        logger = log.config_logger('roomreader', filename=log_file)
     
     @threado.stream
     def bot(inner):
-        print "Connecting XMPP server with JID", xmpp_jid
+        print "Connecting XMPP server with JID.", xmpp_jid
     
         xmpp = yield inner.sub(connect(xmpp_jid, xmpp_password))
         xmpp.core.presence()
-        watchroom = yield xmpp.muc.join(room)
-
-        yield inner.sub(watchroom |xmpp_to_stdout(xmpp_jid,debug)|threado.throws())
+        for room in rooms.split(","):
+            room = room.strip()
+            print 'Joining room %s.' % (room)
+            watchroom = yield xmpp.muc.join(room)
+            inner.sub(watchroom | xmpp_to_stdout(xmpp_jid,debug) | threado.throws())
+        yield inner
     return bot()
 
-main.xmpp_room = "the XMPP room roomreader should watch"
-main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
+main.rooms_help = "comma separated list of XMPP rooms roomreader should watch. " + \
+                  "(e.g. room@conference.example.com, room2@conference.example.com)"
+main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@example.com)"
 main.xmpp_password_help = "the XMPP password"
 main.log_file_help = "log to the given file instead of the console"
 
