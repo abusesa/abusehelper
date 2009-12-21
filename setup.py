@@ -1,8 +1,8 @@
 from distutils.core import setup
-import sys
+import sys,os
 
 setup(name="abusehelper",
-      version="r211", #update this when creating packages
+      version="r214", #update this when creating packages
       packages=["abusehelper", 
                 "abusehelper.core", 
                 "abusehelper.thirdparty",
@@ -15,7 +15,7 @@ setup(name="abusehelper",
       author_email="contact@clarifiednetworks.com",
       url="http://code.google.com/p/abusehelper",
       download_url="http://code.google.com/p/abusehelper/downloads/list",      
-      scripts=["scripts/abusehelperctl"],
+      scripts=["scripts/abusehelperctl","scripts/roomreader"],
       license="MIT",
       classifiers=[
           "Development Status :: 4 - Beta",
@@ -26,23 +26,30 @@ setup(name="abusehelper",
           "Intended Audience :: Telecommunications Industry",
           "License :: Freely Distributable",
           "Programming Language :: Python"],
-      data_files=[
-                   ("/etc/abusehelper", 
-                    ["example/customers.ini",
-                     "example/config.ini"]
-                   ),
-                   ("/etc/abusehelper/templates", 
-                    ["example/templates/dshield",
-                     "example/templates/ircfeed"]
-                    ),
-                   ("/var/log/abusehelper",
-                    [])
-
-                 ]
-
       )
 
 
+if sys.argv[1] == 'install':
+    if not os.path.exists("/etc/abusehelper/"):
+
+        print 'To create abusehelper config directory:\n' + \
+            ' mkdir /etc/abusehelper\n' + \
+            ' chown abusehel:abusehel /etc/abusehelper\n' + \
+            ' chmod 750 /etc/abusehelper'
+
+        print '\nTo configure:\n' + \
+            ' cp -r example/* /etc/abusehelper/\n' + \
+            'And then edit config.ini and customers.ini'
+
+    if not os.path.exists("/var/log/abusehelper/"):
+        print '\nTo create log directory:\n' +  \
+            ' mkdir /var/log/abusehelper\n' + \
+            ' chown abusehel:abusehel /var/log/abusehelper\n' + \
+            ' chmod 770 /var/log/abusehelper' 
+        
+        
+        
+    
 
 
 
