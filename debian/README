@@ -1,0 +1,38 @@
+The Debian Package abusehelper
+----------------------------
+
+What is Abuse Helper
+
+Abuse Helper is toolkit for CERT and Abuse teams. 
+It is a modular, (hopefully) scalable and robust 
+framework to help you in your abuse handling.
+Grandfather: AutoReporter (CERT-FI)
+Father: AbuseKiller (CERT-EE)
+Son: Abuse Helper (CERT-EE, CERT-FI with the Community)
+Distant cousin: AISI
+With Abuse Helper you can:
+
+Retrieve Internet Abuse Handling related information via 
+several sources which are near-real-time (such as IRC)
+periodic (such as Email reports), or request/resnponse 
+(such as HTTP).  You can then aggregate that information 
+based on different keys, such as AS numbers or country codes
+Sent out reports in different formats, via different 
+transports and using different timings 
+
+Abuse Helper features include:
+
+Fully modular (you can utilize different readers, parsers, 
+transports, splitters, combiners in a pipe-like manner)
+Scalable: you can distribute the work to different machines 
+and different geolocations Observable: you can use your 
+favourite XMPP client to observe the bots at work
+
+Prerequisites
+
+Python 2.5
+We've worked hard not to introduce any additional dependencies. If your distro does not have python 2.5 yet, you should be able just to compile and install python 2.5.
+Some bots might require CouchDB 0.9
+Ejabberd XMPP server
+
+ -- Lari Huttunen <debian@huttu.net>  Wed, 02 Dec 2009 12:39:36 +0200

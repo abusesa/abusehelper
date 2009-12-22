@@ -38,7 +38,7 @@ case "${UNAME}" in
         STOPCMD="${PYTHON} -m -c $CFG"
 	;;
     *)
-	SU="su"
+	SU="su -s /bin/sh"
 	;;
 esac
 
