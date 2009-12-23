@@ -5,8 +5,8 @@ myerr() {
  exit 1
 }
 PORTSDIR=/usr/ports/security
-PKG_DIR=/usr/ports/packages/i386/all/
-export PKG_DIR
+PKG_PATH=/usr/ports/packages/i386/all/
+export PKG_PATH
 AH=abusehelper
 AHPORTS=${PORTSDIR}/${AH}
 
@@ -20,6 +20,7 @@ make plist || myerr "Creating plist failed."
 make package || myerr "Creating package failed."
 pkg_add abusehelper-r243
 pkg_delete abusehelper-r243
+echo 'Running userdel & groupdel'
 userdel _abusehe; groupdel _abusehe
 
 
