@@ -1,3 +1,10 @@
+abusehelper (243) hardy; urgency=low
+
+  * Moved the man pages from debian/ to man/ and the pod2man directives
+    to the top level Makefile.
+
+ -- Lari Huttunen <debian@huttu.net>  Wed, 23 Dec 2009 10:20:06 +0200
+
 abusehelper (242) hardy; urgency=low
 
   * Fixed a dh_installman oddity, so that the man pages actually end up 
