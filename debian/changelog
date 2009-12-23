@@ -1,3 +1,9 @@
+abusehelper (241) hardy; urgency=low
+
+  * Created man pages for abusehelperctl and roomreader in POD format and utilized pod2man to generate man pages for the debian package.
+
+ -- Lari Huttunen <debian@huttu.net>  Wed, 23 Dec 2009 09:09:06 +0200
+
 abusehelper (239) hardy; urgency=low
 
   * New upstream release.

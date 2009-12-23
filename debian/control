@@ -3,13 +3,14 @@ XS-Python-Version: >= 2.5
 Section: net
 Priority: extra
 Maintainer: Lari Huttunen <debian@huttu.net>
-Build-Depends: debhelper (>= 5), python-central, dh-make, dpkg-dev, debconf
+Build-Depends: debhelper (>= 5), python-central, dh-make, dpkg-dev, debconf, perl
 Standards-Version: 3.7.2
 
 Package: abusehelper
 XB-Python-Version: >= 2.5
 Architecture: all
 Depends: python (>=2.5), adduser
+Recommends: mail-transport-agent
 Description: Distributed, asynchronous XMPP framework for abuse handling
  AbuseHelper community develops a framework and a socio-economical plan 
  around it to bring the community tighter together. AbuseHelper is a 

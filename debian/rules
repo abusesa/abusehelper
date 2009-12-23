@@ -22,21 +22,24 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 	# Add here commands to configure the package.
+	pod2man --section=1 debian/roomreader.pod roomreader.1
+	pod2man --section=8 debian/abusehelperctl.pod abusehelperctl.8
 	-$(MAKE) configure
 	touch configure-stamp
 
 build: configure $(PYVERS:%=build-python%) 
-	touch $@
+	touch $@-stamp
 
 build-python%:
 	python$* setup.py build
-	touch $@
+	touch $@-stamp
 
 clean:
 	dh_testdir
 	dh_testroot
-	rm -f configure-stamp build-arch-stamp build-indep-stamp #CONFIGURE-STAMP#
-	rm -rf build*
+	rm -f configure-stamp build-arch-stamp build-indep-stamp build-stamp build-python* #CONFIGURE-STAMP#
+	rm -rf build/
+	rm -f *.1 *.8
 
 	# Add here commands to clean up after the build process.
 	-$(MAKE) clean

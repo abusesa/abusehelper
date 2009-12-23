@@ -1,0 +1,87 @@
+=head1 NAME
+
+B<roomreader> - Abuse Helper XMPP MUC CLI display utility
+
+=head1 SYNOPSIS
+
+B<roomreader> [options] rooms xmpp_jid
+
+=head1 SUMMARY
+
+B<roomreader> is an example script for connecting to several XMPP MUCs, rooms, with a given xmpp_jid, userid, and displaying the messages on STDOUT.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h> 
+
+Display the help message and exit.
+
+=item B<--ini-file=ini_file> 
+
+INI file used for configuration. 
+
+=item B<--ini-section=ini_section> 
+
+if an INI configuration file is specified, use this section (default: roomreader) 
+
+=item B<--rooms=rooms> 
+
+comma separated list of XMPP rooms roomreader should watch, e.g. room@conference.example.invalid, room2@conference.example.invalid
+
+=item B<--xmpp_jid=xmpp_jid> 
+
+The XMPP JID (e.g. xmppuser@example.invalid).
+
+=item B<--xmpp_password=xmpp_password> 
+
+The XMPP password. Please note that if you use this option, your shell will most likely log the password in the history file.
+
+=item B<--log-file=file> 
+
+Log the messages into a log file instead of STDOUT.
+
+=item B<--debug> 
+
+Display diagnostic messages.
+
+=back
+
+=head1 ARGUMENTS
+
+=over 8
+
+=item B<rooms> 
+
+The XMPP MUCs may be given as positional arguments after the options. Please note that the list of rooms should be separated by spaces, instead of commas.
+
+=item B<xmpp_jid> 
+
+The XMPP JID, userid, can also be specified as the last positional argument, e.g. xmppuser@example.invalid.
+
+=back
+
+=head1 FILES
+
+=over 8
+
+=item B</etc/abusehelper/roomreader.ini> 
+
+The default configuration file.
+
+=back
+
+=head1 SEE ALSO
+
+=over 8
+
+=item abusehelperctl(1), python(1)
+
+=back
+
+=head1 BUGS
+
+Bug reports, patches and feature wishes should reported at http://code.google.com/p/abusehelper/issues/list
+
+=cut

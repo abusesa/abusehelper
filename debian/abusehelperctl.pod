@@ -1,0 +1,61 @@
+=head1 NAME
+
+B<abusehelperctl> - Abuse Helper control script
+
+=head1 SYNOPSIS
+
+B<abusehelperctl (start|stop|status|restart)>
+
+=head1 SUMMARY
+
+B<abusehelperctl> is the front-end to abuse helper daemons. It reads it's configuration files from /etc/abusehelper and sets up logging under /var/log/abusehelper.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<start> 
+
+Start the abuse helper daemons as the unprivileged user abusehel.
+
+=item B<stop> 
+
+Stop the abuse helper daemons.
+
+=item B<status> 
+
+Display the status of the running daemons.
+
+=item B<restart> 
+
+Stop the abuse helper daemons and start them up again.
+
+=back
+
+=head1 FILES
+
+=over 8
+
+=item B</etc/abusehelper/config.ini> 
+
+The main configuration file.
+
+=item B</etc/abusehelper/customer.ini> 
+
+Customer specific input feed and reporting settings.
+
+=back
+
+=head1 SEE ALSO
+
+=over 8
+
+=item roomreader(1), python(1)
+
+=back
+
+=head1 BUGS
+
+Bug reports, patches and feature wishes should reported at http://code.google.com/p/abusehelper/issues/list
+
+=cut
