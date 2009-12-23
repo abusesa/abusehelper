@@ -64,8 +64,8 @@ binary-common:
 	dh_installexamples --exclude=.svn example/*
 	dh_pycentral
 	dh_installinit
-	dh_installman
 	dh_install
+	dh_installman abusehelperctl.8 roomreader.1
 	dh_link
 	dh_strip
 	dh_compress 

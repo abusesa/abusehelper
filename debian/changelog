@@ -1,6 +1,14 @@
+abusehelper (242) hardy; urgency=low
+
+  * Fixed a dh_installman oddity, so that the man pages actually end up 
+    in the package. :)
+
+ -- Lari Huttunen <debian@huttu.net>  Wed, 23 Dec 2009 09:24:40 +0200
+
 abusehelper (241) hardy; urgency=low
 
-  * Created man pages for abusehelperctl and roomreader in POD format and utilized pod2man to generate man pages for the debian package.
+  * Created man pages for abusehelperctl and roomreader in POD format 
+    and utilized pod2man to generate man pages for the debian package.
 
  -- Lari Huttunen <debian@huttu.net>  Wed, 23 Dec 2009 09:09:06 +0200
 
