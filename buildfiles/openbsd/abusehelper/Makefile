@@ -22,7 +22,7 @@ COMMENT = 		framework to help you in your abuse handling
 #
 # What port/package will be created
 #
-V=0.237
+V=r243
 DISTNAME =		abusehelper-$V
 #PKGNAME =		abusehelper	
 #PKGNAME-foo =		???	for multi packages
@@ -67,7 +67,7 @@ PERMIT_DISTFILES_FTP =	Yes
 
 # where the source files and patches can be fetched
 #
-MASTER_SITES =		http://www.jkry.org/~turmio/abusehelper/
+MASTER_SITES =		http://abusehelper.googlecode.com/files/
 #MASTER_SITES =		${MASTER_SITE_foo:=subdir/}
 # if more master sites are needed...
 #MASTER_SITES0 =
@@ -94,6 +94,8 @@ MODULES =		lang/python
 #MAKE_ENV =		???
 #FAKE_FLAGS =		???
 #REGRESS_FLAGS =	???
+
+
 
 # build/configuration variables
 #
@@ -168,7 +170,7 @@ MODULES =		lang/python
 #LDFLAGS =		???
 #MAKE_FILE =		???
 #PKG_ARCH =		???
-WRKDIST =		${WRKDIR}/abusehelper-read-only
+WRKDIST =		${WRKDIR}/abusehelper-$V
 #WRKSRC =		??? if other than ${WRKDIST}
 #WRKBUILD =		??? if other than ${WRKSRC}
 #WRKCONF =		??? if other than ${WRKBUILD}
@@ -177,11 +179,8 @@ WRKDIST =		${WRKDIR}/abusehelper-read-only
 #INSTALL_TARGET =	???
 #REGRESS_TARGET =	???
 #INSTALL_DATA_DIR=	/
-ABUSEHELPERUSER =	_abusehel
-ABUSEHELPERGROUP =	_abusehel
-ABUSEHELPERDIR =	/var/tmp
-ABUSEHELPERLOGDIR =	/var/log/abusehelper
-SUBST_VARS =		ABUSEHELPERDIR ABUSEHELPERLOGDIR ABUSEHELPERUSER	
+#ABUSEHELPERLOGDIR =	/var/log/abusehelper
+SUBST_VARS =		ABUSEHELPERLOGDIR 
 
 post-install:
 	#${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper
