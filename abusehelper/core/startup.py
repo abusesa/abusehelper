@@ -43,7 +43,7 @@ def main(config_file, enable=None, disable=None):
             continue
         module = config.get(section, "module")
 
-        process = subprocess.Popen([sys.executable, "-u", 
+        process = subprocess.Popen([sys.executable,  
                                     "-m", module,
                                     "--ini-file", config_file,
                                     "--ini-section", section])
