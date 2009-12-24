@@ -1,8 +1,9 @@
 from distutils.core import setup
 import sys,os
 
+
 setup(name="abusehelper",
-      version="1.r247-5", #update this when creating packages
+      version="1.r251", #update this when creating packages
       packages=["abusehelper", 
                 "abusehelper.core", 
                 "abusehelper.thirdparty",
@@ -38,12 +39,20 @@ setup(name="abusehelper",
 
 
 if sys.argv[1] == 'install':
+
+    ahgroup="abusehel"
+    ahuser="abusehel"
+
+    if os.uname()[0] == 'OpenBSD':
+	ahgroup="_abusehe"
+	ahuser="_abusehe"
+
     if not os.path.exists("/etc/abusehelper/"):
 
         print 'To create abusehelper config directory:\n' + \
             ' mkdir /etc/abusehelper\n' + \
-            ' chown abusehel:abusehel /etc/abusehelper\n' + \
-            ' chmod 750 /etc/abusehelper'
+            ' chown root:%s /etc/abusehelper\n' % (ahgroup) + \
+            ' chmod 750 /etc/abusehelper' 
 
         print '\nTo configure:\n' + \
             ' cp -r example/* /etc/abusehelper/\n' + \
@@ -52,7 +61,7 @@ if sys.argv[1] == 'install':
     if not os.path.exists("/var/log/abusehelper/"):
         print '\nTo create log directory:\n' +  \
             ' mkdir /var/log/abusehelper\n' + \
-            ' chown abusehel:abusehel /var/log/abusehelper\n' + \
+            ' chown %s:%s /var/log/abusehelper\n' % (ahuser, ahgroup) + \
             ' chmod 770 /var/log/abusehelper' 
         
         
