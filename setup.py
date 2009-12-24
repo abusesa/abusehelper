@@ -2,12 +2,20 @@ from distutils.core import setup
 import sys,os
 
 setup(name="abusehelper",
-      version="r214", #update this when creating packages
+      version="1.r247-5", #update this when creating packages
       packages=["abusehelper", 
                 "abusehelper.core", 
                 "abusehelper.thirdparty",
                 "abusehelper.year3000",
                 "idiokit"],
+      data_files = [('share/examples/abusehelper', 
+	["example/config.ini",
+	 "example/customers.ini"],
+       ),
+       ('share/examples/abusehelper/templates',
+	 ["example/templates/dshield",
+	 "example/templates/ircfeed"],
+       )],
       description="A framework for receiving and redistributing Abuse Feeds",
       long_description="AbuseHelper is a modular, scalable and robust " + \
           "framework to help you in your abuse handling.",
