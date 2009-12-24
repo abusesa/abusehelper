@@ -1,6 +1,6 @@
 If you haven't configured AbuseHelper earlier, run the following commands: 
 cp -r /usr/local/share/examples/abusehelper /etc/                                                                     
-chown -R _abusehe:_abusehe /etc/abusehelper/ 
+chown -R root:_abusehe /etc/abusehelper/ 
 chmod 750 /etc/abusehelper/
 
 And edit the following files:

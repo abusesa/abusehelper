@@ -4,20 +4,6 @@ myerr() {
  exit 1
 }
 
-create_logdir() {
-  #doublecheck
-  [ $(basename ${LOGDIR}) = "abusehelper" ] || \
-      myerr "Logdir needs to end 'abusehelper' subdir."
-
-  mkdir ${LOGDIR} || myerr "Could not create logdir."
-  echo "Created ${LOGDIR}..."
-
-  chown ${USER} ${LOGDIR} || myerr "Could not chown to ${USER}"
-  echo "chowned to ${USER}..."
-  
-  chmod 700 ${LOGDIR}
-
-}
 
 PYTHON="python"
 UNAME=$(uname)
@@ -36,6 +22,7 @@ case "${UNAME}" in
         SU="su -" 
         PYTHON="python2.5" 
         STOPCMD="${PYTHON} -m -c $CFG"
+	USER="_abusehe"
 	;;
     *)
 	SU="su -s /bin/sh"
@@ -54,12 +41,12 @@ case "$1" in
 	[ $(basename ${LOGDIR}) = "abusehelper" ] || \
             myerr "Logdir needs to end 'abusehelper' subdir."
 
-	[ -d ${LOGDIR} ] || create_logdir
-
+        echo "Running ${SU} ${USER} -c \"${STARTCMD} >${LOG} 2>&1\""
         ${SU} ${USER} -c "${STARTCMD} >${LOG} 2>&1" &
 	;;
 
     stop)
+	echo "ps auxww|fgrep \"${STOPCMD}\"|fgrep -v \"${SU}\""  
 	for i in $(ps auxww|fgrep "${STOPCMD}"|fgrep -v "${SU}" | \
 	    fgrep -v fgrep |fgrep -v bas | awk  '{print $2}')
 	do
@@ -74,10 +61,12 @@ case "$1" in
 	$0 start
 	;;
     status)
+	echo -e 'Below is a list of currently running AbuseHelper processes:\n'
 	ps auxww|fgrep 'abusehelper'|fgrep "${PYTHON}" | \
             fgrep -v "${SU}"|fgrep -v fgrep | \
 	    fgrep -v 'sh -c' | tr -s " "  
 	;;
+
     *)
 	myerr "Usage: $0 <start|stop|status>"
 esac
