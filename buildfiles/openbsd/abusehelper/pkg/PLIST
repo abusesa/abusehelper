@@ -1,4 +1,0 @@
-@newgroup _abusehe:648
-@newuser _abusehe:648:_abusehe:daemon:AbuseHelper account:/var/db/abusehelper:/bin/sh
-@owner _abusehe
-@group _abusehe

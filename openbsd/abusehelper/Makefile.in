@@ -22,7 +22,7 @@ COMMENT = 		framework to help you in your abuse handling
 #
 # What port/package will be created
 #
-V=r243
+V=REPLACEVERSIONNUMBER
 DISTNAME =		abusehelper-$V
 #PKGNAME =		abusehelper	
 #PKGNAME-foo =		???	for multi packages
@@ -183,8 +183,9 @@ WRKDIST =		${WRKDIR}/abusehelper-$V
 SUBST_VARS =		ABUSEHELPERLOGDIR 
 
 post-install:
-	#${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper
-	@mkdir -p /usr/local/share/exampler/abusehelper
-	@find ${WRKDIST}/example/ -maxdepth 1 -exec cp -r {} /usr/local/share/examples/abusehelper \;
+	${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper
+	${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper/templates
+	${INSTALL_DATA} ${WRKSRC}/example/*.ini ${PREFIX}/share/examples/abusehelper	
+	${INSTALL_DATA} ${WRKSRC}/example/templates/* ${PREFIX}/share/examples/abusehelper/templates
 
 .include <bsd.port.mk>
