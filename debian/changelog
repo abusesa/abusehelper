@@ -1,3 +1,9 @@
+abusehelper (256) hardy; urgency=low
+
+  * First release of the debian packaged abusehelper.
+
+ -- Lari Huttunen <debian@huttu.net>  Fri, 01 Jan 2010 15:16:43 +0200
+
 abusehelper (243) hardy; urgency=low
 
   * Moved the man pages from debian/ to man/ and the pod2man directives
