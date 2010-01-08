@@ -1,11 +1,10 @@
 import re
 import csv
-import time
-import urllib2
+import sys
 import imaplib
 import email.parser
 
-from abusehelper.core import events, services, roomfarm
+from abusehelper.core import utils, events, services, roomfarm
 from idiokit import threado, util, timer
 
 @threado.stream
@@ -27,7 +26,11 @@ def fetch_content(inner, mailbox, filter, url_rex, filename_rex):
                 for part in parts:
                     matches = re.findall(url_rex, part)
                     for match in matches:
-                        yield inner.sub(fetch_url(match, filename_rex))
+                        try:
+                            info, cvs_data = yield inner.sub(utils.fetch_url(match))
+                        except utils.FetchUrlFailed, fuf:
+                            print >> sys.stderr, "Could not fetch report %r:" % match, fuf
+                        
         mailbox.store(num, "+FLAGS", "\\Seen")
 
 def find_payload(mailbox, num, path=()):
@@ -61,46 +64,40 @@ def find_payload(mailbox, num, path=()):
             yield path_str, header.get_content_type()
 
 @threado.stream
-def fetch_url(inner, url, filename_rex):
-    opened = urllib2.urlopen(url)
+def parse_cvs(inner, info, cvs_data):
+    groupdict = dict()
 
-    try:
-        info = str(opened.info())
-        header = email.parser.Parser().parsestr(info, headersonly=True)
+    filename = info.get_filename(None)
+    if filename is not None:
+        match = filename_rex.match(filename)
+        if match is not None:
+            groupdict = match.groupdict()
 
-        filename = header.get_filename(None)
-        groupdict = dict()
-        if filename is not None:
-            match = filename_rex.match(filename)
-            if match is not None:
-                groupdict = match.groupdict()
+    for row in csv.DictReader(cvs_data.splitlines()):
+        event = events.Event()
+        for key, value in groupdict.items():
+            if None in (key, value):
+                continue
+            event.add(key, value)
 
-        reader = csv.DictReader(opened)
-        for row in reader:
-            event = events.Event()
+        for key, value in row.items():
+            if None in (key, value):
+                continue
+            key = util.guess_encoding(key).lower().strip()
+            value = util.guess_encoding(value).strip()
+            if not value or value == "-":
+                continue
+            event.add(key, value)
 
-            for key, value in groupdict.items():
-                if None in (key, value):
-                    continue
-                event.add(key, value)
-
-            for key, value in row.items():
-                if None in (key, value):
-                    continue
-                key = util.guess_encoding(key).lower().strip()
-                value = util.guess_encoding(value).strip()
-                if not value or value == "-":
-                    continue
-                event.add(key, value)
-            yield inner.send(event)
-    finally:
+        inner.send(event)
         yield
-        opened.close()
+        list(inner)
 
 class ImapbotService(roomfarm.RoomFarm):
     def __init__(self, xmpp, mail_server, mail_user, mail_password, 
-                 state_file=None, filter=None, url_rex=None, 
-                 filename_rex=None):
+                 filter=None, url_rex=None, 
+                 filename_rex=None, poll_interval=60.0,
+                 state_file=None):
 
         if not filter:
             filter = '(FROM "eventfeed.com" BODY "http://" UNSEEN)'
@@ -122,7 +119,7 @@ class ImapbotService(roomfarm.RoomFarm):
         self.url_rex = re.compile(url_rex)
         self.filename_rex = re.compile(filename_rex)
 
-        self.poll_frequency = 300.0
+        self.poll_interval = poll_interval
         self.expire_time = float()
 
     @threado.stream
@@ -145,20 +142,20 @@ class ImapbotService(roomfarm.RoomFarm):
 
             rooms = self.dsts.get("room")
             for event in inner:
+                print event.attrs
                 for room in rooms:
                     room.send(event)
 
     def run(self):
-        while True:
-            current_time = time.time()
-            if self.expire_time > current_time:
-                yield self.inner, timer.sleep(self.expire_time-current_time)
-            else:
+        try:
+            while True:
+                yield self.inner, timer.sleep(self.poll_interval)
                 yield self.inner.sub(fetch_content(self.mailbox, self.filter, 
-                                               self.url_rex, self.filename_rex)
+                                                   self.url_rex, 
+                                                   self.filename_rex)
                                      | self.distribute())
-
-                self.expire_time = time.time() + self.poll_frequency
+        except services.Stop:
+            self.inner.finish()
 
     @threado.stream
     def session(inner, self, state, room):
@@ -174,6 +171,7 @@ class ImapbotService(roomfarm.RoomFarm):
             self.rooms(inner)
 
 def main(name, xmpp_jid, service_room, mail_server, mail_user,
+         poll_interval=60.0,
          xmpp_password=None, mail_password=None, state_file=None,
          filter=None, url_rex=None, filename_rex=None, log_file=None):
 
@@ -200,7 +198,8 @@ def main(name, xmpp_jid, service_room, mail_server, mail_user,
         logger.addHandler(log.RoomHandler(lobby.room))
 
         service = ImapbotService(xmpp, mail_server, mail_user, mail_password,
-                                 filter, url_rex, filename_rex)
+                                 filter, url_rex, filename_rex, poll_interval,
+                                 state_file)
 
         yield inner.sub(lobby.offer(name, service))
     return bot()
