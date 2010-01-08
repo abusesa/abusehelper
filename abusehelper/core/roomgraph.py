@@ -17,7 +17,7 @@ class RoomGraphService(roomfarm.RoomFarm):
             for event in inner:
                 count += 1
                 if count % 100 == 0:
-                    print "I've seen", count, "events in room", name
+                    print "Seen", count, "events in room", name
 
                 for dst, rules in tests:
                     for rule in rules:
