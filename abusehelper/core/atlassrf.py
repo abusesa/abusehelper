@@ -3,39 +3,20 @@ import cgi
 import sys
 import time
 import urllib2
-import httplib
-import socket
 import urlparse
 import cStringIO as StringIO
 import xml.etree.cElementTree as etree
 
 from idiokit import threado, timer
-from abusehelper.core import events, services, roomfarm, dedup, cymru
-
-class FetchUrlFailed(Exception):
-    pass
-
-@threado.stream
-def fetch_url(inner, opener, url):
-    try:
-        fileobj = yield inner.thread(opener.open, url)
-        list(inner)
-        try:
-            data = yield inner.thread(fileobj.read)
-        finally:
-            fileobj.close()
-    except (urllib2.URLError, httplib.HTTPException, socket.error), error:
-        raise FetchUrlFailed, error
-    list(inner)
-    inner.finish(data)
+from abusehelper.core import utils, events, services, roomfarm, dedup, cymru
 
 TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I | re.S)
 
 @threado.stream
 def fetch_extras(inner, opener, url):
     try:
-        data = yield inner.sub(fetch_url(opener, url))
-    except FetchUrlFailed:
+        data = yield inner.sub(utils.fetch_url(opener, url))
+    except utils.FetchUrlFailed:
         inner.finish(list())
 
     match = TABLE_REX.search(data)
@@ -57,8 +38,8 @@ DC_NS = "http://purl.org/dc/elements/1.1"
 def atlassrf(inner, dedup, opener, url):
     try:
         print "Downloading the report"
-        data = yield inner.sub(fetch_url(opener, url))
-    except FetchUrlFailed, fuf:
+        data = yield inner.sub(utils.fetch_url(opener, url))
+    except utils.FetchUrlFailed, fuf:
         print >> sys.stderr, "Failed to download the report:", fuf
         return
     print "Downloaded the report"

@@ -1,14 +1,11 @@
 import sys
 import csv
 import time
-import socket
-import urllib2
-import httplib
 import urlparse
 import urllib
 
 from idiokit import threado
-from abusehelper.core import events, services, dedup, cymru
+from abusehelper.core import utils, events, services, dedup, cymru
 
 def sanitize_ip(ip):
     # Remove leading zeros from (strings resembling) IPv4 addresses.
@@ -19,29 +16,6 @@ def sanitize_ip(ip):
     except ValueError:
         pass
     return ip
-
-class FetchUrlFailed(Exception):
-    pass
-
-@threado.stream
-def fetch_url(inner, url, opener=None):
-    if opener is None:
-        opener = urllib2.build_opener()
-
-    try:
-        fileobj = yield inner.thread(opener.open, url)
-        list(inner)
-
-        reader = inner.thread(fileobj.read)
-        try:
-            while not reader.has_result():
-                yield inner, reader
-        finally:
-            fileobj.close()
-
-        inner.finish(fileobj.info(), reader.result())
-    except (urllib2.URLError, httplib.HTTPException, socket.error), error:
-        raise FetchUrlFailed, error
 
 @threado.stream
 def dshield(inner, asn, dedup, 
@@ -60,8 +34,8 @@ def dshield(inner, asn, dedup,
 
     print "ASN%s: downloading" % asn
     try:
-        info, data = yield inner.sub(fetch_url(url))
-    except FetchUrlFailed, fuf:
+        info, data = yield inner.sub(utils.fetch_url(url))
+    except utils.FetchUrlFailed, fuf:
         print >> sys.stderr, "ASN%s: downloading failed:" % asn, fuf
         return
     print "ASN%s: downloaded" % asn
