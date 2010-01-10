@@ -1,9 +1,28 @@
+import os
+import sys
+import imp
+import warnings
 from distutils.core import setup
-import sys,os
 
+def generate_version():
+    base_path, _ = os.path.split(__file__)
+    module_path = os.path.join(base_path, "abusehelper", "core")
+
+    module_info = imp.find_module("version", [module_path])
+    version_module = imp.load_module("version", *module_info)
+    
+    version_module.generate(base_path)
+    return version_module.version()
+
+version = generate_version()
+if version is None:
+    sys.stderr("No version info available. Quitting.")
+    sys.exit(1)
+if not version.isdigit():
+    warnings.warn("This is not a clean checkout (version %r)." % version)
 
 setup(name="abusehelper",
-      version="1.r251", #update this when creating packages
+      version="1.r"+version,
       packages=["abusehelper", 
                 "abusehelper.core", 
                 "abusehelper.thirdparty",
