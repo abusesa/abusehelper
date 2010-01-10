@@ -171,7 +171,7 @@ class NETBLOCK(_Rule):
             except error:
                 return None
 
-    def __init__(self, ip, bits, keys=["ip"]):
+    def __init__(self, ip, bits, keys=None):
         if keys is not None:
             keys = frozenset(keys)
 
@@ -229,20 +229,20 @@ class NetblockTests(unittest.TestCase):
         assert not rule(MockEvent(ip=["::1"]))
 
     def test_match_arbitrary_key(self):
-        rule = NETBLOCK("1.2.3.4", 24, keys=None)
+        rule = NETBLOCK("1.2.3.4", 24)
         assert rule(MockEvent(somekey=["1.2.3.255"]))
 
     def test_non_match_arbitrary_key(self):
-        rule = NETBLOCK("1.2.3.4", 24, keys=None)
+        rule = NETBLOCK("1.2.3.4", 24)
         assert not rule(MockEvent(somekey=["1.2.4.255"]))
 
     def test_match_ip_key(self):
-        rule = NETBLOCK("1.2.3.4", 24)
+        rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
         assert rule(MockEvent(somekey=["4.5.6.255"], ip=["1.2.3.255"]))
 
     def test_nonmatch_ip_key(self):
         rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
-        assert not rule(MockEvent(somekey=["4.5.6.255"], ip=["1.2.4.255"]))
+        assert not rule(MockEvent(somekey=["1.2.3.4"], ip=["1.2.4.255"]))
 
     def test_non_match_non_ip_data(self):
         rule = NETBLOCK("1.2.3.4", 24)
