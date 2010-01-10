@@ -1,6 +1,7 @@
 import urllib2
 import httplib
 import socket
+import email.parser
 from idiokit import threado
 
 class FetchUrlFailed(Exception):
@@ -23,7 +24,10 @@ def fetch_url(inner, url, opener=None):
                 yield inner, reader
         finally:
             fileobj.close()
+            
+        info = fileobj.info()
+        info = email.parser.Parser().parsestr(str(info), headersonly=True)
 
-        inner.finish(fileobj.info(), reader.result())
+        inner.finish(info, reader.result())
     except (urllib2.URLError, httplib.HTTPException, socket.error), error:
         raise FetchUrlFailed, error
