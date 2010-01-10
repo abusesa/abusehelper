@@ -15,7 +15,7 @@ TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I | re.S)
 @threado.stream
 def fetch_extras(inner, opener, url):
     try:
-        data = yield inner.sub(utils.fetch_url(url, opener))
+        _, data = yield inner.sub(utils.fetch_url(url, opener))
     except utils.FetchUrlFailed:
         inner.finish(list())
 
@@ -38,7 +38,7 @@ DC_NS = "http://purl.org/dc/elements/1.1"
 def atlassrf(inner, dedup, opener, url):
     try:
         print "Downloading the report"
-        data = yield inner.sub(utils.fetch_url(url, opener))
+        _, data = yield inner.sub(utils.fetch_url(url, opener))
     except utils.FetchUrlFailed, fuf:
         print >> sys.stderr, "Failed to download the report:", fuf
         return
