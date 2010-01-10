@@ -126,7 +126,7 @@ class ImapbotService(roomfarm.RoomFarm):
         roomfarm.RoomFarm.__init__(self, state_file)
 
         self.xmpp = xmpp
-        self.dsts = roomfarm.Counter()
+        self.asns = roomfarm.Counter()
 
         self.mailbox = imaplib.IMAP4_SSL(mail_server, 993)
         self.mailbox.login(mail_user, mail_password)
@@ -157,10 +157,11 @@ class ImapbotService(roomfarm.RoomFarm):
         while True:
             yield inner
 
-            rooms = self.dsts.get("room")
             for event in inner:
-                for room in rooms:
-                    room.send(event)
+                for asn in event.attrs.get("asn", ()):
+                    rooms = self.asns.get(asn)
+                    for room in rooms:
+                        room.send(event)
 
     def run(self):
         try:
@@ -174,16 +175,17 @@ class ImapbotService(roomfarm.RoomFarm):
             self.inner.finish()
 
     @threado.stream
-    def session(inner, self, state, room, **keys):
+    def session(inner, self, state, asn, room, **keys):
+        asn = str(asn)
         room = self.rooms(inner, room)
-        self.dsts.inc("room", room)
+        self.asns.inc(asn, room)
         try:
             while True:
                 yield inner
         except services.Stop:
             inner.finish()
         finally:
-            self.dsts.dec("room", room)
+            self.asns.dec(asn, room)
             self.rooms(inner)
 
 def main(name, xmpp_jid, service_room, mail_server, mail_user,
