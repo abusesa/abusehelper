@@ -54,7 +54,7 @@ class IRCFeedService(roomfarm.RoomFarm):
         self.password = password
         self.use_ssl = use_ssl
 
-        self.dsts = roomfarm.Counter()
+        self.asns = roomfarm.Counter()
 
     @threado.stream_fast
     def distribute(inner, self):
@@ -62,8 +62,10 @@ class IRCFeedService(roomfarm.RoomFarm):
             yield inner
 
             for event in inner:
-                for room, _ in self.dsts:
-                    room.send(event)
+                for asn in event.attrs.get("asn", ()):
+                    rooms = self.asns.get(asn)
+                    for room in rooms:
+                        room.send(event)
 
     @threado.stream
     def handle_room(inner, self, name):
@@ -78,16 +80,17 @@ class IRCFeedService(roomfarm.RoomFarm):
             print "Left room", repr(name)
 
     @threado.stream
-    def session(inner, self, state, room, **keys):
+    def session(inner, self, state, asn, room, **keys):
+        asn = str(asn)
         room = self.rooms(inner, room)
-        self.dsts.inc(room)
+        self.asns.inc(asn, room)
         try:
             while True:
                 yield inner
         except services.Stop:
             inner.finish()
         finally:
-            self.dsts.dec(room)
+            self.asns.dec(asn, room)
             self.rooms(inner)
 
     @threado.stream
