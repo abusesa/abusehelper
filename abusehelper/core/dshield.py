@@ -40,7 +40,7 @@ def dshield(inner, asn, dedup,
         return
     print "ASN%s: downloaded" % asn
 
-    charset = info.getparam("charset")
+    charset = info.get_param("charset")
     if charset is None:
         print >> sys.stderr, "ASN%s: no character set given for the data" % asn
         return

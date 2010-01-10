@@ -5,7 +5,7 @@ import imaplib
 import email.parser
 
 from abusehelper.core import utils, events, services, roomfarm
-from idiokit import threado, util, timer
+from idiokit import threado, timer
 
 @threado.stream
 def fetch_content(inner, mailbox, filter, url_rex, filename_rex):
@@ -26,10 +26,16 @@ def fetch_content(inner, mailbox, filter, url_rex, filename_rex):
                 for part in parts:
                     matches = re.findall(url_rex, part)
                     for match in matches:
+                        print "Downloading URL", match
                         try:
-                            info, cvs_data = yield inner.sub(utils.fetch_url(match))
+                            info, csv_data = yield inner.sub(utils.fetch_url(match))
                         except utils.FetchUrlFailed, fuf:
-                            print >> sys.stderr, "Could not fetch report %r:" % match, fuf
+                            print >> sys.stderr, "Could not fetch URL %s:" % match, fuf
+                            return
+
+                        print "Parsing data from URL", match
+                        yield inner.sub(parse_csv(info, csv_data, filename_rex))
+                        print "Done with URL", match
                         
         mailbox.store(num, "+FLAGS", "\\Seen")
 
@@ -64,16 +70,29 @@ def find_payload(mailbox, num, path=()):
             yield path_str, header.get_content_type()
 
 @threado.stream
-def parse_cvs(inner, info, cvs_data):
+def parse_csv(inner, info, csv_data, filename_rex):
     groupdict = dict()
 
-    filename = info.get_filename(None)
-    if filename is not None:
-        match = filename_rex.match(filename)
-        if match is not None:
-            groupdict = match.groupdict()
+    charset = info.get_param("charset")
+    if charset is None:
+        print >> sys.stderr, "No character set given for the data"
+        return
 
-    for row in csv.DictReader(cvs_data.splitlines()):
+    filename = info.get_filename(None)
+    if filename is None:
+        print >> sys.stderr, "No filename given for the data"
+        return
+
+    match = filename_rex.match(filename)
+    if match is None:
+        print >> sys.stderr, "Filename did not match"
+        return
+
+    groupdict = match.groupdict()
+    for row in csv.DictReader(csv_data.splitlines()):
+        list(inner)
+        yield
+
         event = events.Event()
         for key, value in groupdict.items():
             if None in (key, value):
@@ -83,15 +102,13 @@ def parse_cvs(inner, info, cvs_data):
         for key, value in row.items():
             if None in (key, value):
                 continue
-            key = util.guess_encoding(key).lower().strip()
-            value = util.guess_encoding(value).strip()
+            key = key.decode(charset).lower().strip()
+            value = value.decode(charset).strip()
             if not value or value == "-":
                 continue
             event.add(key, value)
 
         inner.send(event)
-        yield
-        list(inner)
 
 class ImapbotService(roomfarm.RoomFarm):
     def __init__(self, xmpp, mail_server, mail_user, mail_password, 
@@ -142,7 +159,6 @@ class ImapbotService(roomfarm.RoomFarm):
 
             rooms = self.dsts.get("room")
             for event in inner:
-                print event.attrs
                 for room in rooms:
                     room.send(event)
 
@@ -158,7 +174,7 @@ class ImapbotService(roomfarm.RoomFarm):
             self.inner.finish()
 
     @threado.stream
-    def session(inner, self, state, room):
+    def session(inner, self, state, room, **keys):
         room = self.rooms(inner, room)
         self.dsts.inc("room", room)
         try:
