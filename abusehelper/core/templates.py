@@ -92,10 +92,21 @@ class Template(object):
             self.obj = obj
 
     def __getitem__(self, key):
-        for row in csv.reader([key]):
+        for row in csv.reader([key], skipinitialspace=True):
             if not row:
                 return u""
             row = [x.strip() for x in row]
             formatter = self.formatters[row[0]]
             return formatter.format(self.obj, self.events, *row[1:])
         return u""
+
+import unittest
+
+class TemplateRegressionTests(unittest.TestCase):
+    def test_issue_32(self):
+        # Issue 32: Templating does not accept "," as csv separator
+        template = Template('%(csv, ",", column_name)s', csv=CSVFormatter())
+        assert template.format(None, []).rstrip() == "column_name"
+
+if __name__ == "__main__":
+    unittest.main()
