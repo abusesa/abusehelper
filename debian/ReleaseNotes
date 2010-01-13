@@ -1,0 +1,150 @@
+
+   Release Notes Revision 254
+
+   This is our first usable release.
+
+   New bots
+        * Bots
+
+        * DShield Collector (Works out-of-the-box)
+        * AtlasSFR Collector (Access required)
+        * Mailer Reporter (Access to SMTP server required, non-authenticated
+          and submission supported)
+        * Roomgraph for automatic room creation and data aggregation
+        * Historian for storing events that are seen in rooms to SQLite
+          backend
+
+        * Written in a backend-agnostic way, you may customize to have your
+          own backend.
+
+     Bot Templates
+        * IRCFeed Collector
+        * IMAP Collector
+
+        * Out-of-the-box: retrieve URLS to CSV files in supported by
+          [13]Python 2.5.4 csv module in default settings
+        * Customize Bot Template:
+
+        * Retrieve CSV attachments
+        * Change CSV format to non-default
+
+   New Features
+     * Botnet-inspired, XMPP-based architecture: If needed, share the work
+       to several machines and several geolocations.
+     * Highly modular:
+
+     * Infrastructure for writing your own asynchronic, XMPP based,
+       Collector and Reporter Bots.
+
+     * [14]http://code.google.com/p/idiokit/ | Idiokit for writing your
+       own bots:
+
+     * IRC, IMAP, HTTP collectors
+     * Email reporting
+     * Separate namespace in XMPP messages for machine and human readable
+       data. (Human's will see human readable 'logs' in XMPP-rooms, bots
+       will utilize machine readable XML-Stanzas.
+
+     You may also write custom collector bots for coping with Feeds that
+   all have special properties:
+     * availability,
+     * integrity of the information,
+     * bugs,
+     * update frequency,
+     * timespan,
+     * provided information,
+     * used terminology,
+     * formatting (csv with varying delimiter policies, textual, etc)
+     * required preknowledge,
+     * and more.
+
+     Architecture
+
+     Observable:
+     * Utilize XMPP presence to see which bots are currently running.
+     * Utilize room listing for understanding who are present in
+       XMPP-rooms, processing and sharing information
+     * Data flows and logs are visible at the XMPP-rooms that represent
+       natural objects. (source feed, customer rooms, coordinator rooms).
+     * You can use your favorite XMPP client to monitor the data flows and
+       logs.
+
+     * Additionally, [15]AbuseHelper writes logs also to logfiles.
+
+     Scalable
+     * Distributable XMPP server
+     * Distributable bots
+     * Bot states can be moved with bots
+     * Scalability in time:
+
+     * spread processing over time
+     * process only new information
+
+     * Highly configurable, yet simple
+
+     * [16]http://code.google.com/p/abusehelper/source/browse/trunk/exampl
+       e/customers.ini | customer.ini for facilitating varying Customer
+       needs.
+
+     * Report timing
+     * Templates for report formatting and languages
+     * Customers can be defined on AS or CIDR basis
+     * Fine grained customer contact information, you may define different
+       contacts on
+
+     * AS-level
+     * CIDR-level
+     * Report-level
+
+     [17]http://code.google.com/p/abusehelper/source/browse/trunk/example/
+   config.ini | config.ini for controlling:
+     * What Bots are launched in the startup and under which configuration
+
+     * Usernames, passwords, logfiles and support infrastructure (such as
+       mail servers for reporting)
+
+     Dynamic updates for Customer configuration
+
+     Easy to install
+     * Minimal set of dependencies
+
+     * Abuse Helper requires only Python >=2.5 on the same machine
+     * Only few infrastructure components needed: XMPP server, SMTP server
+       (and DNS server)
+
+     All startup and configuration related items are centralized to two
+   configuration files.
+
+   |> [18]Sign in to add a comment
+
+   ©2009 Google - [19]Code Home - [20]Terms of Service - [21]Privacy
+   Policy - [22]Site Directory - [23]Project Hosting Help
+
+   Hosted by [24]Google Code
+
+References
+
+   1. http://code.google.com/p/abusehelper/wiki/ReleaseNotes
+   2. https://www.google.com/accounts/ServiceLogin?service=code&ltmpl=phosting&continue=http%3A%2F%2Fcode.google.com%2Fp%2Fabusehelper%2Fwiki%2FReleaseNotes&followup=http%3A%2F%2Fcode.google.com%2Fp%2Fabusehelper%2Fwiki%2FReleaseNotes
+   3. http://code.google.com/p/abusehelper/
+   4. http://code.google.com/p/abusehelper/
+   5. http://code.google.com/p/abusehelper/
+   6. http://code.google.com/p/abusehelper/
+   7. http://code.google.com/p/abusehelper/downloads/list
+   8. http://code.google.com/p/abusehelper/w/list
+   9. http://code.google.com/p/abusehelper/issues/list
+  10. http://code.google.com/p/abusehelper/source/checkout
+  11. http://code.google.com/u/keliaakikkoman/
+  12. http://code.google.com/p/abusehelper/w/list?q=label:Featured
+  13. http://www.python.org/doc/2.5.4/lib/module-csv.html
+  14. http://code.google.com/p/idiokit/
+  15. http://code.google.com/p/abusehelper/wiki/AbuseHelper
+  16. http://code.google.com/p/abusehelper/source/browse/trunk/example/customers.ini
+  17. http://code.google.com/p/abusehelper/source/browse/trunk/example/config.ini
+  18. https://www.google.com/accounts/ServiceLogin?service=code&ltmpl=phosting&continue=http%3A%2F%2Fcode.google.com%2Fp%2Fabusehelper%2Fwiki%2FReleaseNotes&followup=http%3A%2F%2Fcode.google.com%2Fp%2Fabusehelper%2Fwiki%2FReleaseNotes
+  19. http://code.google.com/
+  20. http://code.google.com/projecthosting/terms.html
+  21. http://www.google.com/privacy.html
+  22. http://code.google.com/more/
+  23. http://code.google.com/p/support/
+  24. http://code.google.com/hosting/

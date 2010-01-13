@@ -1,3 +1,10 @@
+abusehelper (290) hardy; urgency=low
+
+  * New upstream release, which addresses issues 24, 25, 32. More info at:
+    http://code.google.com/p/abusehelper/source/list
+
+ -- Lari Huttunen <svimes@fudinc.com>  Wed, 13 Jan 2010 10:51:50 +0200
+
 abusehelper (256) hardy; urgency=low
 
   * First release of the debian packaged abusehelper.
