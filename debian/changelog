@@ -1,3 +1,9 @@
+abusehelper (293) hardy; urgency=low
+
+  * Abusehelper build has a "hidden" dependency to subversion, fixed.
+
+ -- Lari Huttunen <debian@huttu.net>  Fri, 15 Jan 2010 11:25:30 +0200
+
 abusehelper (292) hardy; urgency=low
 
   * Fix to issue 33, which prevented debian packaging. :)

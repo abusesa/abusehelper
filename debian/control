@@ -3,7 +3,7 @@ XS-Python-Version: >= 2.5
 Section: net
 Priority: extra
 Maintainer: Lari Huttunen <debian@huttu.net>
-Build-Depends: debhelper (>= 5), python-central, dh-make, dpkg-dev, debconf, perl
+Build-Depends: debhelper (>= 5), python-central, dh-make, dpkg-dev, debconf, perl, subversion
 Standards-Version: 3.7.2
 
 Package: abusehelper
