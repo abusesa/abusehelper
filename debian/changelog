@@ -1,3 +1,10 @@
+abusehelper (292) hardy; urgency=low
+
+  * Fix to issue 33, which prevented debian packaging. :)
+    http://code.google.com/p/abusehelper/issues/detail?id=33
+
+ -- Lari Huttunen <debian@huttu.net>  Fri, 15 Jan 2010 10:53:10 +0200
+
 abusehelper (290) hardy; urgency=low
 
   * New upstream release, which addresses issues 24, 25, 32. More info at:
