@@ -1,3 +1,9 @@
+abusehelper (295) hardy; urgency=low
+
+  * Test an idiokit DNS fix.
+
+ -- Lari Huttunen <debian@huttu.net>  Sun, 17 Jan 2010 12:29:55 +0200
+
 abusehelper (293) hardy; urgency=low
 
   * Abusehelper build has a "hidden" dependency to subversion, fixed.
