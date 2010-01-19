@@ -3,12 +3,15 @@ import csv
 import sys
 import imaplib
 import email.parser
+import base64
+import cStringIO
+import zipfile
 
 from abusehelper.core import utils, events, services, roomfarm
-from idiokit import threado, timer
+from idiokit import threado, timer, util
 
 @threado.stream
-def fetch_content(inner, mailbox, filter, url_rex, filename_rex):
+def fetch_content(inner, mailbox, filter, url_rex, filename_rex, from_url):
     mailbox.noop()
 
     result, data = mailbox.search(None, filter)
@@ -16,30 +19,74 @@ def fetch_content(inner, mailbox, filter, url_rex, filename_rex):
         return
 
     for num in data[0].split():
-        for path, content_type in find_payload(mailbox, num):
-            if content_type != "text/plain":
-                continue
-            fetch = "(BODY.PEEK[%s]<0.2048>)" % path
-            result, data = mailbox.fetch(num, fetch)
+        for path, header in find_payload(mailbox, num, from_url=from_url):
+            content_type = header.get_content_type()
 
-            for parts in data:
-                for part in parts:
-                    matches = re.findall(url_rex, part)
-                    for match in matches:
-                        print "Downloading URL", match
-                        try:
-                            info, csv_data = yield inner.sub(utils.fetch_url(match))
-                        except utils.FetchUrlFailed, fuf:
-                            print >> sys.stderr, "Could not fetch URL %s:" % match, fuf
-                            return
+            if from_url:
+                if content_type != "text/plain":
+                    continue
 
-                        print "Parsing data from URL", match
-                        yield inner.sub(parse_csv(info, csv_data, filename_rex))
-                        print "Done with URL", match
+                fetch = "(BODY.PEEK[%s]<0.2048>)" % path
+                result, data = mailbox.fetch(num, fetch)
+
+                for parts in data:
+                    for part in parts:
+                        matches = re.findall(url_rex, part)
+                        for match in matches:
+                            print "Downloading URL", match
+                            try:
+                                info, csv_data = yield inner.sub(utils.fetch_url(match))
+                            except utils.FetchUrlFailed, fuf:
+                                print >> sys.stderr, "Could not fetch URL %s:" % match, fuf
+                                return
+
+                            print "Parsing data from URL", match
+                            yield inner.sub(parse_csv(info.get_filename(None),
+                                                     csv_data,
+                                                     filename_rex,
+                                                     info.get_param("charset")))
+                            print "Done with URL", match
+
+            else:
+                fetch = "(BODY.PEEK[%s])"  % path
+                result, data = mailbox.fetch(num, fetch)
+                for parts in data:
+                    if len(parts) >= 2:
+                        if content_type == "application/zip":
+                            try:
+                                zdata = base64.b64decode(parts[1])
+                            except TypeError:
+                                continue
+
+                            temp = cStringIO.StringIO(zdata)
+
+                            try:
+                                zfile = zipfile.ZipFile(temp)
+                            except zipfile.BadZipfile:
+                                continue
+
+                            for name in zfile.namelist():
+                                csv_data = zfile.read(name)
+
+                                print "Parsing data from file", name
+                                yield inner.sub(parse_csv(name,
+                                                  csv_data,
+                                                  filename_rex))
+                                print "Done with file", name
+                            zfile.close()
+                            temp.close()
+                        else:
+                            name = header.get_filename(None)
+                            print "Parsing data from file", name 
+                            yield inner.sub(parse_csv(name,
+                                                  parts[1],
+                                                  filename_rex))
+                            print "Done with file", name
+
                         
         mailbox.store(num, "+FLAGS", "\\Seen")
 
-def find_payload(mailbox, num, path=()):
+def find_payload(mailbox, num, path=(), from_url=True):
     path = list(path) + [0]
     while True:
         path[-1] += 1
@@ -60,25 +107,25 @@ def find_payload(mailbox, num, path=()):
 
         header = email.parser.Parser().parsestr(data[0], headersonly=True)
         disposition = header.get_params((), "content-disposition")
-        if ("attachment", "") in disposition:
+        
+        if from_url and ("attachment", "") in disposition:
+            continue
+
+        attachment = None
+        if not from_url and (("attachment", "") not in disposition or \
+                             header.get_filename(None) is None):
             continue
 
         if header.is_multipart():
-            for result in find_payload(num, path):
+            for result in find_payload(mailbox, num, path, from_url):
                 yield result
         else:
-            yield path_str, header.get_content_type()
+            yield path_str, header 
 
 @threado.stream
-def parse_csv(inner, info, csv_data, filename_rex):
+def parse_csv(inner, filename, csv_data, filename_rex, charset=None):
     groupdict = dict()
 
-    charset = info.get_param("charset")
-    if charset is None:
-        print >> sys.stderr, "No character set given for the data"
-        return
-
-    filename = info.get_filename(None)
     if filename is None:
         print >> sys.stderr, "No filename given for the data"
         return
@@ -102,8 +149,14 @@ def parse_csv(inner, info, csv_data, filename_rex):
         for key, value in row.items():
             if None in (key, value):
                 continue
-            key = key.decode(charset).lower().strip()
-            value = value.decode(charset).strip()
+
+            if charset:
+                key = key.decode(charset).lower().strip()
+                value = value.decode(charset).strip()
+            else:
+                key = util.guess_encoding(key).lower().strip()
+                value = util.guess_encoding(value).strip()
+
             if not value or value == "-":
                 continue
             event.add(key, value)
@@ -114,7 +167,7 @@ class ImapbotService(roomfarm.RoomFarm):
     def __init__(self, xmpp, mail_server, mail_user, mail_password, 
                  filter=None, url_rex=None, 
                  filename_rex=None, poll_interval=60.0,
-                 state_file=None):
+                 state_file=None, from_url=True):
 
         if not filter:
             filter = '(FROM "eventfeed.com" BODY "http://" UNSEEN)'
@@ -138,6 +191,8 @@ class ImapbotService(roomfarm.RoomFarm):
 
         self.poll_interval = poll_interval
         self.expire_time = float()
+
+        self.from_url = from_url
 
     @threado.stream
     def handle_room(inner, self, name):
@@ -169,7 +224,8 @@ class ImapbotService(roomfarm.RoomFarm):
                 yield self.inner, timer.sleep(self.poll_interval)
                 yield self.inner.sub(fetch_content(self.mailbox, self.filter, 
                                                    self.url_rex, 
-                                                   self.filename_rex)
+                                                   self.filename_rex,
+                                                   self.from_url)
                                      | self.distribute())
         except services.Stop:
             self.inner.finish()
@@ -189,9 +245,9 @@ class ImapbotService(roomfarm.RoomFarm):
             self.rooms(inner)
 
 def main(name, xmpp_jid, service_room, mail_server, mail_user,
-         poll_interval=60.0,
-         xmpp_password=None, mail_password=None, state_file=None,
-         filter=None, url_rex=None, filename_rex=None, log_file=None):
+         poll_interval=60.0, xmpp_password=None, mail_password=None, 
+         state_file=None, filter=None, url_rex=None, filename_rex=None, 
+         log_file=None, from_url=False):
 
     import getpass
     from idiokit.xmpp import connect
@@ -217,7 +273,7 @@ def main(name, xmpp_jid, service_room, mail_server, mail_user,
 
         service = ImapbotService(xmpp, mail_server, mail_user, mail_password,
                                  filter, url_rex, filename_rex, poll_interval,
-                                 state_file)
+                                 state_file, from_url)
 
         yield inner.sub(lobby.offer(name, service))
     return bot()
