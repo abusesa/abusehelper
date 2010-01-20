@@ -66,7 +66,16 @@ if sys.argv[1] == 'install':
 	ahgroup="_abusehe"
 	ahuser="_abusehe"
 
+
+ 
     if not os.path.exists("/etc/abusehelper/"):
+        #todo, rather check if the user actually exists.
+        print 'To create abusehelper user and groups:\n' + \
+            ' groupadd %s\n' % (ahgroup) + \
+            ' useradd -m %s\n ' % (ahuser)
+
+
+
 
         print 'To create abusehelper config directory:\n' + \
             ' mkdir /etc/abusehelper\n' + \
