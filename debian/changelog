@@ -1,3 +1,9 @@
+abusehelper (328) hardy; urgency=low
+
+  * bot-api-2000 introduces bot templates, which hopefully simplify the process of incorporating new feeds.
+
+ -- Lari Huttunen <debian@huttu.net>  Sat, 23 Jan 2010 18:56:31 +0200
+
 abusehelper (295) hardy; urgency=low
 
   * Test an idiokit DNS fix.
