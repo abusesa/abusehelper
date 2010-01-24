@@ -175,7 +175,7 @@ class Config(threado.GeneratorStream):
                         continue
 
                     path = self.name, customer.name, feed
-                    asn_room = self.room_prefix + "." + feed + ".asn" + unicode(asn)
+                    asn_room = self.room_prefix + "." + feed + ".as" + unicode(asn)
                     mail_room = asn_room + "." + name
 
                     yield "historian", path, frozendict(rooms=(asn_room, mail_room))
@@ -184,7 +184,7 @@ class Config(threado.GeneratorStream):
                                                         rule=rule)
                     yield "mailer", path, frozendict(to=emails, 
                                                      room=mail_room,
-                                                     subject=("Report for ASN" + 
+                                                     subject=("Report for AS" + 
                                                               unicode(asn)),
                                                      template=template,
                                                      times=times)
