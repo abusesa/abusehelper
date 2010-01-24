@@ -61,21 +61,21 @@ if sys.argv[1] == 'install':
 
     ahgroup="abusehel"
     ahuser="abusehel"
+    groupadd=""
+    useradd="useradd %s" % (ahuser)
 
     if os.uname()[0] == 'OpenBSD':
 	ahgroup="_abusehe"
 	ahuser="_abusehe"
-
+        groupadd="groupadd %s" % (ahgroup) 
+        useradd="useradd -m -g %s %s" % (ahgroup, ahuser)
 
  
     if not os.path.exists("/etc/abusehelper/"):
         #todo, rather check if the user actually exists.
         print 'To create abusehelper user and groups:\n' + \
-            ' groupadd %s\n' % (ahgroup) + \
-            ' useradd -m %s\n ' % (ahuser)
-
-
-
+            ' %s\n' % (groupadd) + \
+            ' %s\n' % (useradd)
 
         print 'To create abusehelper config directory:\n' + \
             ' mkdir /etc/abusehelper\n' + \
@@ -84,7 +84,7 @@ if sys.argv[1] == 'install':
 
         print '\nTo configure:\n' + \
             ' cp -r example/* /etc/abusehelper/\n' + \
-            'And then edit config.ini and customers.ini'
+            'And then edit config.ini and customers.ini in /etc/abusehelper/'
 
     if not os.path.exists("/var/log/abusehelper/"):
         print '\nTo create log directory:\n' +  \
