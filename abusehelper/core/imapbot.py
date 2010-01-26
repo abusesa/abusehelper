@@ -57,11 +57,10 @@ class IMAPBot(bot.FeedBot):
             yield inner.thread(mailbox.login, 
                                self.mail_user, 
                                self.mail_password)
+            yield inner.thread(mailbox.select,
+                               self.mail_box,
+                               readonly=False)
             try:
-                yield inner.thread(mailbox.select,
-                                   self.mail_box,
-                                   readonly=False)
-                
                 while True:
                     yield inner.sub(self.fetch_content(mailbox, self.filter))
                     yield inner, timer.sleep(self.poll_interval)
