@@ -57,17 +57,22 @@ class IMAPBot(bot.FeedBot):
             yield inner.thread(mailbox.login, 
                                self.mail_user, 
                                self.mail_password)
-            yield inner.thread(mailbox.select,
-                               self.mail_box,
-                               readonly=False)
-            while True:
-                yield inner.sub(self.fetch_content(mailbox, self.filter))
-                yield inner, timer.sleep(self.poll_interval)
-        finally:
+
+            status, msgs = yield inner.thread(mailbox.select,
+                                              self.mail_box,
+                                              readonly=False)
+            if status != "OK":
+                for msg in msgs:
+                    self.log.critical(msg)
+                return
+                
             try:
+                while True:
+                    yield inner.sub(self.fetch_content(mailbox, self.filter))
+                    yield inner, timer.sleep(self.poll_interval)
+            finally:
                 yield inner.thread(mailbox.close)
-            except:
-                pass
+        finally:
             yield inner.thread(mailbox.logout)
 
     @threado.stream
