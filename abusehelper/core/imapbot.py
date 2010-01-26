@@ -80,8 +80,8 @@ class IMAPBot(bot.FeedBot):
 
         for num in data[0].split():
             for path, headers in walk_mail(mailbox, num):
-                main = headers[-1].get_content_maintype()
-                sub = headers[-1].get_content_subtype()
+                main = headers[-1].get_content_maintype().replace("-", "__")
+                sub = headers[-1].get_content_subtype().replace("-", "__")
         
                 handler_name = "handle_" + main + "_" + sub
                 handler = getattr(self, handler_name, self.handle_default)
