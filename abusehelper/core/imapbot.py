@@ -41,6 +41,7 @@ class IMAPBot(bot.FeedBot):
     mail_port = bot.IntParam(default=993)
     mail_user = bot.Param()
     mail_password = bot.Param()
+    mail_box = bot.Param(default="INBOX")
 
     @threado.stream
     def feed(inner, self):
@@ -58,7 +59,7 @@ class IMAPBot(bot.FeedBot):
                                self.mail_password)
             try:
                 yield inner.thread(mailbox.select,
-                                   "INBOX",
+                                   self.mail_box,
                                    readonly=False)
                 
                 while True:
