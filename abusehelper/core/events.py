@@ -30,6 +30,13 @@ class Event(object):
             self.attrs[key] = set()
         self.attrs[key].add(value)
 
+    def discard(self, key, value):
+        self._element = None
+        values = self.attrs.get(key, set())
+        values.discard(value)
+        if not values:
+            self.attrs.pop(key, None)
+
     def contains_key_value(self, key, value):
         return value in self.attrs.get(key, ())
         

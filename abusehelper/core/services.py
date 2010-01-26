@@ -206,12 +206,11 @@ class Lobby(threado.GeneratorStream):
         bind(self, service)
 
         self._update_presence()
-        print "Offering service '%s'" % service_id
-
         try:
             yield inner.sub(service)
         finally:
-            print "Retired service '%s'" % service_id
+            if self.services.get(service_id, None) is service:
+                self.services.pop(service_id, None)
             self._update_presence()
 
     def _start(self, jid, service_id, element):
@@ -248,14 +247,9 @@ class Lobby(threado.GeneratorStream):
             self.xmpp.core.message(jid, end)
             self._discard_session(jid, session_id)
 
-import shelve
+import sqlite3
+from cPickle import loads, dumps, HIGHEST_PROTOCOL
 from idiokit import timer
-
-class MemoryShelve(dict):
-    def sync(self):
-        pass
-    def close(self):
-        self.clear()
 
 class Service(threado.GeneratorStream):
     def __init__(self, state_file=None):
@@ -265,30 +259,44 @@ class Service(threado.GeneratorStream):
         self.shutting_down = False
 
         if state_file is None:
-            self.db = MemoryShelve()
+            self.db = sqlite3.connect(":memory:")
         else:
-            self.db = shelve.open(state_file, protocol=-1)
+            self.db = sqlite3.connect(state_file)
+        self.db.execute("CREATE TABLE IF NOT EXISTS states "+
+                        "(key UNIQUE, state)")
+        self.db.commit()
+
         self.root_key = ""
+
+    def _get(self, key):
+        for state, in self.db.execute("SELECT state FROM states "+
+                                      "WHERE key = ?", (key,)):
+            return loads(str(state))
+        return None
+
+    def _put(self, key, state):
+        self.db.execute("DELETE FROM states WHERE key = ?", (key,))
+        if state is not None:
+            state = sqlite3.Binary(dumps(state, HIGHEST_PROTOCOL))
+            self.db.execute("INSERT INTO states(key, state) VALUES(?, ?)",
+                            (key, state))
 
     def path_key(self, path):
         bites = list()
         for bite in path:
-            if isinstance(bite, unicode):
-                bite = bite.encode("utf-8")
+            bite = bite.encode("unicode-escape")
             bites.append(bite.replace("/", r"\/"))
         return "/" + "/".join(bites)
 
     def run(self):
-        state = self.db.get(self.root_key, None)
+        state = self._get(self.root_key)
+        self._put(self.root_key, None)
         try:
             state = yield self.inner.sub(self.kill_sessions()
                                          | self.main(state))
 
-            if state is None:
-                self.db.pop(self.root_key, None)
-            else:
-                print "Saving the main state"
-                self.db[self.root_key] = state
+            print "Saving the main state"
+            self._put(self.root_key, state)
 
             for path, session in self.sessions.iteritems():
                 try:
@@ -298,13 +306,11 @@ class Service(threado.GeneratorStream):
                 else:
                     print "Saving the state for session", repr(path)
                     key = self.path_key(path)
-                    if state is None:
-                        self.db.pop(key, None)
-                    else:
-                        self.db[key] = state
+                    self._put(key, state)
             for key, session in self.sessions.iteritems():
                 session.result()
         finally:
+            self.db.commit()
             self.db.close()
 
     @threado.stream
@@ -339,7 +345,8 @@ class Service(threado.GeneratorStream):
             self.sessions[path] = session
         else:
             key = self.path_key(path)
-            session = self.session(self.db.get(key, None), **conf)
+            session = self.session(self._get(key), **conf)
+            self._put(key, None)
             self.sessions[path] = session
         bind(self, session)
         return session

@@ -4,7 +4,7 @@ import time
 import errno
 import signal
 import subprocess
-from abusehelper.core import opts
+from abusehelper.core import bot
 
 def all_running(processes):
     for process in processes:
@@ -21,47 +21,50 @@ def kill_processes(processes, sig):
             if ose.errno != errno.ESRCH:
                 raise
 
-def main(config_file, enable=None, disable=None):
-    def signal_handler(sig, frame):
-        sys.exit()
-    signal.signal(signal.SIGTERM, signal_handler)
+class Startup(bot.Bot):
+    bot_name = None
+    ini_file = None
+    ini_section = None
 
-    config = opts.ConfigParser(config_file)
+    config_file = bot.Param("launch processes based in this INI file, "+
+                            "one per section ([DEFAULT] section not included)")
+    enable = bot.ListParam("sections (separated by commas) that are run "+
+                           "(default: run all sections except [DEFAULT])",
+                           default=None)
+    disable = bot.ListParam("sections (separated by commas) that are not run "+
+                            "(default: run all sections except [DEFAULT])",
+                            default=None)
 
-    if enable is not None:
-        enable = set(x.strip() for x in enable.split(","))
-    if disable is not None:
-        disable = set(x.strip() for x in disable.split(","))
+    def run(self):
+        def signal_handler(sig, frame):
+            sys.exit()
+        signal.signal(signal.SIGTERM, signal_handler)
+            
+        config = bot.ConfigParser(self.config_file)
 
-    processes = dict()
-    for section in config.sections():
-        if disable is not None and section in disable:
-            continue
-        if enable is not None and section not in enable:
-            continue
-        if not config.has_option(section, "module"):
-            continue
-        module = config.get(section, "module")
+        processes = dict()
+        for section in config.sections():
+            if self.disable is not None and section in self.disable:
+                continue
+            if self.enable is not None and section not in self.enable:
+                continue
+            if not config.has_option(section, "module"):
+                continue
+            module = config.get(section, "module")
 
-        process = subprocess.Popen([sys.executable,  
-                                    "-m", module,
-                                    "--ini-file", config_file,
-                                    "--ini-section", section])
-        processes[section] = process
+            process = subprocess.Popen([sys.executable,  
+                                        "-m", module,
+                                        "--ini-file", self.config_file,
+                                        "--ini-section", section])
+            processes[section] = process
 
-    try:
-        while all_running(processes.values()):
-            time.sleep(0.1)
-    finally:
-        kill_processes(processes.values(), signal.SIGTERM)
-        for _, process in processes.items():
-            process.wait()
-main.config_filename_help = ("launch processes based in this INI file, "+
-                             "one per section ([DEFAULT] section not included)")
-main.enable_help = ("sections (separated by commas) that are run "+
-                    "(default: run all sections except [DEFAULT])")
-main.disable_help = ("sections (separated by commas) that are not run "+
-                     "(default: run all sections except [DEFAULT])")
+        try:
+            while all_running(processes.values()):
+                time.sleep(0.1)
+        finally:
+            kill_processes(processes.values(), signal.SIGTERM)
+            for _, process in processes.items():
+                process.wait()
 
 if __name__ == "__main__":
-    opts.optparse(main)
+    Startup.from_command_line().run()

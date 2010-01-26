@@ -1,8 +1,12 @@
+import csv
+import socket
 import urllib2
 import httplib
-import socket
 import email.parser
-from idiokit import threado
+
+from idiokit import threado, util
+from abusehelper.core import events
+from cStringIO import StringIO
 
 class FetchUrlFailed(Exception):
     pass
@@ -28,6 +32,33 @@ def fetch_url(inner, url, opener=None):
         info = fileobj.info()
         info = email.parser.Parser().parsestr(str(info), headersonly=True)
 
-        inner.finish(info, reader.result())
+        inner.finish(info, StringIO(reader.result()))
     except (urllib2.URLError, httplib.HTTPException, socket.error), error:
-        raise FetchUrlFailed, error
+        raise FetchUrlFailed(*error.args)
+
+@threado.stream
+def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
+    if columns is None:
+        reader = csv.DictReader(fileobj, delimiter=delimiter)
+    else:
+        reader = csv.reader(fileobj, delimiter=delimiter)
+
+    if charset is None:
+        decode = util.guess_encoding
+    else:
+        decode = lambda x: x.decode(charset)
+
+    for row in reader:
+        yield
+        list(inner)
+
+        if columns is not None:
+            row = dict(zip(columns, row))
+            
+        event = events.Event()
+        for key, value in row.items():
+            if None in (key, value):
+                continue
+            event.add(key.lower().strip(), value.strip())
+                
+        inner.send(event)

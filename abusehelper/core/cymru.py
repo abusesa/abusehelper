@@ -8,6 +8,7 @@ class CymruWhois(threado.GeneratorStream):
 
         self.cache = util.TimedCache(cache_time)
         self.throttle_time = throttle_time
+        self.pending = dict()
 
         self.start()
 
@@ -20,33 +21,39 @@ class CymruWhois(threado.GeneratorStream):
             yield event
 
     @threado.stream
-    def _iteration(inner, self, pending):
-        for ip, events in list(pending.iteritems()):
+    def iteration(inner, self, ips):
+        for ip in list(ips):
             values = self.cache.get(ip, None)
             if values is None:
                 continue
+            events = self.pending.pop(ip, ())
             map(inner.send, self._augment_events(events, values))
-            del pending[ip]
+            ips.discard(ip)
             
-        if not pending:
-            inner.finish(pending)
+        if not ips:
+            return
 
         socket = sockets.Socket()
-        yield inner.sub(socket.connect(("whois.cymru.com", 43)))
-
+        connect = socket.connect(("whois.cymru.com", 43))
         try:        
+            while not connect.has_result():
+                yield inner, connect
+
             socket.send("begin\n")
             socket.send("verbose\n")
-            for ip in pending:
+            for ip in ips:
                 socket.send(ip + "\n")
             socket.send("end\n")
-            
+
             line_buffer = util.LineBuffer()
-            while pending:
+            while ips:
                 try:
-                    data = yield socket
+                    data = yield inner, socket
                 except sockets.error:
                     break
+
+                if not socket.was_source:
+                    continue
 
                 for line in line_buffer.feed(data):                    
                     bites = [x.strip() for x in line.split("|")]
@@ -54,26 +61,31 @@ class CymruWhois(threado.GeneratorStream):
                     if len(bites) != 7:
                         continue
                     ip = bites.pop(1)
-                    events = pending.pop(ip, ())
+
+                    events = self.pending.pop(ip, ())
+                    ips.discard(ip)
                     self.cache.set(ip, bites)
                     map(inner.send, self._augment_events(events, bites))
         finally:
             yield inner.sub(socket.close())
 
-        inner.finish(pending)
+    @threado.stream_fast
+    def collect(inner, self):
+        while True:
+            yield inner
+            for event in inner:
+                for ip in event.attrs.get("ip", ()):
+                    self.pending.setdefault(ip, list()).append(event)
 
-    def run(self):
-        pending = dict()
+    @threado.stream
+    def wake(inner, self):
         sleeper = timer.sleep(self.throttle_time / 2.0)
 
         while True:
-            item = yield self.inner, sleeper
-
+            yield inner, sleeper
             if sleeper.was_source:
-                pending = yield self.inner.sub(self._iteration(pending))
+                pending = yield self.inner.sub(self.iteration(set(self.pending)))
                 sleeper = timer.sleep(self.throttle_time)
-                continue
 
-            for event in [item] + list(self.inner):
-                for ip in event.attrs.get("ip", ()):
-                    pending.setdefault(ip, list()).append(event)
+    def run(self):
+        yield self.inner.sub(self.collect() | self.wake())

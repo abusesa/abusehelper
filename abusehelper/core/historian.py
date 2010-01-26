@@ -1,9 +1,9 @@
-import sqlite3
 import time
-from idiokit.xmpp import connect, Element
+import sqlite3
+from idiokit.xmpp import Element
 from idiokit.jid import JID
 from idiokit import threado, timer
-from abusehelper.core import roomfarm, events, services
+from abusehelper.core import taskfarm, events, bot, services
 
 class HistoryDB(threado.GeneratorStream):
     def __init__(self, path=None, keeptime=None):
@@ -154,17 +154,17 @@ def parse_command(message, name):
         return False
     return _match
 
-class HistorianService(roomfarm.RoomFarm):
-    def __init__(self, xmpp, state_file):
-        roomfarm.RoomFarm.__init__(self)
-        self.xmpp = xmpp
-        self.history = HistoryDB(state_file)
+class HistorianService(bot.ServiceBot):
+    def __init__(self, bot_state_file=None, **keys):
+        bot.ServiceBot.__init__(self, bot_state_file=None, **keys)
+        self.history = HistoryDB(bot_state_file)
+        self.rooms = taskfarm.TaskFarm(self.handle_room)
 
     @threado.stream
     def handle_room(inner, self, name):
-        print "Joining room", repr(name)
-        room = yield inner.sub(self.xmpp.muc.join(name))
-        print "Joined room", repr(name)
+        self.log.info("Joining room %r", name)
+        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        self.log.info("Joined room %r", name)
 
         try:
             yield inner.sub(room
@@ -173,18 +173,21 @@ class HistorianService(roomfarm.RoomFarm):
                             | self.history.collect(unicode(room.room_jid))
                             | threado.throws())
         finally:
-            print "Left room", repr(name)
+            self.log.info("Left room %r", name)
 
     @threado.stream
     def session(inner, self, state, rooms):
-        self.rooms(inner, *rooms)
+        for room in rooms:
+            self.rooms.inc(room)
+
         try:
             while True:
                 yield inner
         except services.Stop:
             inner.finish()
         finally:
-            self.rooms(inner)
+            for room in rooms:
+                self.rooms.dec(room)
 
     @threado.stream_fast
     def command_parser(inner, self, room):
@@ -204,7 +207,7 @@ class HistorianService(roomfarm.RoomFarm):
                         if matcher is None:
                             continue
 
-                        print "Got command", repr(body.text)
+                        self.log.info("Got command %r", body.text)
                         rjid = unicode(room.room_jid)
                         
                         for etime, eroom, event in self.history.find(rjid):
@@ -220,35 +223,5 @@ class HistorianService(roomfarm.RoomFarm):
                                 body.text += "%s: %s\n" % (event_key, vals)
                             room.send(body)
 
-def main(name, xmpp_jid, service_room, 
-         state_file=None, xmpp_password=None, log_file=None):
-    import getpass
-    from abusehelper.core import log
-
-    if not xmpp_password:
-        xmpp_password = getpass.getpass("XMPP password: ")
-
-    logger = log.config_logger(name, filename=log_file)
-
-    @threado.stream
-    def bot(inner):
-        print "Connecting XMPP server with JID", xmpp_jid
-        xmpp = yield inner.sub(connect(xmpp_jid, xmpp_password))
-        xmpp.core.presence()
-
-        print "Joining lobby", service_room
-        lobby = yield inner.sub(services.join_lobby(xmpp, service_room, name))
-
-        service = HistorianService(xmpp, state_file)
-        yield inner.sub(lobby.offer(name, service))
-    return bot()
-main.service_room_help = "the room where the services are collected"
-main.xmpp_jid_help = "the XMPP username (e.g. user@xmpp.example.com)"
-main.xmpp_password_help = "the XMPP password"
-main.state_file_help = ("write the history data into the given file "+
-                        "(default: keep the history only in memory)")
-main.log_file_help = "log to the given file instead of the console"
-
 if __name__ == "__main__":
-    from abusehelper.core import opts
-    threado.run(opts.optparse(main), throw_on_signal=services.Stop())
+    HistorianService.from_command_line().run()

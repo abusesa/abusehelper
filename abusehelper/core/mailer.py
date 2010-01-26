@@ -2,7 +2,7 @@ import time
 import collections
 
 from idiokit import threado, timer
-from abusehelper.core import events, roomfarm, services, templates
+from abusehelper.core import events, taskfarm, services, templates, bot
 
 def next_time(time_string):
     parsed = list(time.strptime(time_string, "%H:%M"))
@@ -120,33 +120,38 @@ class MailerState(object):
                                       attach_and_embed_csv=embed_csv)
         return template
 
-class MailerService(roomfarm.RoomFarm):
-    def __init__(self, xmpp, host, port, from_addr, 
-                 state_file=None, username="", password=""):
-        roomfarm.RoomFarm.__init__(self, state_file)
+class MailerService(bot.ServiceBot):
+    mail_sender = bot.Param("from whom it looks like the mails came from")
+    smtp_host = bot.Param("hostname of the SMTP service used for sending mails")
+    smtp_port = bot.IntParam("port of the SMTP service used for sending mails",
+                             default=25)
+    smtp_auth_user = bot.Param("username for the authenticated SMTP service",
+                               default=None)
+    smtp_auth_password = bot.Param("password for the authenticated SMTP service",
+                                   default=None)
 
-        self.xmpp = xmpp
+    def __init__(self, **keys):
+        bot.ServiceBot.__init__(self, **keys)
 
-        self.from_addr = from_addr
-        self.host = host
-        self.port = port
-        self.username = username
-        self.password = password
+        self.queue_channel = threado.Channel()
+        self.rooms = taskfarm.TaskFarm(self.handle_room)
+        self.states = taskfarm.Counter()
 
-        self.states = roomfarm.Counter()
+        if self.smtp_auth_user and not self.smtp_auth_password:
+            self.smtp_auth_password = getpass.getpass("SMTP password: ")
 
     @threado.stream
     def handle_room(inner, self, name):
-        print "Joining room", repr(name)
-        room = yield inner.sub(self.xmpp.muc.join(name))
-        print "Joined room", repr(name)
+        self.log.info("Joining room %r", name)
+        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        self.log.info("Joined room %r", name)
 
         try:
             yield inner.sub(room
                             | events.stanzas_to_events()
                             | self.distribute(name))
         finally:
-            print "Left room", repr(name)
+            self.log.info("Left room %r", name)
 
     @threado.stream_fast
     def distribute(inner, self, name):
@@ -161,7 +166,7 @@ class MailerService(roomfarm.RoomFarm):
     def get_smtp(self):
         import smtplib
 
-        server = smtplib.SMTP(self.host, self.port)
+        server = smtplib.SMTP(self.smtp_host, self.smtp_port)
         try:
             server.ehlo()
             try:
@@ -169,7 +174,7 @@ class MailerService(roomfarm.RoomFarm):
                     server.starttls()
                     # redundant ehlo, yeah!
                     server.ehlo()
-                    server.login(self.username, self.password)
+                    server.login(self.smtp_auth_user, self.smtp_auth_password)
             except:
                 pass
         except:
@@ -177,8 +182,12 @@ class MailerService(roomfarm.RoomFarm):
             raise
         return server
 
+    def main(self, state):
+        self.queue = self._queue(state)
+        return self.queue
+
     @threado.stream
-    def main(inner, self, queue):
+    def _queue(inner, self, queue):
         if queue is None:
             queue = collections.deque()
         server = None
@@ -202,23 +211,25 @@ class MailerService(roomfarm.RoomFarm):
                 # Try to connect to the SMTP server if we're haven't done that yet
                 while server is None:
                     try:
-                        print "Connecting %s port %d" % (self.host, self.port)
+                        self.log.info("Connecting %r port %d", 
+                                      self.smtp_host, self.smtp_port)
                         server = yield inner.thread(self.get_smtp)
                     except:
-                        print "Error connecting SMTP server, retrying in 10 seconds"
+                        self.log.error("Error connecting SMTP server, "+
+                                       "retrying in 10 seconds")
                         yield inner.sub(sleep_and_collect(10.0))
                     else:
-                        print "Connected to the SMTP server"
+                        self.log.info("Connected to the SMTP server")
 
                 while queue:
                     # Send the oldest mail
                     from_addr, to_addr, subject, msg_str = queue[0]
-                    print "Sending message %r to %s" % (subject, to_addr)
+                    self.log.info("Sending message %r to %r", subject, to_addr)
                     try:
                         yield inner.thread(server.sendmail, from_addr, 
                                            to_addr, msg_str)
                     except Exception, exc:
-                        print "Could not send message to %s: %s" % (to_addr, exc)
+                        self.log.info("Could not send message to %r: %s", to_addr, exc)
                         try:
                             yield inner.thread(server.quit)
                         except:
@@ -227,7 +238,7 @@ class MailerService(roomfarm.RoomFarm):
                         break
                     else:
                         queue.popleft()
-                        print "Sent message to %s" % to_addr
+                        self.log.info("Sent message to %r", to_addr)
         except services.Stop:
             inner.finish(queue)
 
@@ -240,7 +251,7 @@ class MailerService(roomfarm.RoomFarm):
         alarm_ticker = ticker(times)
         template = state.create_template(template)
 
-        self.rooms(inner, room)
+        self.rooms.inc(room)
         self.states.inc(room, state)
         try:
             while True:
@@ -250,60 +261,19 @@ class MailerService(roomfarm.RoomFarm):
 
                 for to, cc, events in state.create_reports(to, cc):
                     prepare = state.prepare_mail(events, 
-                                                 self.from_addr, 
+                                                 self.mail_sender,
                                                  to, 
                                                  cc, 
                                                  subject, 
                                                  template)
                     for from_addr, to_addr, subject, msg_data in prepare:
-                        self.send(from_addr, to_addr, subject, msg_data)
+                        self.queue.send(from_addr, to_addr, subject, msg_data)
         except services.Stop:
             inner.finish(state)
         finally:
             alarm_ticker.throw(threado.Finished())
             self.states.dec(room, state)
-            self.rooms(inner)
-
-def main(name, xmpp_jid, service_room, smtp_host, mail_sender, 
-         xmpp_password=None, smtp_port=25,
-         submission_username=None, submission_password=None,
-         state_file=None, log_file=None):
-    import getpass
-    from idiokit.xmpp import connect
-    from abusehelper.core import log
-    
-    if not xmpp_password:
-        xmpp_password = getpass.getpass("XMPP password: ")
-    if submission_username and not submission_password:
-        submission_password = getpass.getpass("SMTP password: ")
-
-    logger = log.config_logger(name, filename=log_file)
-
-    @threado.stream
-    def bot(inner):
-        print "Connecting XMPP server with JID", xmpp_jid
-        xmpp = yield inner.sub(connect(xmpp_jid, xmpp_password))
-        xmpp.core.presence()
-
-        print "Joining lobby", service_room
-        lobby = yield inner.sub(services.join_lobby(xmpp, service_room, name))
-        logger.addHandler(log.RoomHandler(lobby.room))
-
-        service = MailerService(xmpp, smtp_host, smtp_port, mail_sender,
-                                state_file, 
-                                submission_username, submission_password)
-        yield inner.sub(lobby.offer(name, service))
-    return bot()
-main.service_room_help = "the room where the services are collected"
-main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
-main.xmpp_password_help = "the XMPP password"
-main.smtp_host_help = "hostname of the SMTP service used for sending mails"
-main.smtp_port_help = "port of the SMTP service used for sending mails"
-main.mail_sender_help = "from whom it looks like the mails came from"
-main.submission_username_help = "username for the authenticated SMTP service"
-main.submission_password_help = "password for the authenticated SMTP service"
-main.log_file_help = "log to the given file instead of the console"
+            self.rooms.dec(room)
 
 if __name__ == "__main__":
-    from abusehelper.core import opts
-    threado.run(opts.optparse(main), throw_on_signal=services.Stop())
+    MailerService.from_command_line().run()

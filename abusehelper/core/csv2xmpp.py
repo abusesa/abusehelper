@@ -1,88 +1,28 @@
 import csv
-import uuid
 import urllib2
-import urlparse
-from idiokit import threado, xmpp
-from abusehelper.core import events
+from idiokit import threado
+from abusehelper.core import events, bot, utils
 
-@threado.stream
-def send_csv_chunk(inner, reader, columns=None, chunk_size=100):
-    for count, row in enumerate(reader):
-        if columns is not None:
-            row = dict(zip(columns, row))
-            
-        event = events.Event()
-        for key, value in row.items():
-            if value is None:
-                continue
-            event.add(key.strip(), value.strip())
-                
-        inner.send(event)
-        if count >= chunk_size:
-            inner.finish(True)
-
-        yield
-        list(inner)
-
-    inner.finish(False)
-
-@threado.stream
-def xmpp_ping(inner, namespace="abusehelper#ping"):
-    uid = uuid.uuid4().hex
-    element = xmpp.Element("ping", xmlns=namespace, id=uid)
-    inner.send(element)
-
-    while True:
-        elements = yield inner
-        if elements.children().named("ping", namespace).with_attrs(id=uid):
-            return
-
-@threado.stream
-def csv2xmpp(inner, reader, columns):
-    while True:
-        has_more = yield inner.sub(send_csv_chunk(reader, columns)
-                                   | events.events_to_elements())
-        yield inner.sub(xmpp_ping())
-            
-        if not has_more:
-            return
-
-def main(xmpp_jid, xmpp_room, csv_file,
-         xmpp_password=None, csv_delimiter=",", csv_columns=None):
-    import getpass
-    from idiokit.xmpp import connect
-
-    if not xmpp_password:
-        xmpp_password = getpass.getpass("XMPP password: ")
-
-    parsed = urlparse.urlparse(csv_file)
-    if not parsed.scheme.strip():
-        print "Opening local file", repr(csv_file)
-        fileobj = open(csv_file, "r")
-    else:
-        print "Opening URL", repr(csv_file)
-        fileobj = urllib2.urlopen(csv_file)
-
-    if csv_columns is None:
-        reader = csv.DictReader(fileobj, delimiter=csv_delimiter)
-    else:
-        for csv_columns in csv.reader([csv_columns]): 
-            pass
-        reader = csv.reader(fileobj, delimiter=csv_delimiter)
+class CSV2XMPP(bot.XMPPBot):
+    csv_url = bot.Param()
+    csv_delimiter = bot.Param(default=",")
+    csv_columns = bot.ListParam(default=None)
+    xmpp_room = bot.Param()
 
     @threado.stream
-    def bot(inner):
-        print "Connecting XMPP server with JID", repr(xmpp_jid)
-        xmpp = yield inner.sub(connect(xmpp_jid, xmpp_password))
-        xmpp.core.presence()
+    def main(inner, self):
+        self.log.info("Opening URL %r", self.csv_url)
+        _, fileobj = yield inner.sub(utils.fetch_url(self.csv_url))
+        self.log.info("Opened URL %r", self.csv_url)
 
-        print "Joining room", repr(xmpp_room)
-        room = yield inner.sub(xmpp.muc.join(xmpp_room, "csv2xmpp"))
-        
-        feed = csv2xmpp(reader, csv_columns)
-        yield inner.sub(feed | room | feed)
-    return bot()
+        xmpp = yield inner.sub(self.connect_xmpp())
+
+        self.log.info("Joining room %r", self.xmpp_room)
+        room = yield xmpp.muc.join(self.xmpp_room, self.bot_name)
+
+        yield inner.sub(utils.csv_to_events(fileobj, self.csv_delimiter, self.csv_columns)
+                        | events.events_to_elements() 
+                        | room)
 
 if __name__ == "__main__":
-    import opts
-    threado.run(opts.optparse(main))
+    CSV2XMPP.from_command_line().run()

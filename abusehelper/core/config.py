@@ -2,10 +2,9 @@ import os
 import re
 import sys
 import hashlib
-import traceback
 
 from idiokit import threado, timer
-from abusehelper.core import opts, rules, services
+from abusehelper.core import rules, bot, services
 
 class frozendict(dict):
     def __init__(self, *args, **keys):
@@ -26,6 +25,9 @@ def parse_netblock(string):
         return split[0], 32
     return split[0], int(split[1])
 
+class CustomerDBError(Exception):
+    pass
+
 class CustomerDB(object):
     def __init__(self, filename):
         self.filename = os.path.abspath(filename)
@@ -44,10 +46,9 @@ class CustomerDB(object):
         self.last_mod = last_mod
 
         try:
-            config = opts.ConfigParser(self.filename)
+            config = bot.ConfigParser(self.filename)
         except IOError, ioe:
             if self.was_opened:
-                print >> sys.stderr, "Couldn't open customer file %r" % self.filename
                 self.was_opened = False
                 self.customers = list()
                 return True
@@ -87,21 +88,39 @@ class Customer(object):
             feed_pgp = section.get(feed + "pgp", pgp)
             self.feeds[feed] = feed_template, feed_times, feed_emails, feed_pgp
 
-class Config(threado.GeneratorStream):
-    def __init__(self, name, lobby, filename, room_prefix, template_dir, 
-                 interval=1.0):
-        threado.GeneratorStream.__init__(self)
+from abusehelper.core import log
 
-        self.name = name
-        self.lobby = lobby
-        self.interval = interval
-        self.room_prefix = room_prefix
-        self.template_dir = os.path.abspath(template_dir)
+class ConfigBot(bot.XMPPBot):
+    service_room = bot.Param("the room where the services are collected")
+    customer_file = bot.Param("the customer database file")
+    template_dir = bot.Param("")
 
-        self.db = CustomerDB(filename)
-        self.confs = dict()
+    @threado.stream
+    def main(inner, self, interval=1.0):
+        xmpp = yield inner.sub(self.connect_xmpp())
 
-        self.start()
+        self.log.info("Joining lobby %r", self.service_room)
+        lobby = yield inner.sub(services.join_lobby(xmpp, 
+                                                    self.service_room,
+                                                    self.bot_name))
+        self.log.addHandler(log.RoomHandler(lobby.room))
+
+        confs = dict()
+        db = CustomerDB(self.customer_file)
+
+        try:
+            while True:
+                if db.update():
+                    new_confs = frozenset(self.generate_conf(db, self.service_room))
+                    for key in new_confs - set(confs):
+                        confs[key] = self.setup(lobby, *key)
+                    for key in set(confs) - new_confs:
+                        confs.pop(key).throw(threado.Finished())
+
+                yield inner, timer.sleep(interval)
+        finally:
+            for setup in confs.values():
+                setup.throw(threado.Finished())
 
     def load_template(self, name, cache=None):
         if cache is not None and name in cache:
@@ -118,24 +137,12 @@ class Config(threado.GeneratorStream):
             cache[name] = data
         return data
         
-    def run(self):
-        while True:
-            if self.db.update():
-                confs = frozenset(self.generate_conf())
-                for key in confs - set(self.confs):
-                    self.confs[key] = self.setup(*key)
-                    services.bind(self, self.confs[key])
-                for key in set(self.confs) - confs:
-                    self.confs.pop(key).throw(threado.Finished())
-
-            yield self.inner, timer.sleep(self.interval)
-
-    def generate_conf(self):
+    def generate_conf(self, db, room_prefix):
         templates = dict()
         asn_defaults = dict()
         asn_non_defaults = dict()
 
-        for customer in self.db.customers:
+        for customer in db.customers:
             if customer.asn is None:
                 continue
             if not customer.netblocks:
@@ -171,11 +178,11 @@ class Config(threado.GeneratorStream):
                     try:
                         template = self.load_template(template, templates)
                     except IOError, ioe:
-                        print >> sys.stderr, "Couldn't open template %r" % template
+                        self.log.error("Couldn't open template %r", template)
                         continue
 
-                    path = self.name, customer.name, feed
-                    asn_room = self.room_prefix + "." + feed + ".as" + unicode(asn)
+                    path = self.bot_name, customer.name, feed
+                    asn_room = room_prefix + "." + feed + ".as" + unicode(asn)
                     mail_room = asn_room + "." + name
 
                     yield "historian", path, frozendict(rooms=(asn_room, mail_room))
@@ -191,56 +198,23 @@ class Config(threado.GeneratorStream):
                     yield feed, path, frozendict(asn=asn, room=asn_room)
 
     @threado.stream
-    def setup(inner, self, service, path, conf):
+    def setup(inner, self, lobby, service, path, conf):
         while True:
-            print "waiting for", repr(service), "session", repr(path)
-            session = yield inner.sub(self.lobby.session(service, *path, **conf))
+            self.log.info("Waiting for %r session %r", service, path)
+            session = yield inner.sub(lobby.session(service, *path, **conf))
             if session is None:
                 break
 
-            print "sent", repr(service), "session", repr(path), "conf:"
-            for key, value in conf.iteritems():
-                print "", repr(key), "=", repr(value)
+            conf_str = "\n".join(" %r=%r" % item for item in conf.items())
+            self.log.info("Sent %r session %r conf:\n%s", service, path, conf_str)
                 
             try:
                 yield inner.sub(session)
             except services.Stop:
-                print "lost connection to", repr(service), "session", repr(path)
+                self.log.info("Lost connection to %r session %r", service, path)
             else:
-                print "ended connection to", repr(service), "session", repr(path)
+                self.log.info("Ended connection to %r session %r", service, path)
                 break
 
-def main(name, xmpp_jid, service_room, customer_file, template_dir,
-         service_name=None, xmpp_password=None, log_file=None):
-    import getpass
-    from idiokit.xmpp import connect
-    from abusehelper.core import log
-    
-    if not xmpp_password:
-        xmpp_password = getpass.getpass("XMPP password: ")
-
-    logger = log.config_logger(name, filename=log_file)
-
-    @threado.stream
-    def bot(inner):
-        print "Connecting XMPP server with JID", xmpp_jid
-        xmpp = yield connect(xmpp_jid, xmpp_password)
-        xmpp.core.presence()
-
-        print "Joining lobby", service_room
-        lobby = yield services.join_lobby(xmpp, service_room, name)
-        logger.addHandler(log.RoomHandler(lobby.room))
-
-        config = Config(name, lobby, customer_file, service_room, template_dir)
-        yield inner.sub(lobby | config)
-    return bot()
-main.customer_file_help = "the customer database file"
-main.service_room_help = "the room where the services are collected"
-main.xmpp_jid_help = "the XMPP JID (e.g. xmppuser@xmpp.example.com)"
-main.asn_room_prefix = "prefix for rooms created for each ASN"
-main.xmpp_password_help = "the XMPP password"
-main.log_file_help = "log to the given file instead of the console"
-
 if __name__ == "__main__":
-    from abusehelper.core import opts
-    threado.run(opts.optparse(main))
+    ConfigBot.from_command_line().run()
