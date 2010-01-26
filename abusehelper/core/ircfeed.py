@@ -13,12 +13,6 @@ class IRCFeedBot(bot.FeedBot):
     irc_password = bot.Param(default=None)
     irc_use_ssl = bot.BoolParam()
 
-    def room_key(self, asn, **keys):
-        return str(asn)
-
-    def event_keys(self, event):
-        return event.attrs.get("asn", list())
-
     def filter(self, prefix, command, params):
         if command != "PRIVMSG":
             return False
@@ -30,20 +24,13 @@ class IRCFeedBot(bot.FeedBot):
             return True
 
     def parse(self, prefix, command, params):
-        field_rex = r"([^\s=]+)='([^']*)'"
-        data_rex = r"^([^\s>]+)>\s*(("+ field_rex +"\s*,?\s*)*)\s*$"
-        
-        match = re.match(data_rex, util.guess_encoding(params[-1]))
-        if not match:
-            return None
-
         event = events.Event()
-        event.add("type", match.group(1))
 
-        fields = re.findall(field_rex, match.group(2) or "")
-        for key, value in fields:
-            event.add(key, value)
-            
+        event.add("prefix", prefix)
+        event.add("command", command)
+        for param in params:
+            event.add("param", params)
+
         return event
 
     @threado.stream
@@ -71,5 +58,29 @@ class IRCFeedBot(bot.FeedBot):
         
         yield inner.sub(irc | self._handle())
 
+class IRCFeedService(IRCFeedBot):
+    def room_key(self, asn, **keys):
+        return str(asn)
+
+    def event_keys(self, event):
+        return event.attrs.get("asn", list())
+
+    def parse(self, prefix, command, params):
+        field_rex = r"([^\s=]+)='([^']*)'"
+        data_rex = r"^([^\s>]+)>\s*(("+ field_rex +"\s*,?\s*)*)\s*$"
+        
+        match = re.match(data_rex, util.guess_encoding(params[-1]))
+        if not match:
+            return None
+
+        event = events.Event()
+        event.add("type", match.group(1))
+
+        fields = re.findall(field_rex, match.group(2) or "")
+        for key, value in fields:
+            event.add(key, value)
+            
+        return event
+
 if __name__ == "__main__":
-    IRCFeedBot.from_command_line().run()
+    IRCFeedService.from_command_line().run()
