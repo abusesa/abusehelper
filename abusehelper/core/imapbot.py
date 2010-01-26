@@ -60,13 +60,14 @@ class IMAPBot(bot.FeedBot):
             yield inner.thread(mailbox.select,
                                self.mail_box,
                                readonly=False)
-            try:
-                while True:
-                    yield inner.sub(self.fetch_content(mailbox, self.filter))
-                    yield inner, timer.sleep(self.poll_interval)
-            finally:
-                yield inner.thread(mailbox.close)            
+            while True:
+                yield inner.sub(self.fetch_content(mailbox, self.filter))
+                yield inner, timer.sleep(self.poll_interval)
         finally:
+            try:
+                inner.thread(mailbox.close)
+            except:
+                pass
             yield inner.thread(mailbox.logout)
 
     @threado.stream
