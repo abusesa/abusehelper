@@ -65,7 +65,7 @@ class IMAPBot(bot.FeedBot):
                 yield inner, timer.sleep(self.poll_interval)
         finally:
             try:
-                inner.thread(mailbox.close)
+                yield inner.thread(mailbox.close)
             except:
                 pass
             yield inner.thread(mailbox.logout)
