@@ -5,7 +5,7 @@ from abusehelper.core import bot
 from abusehelper.core import utils
 from abusehelper.core import events
 
-class CSVBot(bot.XMPPBot):
+class ProjectHoneypotBot(bot.XMPPBot):
     xmpp_room = bot.Param("the destination room")
     url = bot.Param("the URL for the data")
 
@@ -48,4 +48,4 @@ class CSVBot(bot.XMPPBot):
             list(inner)
 
 if __name__ == "__main__":        
-    CSVBot.from_command_line().run()
+    ProjectHoneypotBot.from_command_line().run()
