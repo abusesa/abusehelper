@@ -4,7 +4,7 @@ B<roomreader> - Abuse Helper XMPP MUC CLI display utility
 
 =head1 SYNOPSIS
 
-B<roomreader> [options] rooms xmpp_jid
+B<roomreader> [options] xmpp_jid xmpp_rooms
 
 =head1 SUMMARY
 
@@ -26,13 +26,13 @@ INI file used for configuration.
 
 if an INI configuration file is specified, use this section (default: roomreader) 
 
-=item B<--rooms=rooms> 
-
-comma separated list of XMPP rooms roomreader should watch, e.g. room@conference.example.invalid, room2@conference.example.invalid
-
 =item B<--xmpp_jid=xmpp_jid> 
 
 The XMPP JID (e.g. xmppuser@example.invalid).
+
+=item B<--xmpp-rooms=xmpp_rooms> 
+
+comma separated list of XMPP rooms roomreader should watch, e.g. room@conference.example.invalid, room2@conference.example.invalid
 
 =item B<--xmpp_password=xmpp_password> 
 
@@ -42,23 +42,19 @@ The XMPP password. Please note that if you use this option, your shell will most
 
 Log the messages into a log file instead of STDOUT.
 
-=item B<--debug> 
-
-Display diagnostic messages.
-
 =back
 
 =head1 ARGUMENTS
 
 =over 8
 
-=item B<rooms> 
-
-The XMPP MUCs may be given as positional arguments after the options. Please note that the list of rooms should be separated by spaces, instead of commas.
-
 =item B<xmpp_jid> 
 
 The XMPP JID, userid, can also be specified as the last positional argument, e.g. xmppuser@example.invalid.
+
+=item B<xmpp_rooms> 
+
+The XMPP MUCs may be given as positional arguments after the options. Please note that the list of rooms should be separated by spaces, instead of commas.
 
 =back
 
