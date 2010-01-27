@@ -8,7 +8,7 @@ class CSVBot(bot.XMPPBot):
     xmpp_room = bot.Param("the destination room")
     csv_url = bot.Param("the URL for the CSV data")
 
-    # These is not a mandatory options, as they have defaults.
+    # These are not a mandatory options, as they have defaults.
     csv_delimiter = bot.Param("delimiter used in the CSV data",
                               default=",")
     csv_columns = bot.ListParam("comma separated list of column names for the CSV data "+
