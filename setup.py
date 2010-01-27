@@ -74,23 +74,23 @@ if sys.argv[1] == 'install':
     if not os.path.exists("/etc/abusehelper/"):
         #todo, rather check if the user actually exists.
         print 'To create abusehelper user and groups:\n' + \
-            ' %s\n' % (groupadd) + \
-            ' %s\n' % (useradd)
+            ' sudo %s\n' % (groupadd) + \
+            ' sudo %s\n' % (useradd)
 
         print 'To create abusehelper config directory:\n' + \
-            ' mkdir /etc/abusehelper\n' + \
-            ' chown root:%s /etc/abusehelper\n' % (ahgroup) + \
-            ' chmod 750 /etc/abusehelper' 
+            ' sudo mkdir /etc/abusehelper\n' + \
+            ' sudo chown root:%s /etc/abusehelper\n' % (ahgroup) + \
+            ' sudo chmod 750 /etc/abusehelper' 
 
         print '\nTo configure:\n' + \
-            ' cp -r example/* /etc/abusehelper/\n' + \
+            ' sudo cp -r example/* /etc/abusehelper/\n' + \
             'And then edit config.ini and customers.ini in /etc/abusehelper/'
 
     if not os.path.exists("/var/log/abusehelper/"):
         print '\nTo create log directory:\n' +  \
-            ' mkdir /var/log/abusehelper\n' + \
-            ' chown %s:%s /var/log/abusehelper\n' % (ahuser, ahgroup) + \
-            ' chmod 770 /var/log/abusehelper' 
+            ' sudo mkdir /var/log/abusehelper\n' + \
+            ' sudo chown %s:%s /var/log/abusehelper\n' % (ahuser, ahgroup) + \
+            ' sudo chmod 770 /var/log/abusehelper' 
         
         
         
