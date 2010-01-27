@@ -287,8 +287,9 @@ class XMPPBot(Bot):
 
     @threado.stream
     def xmpp_connect(inner, self):
-        self.log.info("Connecting XMPP server with JID %r", self.xmpp_jid)
+        self.log.info("Connecting to XMPP server with JID %r", self.xmpp_jid)
         xmpp = yield inner.sub(connect(self.xmpp_jid, self.xmpp_password))
+        self.log.info("Connected to XMPP server with JID %r", self.xmpp_jid)
         xmpp.core.presence()
         inner.finish(xmpp)
 
