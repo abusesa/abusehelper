@@ -13,14 +13,14 @@ class ForwardBot(bot.XMPPBot):
         conn = yield self.xmpp_connect()
 
         # Join the XMPP rooms
-        src_room = yield conn.muc.join(self.room_src, self.bot_name)
-        dst_room = yield conn.muc.join(self.room_dst, self.bot_name)
+        src = yield conn.muc.join(self.room_src, self.bot_name)
+        dst = yield conn.muc.join(self.room_dst, self.bot_name)
         self.log.info("Joined rooms %r and %r", self.room_src, self.room_dst)
 
         # Forward body elements from the src room to the dst room
         # but filter away stuff by the bot itself to avoid nasty loops.
-        own_jid = src_room.nick_jid
-        yield src_room | self.room_filter(own_jid) | dst_room | threado.dev_null()
+        own_jid = src.nick_jid
+        yield src | self.room_filter(own_jid) | dst | threado.dev_null()
 
     @threado.stream
     def room_filter(inner, self, own_jid):

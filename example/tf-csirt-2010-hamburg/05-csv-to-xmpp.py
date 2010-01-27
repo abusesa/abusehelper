@@ -11,8 +11,9 @@ class CSVBot(bot.XMPPBot):
     # These are not a mandatory options, as they have defaults.
     csv_delimiter = bot.Param("delimiter used in the CSV data",
                               default=",")
-    csv_columns = bot.ListParam("comma separated list of column names for the CSV data "+
-                                "(default: use the first row as column names)",
+    csv_columns = bot.ListParam("comma separated list of column names for "+
+                                "the CSV data (default: use the first row "+
+                                "as column names)",
                                 default=None)
 
     @threado.stream
