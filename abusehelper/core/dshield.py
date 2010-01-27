@@ -31,10 +31,6 @@ class DShieldBot(bot.PollingBot):
         self.log.info("ASN%s: downloaded", asn)
 
         charset = info.get_param("charset")
-        if charset is None:
-            self.log.error("ASN%s: no character set given for the data", asn)
-            return
-
         columns = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
         filtered = (x for x in fileobj if x.strip() and not x.startswith("#"))
         yield inner.sub(utils.csv_to_events(filtered,
