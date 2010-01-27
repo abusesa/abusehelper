@@ -2,7 +2,13 @@ import os
 import sys
 import imp
 import warnings
+import platform
 from distutils.core import setup
+
+if sys.version_info < (2, 5):
+    print >> sys.stderr, "Error: AbuseHelper requires Python 2.5 or higher",
+    print >> sys.stderr, "(you are running Python %s)." % platform.python_version()
+    sys.exit(1)
 
 def generate_version():
     base_path, _ = os.path.split(__file__)
@@ -16,7 +22,7 @@ def generate_version():
 
 version = generate_version()
 if version is None:
-    sys.stderr("No version info available. Quitting.")
+    print >> sys.stderr, "No version info available. Quitting."
     sys.exit(1)
 if not version.isdigit():
     warnings.warn("This is not a clean checkout (version %r)." % version)
