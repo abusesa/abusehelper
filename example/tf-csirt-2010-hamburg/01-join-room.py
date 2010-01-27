@@ -1,4 +1,5 @@
-from idiokit import threado, xmpp
+from idiokit import threado
+from idiokit import xmpp
 
 @threado.stream
 def main(inner, jid, password, roomname):
@@ -14,10 +15,10 @@ def main(inner, jid, password, roomname):
     room.send(body)
 
     # Exit the room
-    yield room.exit("Gotta go, feel the funky flow, yo")
+    yield room.exit("Gotta go / feel the funky flow / yo")
 
-jid = "xmppuser@xmpp.example.com"
+username = "xmppuser@xmpp.example.com"
 password = "xmpppassword"
 roomname = "xmpproom"
 
-threado.run(main(jid, password, roomname))
+threado.run(main(username, password, roomname))
