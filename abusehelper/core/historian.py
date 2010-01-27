@@ -171,7 +171,7 @@ class HistorianService(bot.ServiceBot):
                             | self.command_parser(room)
                             | events.stanzas_to_events()
                             | self.history.collect(unicode(room.room_jid))
-                            | threado.throws())
+                            | threado.dev_null())
         finally:
             self.log.info("Left room %r", name)
 

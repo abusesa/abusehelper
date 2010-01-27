@@ -97,7 +97,7 @@ def main(inner):
 
     asns = [1111, 1112]
     bot = dshieldbot(asns, poll_frequency=10.0)
-    yield inner.sub(bot | events.events_to_elements() | room | threado.throws())
+    yield inner.sub(bot | events.events_to_elements() | room | threado.dev_null())
 
 if __name__ == "__main__":
     threado.run(main())

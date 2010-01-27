@@ -404,7 +404,7 @@ class FeedBot(ServiceBot):
         try:
             yield inner.sub(events.events_to_elements()
                             | room
-                            | threado.throws())
+                            | threado.dev_null())
         finally:
             self.log.info("Left room %r", name)
 
@@ -471,7 +471,7 @@ class FeedBot(ServiceBot):
                             | self.augment()
                             | self._distribute()
                             | self._stats()
-                            | threado.throws())
+                            | threado.dev_null())
         except services.Stop:
             inner.finish(dedup)
 

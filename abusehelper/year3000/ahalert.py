@@ -69,7 +69,7 @@ class AHAlert(bot.XMPPBot):
         try:
             yield inner.sub(room 
                             | self.watch(alerter) 
-                            | threado.throws())
+                            | threado.dev_null())
         finally:
             self.log.info("Left room %r", name)
 
