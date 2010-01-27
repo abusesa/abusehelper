@@ -75,7 +75,7 @@ class AHAlert(bot.XMPPBot):
 
     @threado.stream
     def main(inner, self):
-        xmpp = yield inner.sub(self.connect_xmpp())
+        xmpp = yield inner.sub(self.xmpp_connect())
         alerter = ProwlConnection(",".join(self.apikeys))
 
         rooms = [self.handle_room(xmpp, name, alerter) for name in self.rooms]

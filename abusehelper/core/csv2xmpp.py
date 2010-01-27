@@ -15,7 +15,7 @@ class CSV2XMPP(bot.XMPPBot):
         _, fileobj = yield inner.sub(utils.fetch_url(self.csv_url))
         self.log.info("Opened URL %r", self.csv_url)
 
-        xmpp = yield inner.sub(self.connect_xmpp())
+        xmpp = yield inner.sub(self.xmpp_connect())
 
         self.log.info("Joining room %r", self.xmpp_room)
         room = yield xmpp.muc.join(self.xmpp_room, self.bot_name)

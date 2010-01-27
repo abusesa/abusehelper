@@ -97,7 +97,7 @@ class ConfigBot(bot.XMPPBot):
 
     @threado.stream
     def main(inner, self, interval=1.0):
-        xmpp = yield inner.sub(self.connect_xmpp())
+        xmpp = yield inner.sub(self.xmpp_connect())
 
         self.log.info("Joining lobby %r", self.service_room)
         lobby = yield inner.sub(services.join_lobby(xmpp, 

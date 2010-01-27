@@ -286,7 +286,7 @@ class XMPPBot(Bot):
             list(inner)
 
     @threado.stream
-    def connect_xmpp(inner, self):
+    def xmpp_connect(inner, self):
         self.log.info("Connecting XMPP server with JID %r", self.xmpp_jid)
         xmpp = yield inner.sub(connect(self.xmpp_jid, self.xmpp_password))
         xmpp.core.presence()
@@ -316,7 +316,7 @@ class ServiceBot(XMPPBot):
     def _run(inner, self):
         ver_str = version.version_str()
         self.log.info("Starting service %r version %s", self.bot_name, ver_str)
-        self.xmpp = yield inner.sub(self.connect_xmpp())
+        self.xmpp = yield inner.sub(self.xmpp_connect())
 
         service = _Service(self, self.bot_state_file)
         service.start()
