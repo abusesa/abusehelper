@@ -1,6 +1,6 @@
-from abusehelper.core import bot
 from idiokit import threado
 from idiokit import jid
+from abusehelper.core import bot
 
 class ForwardBot(bot.XMPPBot):
     # Define two parameters (in addition to the default XMPPBot ones)
@@ -9,7 +9,7 @@ class ForwardBot(bot.XMPPBot):
 
     @threado.stream
     def main(inner, self):
-        # Join the XMPP network
+        # Join the XMPP network using credentials given from the command line
         conn = yield self.xmpp_connect()
 
         # Join the XMPP rooms
@@ -17,7 +17,7 @@ class ForwardBot(bot.XMPPBot):
         dst_room = yield conn.muc.join(self.room_dst, self.bot_name)
         self.log.info("Joined rooms %r and %r", self.room_src, self.room_dst)
 
-        # Forward body elements from the src room to the dst room,
+        # Forward body elements from the src room to the dst room
         # but filter away stuff by the bot itself to avoid nasty loops.
         own_jid = src_room.nick_jid
         yield src_room | self.room_filter(own_jid) | dst_room | threado.dev_null()
