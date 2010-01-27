@@ -35,7 +35,7 @@ class CSVBot(bot.XMPPBot):
         csv_feed = utils.csv_to_events(fileobj,
                                        delimiter=self.csv_delimiter,
                                        columns=self.csv_columns)
-        yield csv_feed | events.events_to_elements() | room
+        yield csv_feed | events.events_to_elements() | room | threado.dev_null()
 
 if __name__ == "__main__":        
     CSVBot.from_command_line().run()
