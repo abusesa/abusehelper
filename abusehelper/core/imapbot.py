@@ -1,4 +1,5 @@
 import re
+import getpass
 import imaplib
 import email.parser
 
@@ -40,8 +41,14 @@ class IMAPBot(bot.FeedBot):
     mail_server = bot.Param()
     mail_port = bot.IntParam(default=993)
     mail_user = bot.Param()
-    mail_password = bot.Param()
+    mail_password = bot.Param(default=None)
     mail_box = bot.Param(default="INBOX")
+
+    def __init__(self, **keys):
+        bot.FeedBot.__init__(self, **keys)
+
+        if self.mail_password is None:
+            self.mail_password = getpass.getpass("Mail password: ")
 
     @threado.stream
     def feed(inner, self):
