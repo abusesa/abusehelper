@@ -35,12 +35,12 @@ setup(name="abusehelper",
                 "abusehelper.year3000",
                 "idiokit"],
       data_files = [('share/examples/abusehelper', 
-	["example/config.ini",
-	 "example/customers.ini"],
+	["examples/config.ini",
+	 "examples/customers.ini"],
        ),
        ('share/examples/abusehelper/templates',
-	 ["example/templates/dshield",
-	 "example/templates/ircfeed"],
+	 ["examples/templates/dshield",
+	 "examples/templates/ircfeed"],
        )],
       description="A framework for receiving and redistributing Abuse Feeds",
       long_description="AbuseHelper is a modular, scalable and robust " + \
@@ -89,7 +89,7 @@ if sys.argv[1] == 'install':
             ' sudo chmod 750 /etc/abusehelper' 
 
         print '\nTo configure:\n' + \
-            ' sudo cp -r example/* /etc/abusehelper/\n' + \
+            ' sudo cp -r examples/* /etc/abusehelper/\n' + \
             'And then edit config.ini and customers.ini in /etc/abusehelper/'
 
     if not os.path.exists("/var/log/abusehelper/"):

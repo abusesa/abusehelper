@@ -185,7 +185,7 @@ SUBST_VARS =		ABUSEHELPERLOGDIR
 post-install:
 	${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper
 	${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper/templates
-	${INSTALL_DATA} ${WRKSRC}/example/*.ini ${PREFIX}/share/examples/abusehelper	
-	${INSTALL_DATA} ${WRKSRC}/example/templates/* ${PREFIX}/share/examples/abusehelper/templates
+	${INSTALL_DATA} ${WRKSRC}/examples/*.ini ${PREFIX}/share/examples/abusehelper	
+	${INSTALL_DATA} ${WRKSRC}/examples/templates/* ${PREFIX}/share/examples/abusehelper/templates
 
 .include <bsd.port.mk>
