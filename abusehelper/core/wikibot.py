@@ -1,6 +1,43 @@
-import collections
+import xmlrpclib
 from idiokit import threado, timer
 from abusehelper.core import events, rules, taskfarm, bot, services
+
+class Wiki:
+    def __init__(self, url, user, password, type):
+        self.type = type
+        if self.type == "opencollab":
+            self.separator = "/"
+            import opencollab.wiki
+            self.wiki = opencollab.wiki.CLIWiki(url, user, password)
+        elif self.type == "doku":
+            self.separator = ":"
+            fullurl = "%s/lib/exe/xmlrpc.php?%s" % (url, 
+                                                    urlencode({'u':user,
+                                                               'p':password}))
+            self.wiki = xmlrpclib.ServerProxy(fullurl).wiki
+
+    def putEvents(self, pagename, events, parents=list()):
+        if parents:
+            parts = parents + [pagename]
+            pagename = self.separator.join(parts)
+
+        try:
+            body = self.wiki.getPage(pagename)
+        except:
+            body = unicode()
+
+        if self.type == "opencollab":
+            body += "\n\n" + "\n\n".join(events)
+
+            success = self.wiki.putPage(pagename, body)
+            if not success:
+                return False
+
+        elif self.type == "doku":
+            body += "\\\\ \n" + "\\\\ \n".join(events)
+            self.wiki.putPage(pagename, body, {})
+
+        return True
 
 class CollectorBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
@@ -31,6 +68,7 @@ class CollectorBot(bot.ServiceBot):
 
 import xmlrpclib
 from time import strftime
+from urllib import urlencode
 
 class WikiBot(CollectorBot):
     write_interval = bot.IntParam("write interval", default=1800)
@@ -47,57 +85,50 @@ class WikiBot(CollectorBot):
         url, user, password, type, parent = wiki_params
 
         self.log.info("Connecting to wiki %s" % url)
-        wiki = None
-        if type == "opencollab":
-            try:
-                import opencollab.wiki    
-                wiki = opencollab.wiki.CLIWiki(url, user, password)
-            except:
-                wiki = None
-
-#dokuwiki not tested
-#        elif type == "doku":
-#            full = url+"/lib/exe/xmlrpc.php?"+urlencode({'u':user,'p':password})
-#            try:
-#                wiki = xmlrpclib.ServerProxy(full).wiki
-#            except:
-#                wiki = None
-
-        if not wiki:
+        try:
+            wiki = Wiki(url, user, password, type)
+        except:
             self.log.info("Failed connecting to wiki")
             return
-
         self.log.info("Connected to wiki")
 
         content = dict()
         for event in events:
             asns = event.attrs.get("asn", None)
             for asn in asns:
-                content.setdefault(asn, list())
+                content.setdefault(asn, dict())
+
+                types = list(event.attrs.get("type", list()))
+                if not types:
+                    continue
+
+                type = types[0]
+                content[asn].setdefault(type, list())
                 line = unicode()
 
                 for key, values in event.attrs.iteritems():
                     line += "%s=%s " % (key, ",".join(values))
 
-                content[asn].append(line)
+                content[asn][type].append(line)
 
-        date = strftime("%Y-%m-%d")
+        time = strftime("%Y%m%d")
         for asn in content:
-            pagename = "%s/%s/%s" % (parent, asn, date)
+            parents = list()
+            if parent:
+                parents.append(parent)
 
-            try:
-                body = wiki.getPage(pagename)
-            except:
-                body = unicode()
+            parents.append("as"+asn)
 
-            body += "\n\n" + "\n\n".join(content[asn])
-            self.log.info("Writing asn%s events to wiki" % asn)
+            for type in content[asn]:
+                parents.append(time)
 
-            success = wiki.putPage(pagename, body)
-            if success:
-                self.log.info("Events written to wiki")
-            else:
-                self.log.info("Could not write events to wiki")            
+                self.log.info("Writing as%s events to wiki" % asn)
+                success = wiki.putEvents(type, content[asn][type], parents)
+
+                if success:
+                    self.log.info("Events written to wiki")
+                else:
+                    self.log.info("Could not write events to wiki")            
 
     @threado.stream
     def timed(inner, self, interval):
