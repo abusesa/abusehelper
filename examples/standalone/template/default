@@ -1,0 +1,5 @@
+# Here is the data:
+%(attach_and_embed_csv, report.csv, ",", time, ip, type)s
+
+# Regards,
+# Generic Abuse Handling Organization
