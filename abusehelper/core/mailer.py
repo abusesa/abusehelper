@@ -20,8 +20,6 @@ def next_time(time_string):
 
 @threado.stream
 def alert(inner, *times):
-    times = set(t.lower() for t in times)
-
     while True:
         if times:
             sleeper = timer.sleep(min(map(next_time, times)))
@@ -192,6 +190,8 @@ class MailerService(ReportBot):
         template = templates.Template(template, **self.formatters)
         while True:
             events = yield inner
+            if not events:
+                continue
 
             ENCODING = "utf-8"
         
@@ -224,8 +224,8 @@ class MailerService(ReportBot):
                 msg.attach(part)
 
             msg_data = msg.as_string()
-            for to in to_addrs + cc_addrs:
-                inner.send(from_addr[1], to[1], subject, msg_data)
+            for to_addr in to_addrs + cc_addrs:
+                inner.send(from_addr[1], to_addr[1], subject, msg_data)
 
     def _connect(self):
         import smtplib
