@@ -211,4 +211,4 @@ class IMAPService(IMAPBot):
                 inner.finish(skip_rest)
 
 if __name__ == "__main__":
-    IMAPService.from_command_line().run()
+    IMAPService.from_command_line().execute()

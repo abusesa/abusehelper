@@ -3,15 +3,16 @@ import sys
 import time
 import errno
 import signal
+import inspect
 import subprocess
-from abusehelper.core import bot
+import cPickle as pickle
+from abusehelper.core import bot, config
 
-def all_running(processes):
-    for process in processes:
-        retval = process.poll()
-        if retval is not None:
-            return False
-    return True
+class Startup(config.Config):
+    def startup(self):
+        for key, value in self.member_diff(Startup):
+            if not inspect.isroutine(value):
+                yield key, value
 
 def kill_processes(processes, sig):
     for process in processes:
@@ -21,50 +22,89 @@ def kill_processes(processes, sig):
             if ose.errno != errno.ESRCH:
                 raise
 
-class Startup(bot.Bot):
-    bot_name = None
+class StartupBot(bot.Bot):
     ini_file = None
     ini_section = None
+    startup = None
 
-    config_file = bot.Param("launch processes based in this INI file, "+
-                            "one per section ([DEFAULT] section not included)")
-    enable = bot.ListParam("sections (separated by commas) that are run "+
-                           "(default: run all sections except [DEFAULT])",
-                           default=None)
-    disable = bot.ListParam("sections (separated by commas) that are not run "+
-                            "(default: run all sections except [DEFAULT])",
-                            default=None)
+    def configs(self):
+        return []
 
-    def run(self):
+    def run(self, poll_interval=0.1):
         def signal_handler(sig, frame):
             sys.exit()
         signal.signal(signal.SIGTERM, signal_handler)
-            
-        config = bot.ConfigParser(self.config_file)
 
         processes = dict()
-        for section in config.sections():
-            if self.disable is not None and section in self.disable:
-                continue
-            if self.enable is not None and section not in self.enable:
-                continue
-            if not config.has_option(section, "module"):
-                continue
-            module = config.get(section, "module")
-
-            process = subprocess.Popen([sys.executable,  
-                                        "-m", module,
-                                        "--ini-file", self.config_file,
-                                        "--ini-section", section])
-            processes[section] = process
-
         try:
-            while all_running(processes.values()):
-                time.sleep(0.1)
+            for startup in self.configs():
+                if not hasattr(startup, "startup"):
+                    continue
+                params = dict(startup.startup())
+                
+                module = params["module"]
+                bot_name = params["bot_name"]
+                self.log.info("Launching bot %r from module %r", bot_name, module)
+
+                args = [sys.executable]
+                path, _ = os.path.split(module)
+                if path:
+                    args.extend([module])
+                else:
+                    args.extend(["-m", module])
+                args.append("--startup")
+
+                process = subprocess.Popen(args, stdin=subprocess.PIPE)
+                processes[startup] = process
+
+                pickle.dump(params, process.stdin)
+                process.stdin.flush()
+
+            while True:
+                for startup, process in processes.items():
+                    retval = process.poll()
+                    if retval is not None:
+                        return
+                time.sleep(poll_interval)
         finally:
-            kill_processes(processes.values(), signal.SIGTERM)
-            for _, process in processes.items():
-                process.wait()
+            processes = self.check_processes(processes)
+
+            if processes:
+                self.log.info("Sending SIGTERM to alive bots")
+                kill_processes(processes.values(), signal.SIGTERM)
+
+            while processes:
+                processes = self.check_processes(processes)
+                time.sleep(poll_interval)
+
+    def check_processes(self, processes):
+        processes = dict(processes)
+
+        for startup, process in list(processes.items()):
+            retval = process.poll()
+            if retval is None:
+                continue
+
+            del processes[startup]
+            self.log.info("Bot %r exited with return value %d", 
+                          startup.bot_name, retval)
+
+        return processes
+
+class DefaultStartupBot(StartupBot):
+    config = bot.Param("configuration module")
+    enable = bot.ListParam("bots that are run (default: run all bots)",
+                           default=None)
+    disable = bot.ListParam("bots that are not run (default: run all bots)", 
+                            default=None)
+
+    def configs(self):
+        for conf_obj in set(config.load_configs(os.path.abspath(self.config))):
+            if self.disable is not None and conf_obj.name in self.disable:
+                continue
+            if self.enable is not None and conf_obj.name not in self.enable:
+                continue
+            yield conf_obj
 
 if __name__ == "__main__":
-    Startup.from_command_line().run()
+    DefaultStartupBot.from_command_line().execute()

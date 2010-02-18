@@ -99,11 +99,7 @@ class Lobby(threado.GeneratorStream):
 
     @threado.stream
     def session(inner, self, service_id, *path, **conf):
-        while True:
-            result = yield self._try_session(service_id, *path, **conf)
-            if result is not None:
-                break
-        jid, result = result
+        jid, result = yield inner.sub(self._try_session(service_id, *path, **conf))
 
         for start in result.children("start", SERVICE_NS).with_attrs("id"):
             session_id = start.get_attr("id")
@@ -295,7 +291,6 @@ class Service(threado.GeneratorStream):
             state = yield self.inner.sub(self.kill_sessions()
                                          | self.main(state))
 
-            print "Saving the main state"
             self._put(self.root_key, state)
 
             for path, session in self.sessions.iteritems():
@@ -304,7 +299,6 @@ class Service(threado.GeneratorStream):
                 except:
                     pass
                 else:
-                    print "Saving the state for session", repr(path)
                     key = self.path_key(path)
                     self._put(key, state)
             for key, session in self.sessions.iteritems():

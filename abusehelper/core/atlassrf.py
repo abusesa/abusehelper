@@ -42,12 +42,6 @@ class AtlasSRFBot(bot.PollingBot):
     def augment(self):
         return cymru.CymruWhois()
 
-    def room_key(self, asn, **keys):
-        return asn
-
-    def event_keys(self, event):
-        return event.attrs.get("asn", list())
-
     @threado.stream
     def poll(inner, self, _):
         self.log.info("Downloading the report")

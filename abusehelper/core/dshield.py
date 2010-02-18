@@ -9,11 +9,11 @@ class DShieldBot(bot.PollingBot):
             return bot.PollingBot.augment(self)
         return cymru.CymruWhois()
 
-    def feed_key(self, asn, **keys):
-        return str(asn)
+    def feed_keys(self, asns, **keys):
+        return map(str, asns)
 
-    def room_key(self, asn, **keys):
-        return str(asn)
+    def room_keys(self, asns, **keys):
+        return map(str, asns)
 
     def event_keys(self, event):
         return event.attrs.get("asn", list())
@@ -61,4 +61,4 @@ class DShieldBot(bot.PollingBot):
             inner.send(event)
 
 if __name__ == "__main__":
-    DShieldBot.from_command_line().run()
+    DShieldBot.from_command_line().execute()

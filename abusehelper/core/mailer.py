@@ -292,4 +292,4 @@ class MailerService(ReportBot):
         inner.finish(True)
 
 if __name__ == "__main__":
-    MailerService.from_command_line().run()
+    MailerService.from_command_line().execute()

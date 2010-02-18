@@ -39,24 +39,24 @@ class RoomGraphBot(bot.ServiceBot):
             self.log.info("Left room %r", name)
 
     @threado.stream
-    def session(inner, self, _, src, dst, rule, **keys):
-        src_room = self.rooms.inc(src)
-        dst_room = self.rooms.inc(dst)
+    def session(inner, self, _, src_room, dst_room, rule=rules.CONTAINS(), **keys):
+        src = self.rooms.inc(src_room)
+        dst = self.rooms.inc(dst_room)
 
-        counter = self.srcs.setdefault(src, taskfarm.Counter())
-        counter.inc(dst_room, rule)
+        counter = self.srcs.setdefault(src_room, taskfarm.Counter())
+        counter.inc(dst, rule)
         try:
             while True:
                 yield inner
         except services.Stop:
             inner.finish()
         finally:
-            self.rooms.dec(src)
-            self.rooms.dec(dst)
+            self.rooms.dec(src_room)
+            self.rooms.dec(dst_room)
 
-            counter.dec(dst_room, rule)
+            counter.dec(dst, rule)
             if not counter:
-                self.srcs.pop(src, None)
+                self.srcs.pop(src_room, None)
 
 if __name__ == "__main__":
-    RoomGraphBot.from_command_line().run()
+    RoomGraphBot.from_command_line().execute()

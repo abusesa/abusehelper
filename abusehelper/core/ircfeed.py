@@ -59,12 +59,6 @@ class IRCFeedBot(bot.FeedBot):
         yield inner.sub(irc | self._handle())
 
 class IRCFeedService(IRCFeedBot):
-    def room_key(self, asn, **keys):
-        return str(asn)
-
-    def event_keys(self, event):
-        return event.attrs.get("asn", list())
-
     def parse(self, prefix, command, params):
         field_rex = r"([^\s=]+)='([^']*)'"
         data_rex = r"^([^\s>]+)>\s*(("+ field_rex +"\s*,?\s*)*)\s*$"
@@ -83,4 +77,4 @@ class IRCFeedService(IRCFeedBot):
         return event
 
 if __name__ == "__main__":
-    IRCFeedService.from_command_line().run()
+    IRCFeedService.from_command_line().execute()

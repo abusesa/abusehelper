@@ -176,9 +176,8 @@ class HistorianService(bot.ServiceBot):
             self.log.info("Left room %r", name)
 
     @threado.stream
-    def session(inner, self, state, rooms):
-        for room in rooms:
-            self.rooms.inc(room)
+    def session(inner, self, state, src_room):
+        self.rooms.inc(src_room)
 
         try:
             while True:
@@ -186,8 +185,7 @@ class HistorianService(bot.ServiceBot):
         except services.Stop:
             inner.finish()
         finally:
-            for room in rooms:
-                self.rooms.dec(room)
+            self.rooms.dec(src_room)
 
     @threado.stream_fast
     def command_parser(inner, self, room):
@@ -224,4 +222,4 @@ class HistorianService(bot.ServiceBot):
                             room.send(body)
 
 if __name__ == "__main__":
-    HistorianService.from_command_line().run()
+    HistorianService.from_command_line().execute()

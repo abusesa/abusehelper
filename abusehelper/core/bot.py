@@ -1,8 +1,11 @@
-import re
 import os
 import csv
+import sys
 import inspect
+import logging
 import optparse
+import traceback
+import cPickle as pickle
 from ConfigParser import SafeConfigParser
 
 class ConfigParser(SafeConfigParser):
@@ -85,28 +88,36 @@ def optparse_callback(option, opt_str, value, parser, callback, parsed):
         message = "option " + opt_str + ": " + error.args[0]
         raise optparse.OptionValueError(message)
 
-def grouped_params(params):
-    keys = dict()
-    orders = dict()
+class LineFormatter(logging.Formatter):
+    def __init__(self):
+        format = "%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s"
+        date_format = "%Y-%m-%d %H:%M:%S"
+        logging.Formatter.__init__(self, format, date_format)
 
-    for name, param in params:
-        bites = list(name.split("_"))
-        keys[name] = list()
+    def format(self, record):
+        lines = list()
 
-        for i in range(len(bites)):
-            key = tuple(bites[:i+1])
-            keys[name].append(key)
-            orders[key] = min(orders.get(key, param.order), param.order)
+        msg = record.msg
+        args = record.args
+        try:
+            for line in record.getMessage().splitlines(True):
+                record.msg = line
+                record.args = ()
+                lines.append(logging.Formatter.format(self, record))
+        finally:
+            record.msg = msg
+            record.args = args
 
-    return sorted(params, key=lambda x: tuple(map(orders.get, keys[x[0]])))
+        return "".join(lines)
 
 class Bot(object):
-    bot_name = Param("Name for the bot (default=%default)")
     ini_file = Param("INI file used for configuration", 
                      default=None)
     ini_section = Param("INI section used for configuration "+
                         "(default: bot's name)",
                         default=None)
+    log_file = Param(default=None)
+    startup = BoolParam(default=None)
 
     class __metaclass__(type):
         def __new__(cls, name, parents, keys):
@@ -119,13 +130,27 @@ class Bot(object):
     @classmethod
     def params(cls):
         params = list()
-
-        for name, value in inspect.getmembers(cls):
+        for name, value in inspect.getmembers(cls):            
             if not isinstance(value, Param):
                 continue
             params.append((name, value))
 
-        return grouped_params(params)
+        keys = dict()
+        orders = dict()
+        for base in inspect.getmro(cls):
+            for name, value in inspect.getmembers(base):
+                if not isinstance(value, Param):
+                    continue
+
+                bites = list(name.split("_"))
+                keys[name] = list()
+
+                for i in range(len(bites)):
+                    key = tuple(bites[:i+1])
+                    keys[name].append(key)
+                    orders[key] = min(orders.get(key, value.order), value.order)
+
+        return sorted(params, key=lambda x: tuple(map(orders.get, keys[x[0]])))
 
     @classmethod
     def param_defaults(cls):
@@ -181,7 +206,21 @@ class Bot(object):
     def from_command_line(cls, argv=None):
         default = cls.param_defaults()
         parser, cli = cls.params_from_command_line(argv)
-        
+
+        if cli.get("startup", False):
+            conf = dict(pickle.load(sys.stdin))
+            for name, param in cls.params():
+                if name not in conf:
+                    continue
+                value = conf[name]
+                if isinstance(value, basestring):
+                    try:
+                        value = param.parse(value)
+                    except ParamError, error:
+                        message = "startup parameter " + name + ": " + error.args[0]
+                        parser.error(message)                    
+                default[name] = value
+
         ini_file = cli.get("ini_file", None)
         if ini_file is not None:
             ini_section = cli.get("ini_section", None)
@@ -195,9 +234,8 @@ class Bot(object):
                         value = config.get(ini_section, name)
                         default[name] = param.parse(value)
                     except ParamError, error:
-                        if name not in cli:
-                            message = "parameter " + name + ": " + error.args[0]
-                            parser.error(message)
+                        message = "parameter " + name + ": " + error.args[0]
+                        parser.error(message)
 
         default.update(cli)
         for name, param in cls.params():
@@ -207,49 +245,19 @@ class Bot(object):
         return cls(**default)
 
     def __init__(self, **keys):
-        for name, _ in self.params():
-            setattr(self, name, keys[name])
+        for name, param in self.params():
+            if name in keys:
+                value = keys.pop(name)
+            elif param.has_default():
+                value = param.default
+            else:
+                raise TypeError("missing keyword argument %r" % name)
+            setattr(self, name, value)
 
-import logging
-import getpass
-import traceback
-from idiokit import threado
-from idiokit.xmpp import connect
-from abusehelper.core import log
+        if keys:
+            name = keys.keys()[0]
+            raise TypeError("got an unexpected keyword argument %r" % name)
 
-class LineFormatter(logging.Formatter):
-    def __init__(self):
-        format = "%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s"
-        date_format = "%Y-%m-%d %H:%M:%S"
-        logging.Formatter.__init__(self, format, date_format)
-
-    def format(self, record):
-        lines = list()
-
-        msg = record.msg
-        args = record.args
-        try:
-            for line in record.getMessage().splitlines(True):
-                record.msg = line
-                record.args = ()
-                lines.append(logging.Formatter.format(self, record))
-        finally:
-            record.msg = msg
-            record.args = args
-
-        return "".join(lines)
-
-class XMPPBot(Bot):
-    log_file = Param(default=None)
-    xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
-    xmpp_password = Param("the XMPP password", 
-                          default=None)
-    
-    def __init__(self, **keys):
-        Bot.__init__(self, **keys)
-
-        if self.xmpp_password is None:
-            self.xmpp_password = getpass.getpass("XMPP password: ")
         self.log = self.create_logger()
 
     def create_logger(self):
@@ -266,18 +274,36 @@ class XMPPBot(Bot):
         logger.addHandler(handler)
         return logger
 
-    def run(self):
-        return threado.run(self.main() | self._log_errors())
-
-    @threado.stream
-    def _log_errors(inner, self):
+    def execute(self):
         try:
-            while True:
-                yield inner
-        except threado.Finished:
-            pass
+            return self.run()
+        except SystemExit:
+            raise
         except:
             self.log.critical(traceback.format_exc())
+            sys.exit(1)
+
+    def run(self):
+        pass
+
+import getpass
+from idiokit import threado
+from idiokit.xmpp import connect
+from abusehelper.core import log
+
+class XMPPBot(Bot):
+    xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
+    xmpp_password = Param("the XMPP password", 
+                          default=None)
+    
+    def __init__(self, **keys):
+        Bot.__init__(self, **keys)
+
+        if self.xmpp_password is None:
+            self.xmpp_password = getpass.getpass("XMPP password: ")
+
+    def run(self):
+        return threado.run(self.main())
 
     @threado.stream_fast
     def main(inner, self):
@@ -342,8 +368,7 @@ class ServiceBot(XMPPBot):
             self.log.info("Retired service %r", self.bot_name)
 
     def run(self):
-        return threado.run(self._run() | self._log_errors(),
-                           throw_on_signal=services.Stop())
+        return threado.run(self._run(), throw_on_signal=services.Stop())
 
     @threado.stream
     def main(inner, self, state):
@@ -354,7 +379,7 @@ class ServiceBot(XMPPBot):
             inner.finish()
 
     @threado.stream
-    def session(inner, self, state, room, **keys):
+    def session(inner, self, state, **keys):
         try:
             while True:
                 yield inner
@@ -369,29 +394,31 @@ class FeedBot(ServiceBot):
         ServiceBot.__init__(self, *args, **keys)
 
         self.rooms = taskfarm.TaskFarm(self._room)
-        self.room_keys = taskfarm.Counter()
+        self._room_keys = taskfarm.Counter()
 
     @threado.stream
-    def session(inner, self, state, room, **keys):
-        room = self.rooms.inc(room)
-        room_key = self.room_key(room=room, **keys)
-        self.room_keys.inc(room_key, room)
+    def session(inner, self, state, dst_room, **keys):
+        room = self.rooms.inc(dst_room)
+        room_keys = self.room_keys(dst_room=dst_room, **keys)
+        for room_key in room_keys:
+            self._room_keys.inc(room_key, room)
 
         try:
-            yield inner.sub(ServiceBot.session(self, state, room, **keys))
+            yield inner.sub(ServiceBot.session(self, state, dst_room=dst_room, **keys))
         except services.Stop:
             inner.finish()
         finally:
-            self.room_keys.dec(room_key, room)
-            self.rooms.dec(room)
+            for room_key in room_keys:
+                self._room_keys.dec(room_key, room)
+            self.rooms.dec(dst_room)
 
     @threado.stream
     def feed(inner, self):
         while True:
             yield inner
 
-    def room_key(self, **keys):
-        return None
+    def room_keys(self, **keys):
+        return [None]
 
     def event_keys(self, event):
         return [None]
@@ -416,7 +443,7 @@ class FeedBot(ServiceBot):
 
             for event in inner:
                 for room_key in self.event_keys(event):
-                    rooms = self.room_keys.get(room_key)
+                    rooms = self._room_keys.get(room_key)
 
                     for room in rooms:
                         room.send(event)
@@ -486,24 +513,26 @@ class PollingBot(FeedBot):
     def __init__(self, *args, **keys):
         FeedBot.__init__(self, *args, **keys)
 
-        self.feed_keys = taskfarm.Counter()
         self.feed_queue = collections.deque()
+        self._feed_keys = taskfarm.Counter()
 
     @threado.stream
-    def session(inner, self, state, room, **keys):
-        feed_key = self.feed_key(room=room, **keys)
-        if self.feed_keys.inc(feed_key):
-            self.feed_queue.appendleft((time.time(), feed_key))
+    def session(inner, self, state, **keys):
+        feed_keys = set(self.feed_keys(**keys))
+        for feed_key in feed_keys:
+            if self._feed_keys.inc(feed_key):
+                self.feed_queue.appendleft((time.time(), feed_key))
 
         try:
-            yield inner.sub(FeedBot.session(self, state, room, **keys))
+            yield inner.sub(FeedBot.session(self, state, **keys))
         except services.Stop:
             inner.finish()
         finally:
-            self.feed_keys.dec(feed_key)
+            for feed_key in feed_keys:
+                self._feed_keys.dec(feed_key)
 
-    def feed_key(self, **keys):
-        return None
+    def feed_keys(self, **keys):
+        return [None]
 
     @threado.stream
     def feed(inner, self):
@@ -516,7 +545,7 @@ class PollingBot(FeedBot):
                 continue
             
             _, feed_key = self.feed_queue.popleft()
-            if not self.feed_keys.contains(feed_key):
+            if not self._feed_keys.contains(feed_key):
                 continue
             
             yield inner.sub(self.poll(feed_key))
