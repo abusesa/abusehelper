@@ -1,6 +1,6 @@
 import xmlrpclib
 from idiokit import threado, timer
-from abusehelper.core import events, rules, taskfarm, bot, services
+from abusehelper.core import events, taskfarm, bot, services
 
 class Wiki:
     def __init__(self, url, user, password, type):
@@ -152,14 +152,13 @@ class WikiBot(CollectorBot):
             inner.finish()
 
     @threado.stream
-    def session(inner, self, state, room, wiki_url, wiki_user, wiki_password, 
+    def session(inner, self, state, src_room, wiki_url, wiki_user, wiki_password, 
                 wiki_type="opencollab", parent="", **keys):
+        self.rooms.inc(src_room)
+        self.wikis[src_room] = (wiki_url, wiki_user, wiki_password, 
+                                wiki_type, parent)
 
-        self.rooms.inc(room)
-        self.wikis[room] = (wiki_url, wiki_user, wiki_password, 
-                            wiki_type, parent)
-
-        self.events.setdefault(room, list())
+        self.events.setdefault(src_room, list())
 
         try:
             while True:
@@ -167,10 +166,10 @@ class WikiBot(CollectorBot):
         except services.Stop:
             inner.finish()
         finally:
-            self.rooms.dec(room)
-            del self.wikis[room]
-            del self.events[room]
+            self.rooms.dec(src_room)
+            del self.wikis[src_room]
+            del self.events[src_room]
 
 if __name__ == "__main__":
-    WikiBot.from_command_line().run()
+    WikiBot.from_command_line().execute()
 
