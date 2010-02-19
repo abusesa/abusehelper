@@ -29,13 +29,21 @@ class Wiki:
         if self.type == "opencollab":
             body += "\n\n" + "\n\n".join(events)
 
-            success = self.wiki.putPage(pagename, body)
+            try:
+                success = self.wiki.putPage(pagename, body)
+            except:
+                success = False
+
             if not success:
                 return False
 
         elif self.type == "doku":
             body += "\\\\ \n" + "\\\\ \n".join(events)
-            self.wiki.putPage(pagename, body, {})
+
+            try:
+                self.wiki.putPage(pagename, body, {})
+            except:
+                return False
 
         return True
 
@@ -152,8 +160,9 @@ class WikiBot(CollectorBot):
             inner.finish()
 
     @threado.stream
-    def session(inner, self, state, src_room, wiki_url, wiki_user, wiki_password, 
-                wiki_type="opencollab", parent="", **keys):
+    def session(inner, self, state, src_room, wiki_url, wiki_user,
+                wiki_password, wiki_type="opencollab", parent="", **keys):
+
         self.rooms.inc(src_room)
         self.wikis[src_room] = (wiki_url, wiki_user, wiki_password, 
                                 wiki_type, parent)
