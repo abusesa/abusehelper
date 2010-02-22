@@ -26,7 +26,7 @@ class DShieldBot(bot.PollingBot):
         try:
             info, fileobj = yield inner.sub(utils.fetch_url(url))
         except utils.FetchUrlFailed, fuf:
-            self.log.error("ASN%s: downloading failed: %s", asn, fuf)
+            self.log.error("ASN%s: downloading failed: %r", asn, fuf)
             return
         self.log.info("ASN%s: downloaded", asn)
 

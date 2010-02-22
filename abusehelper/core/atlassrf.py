@@ -49,7 +49,7 @@ class AtlasSRFBot(bot.PollingBot):
         try:
             _, fileobj = yield inner.sub(utils.fetch_url(self.feed_url, opener))
         except utils.FetchUrlFailed, fuf:
-            self.log.error("Failed to download the report: %s", fuf)
+            self.log.error("Failed to download the report: %r", fuf)
             return
         self.log.info("Downloaded the report")
 
