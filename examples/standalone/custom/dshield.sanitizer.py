@@ -1,20 +1,34 @@
+import time as _time
+import socket
+from abusehelper.core.events import Event
 from abusehelper.core.config import load_module
 
-# Load module "sanitizer" from the same directory as this file.
 sanitizer = load_module("sanitizer")
 
-# sanitizer.Sanitizer is the base class for a simple sanitizer bot.
-class DShieldSanitizer(sanitizer.Sanitizer):
-    # .sanitize(event) is the hook method for sanitizing events. This
-    # is the only method you have to implement to create a basic
-    # normalizer, sanitizer, modifier or filter.
-    def sanitize(self, event):
-        # Modify and create events here.
-        event.add("type", "unknown")
+def time(string, format="%Y-%m-%d %H:%M:%S"):
+    parsed = _time.strptime(string, format)
+    if _time.gmtime() < parsed:
+        raise ValueError()
+    return _time.strftime("%Y-%m-%d %H:%M:%S", parsed)
 
-        # Return a list of events here. The list can contain 0-n events.
-        return [event]
+def ip(string):
+    return socket.inet_ntoa(socket.inet_aton(string))
+
+class DShieldSanitizer(sanitizer.Sanitizer):
+    def sanitize(self, event):
+        new = Event()
+        new.update("ip", event.values("ip", ip))
+        new.update("time", event.values("updated", time))
+        new.update("asn", event.values("asn"))
+        new.add("type", "unknown")
+
+        if not new.contains("ip"):
+            self.log.error("No valid IP for event %r", event)
+            return []
+        if not new.contains("time"):
+            self.log.error("No valid time for event %r", event)
+            return []
+        return [new]
 
 if __name__ == "__main__":
-    # Execute the sanitizer bot based on the command line options.
     DShieldSanitizer.from_command_line().execute()
