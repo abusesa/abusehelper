@@ -1,3 +1,5 @@
+import re
+import socket
 from abusehelper.core import rules
 from abusehelper.core.config import *
 from abusehelper.core.runtime import *
@@ -47,6 +49,69 @@ class Type(Base):
                | self.room() 
                | self.class_room())
 
+def parse_netblock(netblock):
+    split = netblock.split("/", 1)
+    ip = split[0]
+
+    try:
+        socket.inet_pton(socket.AF_INET, ip)
+    except socket.error:
+        try:
+            socket.inet_pton(socket.AF_INET6, ip)
+        except socket.error:
+            raise ValueError("not a valid IP address %r" % ip)
+        bits = 128
+    else:
+        bits = 32
+
+    if len(split) == 2:
+        bits = int(split[1])
+    return rules.NETBLOCK(ip, bits)
+
+def parse_asn_netblock(item):
+    string = str(item)
+
+    plus_asn = list()
+    minus_asn = list()
+    plus_netblock = list()
+    minus_netblock = list()
+
+    rex = re.compile("^\s*([+-])?\s*([^-+\s]+)\s*")
+    while string:
+        match = rex.search(string)
+        if not match:
+            raise ValueError("invalid asn/netblock rule %r" % item)
+
+        prefix, data = match.groups()
+        string = string[match.end():]
+
+        if data.isdigit():
+            rule = rules.CONTAINS(asn=str(int(data)))
+            if prefix == "-":
+                minus_asn.append(rule)
+            else:
+                plus_asn.append(rule)
+        else:
+            rule = parse_netblock(data)
+            if prefix == "-":
+                minus_netblock.append(rule)
+            else:
+                plus_netblock.append(rule)
+
+    total = list()
+    if plus_asn:
+        total.append(rules.OR(*plus_asn))
+    if minus_asn:
+        total.append(rules.NOT(rules.OR(*minus_asn)))
+    if plus_netblock:
+        total.append(rules.OR(*plus_netblock))
+    if minus_netblock:
+        total.append(rules.NOT(rules.OR(*minus_netblock)))
+
+    if not total:
+        raise ValueError("empty asn/netblock rule")
+    return rules.AND(*total)
+
 template_cache = dict()
 
 def load_template(name):
@@ -94,17 +159,19 @@ class Customer(Base):
 
     def main(self):
         if self.asns:
-            rule = rules.OR(*[rules.CONTAINS(asn=str(asn)) 
-                              for asn in self.asns])
-            if self.types is None:
-                yield (Type.class_room() 
-                       | Session("roomgraph", rule=rule) 
-                       | self.room())
-            else:
-                for type in self.types:
-                    yield (Type(name=type).room() 
+            asns = map(parse_asn_netblock, self.asns)
+            if asns:
+                rule = rules.OR(*asns)
+
+                if self.types is None:
+                    yield (Type.class_room() 
                            | Session("roomgraph", rule=rule) 
                            | self.room())
+                else:
+                    for type in self.types:
+                        yield (Type(name=type).room() 
+                               | Session("roomgraph", rule=rule) 
+                               | self.room())
 
         if self.report is not None:
             yield self.room() | self.report(self)
@@ -122,5 +189,8 @@ unknown = Type()
 
 # Customer definitions
 
-unknown_to_mail = Customer(asns=[1, 2, 3], report=mail, types=["unknown"])
-all_to_wiki = Customer(asns=[1, 2, 3], report=wiki)
+unknown_to_mail = Customer(asns=["3 +127.0.0.1/16"],
+                           report=mail, 
+                           types=["unknown"])
+all_to_wiki = Customer(asns=[1, 2, 3], 
+                       report=wiki)
