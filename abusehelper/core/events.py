@@ -155,7 +155,7 @@ class Event(object):
         self._element = None
         self.attrs.pop(key, None)
 
-    def values(self, key=_NO_VALUE, parser=None, ignored=set([None])):
+    def values(self, key=_NO_VALUE, parser=None, ignored=[None]):
         attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is not _NO_VALUE:
             return attrs.get(key, set())
@@ -170,7 +170,7 @@ class Event(object):
             return result
 
     def value(self, key=_NO_VALUE, default=_NO_VALUE, 
-              parser=None, ignored=set([None])):
+              parser=None, ignored=[None]):
         attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is _NO_VALUE:
             for value in attrs.itervalues():
@@ -186,7 +186,7 @@ class Event(object):
         return default
 
     def contains(self, key=_NO_VALUE, value=_NO_VALUE, 
-                 parser=None, ignored=set([None])):
+                 parser=None, ignored=[None]):
         attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is not _NO_VALUE:
             if value is _NO_VALUE:
@@ -201,7 +201,7 @@ class Event(object):
                 return True
         return False
 
-    def keys(self, parser=None, ignored=set([None])):
+    def keys(self, parser=None, ignored=[None]):
         attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         return attrs.keys()
 
