@@ -72,6 +72,8 @@ class IMAPBot(bot.FeedBot):
                 for msg in msgs:
                     self.log.critical(msg)
                 return
+            self.log.info("Logged in to IMAP server %s port %d",
+                          self.mail_server, self.mail_port)
                 
             try:
                 while True:
