@@ -108,6 +108,31 @@ class Event(object):
         self._element = None
 
     def add(self, key, value, *values):
+        """
+        Add value(s) for a key.
+
+        >>> event = Event()
+        >>> event.add("key", "1")
+        >>> event.values("key")
+        set(['1'])
+
+        More than one value can be added with one call.
+
+        >>> event = Event()
+        >>> event.add("key", "1", "2")
+        >>> event.values("key") == set(["1", "2"])
+        True
+
+        Key-value pairs is already contained by the event are ignored.
+
+        >>> event = Event()
+        >>> event.add("key", "1")
+        >>> event.values("key")
+        set(['1'])
+        >>> event.add("key", "1")
+        >>> event.values("key")
+        set(['1'])
+        """
         self._element = None
         if key not in self.attrs:
             self.attrs[key] = set()
@@ -115,6 +140,24 @@ class Event(object):
         self.attrs[key].update(values)
 
     def update(self, key, values):
+        """
+        Update the values of a key.
+
+        >>> event = Event()
+        >>> event.update("key", ["1", "2"])
+        >>> event.values("key") == set(["1", "2"])
+        True
+
+        The event will not be modified if there are no values to add.
+
+        >>> event = Event()
+        >>> event.update("key", [])
+        >>> event.contains("key")
+        False
+        """
+        if not values:
+            return
+
         self._element = None
         if key not in self.attrs:
             self.attrs[key] = set()
@@ -290,3 +333,7 @@ class EventList(object):
         for _ in self:
             return True
         return False
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
