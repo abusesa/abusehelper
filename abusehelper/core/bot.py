@@ -463,7 +463,7 @@ class FeedBot(ServiceBot):
                     inner.send(event)
 
     @threado.stream_fast
-    def _stats(inner, self, interval=1.0):
+    def _stats(inner, self, interval=60.0):
         count = 0
         sleeper = timer.sleep(interval)
 
