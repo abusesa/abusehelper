@@ -3,19 +3,20 @@ from abusehelper.core.config import *
 from abusehelper.core.runtime import *
 
 startup = load_module("startup")
-prefix = startup.Bot.service_room + "."
 
 class Base(Config):
+    prefix = startup.Bot.service_room
+
     @classmethod
     def class_name(cls):
         return cls.__name__.lower()
     
     @classmethod
     def class_room(cls):
-        return Room(prefix+cls.class_name()+"s")
+        return Room(cls.prefix+"."+cls.class_name()+"s")
 
     def room(self):
-        return Room(prefix+self.class_name()+"."+self.name)
+        return Room(self.prefix+"."+self.class_name()+"."+self.name)
 
     # The session pipes yielded here are collected and then run.
     def runtime(self):
@@ -57,49 +58,69 @@ def load_template(name):
             template_file.close()
     return template_cache[name]
 
-class Mail(Session):
-    def __init__(self, to=[], cc=[], template="default", times=["08:00"]):
-        template = load_template(template)
-        Session.__init__(self, "mailer", to=to, cc=cc, template=template, times=times)
+def wiki(customer):
+    return Session("wikibot", 
+                   "%(prefix)s", "%(name)s",
+                   wiki_url=customer.wiki_url, 
+                   wiki_user=customer.wiki_user, 
+                   wiki_password=customer.wiki_password,
+                   wiki_type=customer.wiki_type,
+                   wiki_parent=customer.wiki_parent)
 
-class Wiki(Session):
-    def __init__(self, url, user, password, type="opencollab", parent=""):
-        Session.__init__(self, "wikibot", 
-                         wiki_url=url, wiki_user=user, wiki_password=password,
-                         wiki_type=type, parent=parent)
+def mail(customer):
+    template = load_template(customer.mail_template)
+    return Session("mailer",
+                   "%(prefix)s", "%(name)s",
+                   to=customer.mail_to, 
+                   cc=customer.mail_cc, 
+                   template=template,
+                   times=customer.mail_times)
 
 class Customer(Base):
     asns = [] # Default: no asns
     types = None # Default: all types
-    reports = [] # Default: no reporting
+    report = None # Default: no reporting
+
+    wiki_url = "https://wiki.example.com"
+    wiki_user = "wikiuser"
+    wiki_password = "wikipassword"
+    wiki_type = "opencollab"
+    wiki_parent = dynamic("%(name)s")
+
+    mail_to = []
+    mail_cc = []
+    mail_template = "default"
+    mail_times = ["08:00"]
 
     def main(self):
         if self.asns:
-            rule = rules.OR(*[rules.CONTAINS(asn=str(asn)) for asn in self.asns])
+            rule = rules.OR(*[rules.CONTAINS(asn=str(asn)) 
+                              for asn in self.asns])
             if self.types is None:
-                yield Type.class_room() | Session("roomgraph", rule=rule) | self.room()
+                yield (Type.class_room() 
+                       | Session("roomgraph", rule=rule) 
+                       | self.room())
             else:
                 for type in self.types:
-                    yield Type(name=type).room() | Session("roomgraph", rule=rule) | self.room()
+                    yield (Type(name=type).room() 
+                           | Session("roomgraph", rule=rule) 
+                           | self.room())
 
-        for report in self.reports:
-            yield self.room() | report
+        if self.report is not None:
+            yield self.room() | self.report(self)
 
 # Source definitions
 
-dshield = Source(asns=[1, 2, 3, 4])
+dshield = Source(asns=[1, 2, 3])
+ircfeed = Source()
 
 # Type definitions
 
 malware = Type()
 spam = Type()
-ufo = Type()
+unknown = Type()
 
 # Customer definitions
 
-malware_to_mail = Customer(asns=[1, 2, 3], 
-                                 reports=[Mail()], 
-                                 types=["malware"])
-all_to_wiki = Customer(asns=[1, 2, 3], 
-                       reports=[Wiki("https://wiki.example.com",
-                                     "wikiuser", "wikipassword")])
+unknown_to_mail = Customer(asns=[1, 2, 3], report=mail, types=["unknown"])
+all_to_wiki = Customer(asns=[1, 2, 3], report=wiki)
