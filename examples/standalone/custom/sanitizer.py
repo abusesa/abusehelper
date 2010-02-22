@@ -1,5 +1,32 @@
+import socket
+import time as _time
 from idiokit import threado
 from abusehelper.core import events, bot, taskfarm, services
+
+def format_time(time_tuple=None):
+    if time_tuple is None:
+        time_tuple = _time.gmtime()
+    return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
+
+def time(string, format="%Y-%m-%d %H:%M:%S"):
+    try:
+        parsed = _time.strptime(string, format)
+    except ValueError:
+        return None
+
+    if _time.gmtime() < parsed:
+        return None
+    return format_time(parsed)
+
+def ip(string):
+    try:
+        socket.inet_pton(socket.AF_INET, string)
+    except socket.error:
+        try:
+            socket.inet_pton(socket.AF_INET6, string)
+        except socket.error:
+            return None
+    return string
 
 class Sanitizer(bot.ServiceBot):
     def __init__(self, **keys):
