@@ -216,6 +216,9 @@ class Event(object):
             self._element = event
         return self._element
 
+    def __repr__(self):
+        return self.__class__.__name__ + "(" + repr(self.attrs) + ")"
+
 @threado.stream_fast
 def stanzas_to_events(inner):
     while True:
