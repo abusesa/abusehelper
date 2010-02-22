@@ -106,8 +106,6 @@ class WikiBot(CollectorBot):
                 content.setdefault(asn, dict())
 
                 type = event.value("type", None)
-                if type is None:
-                    continue
 
                 content[asn].setdefault(type, list())
                 line = unicode()
@@ -127,10 +125,13 @@ class WikiBot(CollectorBot):
             parents.append("as"+asn)
 
             for type in content[asn]:
-                parents.append(time)
-
                 self.log.info("Writing as%s events to wiki" % asn)
-                success = wiki.putEvents(type, content[asn][type], parents)
+
+                if type == None:
+                    success = wiki.putEvents(type, time, parents)
+                else:
+                    parents.append(time)
+                    success = wiki.putEvents(type, content[asn][type], parents)
 
                 if success:
                     self.log.info("Events written to wiki")
