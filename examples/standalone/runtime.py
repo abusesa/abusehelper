@@ -65,7 +65,7 @@ def wiki(customer):
                    wiki_user=customer.wiki_user, 
                    wiki_password=customer.wiki_password,
                    wiki_type=customer.wiki_type,
-                   wiki_parent=customer.wiki_parent)
+                   parent=customer.wiki_parent)
 
 def mail(customer):
     template = load_template(customer.mail_template)
