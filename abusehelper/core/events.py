@@ -45,9 +45,9 @@ class _Parsed(object):
             values = list(self.filter(values))
 
             try:
-                yield set(parsed_values)
+                yield set(values)
             except TypeError:
-                yield parsed_values
+                yield values
 
     def values(self):
         return list(self.itervalues())
@@ -156,6 +156,46 @@ class Event(object):
         self.attrs.pop(key, None)
 
     def values(self, key=_NO_VALUE, parser=None, ignored=[None]):
+        """
+        Return event values (for a specific key, if given).
+
+        >>> event = Event()
+        >>> event.add("key", "1", "2")
+        >>> event.add("other", "3", "4")
+        >>> event.values() == set(["1", "2", "3", "4"])
+        True
+        >>> event.values("key") == set(["1", "2"])
+        True
+
+        Perform parsing, validation and filtering by passing in a
+        parsing function and a collection of ignored parsing values
+        ([None] by default, so all None objects returned by the
+        parsing function will be ignored).
+
+        >>> import socket
+        >>> def ipv4(string):
+        ...     try:
+        ...         return socket.inet_ntoa(socket.inet_aton(string))
+        ...     except socket.error:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "1.2.3.4", "abba")
+        >>> event.add("other", "10.10.10.10")
+        >>> event.values("key", parser=ipv4) == set(["1.2.3.4"])
+        True
+        >>> event.values(parser=ipv4) == set(["1.2.3.4", "10.10.10.10"])
+        True
+
+        The returned value collection is always a set unless the
+        parsing function returns unhashable objects (e.g. lists):
+
+        >>> event = Event()
+        >>> event.add("key", "ab", "cd")
+        >>> event.values() == set(["ab", "cd"])
+        True
+        >>> event.values(parser=list) == [["a", "b"], ["c", "d"]]
+        True
+        """
         attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is not _NO_VALUE:
             return attrs.get(key, set())
