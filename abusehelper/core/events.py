@@ -88,8 +88,7 @@ class Event(object):
         self._element = None
 
     def add(self, key, value, *values):
-        """
-        Add value(s) for a key.
+        """Add value(s) for a key.
 
         >>> event = Event()
         >>> event.add("key", "1")
@@ -113,6 +112,7 @@ class Event(object):
         >>> event.values("key")
         set(['1'])
         """
+
         self._element = None
         if key not in self.attrs:
             self.attrs[key] = set()
@@ -120,8 +120,7 @@ class Event(object):
         self.attrs[key].update(values)
 
     def update(self, key, values):
-        """
-        Update the values of a key.
+        """Update the values of a key.
 
         >>> event = Event()
         >>> event.update("key", ["1", "2"])
@@ -135,6 +134,7 @@ class Event(object):
         >>> event.contains("key")
         False
         """
+
         if not values:
             return
 
@@ -144,6 +144,22 @@ class Event(object):
         self.attrs[key].update(values)
 
     def discard(self, key, value, *values):
+        """Discard some value(s) of a key.
+
+        >>> event = Event()
+        >>> event.add("key", "1", "2", "3")
+        >>> event.discard("key", "1", "3")
+        >>> event.values("key")
+        set(['2'])
+
+        Values that don't exist for the given key are silently ignored.
+
+        >>> event = Event()
+        >>> event.add("key", "2")
+        >>> event.discard("key", "1", "2")
+        >>> event.values("key")
+        set([])
+        """
         self._element = None
         value_set = self.attrs.get(key, set())
         value_set.discard(value)
@@ -152,12 +168,25 @@ class Event(object):
             self.attrs.pop(key, None)
 
     def clear(self, key):
+        """Clear all values of a key.
+
+        >>> event = Event()
+        >>> event.add("key", "1")
+        >>> event.clear("key")
+        >>> event.contains("key")
+        False
+        
+        Clearing keys that do not exist does nothing.
+
+        >>> event = Event()
+        >>> event.clear("key")
+        """
+
         self._element = None
         self.attrs.pop(key, None)
 
     def values(self, key=_NO_VALUE, parser=None, ignored=[None]):
-        """
-        Return event values (for a specific key, if given).
+        """Return event values (for a specific key, if given).
 
         >>> event = Event()
         >>> event.add("key", "1", "2")
@@ -169,7 +198,7 @@ class Event(object):
 
         Perform parsing, validation and filtering by passing in a
         parsing function and a collection of ignored parsing values
-        ([None] by default, so all None objects returned by the
+        ([None] by default, ie. all None objects returned by the
         parsing function will be ignored).
 
         >>> import socket
@@ -191,11 +220,10 @@ class Event(object):
 
         >>> event = Event()
         >>> event.add("key", "ab", "cd")
-        >>> event.values() == set(["ab", "cd"])
-        True
         >>> event.values(parser=list) == [["a", "b"], ["c", "d"]]
         True
         """
+
         attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is not _NO_VALUE:
             return attrs.get(key, set())
@@ -211,10 +239,67 @@ class Event(object):
 
     def value(self, key=_NO_VALUE, default=_NO_VALUE, 
               parser=None, ignored=[None]):
+        """Return one event value (for a specific key, if given).
+
+        The value can be picked either from the values of some
+        specific key or amongts event values.
+
+        >>> event = Event()
+        >>> event.add("key", "1")
+        >>> event.add("other", "2")
+        >>> event.value("key")
+        '1'
+        >>> event.value() in ["1", "2"]
+        True
+
+        A default return value can be defined in case no suitable
+        value is available:
+
+        >>> event = Event()
+        >>> event.value("key", "default value")
+        'default value'
+        >>> event.value(default="default value")
+        'default value'
+
+        KeyError is raised if no suitable values are available and no
+        default is given.
+
+        >>> event = Event()
+        >>> event.value()
+        Traceback (most recent call last):
+        ...
+        KeyError: 'no value available'
+        >>> event.value("somekey")
+        Traceback (most recent call last):
+        ...
+        KeyError: 'somekey'
+
+        As with .values(...), a parsing function and a collection of
+        ignored values can be given, and they will be used to modify
+        the results.
+
+        >>> def int_parse(string):
+        ...     try:
+        ...         return int(string)
+        ...     except ValueError:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "1", "a")
+        >>> event.value(parser=int_parse)
+        1
+        >>> event.value("key", parser=int_parse)
+        1
+        >>> event.value("other", parser=int_parse)
+        Traceback (most recent call last):
+        ...
+        KeyError: 'other'
+        """
+
         attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is _NO_VALUE:
-            for value in attrs.itervalues():
-                return value
+            for values in attrs.itervalues():
+                for value in values:
+                    return value
         else:
             for value in attrs.get(key, ()):
                 return value
