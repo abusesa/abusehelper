@@ -144,7 +144,7 @@ def mail(customer):
 class Customer(Base):
     asns = [] # Default: no asns
     types = None # Default: all types
-    report = None # Default: no reporting
+    reports = [] # Default: no reporting
 
     wiki_url = "https://wiki.example.com"
     wiki_user = "wikiuser"
@@ -173,8 +173,8 @@ class Customer(Base):
                                | Session("roomgraph", rule=rule) 
                                | self.room())
 
-        if self.report is not None:
-            yield self.room() | self.report(self)
+        for report in self.reports:
+            yield self.room() | report(self)
 
 # Source definitions
 
@@ -190,7 +190,7 @@ unknown = Type()
 # Customer definitions
 
 unknown_to_mail = Customer(asns=["3 +127.0.0.1/16"],
-                           report=mail, 
+                           reports=[mail, wiki], 
                            types=["unknown"])
 all_to_wiki = Customer(asns=[1, 2, 3], 
-                       report=wiki)
+                       reports=[wiki])
