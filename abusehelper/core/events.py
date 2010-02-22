@@ -1,5 +1,8 @@
 import os
 import gzip
+from functools import partial
+from operator import contains
+from itertools import ifilterfalse, imap
 from cStringIO import StringIO
 from idiokit import threado
 from idiokit.xmlcore import Element
@@ -8,22 +11,17 @@ EVENT_NS = "abusehelper#event"
 _NO_VALUE = object()
 
 class _Parsed(object):
-    __slots__ = "attrs", "parser", "ignore"
+    __slots__ = "attrs", "parser", "filter"
 
-    def __init__(self, attrs, parser, ignore):
+    def __init__(self, attrs, parser, ignored):
         self.attrs = attrs
         self.parser = parser
-        self.ignore = ignore
+        self.filter = partial(ifilterfalse, partial(contains, ignored))
 
     def get(self, key, default):
-        values = list()
-        for value in self.attrs.get(key, ()):
-            try:
-                parsed = self.parser(value)
-            except self.ignore:
-                pass
-            else:
-                values.append(parsed)
+        values = self.attrs.get(key, ())
+        values = imap(self.parser, values)
+        values = list(self.filter(values))
 
         if values:
             try:
@@ -37,28 +35,15 @@ class _Parsed(object):
 
     def iterkeys(self):
         for key, values in self.attrs.iteritems():
-            for value in values:
-                try:
-                    self.parser(value)
-                except self.ignore:
-                    pass
-                else:
-                    yield key
-                    break
+            for _ in self.filter(imap(self.parser, values)):
+                yield key
+                break
 
     def itervalues(self):
         for key, values in self.attrs.iteritems():
-            parsed_values = list()
-            append = parsed_values.append
+            values = imap(self.parser, values)
+            values = list(self.filter(values))
 
-            for value in values:
-                try:
-                    parsed_value = self.parser(value)
-                except self.ignore:
-                    pass
-                else:
-                    append(parsed_value)
-                
             try:
                 yield set(parsed_values)
             except TypeError:
@@ -73,14 +58,9 @@ class _Parsed(object):
         return False
 
     def __contains__(self, key):
-        for value in self.attrs.get(key, ()):
-            try:
-                self.parser(value)
-            except self.ignore:
-                pass
-            else:
-                return True
-        return False
+        values = self.attrs.get(key, ())
+        values = imap(self.parser, values)
+        return any(self.filter(imap(self.parsed, values)))
 
 class Event(object):
     __slots__ = "attrs", "_element"
@@ -175,8 +155,8 @@ class Event(object):
         self._element = None
         self.attrs.pop(key, None)
 
-    def values(self, key=_NO_VALUE, parser=None, ignore=Exception):
-        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+    def values(self, key=_NO_VALUE, parser=None, ignored=set([None])):
+        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is not _NO_VALUE:
             return attrs.get(key, set())
 
@@ -190,8 +170,8 @@ class Event(object):
             return result
 
     def value(self, key=_NO_VALUE, default=_NO_VALUE, 
-              parser=None, ignore=Exception):
-        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+              parser=None, ignored=set([None])):
+        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is _NO_VALUE:
             for value in attrs.itervalues():
                 return value
@@ -206,8 +186,8 @@ class Event(object):
         return default
 
     def contains(self, key=_NO_VALUE, value=_NO_VALUE, 
-                 parser=None, ignore=Exception):
-        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+                 parser=None, ignored=set([None])):
+        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         if key is not _NO_VALUE:
             if value is _NO_VALUE:
                 return key in attrs
@@ -221,8 +201,8 @@ class Event(object):
                 return True
         return False
 
-    def keys(self, parser=None, ignore=Exception):
-        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+    def keys(self, parser=None, ignored=set([None])):
+        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
         return attrs.keys()
 
     def to_element(self):
