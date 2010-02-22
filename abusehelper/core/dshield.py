@@ -16,7 +16,7 @@ class DShieldBot(bot.PollingBot):
         return map(str, asns)
 
     def event_keys(self, event):
-        return event.attrs.get("asn", list())
+        return list(event.values("asn"))
 
     @threado.stream
     def poll(inner, self, asn, url="http://dshield.org/asdetailsascii.html"):
@@ -44,8 +44,9 @@ class DShieldBot(bot.PollingBot):
         while True:
             event = yield inner
 
-            for ip in list(event.attrs.get("ip", ())):
-                event.discard("ip", ip)
+            ips = list(event.values("ip"))
+            event.clear("ip")
+            for ip in ips:
                 try:
                     ip = ".".join(map(str, map(int, ip.split("."))))
                 except ValueError:

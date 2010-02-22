@@ -212,9 +212,9 @@ class WhoisService(roomfarm.RoomFarm):
             yield inner, channel
 
             for event in inner:
-                if "email" in event.attrs:
+                if event.contains("email"):
                     continue
-                for ip in event.attrs.get("ip", ()):
+                for ip in event.values("ip"):
                     if ip not in events:
                         collect(ip)
                     events.setdefault(ip, set()).add(event)

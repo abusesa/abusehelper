@@ -1,13 +1,90 @@
 import os
-import csv
 import gzip
 from cStringIO import StringIO
 from idiokit import threado
 from idiokit.xmlcore import Element
 
 EVENT_NS = "abusehelper#event"
+_NO_VALUE = object()
+
+class _Parsed(object):
+    __slots__ = "attrs", "parser", "ignore"
+
+    def __init__(self, attrs, parser, ignore):
+        self.attrs = attrs
+        self.parser = parser
+        self.ignore = ignore
+
+    def get(self, key, default):
+        values = list()
+        for value in self.attrs.get(key, ()):
+            try:
+                parsed = self.parser(value)
+            except self.ignore:
+                pass
+            else:
+                values.append(parsed)
+
+        if values:
+            try:
+                return set(values)
+            except TypeError:
+                return values
+        return default
+
+    def keys(self):
+        return list(self.iterkeys())
+
+    def iterkeys(self):
+        for key, values in self.attrs.iteritems():
+            for value in values:
+                try:
+                    self.parser(value)
+                except self.ignore:
+                    pass
+                else:
+                    yield key
+                    break
+
+    def itervalues(self):
+        for key, values in self.attrs.iteritems():
+            parsed_values = list()
+            append = parsed_values.append
+
+            for value in values:
+                try:
+                    parsed_value = self.parser(value)
+                except self.ignore:
+                    pass
+                else:
+                    append(parsed_value)
+                
+            try:
+                yield set(parsed_values)
+            except TypeError:
+                yield parsed_values
+
+    def values(self):
+        return list(self.itervalues())
+
+    def __nonzero__(self):
+        for key in self.iterkeys():
+            return True
+        return False
+
+    def __contains__(self, key):
+        for value in self.attrs.get(key, ()):
+            try:
+                self.parser(value)
+            except self.ignore:
+                pass
+            else:
+                return True
+        return False
 
 class Event(object):
+    __slots__ = "attrs", "_element"
+
     @classmethod
     def from_element(self, element):
         if len(element) != 1:
@@ -15,33 +92,95 @@ class Event(object):
         if not element.named("event", EVENT_NS):
             return None
 
-        event = Event(element)
+        event = Event()
+        event._element = element
         for attr in element.children("attr").with_attrs("key", "value"):
             event.add(attr.get_attr("key"), attr.get_attr("value"))
         return event
 
-    def __init__(self, element=None):
+    def __init__(self, *events):
         self.attrs = dict()
+
+        for event in events:
+            for key in event.keys():
+                self.update(key, event.values())
+                
         self._element = None
 
-    def add(self, key, value):
+    def add(self, key, value, *values):
         self._element = None
         if key not in self.attrs:
             self.attrs[key] = set()
         self.attrs[key].add(value)
+        self.attrs[key].update(values)
 
-    def discard(self, key, value):
+    def update(self, key, values):
         self._element = None
-        values = self.attrs.get(key, set())
-        values.discard(value)
-        if not values:
+        if key not in self.attrs:
+            self.attrs[key] = set()
+        self.attrs[key].update(values)
+
+    def discard(self, key, value, *values):
+        self._element = None
+        value_set = self.attrs.get(key, set())
+        value_set.discard(value)
+        value_set.difference_update(values)
+        if not value_set:
             self.attrs.pop(key, None)
 
-    def contains_key_value(self, key, value):
-        return value in self.attrs.get(key, ())
-        
-    def contains_key(self, key):
-        return key in self.attrs
+    def clear(self, key):
+        self._element = None
+        self.attrs.pop(key, None)
+
+    def values(self, key=_NO_VALUE, parser=None, ignore=Exception):
+        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+        if key is not _NO_VALUE:
+            return attrs.get(key, set())
+
+        result = list()
+        for values in attrs.values():
+            result.extend(values)
+
+        try:
+            return set(result)
+        except TypeError:
+            return result
+
+    def value(self, key=_NO_VALUE, default=_NO_VALUE, 
+              parser=None, ignore=Exception):
+        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+        if key is _NO_VALUE:
+            for value in attrs.itervalues():
+                return value
+        else:
+            for value in attrs.get(key, ()):
+                return value
+
+        if default is _NO_VALUE:
+            if key is _NO_VALUE:
+                raise KeyError("no value available")
+            raise KeyError(key)
+        return default
+
+    def contains(self, key=_NO_VALUE, value=_NO_VALUE, 
+                 parser=None, ignore=Exception):
+        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+        if key is not _NO_VALUE:
+            if value is _NO_VALUE:
+                return key in attrs
+            return value in attrs.get(key, ())
+
+        if value is _NO_VALUE:
+            return not not attrs
+
+        for value_set in attrs.itervalues():
+            if value in value_set:
+                return True
+        return False
+
+    def keys(self, parser=None, ignore=Exception):
+        attrs = _Parsed(self.attrs, parser, ignore) if parser else self.attrs
+        return attrs.keys()
 
     def to_element(self):
         if self._element is None:

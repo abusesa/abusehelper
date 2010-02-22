@@ -41,10 +41,8 @@ class _EventDict(object):
         self.encoder = encoder
 
     def __getitem__(self, key):
-        values = self.event.attrs.get(key, None)
-        if not values:
-            return self.encoder(u"")
-        return self.encoder(list(values)[0])
+        value = self.event.value(key, u"")
+        return self.encoder(value)
 
 class CSVFormatter(object):
     def _encode(self, string):

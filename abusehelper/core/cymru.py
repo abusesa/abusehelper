@@ -76,7 +76,7 @@ class CymruWhois(threado.GeneratorStream):
         while True:
             yield inner
             for event in inner:
-                for ip in event.attrs.get("ip", ()):
+                for ip in event.values("ip"):
                     self.pending.setdefault(ip, list()).append(event)
 
     @threado.stream

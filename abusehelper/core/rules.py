@@ -119,10 +119,10 @@ class CONTAINS(_Rule):
 
     def __call__(self, event):
         for key in self.keys:
-            if not event.contains_key(key):
+            if not event.contains(key):
                 return False
         for key, value in self.key_values.items():
-            if not event.contains_key_value(key, value):
+            if not event.contains(key, value):
                 return False
         return True
 CONTAINS.serialize_register()
@@ -195,13 +195,12 @@ class NETBLOCK(_Rule):
 
     def __call__(self, event):
         if self.keys is None:
-            keys = event.attrs.keys()
+            keys = event.keys()
         else:
             keys = self.keys
 
         for key in keys:
-            values = event.attrs.get(key, ())
-            for value in values:
+            for value in event.values(key):
                 parsed = self.parse_ip(value)
                 if parsed is None:
                     continue
@@ -214,10 +213,13 @@ class NETBLOCK(_Rule):
 NETBLOCK.serialize_register()
 
 import unittest
+from abusehelper.core import events
 
-class MockEvent(object):
+class MockEvent(events.Event):
     def __init__(self, **keys):
-        self.attrs = dict(keys)
+        events.Event.__init__(self)
+        for key, values in keys.iteritems():
+            self.update(key, values)
 
 class NetblockTests(unittest.TestCase):
     def test_match_ipv6(self):

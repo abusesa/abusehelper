@@ -457,8 +457,9 @@ class FeedBot(ServiceBot):
             yield inner
 
             for event in inner:
-                string = repr(list(sorted(event.attrs.items())))
-                if dedup.add(string):
+                items = [(key, event.values(key)) for key in event.keys()]
+                items.sort()
+                if dedup.add(repr(items)):
                     inner.send(event)
 
     @threado.stream_fast

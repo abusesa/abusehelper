@@ -46,8 +46,9 @@ class HistoryDB(threado.GeneratorStream):
                 self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
                                     (int(time.time()), room_name))
                 eventid = self.cursor.lastrowid
-        
-                for key, values in event.attrs.items():
+                
+                for key in event.keys():
+                    values = event.values(key)
                     self.cursor.executemany("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
                                             [(eventid, key, value) for value in values])
 
@@ -146,11 +147,11 @@ def parse_command(message, name):
             values.add(pair[0])
 
     def _match(event):
-        for event_key, event_values in event.attrs.iteritems():
-            if event_values & values:
+        for key, keyed_values in keyed.iteritems():
+            if keyed_values.intersection(event.values(key)):
                 return True
-            if event_values & keyed.get(event_key, set()):
-                return True
+        if values.intersection(event.values()):
+            return True
         return False
     return _match
 
@@ -216,9 +217,9 @@ class HistorianService(bot.ServiceBot):
 
                             body = Element("body")
                             body.text = "%s %s\n" % (format_time(etime), eroom)
-                            for event_key, event_values in event.attrs.items():
-                                vals = ", ".join(event_values)
-                                body.text += "%s: %s\n" % (event_key, vals)
+                            for key in event.keys():
+                                vals = ", ".join(event.values(key))
+                                body.text += "%s: %s\n" % (key, vals)
                             room.send(body)
 
 if __name__ == "__main__":

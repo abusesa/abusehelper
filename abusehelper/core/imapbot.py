@@ -135,7 +135,7 @@ class IMAPService(IMAPBot):
         while True:
             event = yield inner
 
-            for key in list(event.attrs):
+            for key in event.keys():
                 event.discard(key, "")
                 event.discard(key, "-")
 

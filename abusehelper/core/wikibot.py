@@ -102,19 +102,18 @@ class WikiBot(CollectorBot):
 
         content = dict()
         for event in events:
-            asns = event.attrs.get("asn", None)
-            for asn in asns:
+            for asn in event.values("asn"):
                 content.setdefault(asn, dict())
 
-                types = list(event.attrs.get("type", list()))
-                if not types:
+                type = event.value("type", None)
+                if type is None:
                     continue
 
-                type = types[0]
                 content[asn].setdefault(type, list())
                 line = unicode()
 
-                for key, values in event.attrs.iteritems():
+                for key in event.keys():
+                    values = event.values(key)
                     line += "%s=%s " % (key, ",".join(values))
 
                 content[asn][type].append(line)
