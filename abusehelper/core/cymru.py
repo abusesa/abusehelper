@@ -35,7 +35,7 @@ class CymruWhois(threado.GeneratorStream):
 
         socket = sockets.Socket()
         connect = socket.connect(("whois.cymru.com", 43))
-        try:        
+        try:
             while not connect.has_result():
                 yield inner, connect
 
@@ -55,7 +55,7 @@ class CymruWhois(threado.GeneratorStream):
                 if not socket.was_source:
                     continue
 
-                for line in line_buffer.feed(data):                    
+                for line in line_buffer.feed(data):
                     bites = [x.strip() for x in line.split("|")]
                     bites = [x if x not in ("", "NA") else None for x in bites]
                     if len(bites) != 7:
@@ -65,7 +65,9 @@ class CymruWhois(threado.GeneratorStream):
                     events = self.pending.pop(ip, ())
                     ips.discard(ip)
                     self.cache.set(ip, bites)
-                    map(inner.send, self._augment_events(events, bites))
+
+                    for event in self._augment_events(events, bites):
+                        inner.send(event)
         finally:
             yield inner.sub(socket.close())
 
@@ -84,7 +86,7 @@ class CymruWhois(threado.GeneratorStream):
         while True:
             yield inner, sleeper
             if sleeper.was_source:
-                pending = yield self.inner.sub(self.iteration(set(self.pending)))
+                yield inner.sub(self.iteration(set(self.pending)))
                 sleeper = timer.sleep(self.throttle_time)
 
     def run(self):
