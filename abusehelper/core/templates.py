@@ -7,7 +7,7 @@ class Formatter(object):
     def format(self, result, events, *args):
         raise NotImplementedError()
 
-class Constant(object):
+class Const(object):
     def __init__(self, value):
         self.value = value
 
@@ -73,30 +73,28 @@ class CSVFormatter(object):
         return self._decode(stringio.getvalue())
 
 class Template(object):
+    class _Formatter(object):
+        def __init__(self, obj, events, formatters):
+            self.obj = obj
+            self.events = events
+            self.formatters = formatters
+            
+        def __getitem__(self, key):
+            for row in csv.reader([key], skipinitialspace=True):
+                if not row:
+                    return u""
+                row = [x.strip() for x in row]
+                formatter = self.formatters[row[0]]
+                return formatter.format(self.obj, self.events, *row[1:])
+            return u""
+
     def __init__(self, data, **formatters):
         self.data = guess_encoding(data)
         self.formatters = formatters
 
-        self.obj = None
-        self.events = None
-        
     def format(self, obj, events):
-        self.obj = obj
-        self.events = events
-        try:
-            return self.data % self
-        finally:
-            self.events = None
-            self.obj = obj
-
-    def __getitem__(self, key):
-        for row in csv.reader([key], skipinitialspace=True):
-            if not row:
-                return u""
-            row = [x.strip() for x in row]
-            formatter = self.formatters[row[0]]
-            return formatter.format(self.obj, self.events, *row[1:])
-        return u""
+        formatter = self._Formatter(obj, events, self.formatters)
+        return self.data % formatter
 
 import unittest
 

@@ -152,6 +152,43 @@ class ReportBot(bot.ServiceBot):
         yield
         inner.finish(True)
 
+class MailTemplate(templates.Template):
+    def format(self, events, encoding="utf-8"):
+        from email import message_from_string
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.charset import Charset, QP
+        from email.utils import formatdate, make_msgid
+
+        parts = list()
+        data = templates.Template.format(self, parts, events)
+        parsed = message_from_string(data.encode(encoding))
+
+        charset = Charset(encoding)
+        charset.header_encoding = QP
+
+        msg = MIMEMultipart()
+        msg.set_charset(charset)
+        for key, value in msg.items():
+            del parsed[key]
+        for key, value in parsed.items():
+            msg[key] = value
+
+        for encoded in ["Subject", "Comment"]:
+            if encoded not in msg:
+                continue
+            value = charset.header_encode(msg[encoded])
+            del msg[encoded]
+            msg[encoded] = value
+
+        del msg['Content-Transfer-Encoding']
+        msg['Content-Transfer-Encoding'] = '7bit'
+
+        msg.attach(MIMEText(parsed.get_payload(), "plain", encoding))
+        for part in parts:
+            msg.attach(part)
+        return msg
+
 class MailerService(ReportBot):
     mail_sender = bot.Param("from whom it looks like the mails came from")
     smtp_host = bot.Param("hostname of the SMTP service used for sending mails")
@@ -159,8 +196,8 @@ class MailerService(ReportBot):
                              default=25)
     smtp_auth_user = bot.Param("username for the authenticated SMTP service",
                                default=None)
-    smtp_auth_password = bot.Param("password for the authenticated SMTP service",
-                                   default=None)
+    smtp_auth_password = bot.Param("password for the authenticated SMTP "+
+                                   "service", default=None)
 
     def __init__(self, **keys):
         ReportBot.__init__(self, **keys)
@@ -180,52 +217,46 @@ class MailerService(ReportBot):
         return ReportBot.collect(self, state, **keys) | self._collect(**keys)
 
     @threado.stream
-    def _collect(inner, self, to=[], cc=[], subject="", template="", **keys):
-        from email.header import Header
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-        from email.charset import Charset, QP
+    def _collect(inner, self, to=[], cc=[], template="", **keys):
+        from email.header import decode_header
         from email.utils import formatdate, make_msgid, getaddresses, formataddr
 
-        template = templates.Template(template, **self.formatters)
+        # FIXME: Use encoding after getaddresses
+        from_addr = getaddresses([self.mail_sender])[0]
+        to_addrs = ", ".join(map(formataddr, getaddresses(to)))
+        cc_addrs = ", ".join(map(formataddr, getaddresses(cc)))
+
+        formatters = dict(self.formatters)
+        formatters["to"] = templates.Const(to_addrs)
+        formatters["cc"] = templates.Const(cc_addrs)
+        template = MailTemplate(template, **formatters)
+
         while True:
             events = yield inner
             if not events:
                 continue
 
-            ENCODING = "utf-8"
-        
-            from_addr = getaddresses([self.mail_sender])[0]
-            to_addrs = getaddresses(to)
-            cc_addrs = getaddresses(cc)
-        
-            msg = MIMEMultipart()
+            msg = template.format(events)
     
-            # FIXME: Use encoding after getaddresses
+            if "To" not in msg:
+                msg["To"] = to_addrs
+            if "Cc" not in msg:
+                msg["Cc"] = cc_addrs
+
+            del msg["From"]
             msg["From"] = formataddr(from_addr)
-            msg["To"] = ", ".join(map(formataddr, to_addrs))
-            msg["Cc"] = ", ".join(map(formataddr, cc_addrs))
-            msg["Subject"] = Header(subject, ENCODING)
-            msg['Date'] = formatdate()
+            msg['Date'] = formatdate()             
             msg['Message-ID'] = make_msgid()
-
-            charset = Charset(ENCODING)
-            charset.header_encoding = QP
-            msg.set_charset(charset)
-
-            del msg['Content-Transfer-Encoding']
-            msg['Content-Transfer-Encoding'] = '7bit'
-
-            parts = list()
-            data = template.format(parts, events)
-
-            msg.attach(MIMEText(data.encode("utf-8"), "plain", "utf-8"))
-            for part in parts:
-                msg.attach(part)
+            subject = msg.get("Subject", "")
 
             msg_data = msg.as_string()
-            for to_addr in to_addrs + cc_addrs:
-                inner.send(from_addr[1], to_addr[1], subject, msg_data)
+
+            mail_to = (msg.get_all("To", list()) 
+                       + msg.get_all("Cc", list()))
+            mail_to = [addr for (name, addr) in getaddresses(mail_to)]
+            mail_to = filter(None, map(str.strip, mail_to))
+            for address in mail_to:
+                inner.send(from_addr[1], address, subject, msg_data)
 
     def _connect(self):
         import smtplib
@@ -267,10 +298,12 @@ class MailerService(ReportBot):
         while self.server is None:
             list(inner)
             try:
-                self.log.info("Connecting %r port %d", self.smtp_host, self.smtp_port)
+                self.log.info("Connecting %r port %d", 
+                              self.smtp_host, self.smtp_port)
                 self.server = yield inner.thread(self._connect)
             except:
-                self.log.error("Error connecting SMTP server, retrying in 10 seconds")
+                self.log.error("Error connecting SMTP server, "+
+                               "retrying in 10 seconds")
                 yield inner.sub(timer.sleep(10.0))
             else:
                 self.log.info("Connected to the SMTP server")
@@ -278,7 +311,8 @@ class MailerService(ReportBot):
                 
         self.log.info("Sending message %r to %r", subject, to_addr)
         try:
-            yield inner.thread(self.server.sendmail, from_addr, to_addr, msg_str)
+            yield inner.thread(self.server.sendmail, 
+                               from_addr, to_addr, msg_str)
         except Exception, exc:
             self.log.info("Could not send message to %r: %s", to_addr, exc)
             try:
