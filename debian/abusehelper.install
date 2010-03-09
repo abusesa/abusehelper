@@ -1,2 +1,2 @@
-example/*.ini etc/abusehelper
-example/templates/* etc/abusehelper/templates
+examples/*.ini etc/abusehelper
+examples/templates/* etc/abusehelper/templates

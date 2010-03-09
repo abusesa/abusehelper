@@ -1,3 +1,9 @@
+abusehelper (457) hardy; urgency=low
+
+  * New upstream release with multiple fixes and the merged bot-api-2000.
+
+ -- Lari Huttunen <debian@huttu.net>  Tue, 09 Mar 2010 12:35:08 +0200
+
 abusehelper (328) hardy; urgency=low
 
   * bot-api-2000 introduces bot templates, which hopefully simplify the process of incorporating new feeds.

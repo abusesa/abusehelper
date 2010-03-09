@@ -58,6 +58,7 @@ binary-common:
 	dh_testroot
 	dh_installchangelogs 
 	dh_installdocs
+	dh_installexamples --exclude=.svn contrib/*
 	dh_installexamples --exclude=.svn examples/*
 	dh_pycentral
 	dh_installinit
