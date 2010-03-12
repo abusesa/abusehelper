@@ -44,7 +44,7 @@ class IMAPBot(bot.FeedBot):
 
     @threado.stream
     def feed(inner, self):
-        yield inner.sub(self.noop() | self.poll() | self.run_mailbox())
+        yield inner.sub(self.run_mailbox() | self.noop() | self.poll())
 
     # Mailbox handling
 
