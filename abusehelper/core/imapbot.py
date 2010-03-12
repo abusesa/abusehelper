@@ -231,6 +231,7 @@ class IMAPBot(bot.FeedBot):
                 sender = top_header["From"] or "<unknown sender>"
                 self.log.info("Handling mail %r from %r", subject, sender)
                 yield inner.sub(self.handle(parts))
+                self.log.info("Done with mail %r from %r", subject, sender)
 
             # UID STORE command flags have to be in parentheses, otherwise
             # imaplib quotes them, which is not allowed.
