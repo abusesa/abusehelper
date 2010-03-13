@@ -44,14 +44,20 @@ class StartupBot(bot.Bot):
                 
                 module = params["module"]
                 bot_name = params["bot_name"]
-                self.log.info("Launching bot %r from module %r", bot_name, module)
+                self.log.info("Launching bot %r from module %r", 
+                              bot_name, module)
 
                 args = [sys.executable]
                 path, _ = os.path.split(module)
                 if path:
                     args.extend([module])
                 else:
-                    args.extend(["-m", module])
+                    # At least Python 2.5 on OpenBSD replaces the
+                    # argument right after the -m option with "-c" in
+                    # the process listing, making it harder to figure
+                    # out which modules are running. Workaround: Use
+                    # "-m runpy module" instead of "-m module".
+                    args.extend(["-m", "runpy", module])
                 args.append("--startup")
 
                 process = subprocess.Popen(args, stdin=subprocess.PIPE)
