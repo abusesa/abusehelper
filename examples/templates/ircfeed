@@ -1,7 +1,0 @@
-# This is a mail that is based on the ircfeed template.
-
-# Here is the data:
-%(attach_and_embed_csv, report.csv, |, ip)s
-
-# Regards,
-# Generic Abuse Handling Organization
