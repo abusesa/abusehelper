@@ -10,7 +10,6 @@ kill_startup() {
 	echo " kill $* $i"
         ${SU} ${USER} -c "kill $* $i"
     done
-    echo "done."
 }
 
 kill_rest() {
@@ -63,8 +62,8 @@ case "$1" in
     stop)
 	echo "Killing startup..."
 	kill_startup
-	sleep 1
 	echo "Done."
+	sleep 1
 	echo "Killing the remaining processes..."
 	kill_rest
 	kill_rest -9
