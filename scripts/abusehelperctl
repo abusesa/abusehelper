@@ -4,7 +4,7 @@ myerr() {
     exit 1
 }
 kill_startup() {
-    for i in $(ps -auxww|grep python |fgrep startup.py |fgrep -v "${SU}" | \
+    for i in $(ps auxww|grep python |fgrep startup.py |fgrep -v "${SU}" | \
 	fgrep -v fgrep | awk  '{print $2}')
     do
 	echo " kill $* $i"
@@ -14,7 +14,7 @@ kill_startup() {
 }
 
 kill_rest() {
-    for i in $(ps -auxww|grep python |egrep 'abusehelper\.core|sanitizer.py'|fgrep -v "${SU}" | \
+    for i in $(ps auxww|grep python |egrep 'abusehelper\.core|sanitizer.py'|fgrep -v "${SU}" | \
 	fgrep -v fgrep | awk  '{print $2}')
     do
 	echo " kill $* $i"
