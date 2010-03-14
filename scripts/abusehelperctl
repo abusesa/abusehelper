@@ -1,17 +1,36 @@
 #!/bin/sh 
 myerr() {
- echo "$*" >&2
- exit 1
+    echo "$*" >&2
+    exit 1
+}
+kill_startup() {
+    for i in $(ps -auxww|grep python |fgrep startup.py |fgrep -v "${SU}" | \
+	fgrep -v fgrep | awk  '{print $2}')
+    do
+	echo " kill $* $i"
+        ${SU} ${USER} -c "kill $* $i"
+    done
+    echo "done."
 }
 
+kill_rest() {
+    for i in $(ps -auxww|grep python |egrep 'abusehelper\.core|sanitizer.py'|fgrep -v "${SU}" | \
+	fgrep -v fgrep | awk  '{print $2}')
+    do
+	echo " kill $* $i"
+        ${SU} ${USER} -c "kill $* $i"
+    done
+}
 
 PYTHON="python"
 UNAME=$(uname)
-CFG="/etc/abusehelper/config.ini"
-INSTALLROOT=""
-LOGDIR="${INSTALLROOT}/var/log/abusehelper"
-LOG="${LOGDIR}/abusehelper.log"
+
 USER="abusehel"
+USECASEDIR="/var/lib/ah2/production"
+LOG="${USECASEDIR}/log/abusehelper.log"
+
+
+
 
 case "${UNAME}" in
     "Darwin")
@@ -21,7 +40,7 @@ case "${UNAME}" in
         [ ! -f "/usr/local/bin/python2.5" ] && myerror "python2.5 not found"
         SU="su -" 
         PYTHON="python2.5" 
-        STOPCMD="${PYTHON} -m -c $CFG"
+       
 	USER="_abusehe"
 	;;
     *)
@@ -29,30 +48,27 @@ case "${UNAME}" in
 	;;
 esac
 
-AHCMD="${PYTHON} -m abusehelper.core.startup" 
-STARTCMD="${AHCMD} ${CFG}"
+STARTCMD="${PYTHON} -m abusehelper.core.startup" 
 
 # Default, ${STARTCMD} = ${STOPCMD}. OpenBSD behaves slightly differently.
 [ -z "${STOPCMD}" ] && STOPCMD="${STARTCMD}" 
 
 case "$1" in
     start)
-
-	[ $(basename ${LOGDIR}) = "abusehelper" ] || \
-            myerr "Logdir needs to end 'abusehelper' subdir."
-
-        echo "Running ${SU} ${USER} -c \"${STARTCMD} >${LOG} 2>&1\""
-        ${SU} ${USER} -c "${STARTCMD} >${LOG} 2>&1" &
+        ${SU} ${USER} -c "(cd ${USECASEDIR}; ${STARTCMD} ./startup.py >${LOG} 2>&1)" &
+	echo "AbuseHelper started."
+	echo "Run \"tail -f ${LOG}\" to see AbuseHelper's status."
 	;;
 
     stop)
-	echo "ps auxww|fgrep \"${STOPCMD}\"|fgrep -v \"${SU}\""  
-	for i in $(ps auxww|fgrep "${STOPCMD}"|fgrep -v "${SU}" | \
-	    fgrep -v fgrep |fgrep -v bas | awk  '{print $2}')
-	do
-	    echo "kill $i"
-            ${SU} ${USER} -c "kill $i"
-	done
+	echo "Killing startup..."
+	kill_startup
+	sleep 1
+	echo "Done."
+	echo "Killing the remaining processes..."
+	kill_rest
+	kill_rest -9
+	echo 'Done.'
 	;;
 
     restart)
@@ -62,7 +78,7 @@ case "$1" in
 	;;
     status)
 	echo -e 'Below is a list of currently running AbuseHelper processes:\n'
-	ps auxww|fgrep 'abusehelper'|fgrep "${PYTHON}" | \
+	ps auxww|egrep 'abusehelper|sanitizer.py'|fgrep "${PYTHON}" | \
             fgrep -v "${SU}"|fgrep -v fgrep | \
 	    fgrep -v 'sh -c' | tr -s " "  
 	;;
