@@ -28,18 +28,10 @@ if not version.isdigit():
     warnings.warn("This is not a clean checkout (version %r)." % version)
 
 setup(name="abusehelper",
-      version="1.r"+version,
+      version="2.r"+version,
       packages=["abusehelper", 
                 "abusehelper.core", 
                 "idiokit"],
-      data_files = [('share/examples/abusehelper', 
-	["examples/config.ini",
-	 "examples/customers.ini"],
-       ),
-       ('share/examples/abusehelper/templates',
-	 ["examples/templates/dshield",
-	 "examples/templates/ircfeed"],
-       )],
       description="A framework for receiving and redistributing Abuse Feeds",
       long_description="AbuseHelper is a modular, scalable and robust " + \
           "framework to help you in your abuse handling.",
@@ -59,46 +51,4 @@ setup(name="abusehelper",
           "License :: Freely Distributable",
           "Programming Language :: Python"],
       )
-
-
-if sys.argv[1] == 'install':
-
-    ahgroup="abusehel"
-    ahuser="abusehel"
-    groupadd=""
-    useradd="useradd %s" % (ahuser)
-
-    if os.uname()[0] == 'OpenBSD':
-	ahgroup="_abusehe"
-	ahuser="_abusehe"
-        groupadd="groupadd %s" % (ahgroup) 
-        useradd="useradd -m -g %s %s" % (ahgroup, ahuser)
-
- 
-    if not os.path.exists("/etc/abusehelper/"):
-        #todo, rather check if the user actually exists.
-        print 'To create abusehelper user and groups:\n' + \
-            ' sudo %s\n' % (groupadd) + \
-            ' sudo %s\n' % (useradd)
-
-        print 'To create abusehelper config directory:\n' + \
-            ' sudo mkdir /etc/abusehelper\n' + \
-            ' sudo chown root:%s /etc/abusehelper\n' % (ahgroup) + \
-            ' sudo chmod 750 /etc/abusehelper' 
-
-        print '\nTo configure:\n' + \
-            ' sudo cp -r examples/* /etc/abusehelper/\n' + \
-            'And then edit config.ini and customers.ini in /etc/abusehelper/'
-
-    if not os.path.exists("/var/log/abusehelper/"):
-        print '\nTo create log directory:\n' +  \
-            ' sudo mkdir /var/log/abusehelper\n' + \
-            ' sudo chown %s:%s /var/log/abusehelper\n' % (ahuser, ahgroup) + \
-            ' sudo chmod 770 /var/log/abusehelper' 
-        
-        
-        
-    
-
-
 
