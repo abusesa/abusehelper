@@ -1,7 +1,7 @@
 import os
-from abusehelper.core.config import *
+from abusehelper.core.config import relative_path
 
-class Bot(Config):
+class Bot(object):
     def __init__(self, name, **attrs):
         self.attrs = dict(
             # Overwrite these only when you really know what you are doing.
@@ -32,11 +32,9 @@ class Bot(Config):
         return self.attrs
 
 def configs():
-    base_dir = os.path.dirname(__file__)
-
     return [
         Bot("runtime", 
-            config=os.path.join(base_dir, "runtime.py")),
+            config=relative_path("runtime.py")),
         
         Bot("mailer",
             # Mailer will use this server and port for sending mails.

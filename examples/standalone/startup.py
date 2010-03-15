@@ -1,7 +1,7 @@
 import os
-from abusehelper.core.config import *
+from abusehelper.core.config import relative_path
 
-class Bot(Config):
+class Bot(object):
     # The default credentials used for XMPP connections.
     xmpp_jid = 'xmppuser@xmpp.example.com'
     xmpp_password = 'xmpppassword'
@@ -10,8 +10,6 @@ class Bot(Config):
     service_room = 'my-usecase'
 
     def __init__(self, name, **attrs):
-        Config.__init__(self)
-
         self.attrs = dict(
             module="abusehelper.core."+name,
             bot_name=name,

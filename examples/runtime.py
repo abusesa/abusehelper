@@ -1,5 +1,4 @@
 from abusehelper.core import rules
-from abusehelper.core.config import *
 from abusehelper.core.runtime import *
 
 dshield_template = """
@@ -21,7 +20,7 @@ def parse_netblock(string):
 def netblock_rule(parsed_netblocks):
     return rules.OR(*[rules.NETBLOCK(*x) for x in parsed_netblocks])
 
-class Customer(Config):
+class Customer(object):
     prefix = ""
     filter_rule = None
 
@@ -34,10 +33,12 @@ class Customer(Config):
     template = dshield_template
     times = ["08:00"]
 
-    def __init__(self, name, asn, *args, **keys):
-        Config.__init__(self, *args, **keys)
+    def __init__(self, name, asn, **keys):
         self.name = name
         self.asn = asn
+
+        for key, value in keys.items():
+            setattr(self, key, value)
 
     def runtime(self):
         return [

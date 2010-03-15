@@ -1,12 +1,12 @@
 import re
 import socket
 from abusehelper.core import rules
-from abusehelper.core.config import *
-from abusehelper.core.runtime import *
+from abusehelper.core.config import relative_path, load_module
+from abusehelper.core.runtime import Room, Session
 
 startup = load_module("startup")
 
-class Base(Config):
+class Base(object):
     prefix = startup.Bot.service_room
 
     @classmethod
@@ -31,7 +31,6 @@ class Base(Config):
 
 class Source(Base):
     def __init__(self, name, **attrs):
-        Base.__init__(self)
         self.name = name
         self.attrs = attrs
 
@@ -43,7 +42,6 @@ class Source(Base):
 
 class Type(Base):
     def __init__(self, name):
-        Base.__init__(self)
         self.name = name
 
     def main(self):
@@ -163,9 +161,10 @@ class Customer(Base):
 
     def __init__(self, name, **attrs):
         self.name = name
-        self.wiki_parent = self.name
+        self.wiki_parent = name
 
-        Base.__init__(self, **attrs)
+        for key, value in attrs.items():
+            setattr(self, key, value)
 
     def main(self):
         if self.asns:
