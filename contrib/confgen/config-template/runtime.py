@@ -120,7 +120,7 @@ template_cache = dict()
 
 def load_template(name):
     if name not in template_cache:
-        template_file = open(relative("template", name))
+        template_file = open(relative_path("template", name))
         try:
             template_cache[name] = template_file.read()
         finally:

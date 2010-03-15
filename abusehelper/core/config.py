@@ -37,7 +37,7 @@ def _base_dir(depth=2):
     calling_file = calling_frame[1]
     return os.path.dirname(os.path.abspath(calling_file))    
 
-def relative(*path):
+def relative_path(*path):
     return os.path.abspath(os.path.join(_base_dir(), *path))
 
 def load_module(module_name, relative_to_caller=True):

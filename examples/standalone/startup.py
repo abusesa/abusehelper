@@ -18,8 +18,8 @@ class Bot(Config):
 
             # Unomment the following lines, and the bots will keep
             # persistent state and log to files, respectively.
-            #bot_state_file=relative("state", name + ".state"),
-            #log_file=relative("log", name + ".log"),
+            #bot_state_file=relative_path("state", name + ".state"),
+            #log_file=relative_path("log", name + ".log"),
 
             xmpp_jid=self.xmpp_jid,
             xmpp_password=self.xmpp_password,
@@ -42,9 +42,10 @@ def configs():
     yield Bot("dshield")
     yield Bot("roomgraph")
     yield Bot("historian")
-    yield Bot("runtime", config=relative("runtime.py"))
+    yield Bot("runtime", config=relative_path("runtime.py"))
 
     # Find and launch modules named custom/*.sanitizer.py
-    for filename in os.listdir(relative("custom")):
+    for filename in os.listdir(relative_path("custom")):
         if filename.endswith(".sanitizer.py"):
-            yield Bot(name=filename[:-3], module=relative("custom", filename))
+            yield Bot(name=filename[:-3], 
+                      module=relative_path("custom", filename))
