@@ -3,13 +3,6 @@ import uuid
 from idiokit import jid
 from abusehelper.core import serialize, config
 
-class Runtime(config.Config):
-    def runtime(self):
-        for key, value in self.member_diff(Runtime):
-            if not isinstance(value, Pipeable):
-                continue
-            yield value
-
 class Pipeable(object):
     def sessions(self, runtime):
         return [self]
@@ -42,19 +35,18 @@ class Pipe(Pipeable):
                     sessions.append(piece)
             else:
                 if isinstance(piece, Room) and isinstance(prev, Room):
-                    sessions.append(Session("roomgraph",
-                                            src_room=prev.format(runtime),
-                                            dst_room=piece.format(runtime)))
+                    sessions.append(Session("roomgraph", 
+                                            src_room=prev.name,
+                                            dst_room=piece.name))
                 elif isinstance(prev, Room):
-                    sessions.append(piece.updated(src_room=prev.format(runtime)))
+                    sessions.append(piece.updated(src_room=prev.name))
                 elif isinstance(piece, Room):
                     if sessions:
-                        room = piece.format(runtime)
-                        sessions[-1] = sessions[-1].updated(dst_room=room)
+                        sessions[-1] = sessions[-1].updated(dst_room=piece.name)
                 else:
-                    room = Room().format(runtime)
-                    sessions[-1] = sessions[-1].updated(dst_room=room)
-                    sessions.append(piece.updated(src_room=room))
+                    room = Room()
+                    sessions[-1] = sessions[-1].updated(dst_room=room.name)
+                    sessions.append(piece.updated(src_room=room.name))
 
             prev = piece
         return sessions
@@ -75,13 +67,10 @@ class Session(Pipeable):
             try:
                 value  = serialize.load(serialize.dump(value))
             except serialize.UnregisteredType:
-                raise SessionError("can not serialize key %r value %r" % (key, value))
+                raise SessionError("can not serialize key %r value %r" % 
+                                   (key, value))
             conf[key] = value
         self.__dict__["_conf"] = frozenset(conf.items())
-
-    def format_path(self, runtime):
-        formatter = config.Formatter(runtime)
-        return tuple(bite % formatter for bite in self.path)
 
     def updated(self, **conf):
         new_conf = dict(self._conf)
@@ -95,7 +84,7 @@ class Session(Pipeable):
         raise AttributeError("%r instances are immutable" % self.__class__)
 
     def __hash__(self):
-        return hash(self.service) ^ hash(self._conf)
+        return hash(self.service) ^ hash(self._conf) ^ hash(self.path)
 
     def __eq__(self, other):
         if not isinstance(other, Session):
@@ -111,27 +100,21 @@ class Session(Pipeable):
         return not result
 
 class Room(Pipeable):
-    def __init__(self, name=u"%(random)s"):
+    def __init__(self, name=None):
+        if name is None:
+            name = uuid.uuid4().hex
         if not isinstance(name, unicode):
             name = unicode(name)
 
-        self.name = name
-        self.random = uuid.uuid4().hex
-
-    def sessions(self, runtime):
-        return []
-
-    def format(self, other):
-        formatter = config.Formatter(other)
-        formatter["random"] = self.random
-
-        name = self.name % formatter
         try:
             jid.nodeprep(name)
         except jid.JIDError:
             jid.JID(name)
 
-        return name
+        self.name = name
+
+    def sessions(self, runtime):
+        return []
 
 from idiokit import threado, timer
 from abusehelper.core import bot, services, log
@@ -178,9 +161,8 @@ class RuntimeBot(bot.XMPPBot):
                         current.setdefault(config, set())
                         for container in config_runtime():
                             for session in container.sessions(config):
-                                path = session.format_path(config)
-                                added.add((path, session))
-                                current[config].add((path, session))
+                                added.add(session)
+                                current[config].add(session)
 
                 removed.difference_update(added)
                 for key in removed:
@@ -188,8 +170,8 @@ class RuntimeBot(bot.XMPPBot):
                     stream.throw(Cancel())
 
                 added.difference_update(sessions)
-                for path, session in added:
-                    sessions[(path, session)] = self.session(lobby, path, session)
+                for session in added:
+                    sessions[session] = self.session(lobby, session)
         finally:
             for stream in sessions.values():
                 stream.throw(Cancel())        
@@ -206,21 +188,23 @@ class RuntimeBot(bot.XMPPBot):
         yield inner.sub(self.configs() | self._handle_updates(lobby))
 
     @threado.stream
-    def session(inner, self, lobby, path, session):
+    def session(inner, self, lobby, session):
         name = session.service
-        if path:
-            name += "(" + ".".join(path) + ")"
+        if session.path:
+            name += "(" + ".".join(session.path) + ")"
         
         while True:
             self.log.info("Waiting for %r", name)
             try:
-                stream = yield inner.sub(lobby.session(session.service, *path, 
+                stream = yield inner.sub(lobby.session(session.service, 
+                                                       *session.path, 
                                                        **session.conf))
             except Cancel:
                 self.log.info("Stopped waiting for %r", name)
                 break
 
-            conf_str = "\n".join(" %r=%r" % item for item in session.conf.items())
+            conf_str = "\n".join(" %r=%r" % item for item 
+                                 in session.conf.items())
             self.log.info("Sent %r conf:\n%s", name, conf_str)
                 
             try:
@@ -247,7 +231,8 @@ class DefaultRuntimeBot(RuntimeBot):
             except BaseException, exception:
                 if error_msg != str(exception):
                     error_msg = str(exception)
-                    self.log.error("Couldn't load module %r: %s", self.config, error_msg)
+                    self.log.error("Couldn't load module %r: %s", 
+                                   self.config, error_msg)
             else:
                 error_msg = None
                 inner.send(self.SET, configs)

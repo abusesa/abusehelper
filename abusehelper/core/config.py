@@ -3,56 +3,29 @@ import sys
 import imp
 import hashlib
 import inspect
-import weakref
 
-class Formatter(dict):
-    def __init__(self, config):
-        dict.__init__(self)
-        self.config = config
-
-    def __getitem__(self, key):
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            return getattr(self.config, key)
-
-def dynamic(func_or_string):
-    refs = weakref.WeakKeyDictionary()
-
-    def getter(self):
-        if self in refs:
-            return refs[self]
-
-        if callable(func_or_string):
-            return func_or_string(self)
-        return func_or_string % Formatter(self)
-
-    def setter(self, value):
-        refs[self] = value
-
-    return property(getter, setter)
-
-def _base_dir(depth=2):
+def base_dir(depth=1):
     calling_frame = inspect.stack()[depth]
     calling_file = calling_frame[1]
     return os.path.dirname(os.path.abspath(calling_file))    
 
 def relative_path(*path):
-    return os.path.abspath(os.path.join(_base_dir(), *path))
+    return os.path.abspath(os.path.join(base_dir(depth=2), *path))
 
 def load_module(module_name, relative_to_caller=True):
-    base_dir = _base_dir()
+    base = base_dir(depth=2)
 
     path, name = os.path.split(module_name)
     if not path:
-        paths = list(sys.path)
         if relative_to_caller:
-            paths = [base_dir] + paths
+            paths = [base]
+        else:
+            paths = None
         found = imp.find_module(name, paths)
         return imp.load_module(name, *found)
     
     if relative_to_caller:
-        module_name = os.path.join(base_dir, module_name)
+        module_name = os.path.join(base, module_name)
     module_file = open(module_name, "r")
     try:
         name = hashlib.md5(module_name).hexdigest()
@@ -67,27 +40,17 @@ def default_configs(globals):
                 setattr(value, "name", key)
             yield value
 
-def load_configs(module_name):
+def load_configs(module_name, config_func_name="configs"):
     module = load_module(module_name, False)
-    configs = getattr(module, "configs", None)
+    configs = getattr(module, config_func_name, None)
 
     if configs is None:
-        iterator = default_configs(dict(inspect.getmembers(module)))
-    else:
-        iterator = configs()
-        
-    for value in iterator:
+        raise ImportError("no callable %r defined" % config_func_name)
+
+    for value in configs():
         yield value
 
 class Config(object):
     def __init__(self, **keys):
         for key, value in keys.items():
             setattr(self, key, value)
-
-    def member_diff(self, base_class=None):
-        if base_class is None:
-            base_class = self.__class__
-
-        for key, value in inspect.getmembers(self):
-            if not hasattr(base_class, key):
-                yield key, value

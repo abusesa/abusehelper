@@ -8,12 +8,6 @@ import subprocess
 import cPickle as pickle
 from abusehelper.core import bot, config
 
-class Startup(config.Config):
-    def startup(self):
-        for key, value in self.member_diff(Startup):
-            if not inspect.isroutine(value):
-                yield key, value
-
 def kill_processes(processes, sig):
     for process in processes:
         try:
