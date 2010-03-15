@@ -71,19 +71,15 @@ class TaskFarm(object):
                 channel.rethrow()
 
     @threado.stream
-    def _inc(inner, self, key, channel, channels):
+    def _inc(inner, self, key):
         try:
-            while not channel.has_result():
+            while True:
+                yield inner
                 for item in inner:
                     inner.send(item)
-                for _ in channel:
-                    pass
-                yield inner, channel
         finally:
-            channels.discard(channel)
             if self.counter.dec(key):
                 callqueue.add(self._check, key)
-        inner.finish(channel.result())        
 
     def inc(self, *args, **keys):
         key = self._key(*args, **keys)
@@ -92,11 +88,14 @@ class TaskFarm(object):
             channels = set()
             task = self.task(*args, **keys) | self._guard(channels)
             self.tasks[key] = task, channels
+        task, channels = self.tasks[key]
 
-        _, channels = self.tasks[key]
-        channel = threado.Channel()
+        channel = self._inc(key)
+        if task.has_result():
+            return task | channel
+
         channels.add(channel)
-        return self._inc(key, channel, channels)
+        return channel
 
     def get(self, *args, **keys):
         key = self._key(*args, **keys)        
