@@ -42,8 +42,3 @@ def load_configs(module_name, config_func_name="configs"):
     if configs is None or not callable(configs):
         raise ImportError("no callable %r defined" % config_func_name)
     return configs()
-
-class Config(object):
-    def __init__(self, **keys):
-        for key, value in keys.items():
-            setattr(self, key, value)
