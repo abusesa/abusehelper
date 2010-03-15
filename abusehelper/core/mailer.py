@@ -111,18 +111,16 @@ class ReportBot(bot.ServiceBot):
                     self.queue.append(item)
                     self.waker.send()
 
-        self.rooms.inc(src_room)
         collector = _alert() | self.collect(state, **keys) | _collect()
         self.collectors.setdefault(src_room, set()).add(collector)
 
         try:
-            result = yield inner.sub(collector)
+            result = yield inner.sub(collector | self.rooms.inc(src_room))
         finally:
             collectors = self.collectors.get(src_room, set())
             collectors.discard(collector)
             if not collectors:
                 self.collectors.pop(src_room, None)
-            self.rooms.dec(src_room)
 
         inner.finish(result)
 

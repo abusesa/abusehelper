@@ -397,19 +397,17 @@ class FeedBot(ServiceBot):
 
     @threado.stream
     def session(inner, self, state, dst_room, **keys):
-        room = self.rooms.inc(dst_room)
         room_keys = self.room_keys(dst_room=dst_room, **keys)
         for room_key in room_keys:
-            self._room_keys.inc(room_key, room)
+            self._room_keys.inc(room_key, dst_room)
 
         try:
-            yield inner.sub(ServiceBot.session(self, state, dst_room=dst_room, **keys))
+            yield inner.sub(self.rooms.inc(dst_room))
         except services.Stop:
             inner.finish()
         finally:
             for room_key in room_keys:
-                self._room_keys.dec(room_key, room)
-            self.rooms.dec(dst_room)
+                self._room_keys.dec(room_key, dst_room)
 
     @threado.stream
     def feed(inner, self):
@@ -442,12 +440,15 @@ class FeedBot(ServiceBot):
 
             for event in inner:
                 for room_key in self.event_keys(event):
-                    rooms = self._room_keys.get(room_key)
+                    dst_rooms = self._room_keys.get(room_key)
 
-                    for room in rooms:
+                    for dst_room in dst_rooms:
+                        room = self.rooms.get(dst_room)
+                        if room is None:
+                            continue
                         room.send(event)
 
-                    if rooms:
+                    if dst_rooms:
                         inner.send(event)
 
     @threado.stream_fast

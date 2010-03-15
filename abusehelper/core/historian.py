@@ -178,15 +178,10 @@ class HistorianService(bot.ServiceBot):
 
     @threado.stream
     def session(inner, self, state, src_room):
-        self.rooms.inc(src_room)
-
         try:
-            while True:
-                yield inner
+            yield inner.sub(self.rooms.inc(src_room))
         except services.Stop:
             inner.finish()
-        finally:
-            self.rooms.dec(src_room)
 
     @threado.stream_fast
     def command_parser(inner, self, room):

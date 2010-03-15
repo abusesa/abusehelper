@@ -48,23 +48,58 @@ class TaskFarm(object):
         self.tasks = dict()
         self.counter = Counter()
 
+    def _key(self, *args, **keys):
+        return tuple(args), frozenset(keys.items())
+
     def _check(self, key):
         if self.counter.contains(key):
             return
         if key not in self.tasks:
             return
-        self.tasks.pop(key).throw(self.throw)
+        task, _ = self.tasks.pop(key)
+        task.throw(self.throw)
 
-    def _key(self, *args, **keys):
-        return tuple(args), frozenset(keys.items())        
+    @threado.stream_fast
+    def _guard(inner, self, channels):
+        try:
+            while True:
+                yield inner
+                for item in inner:
+                    inner.send(item)
+        except:
+            for channel in channels:
+                channel.rethrow()
+
+    @threado.stream
+    def _inc(inner, self, key, channel, channels):
+        try:
+            while not channel.has_result():
+                for item in inner:
+                    inner.send(item)
+                for _ in channel:
+                    pass
+                yield inner, channel
+        finally:
+            channels.discard(channel)
+            if self.counter.dec(key):
+                callqueue.add(self._check, key)
+        inner.finish(channel.result())        
 
     def inc(self, *args, **keys):
         key = self._key(*args, **keys)
-        if self.counter.inc(key):
-            self.tasks[key] = self.task(*args, **keys)
-        return self.tasks[key]
 
-    def dec(self, *args, **keys):
-        key = self._key(*args, **keys)
-        if self.counter.dec(key):
-            callqueue.add(self._check, key)
+        if self.counter.inc(key):
+            channels = set()
+            task = self.task(*args, **keys) | self._guard(channels)
+            self.tasks[key] = task, channels
+
+        _, channels = self.tasks[key]
+        channel = threado.Channel()
+        channels.add(channel)
+        return self._inc(key, channel, channels)
+
+    def get(self, *args, **keys):
+        key = self._key(*args, **keys)        
+        if key not in self.tasks:
+            return None
+        return self.tasks[key][0]

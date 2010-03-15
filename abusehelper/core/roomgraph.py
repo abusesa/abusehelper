@@ -19,7 +19,11 @@ class RoomGraphBot(bot.ServiceBot):
                 if count % 100 == 0:
                     self.log.info("Seen %d events in room %r", count, name)
 
-                for dst, rules in tests:
+                for dst_room, rules in tests:
+                    dst = self.rooms.get(dst_room)
+                    if dst is None:
+                        continue
+
                     for rule in rules:
                         if rule(event):
                             dst.send(event)
@@ -40,21 +44,15 @@ class RoomGraphBot(bot.ServiceBot):
 
     @threado.stream
     def session(inner, self, _, src_room, dst_room, rule=rules.CONTAINS(), **keys):
-        src = self.rooms.inc(src_room)
-        dst = self.rooms.inc(dst_room)
-
         counter = self.srcs.setdefault(src_room, taskfarm.Counter())
-        counter.inc(dst, rule)
+        counter.inc(dst_room, rule)
         try:
-            while True:
-                yield inner
+            yield inner.sub(self.rooms.inc(src_room)
+                            | self.rooms.inc(dst_room))
         except services.Stop:
             inner.finish()
         finally:
-            self.rooms.dec(src_room)
-            self.rooms.dec(dst_room)
-
-            counter.dec(dst, rule)
+            counter.dec(dst_room, rule)
             if not counter:
                 self.srcs.pop(src_room, None)
 

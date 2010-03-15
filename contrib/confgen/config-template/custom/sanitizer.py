@@ -52,9 +52,12 @@ class Sanitizer(bot.ServiceBot):
         while True:
             yield inner
             
-            rooms = set(self.srcs.get(name))
+            rooms = set(map(self.rooms.get, self.srcs.get(name)))
+            rooms.discard(None)
+
             if not rooms:
-                list(inner)
+                for _ in inner:
+                    pass
                 continue
 
             for event in inner:
@@ -64,18 +67,13 @@ class Sanitizer(bot.ServiceBot):
 
     @threado.stream
     def session(inner, self, _, src_room, dst_room, **keys):
-        src = self.rooms.inc(src_room)
-        dst = self.rooms.inc(dst_room)
-        self.srcs.inc(src_room, dst)
+        self.srcs.inc(src_room, dst_room)
         try:
-            while True:
-                yield inner
+            yield inner.sub(self.rooms.inc(src_room) | self.rooms.inc(dst_room))
         except services.Stop:
             inner.finish()
         finally:
-            self.srcs.dec(src_room, dst)
-            self.rooms.dec(src_room)
-            self.rooms.dec(dst_room)
+            self.srcs.dec(src_room, dst_room)
 
     def sanitize(self, event):
         return [event]

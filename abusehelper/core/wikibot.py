@@ -163,19 +163,16 @@ class WikiBot(CollectorBot):
     def session(inner, self, state, src_room, wiki_url, wiki_user,
                 wiki_password, wiki_type="opencollab", parent="", **keys):
 
-        self.rooms.inc(src_room)
         self.wikis[src_room] = (wiki_url, wiki_user, wiki_password, 
                                 wiki_type, parent)
 
         self.events.setdefault(src_room, list())
 
         try:
-            while True:
-                yield inner
+            yield inner.sub(self.rooms.inc(src_room))
         except services.Stop:
             inner.finish()
         finally:
-            self.rooms.dec(src_room)
             del self.wikis[src_room]
             del self.events[src_room]
 
