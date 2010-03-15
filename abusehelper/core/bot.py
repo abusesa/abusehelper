@@ -351,8 +351,7 @@ class ServiceBot(XMPPBot):
         if self.service_mock_session is not None:
             keys = dict(item.split("=", 1) for item in self.service_mock_session)
             self.log.info("Running a mock ression with keys %r" % keys)
-            service.session(None, **keys)
-            yield inner.sub(service)
+            yield inner.sub(service.session(None, **keys) | service)
             return
 
         self.log.info("Joining lobby %r", self.service_room)
