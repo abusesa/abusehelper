@@ -224,18 +224,22 @@ class DefaultRuntimeBot(RuntimeBot):
 
     @threado.stream
     def configs(inner, self):
+        conf_path = os.path.abspath(self.config)
+        last_mtime = None
         error_msg = None
+
         while True:
             try:
-                configs = config.load_configs(os.path.abspath(self.config))
+                mtime = os.path.getmtime(conf_path)
+                if last_mtime != mtime:
+                    last_mtime = mtime
+                    inner.send(self.SET, config.load_configs(conf_path))
+                    error_msg = None
             except BaseException, exception:
                 if error_msg != str(exception):
                     error_msg = str(exception)
                     self.log.error("Couldn't load module %r: %s", 
                                    self.config, error_msg)
-            else:
-                error_msg = None
-                inner.send(self.SET, configs)
 
             yield inner, timer.sleep(self.poll_interval)
 
