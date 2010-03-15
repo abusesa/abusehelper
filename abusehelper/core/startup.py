@@ -99,9 +99,15 @@ class DefaultStartupBot(StartupBot):
 
     def configs(self):
         for conf_obj in set(config.load_configs(os.path.abspath(self.config))):
-            if self.disable is not None and conf_obj.name in self.disable:
+            startup = getattr(conf_obj, "startup", None)
+            if startup is None:
                 continue
-            if self.enable is not None and conf_obj.name not in self.enable:
+
+            params = startup()
+            names = set([params["bot_name"], params["module"]])
+            if self.disable is not None and names & set(self.disable):
+                continue
+            if self.enable is not None and not (names & set(self.enable)):
                 continue
             yield conf_obj
 
