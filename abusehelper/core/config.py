@@ -35,13 +35,6 @@ def load_module(module_name, relative_to_caller=True):
     finally:
         module_file.close()
 
-def default_configs(globals, set_names=True):
-    for key, value in globals.items():
-        if isinstance(value, Config):
-            if set_names and not hasattr(value, "name"):
-                setattr(value, "name", key)
-            yield value
-
 def load_configs(module_name, config_func_name="configs"):
     module = load_module(module_name, False)
     configs = getattr(module, config_func_name, None)
