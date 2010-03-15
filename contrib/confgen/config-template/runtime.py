@@ -30,18 +30,22 @@ class Base(Config):
         return []
 
 class Source(Base):
-    def main(self):
-        # Harvest the instance attributes that the class (Source)
-        # doesn't already have.
-        attrs = dict(self.member_diff())
-        attrs.pop("name", None)
+    def __init__(self, name, **attrs):
+        Base.__init__(self)
+        self.name = name
+        self.attrs = attrs
 
-        yield (Session(self.name, **attrs) 
+    def main(self):
+        yield (Session(self.name, **self.attrs)
                | self.room() 
                | Session(self.name + ".sanitizer")
                | self.class_room())
 
 class Type(Base):
+    def __init__(self, name):
+        Base.__init__(self)
+        self.name = name
+
     def main(self):
         rule = rules.CONTAINS(type=self.name)
         yield (Source.class_room() 
@@ -116,7 +120,7 @@ template_cache = dict()
 
 def load_template(name):
     if name not in template_cache:
-        template_file = open(startup.locate("template", name))
+        template_file = open(relative("template", name))
         try:
             template_cache[name] = template_file.read()
         finally:
@@ -125,7 +129,7 @@ def load_template(name):
 
 def wiki(customer):
     return Session("wikibot", 
-                   "%(prefix)s", "%(name)s",
+                   customer.prefix, customer.name,
                    wiki_url=customer.wiki_url, 
                    wiki_user=customer.wiki_user, 
                    wiki_password=customer.wiki_password,
@@ -135,7 +139,7 @@ def wiki(customer):
 def mail(customer):
     template = load_template(customer.mail_template)
     return Session("mailer",
-                   "%(prefix)s", "%(name)s",
+                   customer.prefix, customer.name,
                    to=customer.mail_to, 
                    cc=customer.mail_cc, 
                    template=template,
@@ -150,12 +154,18 @@ class Customer(Base):
     wiki_user = "wikiuser"
     wiki_password = "wikipassword"
     wiki_type = "opencollab"
-    wiki_parent = dynamic("%(name)s")
+    wiki_parent = None
 
     mail_to = []
     mail_cc = []
     mail_template = "default"
     mail_times = ["08:00"]
+
+    def __init__(self, name, **attrs):
+        self.name = name
+        self.wiki_parent = self.name
+
+        Base.__init__(self, **attrs)
 
     def main(self):
         if self.asns:
@@ -176,21 +186,21 @@ class Customer(Base):
         for report in self.reports:
             yield self.room() | report(self)
 
-# Source definitions
+def configs():
+    # Source definitions
+    yield Source("dshield", asns=[1, 2, 3])
+    yield Source("ircfeed")
 
-dshield = Source(asns=[1, 2, 3])
-ircfeed = Source()
+    # Type definitions
+    yield Type("malware")
+    yield Type("spam")
+    yield Type("unknown")
 
-# Type definitions
-
-malware = Type()
-spam = Type()
-unknown = Type()
-
-# Customer definitions
-
-unknown_to_mail = Customer(asns=["3 +127.0.0.1/16"],
-                           reports=[mail, wiki], 
-                           types=["unknown"])
-all_to_wiki = Customer(asns=[1, 2, 3], 
-                       reports=[wiki])
+    # Customer definitions
+    yield Customer("unknown_to_mail",
+                   asns=["3 +127.0.0.1/16"],
+                   reports=[mail, wiki], 
+                   types=["unknown"])
+    yield Customer("all_to_wiki",
+                   asns=[1, 2, 3], 
+                   reports=[wiki])

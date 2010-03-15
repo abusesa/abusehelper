@@ -1,19 +1,7 @@
 import os
 from abusehelper.core.config import *
-from abusehelper.core.startup import *
 
-def locate(*path):
-    base_dir, _ = os.path.split(__file__)
-    return os.path.abspath(os.path.join(base_dir, *path))
-
-class Bot(Startup):
-    bot_name = dynamic("%(name)s")
-
-    # Unomment the following lines, and the bots will keep
-    # persistent state and log to files, respectively.
-    #bot_state_file = dynamic(locate("state", "%(name)s.state"))
-    #log_file = dynamic(locate("log", "%(name)s.log"))
-
+class Bot(Config):
     # The default credentials used for XMPP connections.
     xmpp_jid = "@XMPP_JID@"
     xmpp_password = "@XMPP_PASSWORD@"
@@ -21,36 +9,42 @@ class Bot(Startup):
     # The XMPP multi-user chat room used for bot control.
     service_room = "@SERVICE_ROOM@"
 
-# Class for launching abusehelper core bots.
-class CoreBot(Bot):
-    module = dynamic("abusehelper.core.%(name)s")
+    def __init__(self, name, **attrs):
+        Config.__init__(self)
 
-# Class for launching our custom bots.
-class CustomBot(Bot):
-    module = dynamic(locate("custom", "%(name)s.py"))
+        self.attrs = dict(
+            module="abusehelper.core."+name,
+            bot_name=name,
 
-# Define function "configs" to bypass the default startup behavior of
-# harvesting this module's namespace for config objects.
+            # Unomment the following lines, and the bots will keep
+            # persistent state and log to files, respectively.
+            #bot_state_file=relative("state", name + ".state"),
+            #log_file=relative("log", name + ".log"),
+
+            xmpp_jid=self.xmpp_jid,
+            xmpp_password=self.xmpp_password,
+            service_room=self.service_room,
+            )
+        self.attrs.update(attrs)
+
+    def startup(self):
+        return self.attrs
+
 def configs():
-    # Load the configs from this module's global namespace.
-    for value in default_configs(globals()):
-        yield value
+    # Launch a fine selection of abusehelper.core.* bots
+    yield Bot("mailer",
+              smtp_host="@SMTP_HOST@",
+              smtp_port="@SMTP_PORT@",
+              smtp_auth_user="@SMTP_AUTH_USER@",
+              smtp_auth_password="@SMTP_AUTH_PASSWORD@",
+              mail_sender="@MAIL_SENDER@")
+    yield Bot("wikibot")
+    yield Bot("dshield")
+    yield Bot("roomgraph")
+    yield Bot("historian")
+    yield Bot("runtime", config=relative("runtime.py"))
 
-    # Go through the custom bot directory, and launch all modules
-    # named *.sanitizer.py automatically.
-    for filename in os.listdir(locate("custom")):
+    # Find and launch modules named custom/*.sanitizer.py
+    for filename in os.listdir(relative("custom")):
         if filename.endswith(".sanitizer.py"):
-            yield CustomBot(name=filename[:-3])
-
-# Manual startup definitions start here
-
-mailer = CoreBot(smtp_host="@SMTP_HOST@",
-                 smtp_port="@SMTP_PORT@",
-                 smtp_auth_user="@SMTP_AUTH_USER@",
-                 smtp_auth_password="@SMTP_AUTH_PASSWORD@",
-                 mail_sender="@MAIL_SENDER@")
-wikibot = CoreBot()
-dshield = CoreBot()
-roomgraph = CoreBot()
-historian = CoreBot()
-runtime = CoreBot(config=locate("runtime.py"))
+            yield Bot(name=filename[:-3], module=relative("custom", filename))
