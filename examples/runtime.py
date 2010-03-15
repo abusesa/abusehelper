@@ -31,13 +31,11 @@ class Customer(Config):
     # Mailer options
     to = []
     cc = []
-    subject = dynamic("Report for AS%(asn)s")
     template = dshield_template
     times = ["08:00"]
 
     def __init__(self, name, asn, *args, **keys):
         Config.__init__(self, *args, **keys)
-
         self.name = name
         self.asn = asn
 
@@ -52,8 +50,7 @@ class Customer(Config):
                       to=self.to,
                       cc=self.cc,
                       times=self.times,
-                      template=self.template,
-                      subject=self.subject)
+                      template=self.template)
             ]
 
 CUSTOMERS = [
