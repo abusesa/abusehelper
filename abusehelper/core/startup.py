@@ -43,9 +43,8 @@ class StartupBot(bot.Bot):
                 params = dict(startup.startup())
                 
                 module = params["module"]
-                bot_name = params["bot_name"]
-                self.log.info("Launching bot %r from module %r", 
-                              bot_name, module)
+                name = params["bot_name"]
+                self.log.info("Launching bot %r from module %r", name, module)
 
                 args = [sys.executable]
                 path, _ = os.path.split(module)
@@ -61,13 +60,13 @@ class StartupBot(bot.Bot):
                 args.append("--startup")
 
                 process = subprocess.Popen(args, stdin=subprocess.PIPE)
-                processes[startup] = process
+                processes[startup] = name, process
 
                 pickle.dump(params, process.stdin)
                 process.stdin.flush()
 
             while True:
-                for startup, process in processes.items():
+                for startup, (_, process) in processes.items():
                     retval = process.poll()
                     if retval is not None:
                         return
@@ -77,7 +76,8 @@ class StartupBot(bot.Bot):
 
             if processes:
                 self.log.info("Sending SIGTERM to alive bots")
-                kill_processes(processes.values(), signal.SIGTERM)
+                kill_processes([x[1] for x in processes.values()], 
+                               signal.SIGTERM)
 
             while processes:
                 processes = self.check_processes(processes)
@@ -86,14 +86,13 @@ class StartupBot(bot.Bot):
     def check_processes(self, processes):
         processes = dict(processes)
 
-        for startup, process in list(processes.items()):
+        for startup, (name, process) in list(processes.items()):
             retval = process.poll()
             if retval is None:
                 continue
 
             del processes[startup]
-            self.log.info("Bot %r exited with return value %d", 
-                          startup.bot_name, retval)
+            self.log.info("Bot %r exited with return value %d", name, retval)
 
         return processes
 
