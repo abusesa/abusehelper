@@ -22,6 +22,7 @@ def load_module(module_name, relative_to_caller=True):
         else:
             paths = None
         found = imp.find_module(name, paths)
+        sys.modules.pop(name, None)
         return imp.load_module(name, *found)
     
     if relative_to_caller:
@@ -29,14 +30,15 @@ def load_module(module_name, relative_to_caller=True):
     module_file = open(module_name, "r")
     try:
         name = hashlib.md5(module_name).hexdigest()
+        sys.modules.pop(name, None)
         return imp.load_source(name, module_name, module_file)
     finally:
         module_file.close()
 
-def default_configs(globals):
+def default_configs(globals, set_names=True):
     for key, value in globals.items():
         if isinstance(value, Config):
-            if not hasattr(value, "name"):
+            if set_names and not hasattr(value, "name"):
                 setattr(value, "name", key)
             yield value
 
@@ -44,11 +46,9 @@ def load_configs(module_name, config_func_name="configs"):
     module = load_module(module_name, False)
     configs = getattr(module, config_func_name, None)
 
-    if configs is None:
+    if configs is None or not callable(configs):
         raise ImportError("no callable %r defined" % config_func_name)
-
-    for value in configs():
-        yield value
+    return configs()
 
 class Config(object):
     def __init__(self, **keys):
