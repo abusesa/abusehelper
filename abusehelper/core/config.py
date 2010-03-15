@@ -32,11 +32,17 @@ def dynamic(func_or_string):
 
     return property(getter, setter)
 
-def load_module(module_name, relative_to_caller=True):
-    calling_frame = inspect.stack()[1]
+def _base_dir(depth=2):
+    calling_frame = inspect.stack()[depth]
     calling_file = calling_frame[1]
-    base_dir, _ = os.path.split(os.path.abspath(calling_file))
-    
+    return os.path.dirname(os.path.abspath(calling_file))    
+
+def relative(*path):
+    return os.path.abspath(os.path.join(_base_dir(), *path))
+
+def load_module(module_name, relative_to_caller=True):
+    base_dir = _base_dir()
+
     path, name = os.path.split(module_name)
     if not path:
         paths = list(sys.path)
