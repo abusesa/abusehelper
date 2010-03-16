@@ -24,6 +24,14 @@ class _Rule(object):
             return result
         return not result
 
+    def __repr__(self):
+        args, keys = self.arguments
+
+        reprs = list()
+        reprs.extend(map(repr, args))
+        reprs.extend(key + "=" + repr(value) for (key, value) in keys)
+        return self.__class__.__name__ + "(" + ", ".join(reprs) + ")"
+
     def __hash__(self):
         return hash(self.__class__) ^ hash(self.arguments)
 
