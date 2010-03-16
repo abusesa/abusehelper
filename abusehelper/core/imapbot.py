@@ -108,8 +108,7 @@ class IMAPBot(bot.FeedBot):
 
             if status != "OK":
                 for msg in msgs:
-                    self.log.critical(msg)
-                return
+                    raise imaplib.IMAP4.abort(msg)
         except:
             mailbox.logout()
             raise
