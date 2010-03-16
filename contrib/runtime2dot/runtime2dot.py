@@ -59,7 +59,7 @@ class DotBot(bot.Bot):
 
             for session in sessions:
                 conf = dict(session.conf)
-                path = session.format_path(config)
+                path = session.path
                 src = conf.pop("src_room", None)
                 dst = conf.pop("dst_room", None)
 
