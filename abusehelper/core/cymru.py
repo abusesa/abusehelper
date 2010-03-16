@@ -3,9 +3,10 @@ from idiokit import util, threado, sockets, timer
 class CymruWhois(threado.GeneratorStream):
     LINE_KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
 
-    def __init__(self, throttle_time=10.0, cache_time=60*60.0):
+    def __init__(self, key="ip", throttle_time=10.0, cache_time=60*60.0):
         threado.GeneratorStream.__init__(self)
 
+        self.key = key
         self.cache = util.TimedCache(cache_time)
         self.throttle_time = throttle_time
         self.pending = dict()
@@ -76,7 +77,7 @@ class CymruWhois(threado.GeneratorStream):
         while True:
             yield inner
             for event in inner:
-                for ip in event.values("ip"):
+                for ip in event.values(self.key):
                     self.pending.setdefault(ip, list()).append(event)
 
     @threado.stream
