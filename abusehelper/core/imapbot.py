@@ -163,7 +163,7 @@ class IMAPBot(bot.FeedBot):
 
     @threado.stream
     def get_header(inner, self, uid, section):
-        body_rex_str = r"\s*\d+\s+\(UID %s BODY\[%s\]\s+" % (uid, section)
+        body_rex_str = r"\s*\d+\s+\((UID %s )?\s*BODY\[%s\]\s+" % (uid, section)
         body_rex = re.compile(body_rex_str, re.I)
         
         fetch = "(BODY.PEEK[%s])" % section
@@ -171,6 +171,8 @@ class IMAPBot(bot.FeedBot):
 
         # Filter away parts that don't closely enough resemble tuple
         # ("<MSGNUM> (UID <MSGUID> BODY[<MSGPATH>.MIME] {<SIZE>}", "<MIMEHEADERS>")
+        # or 
+        # ("<MSGNUM> (BODY[<MSGPATH>.MIME] {<SIZE>}", "<MIMEHEADERS>")
         data = [x for x in data if isinstance(x, tuple) and len(x) >= 2]
         data = [x[1] for x in data if body_rex.match(x[0])]
         if not data:
