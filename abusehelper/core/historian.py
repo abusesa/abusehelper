@@ -167,9 +167,10 @@ class HistorianService(bot.ServiceBot):
         room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
         self.log.info("Joined room %r", name)
 
+        self.xmpp.add_listener(self.query_handler)
+
         try:
             yield inner.sub(room
-                            | self.command_parser(room)
                             | events.stanzas_to_events()
                             | self.history.collect(unicode(room.room_jid))
                             | threado.dev_null())
@@ -183,39 +184,56 @@ class HistorianService(bot.ServiceBot):
         except services.Stop:
             inner.finish()
 
-    @threado.stream_fast
-    def command_parser(inner, self, room):
-        while True:
-            yield inner
+    def query_handler(self, success, element):
+        if not success:
+            return
 
-            for elements in inner:
-                inner.send(elements)
+        for message in element.named("message").with_attrs("from"):
+            self.command_parser(message)
 
-                for message in elements.named("message").with_attrs("from"):
-                    sender = JID(message.get_attr("from"))
-                    if sender == room.nick_jid:
-                        continue
+    def command_parser(self, message):
+        sender = JID(message.get_attr("from"))
+        room_jid = sender.bare()
+        chat_type = message.get_attr("type")
 
-                    for body in message.children("body"):
-                        matcher = parse_command(body, "historian")
-                        if matcher is None:
-                            continue
+        if room_jid not in self.xmpp.muc.rooms:
+            return
 
-                        self.log.info("Got command %r", body.text)
-                        rjid = unicode(room.room_jid)
+        for jid in self.xmpp.muc.rooms:
+            for room in self.xmpp.muc.rooms[jid]:
+                if room.nick_jid == sender:
+                    return
+
+        for body in message.children("body"):
+            matcher = parse_command(body, "historian")
+            if matcher is None:
+                continue
+
+            self.log.info("Got command %r from %s", body.text, sender)
                         
-                        for etime, eroom, event in self.history.find(rjid):
-                            yield
+            counter = 0
+            for etime, eroom, event in self.history.find(unicode(room_jid)):
+                if not matcher(event):
+                    continue
 
-                            if not matcher(event):
-                                continue
+                body = Element("body")
+                body.text = "%s %s\n" % (format_time(etime), eroom)
+                for key in event.keys():
+                    vals = ", ".join(event.values(key))
+                    body.text += "%s: %s\n" % (key, vals)
 
-                            body = Element("body")
-                            body.text = "%s %s\n" % (format_time(etime), eroom)
-                            for key in event.keys():
-                                vals = ", ".join(event.values(key))
-                                body.text += "%s: %s\n" % (key, vals)
-                            room.send(body)
+                elements = [body]
+                if chat_type == "groupchat":
+                    attrs = dict(type=chat_type)
+                    to = room_jid
+                else:
+                    attrs = dict()
+                    to = sender
+
+                self.xmpp.core.message(to, *elements, **attrs)
+                counter += 1
+
+            self.log.info("Returned %i events.", counter)
 
 if __name__ == "__main__":
     HistorianService.from_command_line().execute()
