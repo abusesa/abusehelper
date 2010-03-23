@@ -43,6 +43,9 @@ class HistoryDB(threado.GeneratorStream):
             yield inner
                 
             for event in inner:
+                if event.contains("action"):
+                    continue
+                
                 self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
                                     (int(time.time()), room_name))
                 eventid = self.cursor.lastrowid
@@ -189,27 +192,64 @@ class HistorianService(bot.ServiceBot):
             return
 
         for message in element.named("message").with_attrs("from"):
-            self.command_parser(message)
+            sender = JID(message.get_attr("from"))
+            room_jid = sender.bare()
+            chat_type = message.get_attr("type")
 
-    def command_parser(self, message):
-        sender = JID(message.get_attr("from"))
-        room_jid = sender.bare()
-        chat_type = message.get_attr("type")
+            if chat_type == "groupchat":
+                attrs = dict(type=chat_type)
+                to = room_jid
+            else:
+                attrs = dict()
+                to = sender
+            
+            if room_jid not in self.xmpp.muc.rooms:
+                return
 
-        if room_jid not in self.xmpp.muc.rooms:
-            return
+            if room_jid == self.service_room:
+                room_jid = None
 
-        for jid in self.xmpp.muc.rooms:
-            for room in self.xmpp.muc.rooms[jid]:
-                if room.nick_jid == sender:
-                    return
+            for jid in self.xmpp.muc.rooms:
+                for room in self.xmpp.muc.rooms[jid]:
+                    if room.nick_jid == sender:
+                        return
 
+            if message.children("body"):
+                self.command_parser(element, to, room_jid, **attrs)
+            elif message.children("event"):
+                self.event_parser(element, to, room_jid, **attrs)
+
+    def event_parser(self, message, requester, room_jid, **attrs):
+        for e in message.children("event"):
+            ev = events.Event.from_element(e)
+
+            if not ev or not ev.contains("action") or ev.value("action") != "historian":
+                continue
+
+            try:
+                start = ev.value("start")
+                end = ev.value("end")
+            except:
+                continue
+            
+            self.log.info("Got history request from %r for %r", requester, room_jid)
+
+            counter = 0
+            for etime, eroom, event in self.history.find(unicode(room_jid), start, end):
+                counter += 1
+                self.xmpp.core.message(requester, event.to_element(), **attrs)
+            
+            if counter == 0:
+                event = events.Event()
+                self.xmpp.core.message(requester, event.to_element(), **attrs) 
+
+    def command_parser(self, message, requester, room_jid, **attrs):
         for body in message.children("body"):
             matcher = parse_command(body, "historian")
             if matcher is None:
                 continue
 
-            self.log.info("Got command %r from %s", body.text, sender)
+            self.log.info("Got command %r, responding to %r", body.text, requester)
                         
             counter = 0
             for etime, eroom, event in self.history.find(unicode(room_jid)):
@@ -223,14 +263,8 @@ class HistorianService(bot.ServiceBot):
                     body.text += "%s: %s\n" % (key, vals)
 
                 elements = [body]
-                if chat_type == "groupchat":
-                    attrs = dict(type=chat_type)
-                    to = room_jid
-                else:
-                    attrs = dict()
-                    to = sender
 
-                self.xmpp.core.message(to, *elements, **attrs)
+                self.xmpp.core.message(requester, *elements, **attrs)
                 counter += 1
 
             self.log.info("Returned %i events.", counter)
