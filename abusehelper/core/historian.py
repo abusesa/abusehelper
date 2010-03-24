@@ -45,7 +45,7 @@ class HistoryDB(threado.GeneratorStream):
             yield inner
                 
             for event in inner:
-                if event.contains("action"):
+                if event.contains("bot:action"):
                     continue
                 
                 self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
@@ -286,15 +286,12 @@ class HistorianService(bot.ServiceBot):
         for element in message.children("event"):
             event = events.Event.from_element(element)
 
-            if not event or not event.contains("action") \
-                         or event.value("action") != "historian":
+            if not event or not event.contains("bot:action") \
+                         or event.value("bot:action") != "historian":
                 continue
 
-            try:
-                start = event.value("start")
-                end = event.value("end")
-            except:
-                continue
+            start = event.value("start", None)
+            end = event.value("end", None)
             
             self.log.info("Got history request from %r for %r", requester, 
                                                                 room_jid)
