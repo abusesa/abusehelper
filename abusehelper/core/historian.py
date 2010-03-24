@@ -277,10 +277,10 @@ class HistorianService(bot.ServiceBot):
                     if room.nick_jid == sender:
                         return
 
-            if message.children("body"):
-                self.command_parser(element, to, room_jid, **attrs)
             if message.children("event"):
                 self.event_parser(element, to, room_jid, **attrs)
+            elif message.children("body"):
+                self.command_parser(element, to, room_jid, **attrs)
 
     def event_parser(self, message, requester, room_jid, **attrs):
         for element in message.children("event"):
