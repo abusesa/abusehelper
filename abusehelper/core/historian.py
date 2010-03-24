@@ -1,4 +1,6 @@
 import time
+import re
+from datetime import datetime
 import sqlite3
 from idiokit.xmpp import Element
 from idiokit.jid import JID
@@ -131,23 +133,80 @@ class HistoryDB(threado.GeneratorStream):
 def format_time(timestamp):
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
 
+def iso_to_unix(iso_time, format=None):
+    if format:
+        return time.mktime(datetime.strptime(iso_time, format).timetuple())
+
+    try:
+        f = "%Y-%m-%d %H:%M:%S"
+        return time.mktime(datetime.strptime(iso_time, f).timetuple())
+    except ValueError:
+        try:
+            f = "%Y-%m-%d %H:%M"
+            return time.mktime(datetime.strptime(iso_time, f).timetuple())
+        except ValueError:
+            f = "%Y-%m-%d"
+            return time.mktime(datetime.strptime(iso_time, f).timetuple())
+
 def parse_command(message, name):
     parts = message.text.split()
     if not len(parts) >= 2:
-        return None
+        return None, None, None
     command = parts[0][1:]
     if command != name:
-        return None
+        return None, None, None
 
+    params = " ".join(parts[1:])
+
+    start = list()
+    end = list()
     keyed = dict()
     values = set()
-    for part in parts[1:]:
-        pair = part.split("=")
-        if len(pair) >= 2:
-            keyed.setdefault(pair[0], set())
-            keyed[pair[0]].add(pair[1])
-        elif len(pair) == 1:
-            values.add(pair[0])
+    regexp = r'(\S+="[\S\s]+?")|(\S+=\S+)|("\S+\s\S+")|(\S+)'
+    for match in re.findall(regexp, params):
+        for group in match:
+            if not group:
+                continue
+
+            pair = group.split('=')
+
+            if len(pair) == 1:
+                value = pair[0]
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+                if value:
+                    values.add(value)
+            elif len(pair) >= 2:
+                value = "=".join(pair[1:])
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+
+                if value:
+                    if pair[0] == "start":
+                        try:
+                            start.append(iso_to_unix(value))
+                        except:
+                            keyed.setdefault(pair[0], set())
+                            keyed[pair[0]].add(value)
+                    elif pair[0] == "end":
+                        try:
+                            end.append(iso_to_unix(value))
+                        except:
+                            keyed.setdefault(pair[0], set())
+                            keyed[pair[0]].add(value)
+                    else:
+                        keyed.setdefault(pair[0], set())
+                        keyed[pair[0]].add(value)
+
+    if start:
+        start = sorted(start).pop(0)
+    else:
+        start = None
+
+    if end:
+        end = sorted(end).pop()
+    else:
+        end = None
 
     def _match(event):
         for key, keyed_values in keyed.iteritems():
@@ -156,7 +215,9 @@ def parse_command(message, name):
         if values.intersection(event.values()):
             return True
         return False
-    return _match
+
+    return _match, start, end
+
 
 class HistorianService(bot.ServiceBot):
     def __init__(self, bot_state_file=None, **keys):
@@ -208,6 +269,8 @@ class HistorianService(bot.ServiceBot):
 
             if room_jid == self.service_room:
                 room_jid = None
+            else:
+                room_jid = unicode(room_jid)
 
             for jid in self.xmpp.muc.rooms:
                 for room in self.xmpp.muc.rooms[jid]:
@@ -216,26 +279,27 @@ class HistorianService(bot.ServiceBot):
 
             if message.children("body"):
                 self.command_parser(element, to, room_jid, **attrs)
-            elif message.children("event"):
+            if message.children("event"):
                 self.event_parser(element, to, room_jid, **attrs)
 
     def event_parser(self, message, requester, room_jid, **attrs):
-        for e in message.children("event"):
-            ev = events.Event.from_element(e)
+        for element in message.children("event"):
+            event = events.Event.from_element(element)
 
-            if not ev or not ev.contains("action") or ev.value("action") != "historian":
+            if not event or not event.contains("action") \
+                         or event.value("action") != "historian":
                 continue
 
             try:
-                start = ev.value("start")
-                end = ev.value("end")
+                start = event.value("start")
+                end = event.value("end")
             except:
                 continue
             
-            self.log.info("Got history request from %r for %r", requester, room_jid)
-
+            self.log.info("Got history request from %r for %r", requester, 
+                                                                room_jid)
             counter = 0
-            for etime, eroom, event in self.history.find(unicode(room_jid), start, end):
+            for etime, eroom, event in self.history.find(room_jid, start, end):
                 counter += 1
                 self.xmpp.core.message(requester, event.to_element(), **attrs)
             
@@ -245,14 +309,14 @@ class HistorianService(bot.ServiceBot):
 
     def command_parser(self, message, requester, room_jid, **attrs):
         for body in message.children("body"):
-            matcher = parse_command(body, "historian")
+            matcher, start, end = parse_command(body, "historian")
             if matcher is None:
                 continue
 
-            self.log.info("Got command %r, responding to %r", body.text, requester)
-                        
+            self.log.info("Got command %r, responding to %r", body.text, 
+                                                              requester)
             counter = 0
-            for etime, eroom, event in self.history.find(unicode(room_jid)):
+            for etime, eroom, event in self.history.find(room_jid, start, end):
                 if not matcher(event):
                     continue
 
