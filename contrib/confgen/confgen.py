@@ -12,6 +12,7 @@ def dummy(_repr):
     return _dummy()
 
 NOT_GIVEN = dummy("<not given>")
+IGNORE_FILES = (".svn")
 
 def input(name, default=NOT_GIVEN, parser=NOT_GIVEN):
     prompt = name
@@ -61,7 +62,7 @@ src = os.path.join(dirname, "config-template")
 dst = sys.argv[1]
 
 try:
-    shutil.copytree(src, dst)
+    shutil.copytree(src, dst, ignore=shutil.ignore_patterns(IGNORE_FILES))
     try:
         replaces = dict(XMPP_JID=input("XMPP JID", parser=parse_jid),
                         XMPP_PASSWORD=input("XMPP password"),
