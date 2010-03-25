@@ -226,12 +226,19 @@ class HistorianService(bot.ServiceBot):
         self.rooms = taskfarm.TaskFarm(self.handle_room)
 
     @threado.stream
+    def main(inner, self, state):
+        self.xmpp.add_listener(self.query_handler)
+        try:
+            while True:
+                yield inner
+        except services.Stop:
+            inner.finish()
+
+    @threado.stream
     def handle_room(inner, self, name):
         self.log.info("Joining room %r", name)
         room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
         self.log.info("Joined room %r", name)
-
-        self.xmpp.add_listener(self.query_handler)
 
         try:
             yield inner.sub(room
