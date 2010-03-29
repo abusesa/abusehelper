@@ -270,8 +270,6 @@ class HistorianService(bot.ServiceBot):
                         break
                 if not own:
                     inner.send(element)
-                else:
-                    print element.serialize()
 
     def query_handler(self, success, element):
         if not success:
