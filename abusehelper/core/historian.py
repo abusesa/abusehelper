@@ -5,7 +5,7 @@ import sqlite3
 from idiokit.xmpp import Element
 from idiokit.jid import JID
 from idiokit import threado, timer
-from abusehelper.core import taskfarm, events, bot, services
+from abusehelper.core import taskfarm, events, bot, services, rules
 
 class HistoryDB(threado.GeneratorStream):
     def __init__(self, path=None, keeptime=None):
@@ -300,11 +300,24 @@ class HistorianService(bot.ServiceBot):
             start = event.value("start", None)
             end = event.value("end", None)
             
+            match_rule = None
+            for key in event.keys():
+                if(key == "start" or key == "end" or key == "bot:action"):
+                    continue
+                rule = { str(key): event.value(key) }
+                if match_rule == None:
+                    match_rule = rules.CONTAINS(**rule)
+                else:
+                    match_rule = rules.OR(match_rule, rules.CONTAINS(**rule))
+            
             self.log.info("Got history request from %r for %r", requester, 
                                                                 room_jid)
             counter = 0
             for etime, eroom, event in self.history.find(room_jid, start, end):
+                if not match_rule(event):
+                    continue
                 counter += 1
+                event.add("bot:history", True)
                 self.xmpp.core.message(requester, event.to_element(), **attrs)
             
             if counter == 0:
