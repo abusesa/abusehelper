@@ -47,7 +47,7 @@ class HistoryDB(threado.GeneratorStream):
             for event in inner:
                 if event.contains("bot:action"):
                     continue
-                
+
                 self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
                                     (int(time.time()), room_name))
                 eventid = self.cursor.lastrowid
@@ -242,6 +242,7 @@ class HistorianService(bot.ServiceBot):
 
         try:
             yield inner.sub(room
+                            | self.skip_own(room)
                             | events.stanzas_to_events()
                             | self.history.collect(unicode(room.room_jid))
                             | threado.dev_null())
@@ -254,6 +255,23 @@ class HistorianService(bot.ServiceBot):
             yield inner.sub(self.rooms.inc(src_room))
         except services.Stop:
             inner.finish()
+
+    @threado.stream_fast
+    def skip_own(inner, self, room):
+        while True:
+            yield inner
+
+            for element in inner:
+                own = False
+                for owned in element.with_attrs("from"):
+                    sender = JID(owned.get_attr("from"))
+                    if room.nick_jid == sender:
+                        own = True
+                        break
+                if not own:
+                    inner.send(element)
+                else:
+                    print element.serialize()
 
     def query_handler(self, success, element):
         if not success:
@@ -346,6 +364,7 @@ class HistorianService(bot.ServiceBot):
                 elements = [body]
 
                 self.xmpp.core.message(requester, *elements, **attrs)
+                self.xmpp.core.message(requester, event.to_element(), **attrs)
                 counter += 1
 
             self.log.info("Returned %i events.", counter)
