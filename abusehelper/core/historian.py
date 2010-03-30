@@ -130,8 +130,8 @@ class HistoryDB(threado.GeneratorStream):
         if previous_id is not None:
             yield previous_ts, previous_room, event
 
-def format_time(timestamp):
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+def format_time(timestamp, format="%Y-%m-%d %H:%M:%S"):
+    return time.strftime(format, time.localtime(timestamp))
 
 def iso_to_unix(iso_time, format=None):
     if format:
@@ -147,6 +147,23 @@ def iso_to_unix(iso_time, format=None):
         except ValueError:
             f = "%Y-%m-%d"
             return time.mktime(datetime.strptime(iso_time, f).timetuple())
+
+def delay_element(timestamp):
+    if time.daylight:
+        timestamp = timestamp + time.altzone
+    else:
+        timestamp = timestamp + time.timezone
+
+    delay = Element("delay")
+    delay.text = "Greetings earthlings"
+    delay.set_attr("xmlns", 'urn:xmpp:delay')
+#    delay.set_attr("from", 'historian')
+    delay.set_attr("stamp", format_time(timestamp, '%Y-%m-%dT%H:%M:%SZ'))
+#    delay = Element("x")
+#    delay.set_attr("xmlns", 'jabber:x:delay')
+#    delay.set_attr("from", 'historian')
+#    delay.set_attr("stamp", format_time(timestamp, '%Y%m%dT%H:%M:%S'))
+    return delay
 
 def parse_command(message, name):
     parts = message.text.split()
@@ -330,12 +347,14 @@ class HistorianService(bot.ServiceBot):
                                                                 room_jid)
             counter = 0
             for etime, eroom, event in self.history.find(room_jid, start, end):
-                if not match_rule(event):
+                if match_rule and not match_rule(event):
                     continue
+
                 counter += 1
                 event.add("bot:history", True)
-                self.xmpp.core.message(requester, event.to_element(), **attrs)
-            
+                elements = [event.to_element(), delay_element(etime)]
+                self.xmpp.core.message(requester, *elements, **attrs)
+
             if counter == 0:
                 event = events.Event()
                 self.xmpp.core.message(requester, event.to_element(), **attrs) 
@@ -360,9 +379,7 @@ class HistorianService(bot.ServiceBot):
                     body.text += "%s: %s\n" % (key, vals)
 
                 elements = [body]
-
                 self.xmpp.core.message(requester, *elements, **attrs)
-                self.xmpp.core.message(requester, event.to_element(), **attrs)
                 counter += 1
 
             self.log.info("Returned %i events.", counter)
