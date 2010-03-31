@@ -1,5 +1,6 @@
 from idiokit.xmlcore import Element
 from abusehelper.core import serialize
+import re
 
 class RuleError(Exception):
     pass
@@ -34,6 +35,37 @@ class _Rule(object):
 
     def __hash__(self):
         return hash(self.__class__) ^ hash(self.arguments)
+
+class REGEXP(_Rule):
+    @classmethod
+    def dump_rule(cls, dump, name, rule):
+        element = Element(name)
+        element.add(dump(rule.child))
+        return element
+
+    @classmethod
+    def load_rule(cls, load, element):
+        children = list(element.children())
+        if len(children) != 1:
+            raise RuleError(element)
+        return cls(load(children[0]))
+
+    def __init__(self, *keys, **key_values):
+        _Rule.__init__(self, *keys, **key_values)
+        self.keys = keys
+        self.key_values = key_values
+
+    def __call__(self, event):
+        for key, value in event.attrs.iteritems():
+            for rkey, regex in self.key_values.iteritems():
+                if key != rkey:
+                    continue
+                if regex.search(str(value)):
+                    return True
+                    
+        return False
+        
+REGEXP.serialize_register()
 
 class NOT(_Rule):
     @classmethod

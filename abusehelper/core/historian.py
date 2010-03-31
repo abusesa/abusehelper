@@ -337,11 +337,12 @@ class HistorianService(bot.ServiceBot):
             for key in event.keys():
                 if(key == "start" or key == "end" or key == "bot:action"):
                     continue
-                rule = { str(key): event.value(key) }
+                value = event.value(key)
+                rule = { str(key): re.compile(value) }
                 if match_rule == None:
-                    match_rule = rules.CONTAINS(**rule)
+                    match_rule = rules.REGEXP(**rule)
                 else:
-                    match_rule = rules.OR(match_rule, rules.CONTAINS(**rule))
+                    match_rule = rules.OR(match_rule, rules.REGEXP(**rule))
             
             self.log.info("Got history request from %r for %r", requester, 
                                                                 room_jid)
@@ -351,7 +352,6 @@ class HistorianService(bot.ServiceBot):
                     continue
 
                 counter += 1
-                event.add("bot:history", True)
                 elements = [event.to_element(), delay_element(etime)]
                 self.xmpp.core.message(requester, *elements, **attrs)
 
