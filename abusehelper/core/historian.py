@@ -2,7 +2,7 @@ import time
 import re
 from datetime import datetime
 import sqlite3
-from idiokit.xmpp import Element
+from idiokit.xmpp import Element, ElementParser
 from idiokit.jid import JID
 from idiokit import threado, timer
 from abusehelper.core import taskfarm, events, bot, services, rules
@@ -18,15 +18,16 @@ class HistoryDB(threado.GeneratorStream):
         cursor = self.conn.cursor()
 
         cursor.execute("CREATE TABLE IF NOT EXISTS events "+
-                       "(id INTEGER PRIMARY KEY, timestamp INTEGER, room INTEGER)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS events_id_index ON events(id)")
+                       "(id TEXT, timestamp INTEGER, start INTEGER,"+
+                       "end INTEGER, room TEXT, sender TEXT, data TEXT)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_room_index ON events(room)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_room_start_end_index ON EVENTS(room, start, end)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_id_start_index ON EVENTS(room, id, start)")
+        
+        """cursor.execute("CREATE INDEX IF NOT EXISTS events_id_index ON events(id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS events_room_ts_index ON events(room, timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS events_room_index ON events(room)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS events_ts_index ON events(timestamp)")
-        
-        cursor.execute("CREATE TABLE IF NOT EXISTS attrs "+
-                       "(eventid INTEGER, key TEXT, value TEXT)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS attrs_eventid_index ON attrs(eventid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS events_ts_index ON events(timestamp)")"""
 
         self.conn.commit()
         self.keeptime = keeptime
@@ -44,18 +45,29 @@ class HistoryDB(threado.GeneratorStream):
         while True:
             yield inner
                 
-            for event in inner:
-                if event.contains("bot:action"):
-                    continue
-
-                self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
-                                    (int(time.time()), room_name))
-                eventid = self.cursor.lastrowid
-                
-                for key in event.keys():
-                    values = event.values(key)
-                    self.cursor.executemany("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
-                                            [(eventid, key, value) for value in values])
+            for element in inner:
+                for child in element.children().named("event"):
+                    if child.children("delay"):
+                        continue
+                    
+                    event = events.Event.from_element(child)
+                    if event.contains("bot:action"):
+                        continue
+                    
+                    eventid = event.value("id", None)
+                    event.clear("id")
+                    start = event.value("start", int(time.time()))
+                    end = event.value("end", None)
+                    data = event.to_element().serialize()
+                    sender = element.get_attr("from")
+                    if eventid:
+                        self.cursor.execute("UPDATE events SET end = ? "+
+                                            "WHERE id = ? AND room = ? AND sender = ? AND end IS NULL",
+                                            (int(time.time()), eventid, room_name, sender))
+                    self.cursor.execute("INSERT INTO events(id, start, end, timestamp, room, sender, data) "+ 
+                                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                        (eventid, start, end, int(time.time()), room_name, sender, data))
+                    self.conn.commit()
 
     def run(self, interval=1.0):
         try:
@@ -66,15 +78,9 @@ class HistoryDB(threado.GeneratorStream):
                 if self.keeptime is not None:
                     cutoff = int(time.time() - self.keeptime)
                     
-                    max_id = self.cursor.execute("SELECT MAX(events.id) FROM events "+
-                                                 "WHERE events.timestamp <= ?", (cutoff,))
+                    self.cursor.execute("DELETE FROM events "+
+                                        "WHERE events.timestamp <= ?", (cutoff,))
                     
-                    max_id = list(max_id)[0][0]
-                    if max_id is not None:
-                        self.cursor.execute("DELETE FROM events WHERE events.id <= ?",
-                                            (max_id,))
-                        self.cursor.execute("DELETE FROM attrs WHERE attrs.eventid <= ?",
-                                            (max_id,))
                 self.conn.commit()
                 self.cursor = self.conn.cursor()
         finally:
@@ -83,52 +89,49 @@ class HistoryDB(threado.GeneratorStream):
 
     def close(self):
         self.throw(threado.Finished())
+        
+    def handle_leave(self, sender):
+        if sender:
+            query = ("UPDATE events SET end = ? WHERE sender = ?")
+            self.conn.execute(query, (int(time.time()), sender))
 
     def find(self, room_name=None, start=None, end=None):
-        query = ("SELECT events.id, events.room, events.timestamp, attrs.key, attrs.value "+
-                 "FROM attrs "+
-                 "INNER JOIN events ON events.id=attrs.eventid ")
+        query = ("SELECT id, room, sender, timestamp, start, end, data FROM events ")
         args = list()
         where = list()
-    
         if room_name is not None:
             where.append("events.room = ?")
             args.append(room_name)
 
         if None not in (start, end):
-            where.append("events.timestamp BETWEEN ? AND ?")
+            where.append("(events.start >= ? AND events.end <= ?) "+
+                         "OR (events.start < ? AND (events.end > ? OR events.end IS NULL)) "+
+                         "OR ((events.end > ? OR events.end IS NULL) AND events.start < ?)")
             args.append(start)
             args.append(end)
+            args.extend(2*[start])
+            args.extend(2*[end])
         elif start is not None:
-            where.append("events.timestamp >= ?")
-            args.append(start)
+            where.append("events.start >= ? OR (events.start < ? AND (events.end > ? OR events.end IS NULL))")
+            args.extend(3*[start])
         elif end is not None:
-            where.append("events.timestamp < ?")
-            args.append(end)
-
+            where.append("events.end < ? OR (events.end > ? AND events.start < ?)")
+            args.extend(3*[end])
+        else:
+            where.append("events.end IS NULL")
+            
         if where:
             query += "WHERE " + " AND ".join(where) + " "
         
-        query += "ORDER BY events.id"
+        query += "ORDER BY events.timestamp"
 
-        event = events.Event()
-        previous_id = None
-        previous_ts = None
-        previous_room = None
-        for id, room, ts, key, value in self.conn.execute(query, args):
-            if previous_id != id:
-                if previous_id is not None:
-                    yield previous_ts, previous_room, event
-                event = events.Event()
+        print query, args
 
-            previous_id = id
-            previous_ts = ts
-            previous_room = room
-
-            event.add(key, value)
-
-        if previous_id is not None:
-            yield previous_ts, previous_room, event
+        for eventid, room, sender, timestamp, start, end, data in self.conn.execute(query, args):
+            parser = ElementParser()
+            for element in parser.feed("<foo>"+data+"</foo>").named("event"): #FIXME HACK
+                event = events.Event.from_element(element)
+                yield timestamp, room, event
 
 def format_time(timestamp, format="%Y-%m-%d %H:%M:%S"):
     return time.strftime(format, time.localtime(timestamp))
@@ -260,7 +263,7 @@ class HistorianService(bot.ServiceBot):
         try:
             yield inner.sub(room
                             | self.skip_own(room)
-                            | events.stanzas_to_events()
+                            | self.handle_leaves(room)
                             | self.history.collect(unicode(room.room_jid))
                             | threado.dev_null())
         finally:
@@ -272,6 +275,19 @@ class HistorianService(bot.ServiceBot):
             yield inner.sub(self.rooms.inc(src_room))
         except services.Stop:
             inner.finish()
+
+    @threado.stream_fast
+    def handle_leaves(inner, self, room):
+        while True:
+            yield inner
+            
+            for element in inner:
+                for presence in element.named("presence"):
+                    change = presence.get_attr("type")
+                    sender = presence.get_attr("from")
+                    if change == "unavailable":
+                        self.history.handle_leave(sender)
+                inner.send(element)
 
     @threado.stream_fast
     def skip_own(inner, self, room):
@@ -331,12 +347,13 @@ class HistorianService(bot.ServiceBot):
                 continue
 
             start = event.value("start", None)
+            event.clear("start")
             end = event.value("end", None)
+            event.clear("end")
+            event.clear("bot:action")
             
             match_rule = None
             for key in event.keys():
-                if(key == "start" or key == "end" or key == "bot:action"):
-                    continue
                 value = event.value(key)
                 rule = { str(key): re.compile(value) }
                 if match_rule == None:
@@ -358,6 +375,8 @@ class HistorianService(bot.ServiceBot):
             if counter == 0:
                 event = events.Event()
                 self.xmpp.core.message(requester, event.to_element(), **attrs) 
+
+            self.log.info("Returned %i events.", counter)
 
     def command_parser(self, message, requester, room_jid, **attrs):
         for body in message.children("body"):
@@ -384,5 +403,6 @@ class HistorianService(bot.ServiceBot):
 
             self.log.info("Returned %i events.", counter)
 
+  
 if __name__ == "__main__":
     HistorianService.from_command_line().execute()
