@@ -70,7 +70,7 @@ class TaskFarm(object):
             for channel in channels:
                 channel.rethrow()
 
-    @threado.stream
+    @threado.stream_fast
     def _inc(inner, self, key):
         try:
             while True:
