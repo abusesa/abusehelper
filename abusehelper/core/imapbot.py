@@ -172,6 +172,9 @@ class IMAPBot(bot.FeedBot):
         # ("<MSGNUM> (UID <MSGUID> BODY[<SECTION>] {<SIZE>}", "<HEADERS>")
         data = [x for x in data if isinstance(x, tuple) and len(x) >= 2]
         data = [x[1] for x in data if body_rex.match(x[0])]
+
+        # Accept only non-empty header data
+        data = [x for x in data if x]
         if not data:
             inner.finish()
         inner.finish(email.parser.Parser().parsestr(data[0], headersonly=True))
@@ -225,7 +228,7 @@ class IMAPBot(bot.FeedBot):
                 parts.append((headers, self.fetcher(uid, path)))
                 
             if parts:
-                top_header, _ = parts[0][0]
+                top_header = parts[0][0][0]
                 subject = top_header["Subject"] or "<no subject>"
                 sender = top_header["From"] or "<unknown sender>"
                 self.log.info("Handling mail %r from %r", subject, sender)
