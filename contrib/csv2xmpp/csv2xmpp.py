@@ -37,38 +37,85 @@ class CSV2XMPP(bot.XMPPBot):
 def events_to_elements_with_delay_element(inner,timestamp_column):
     eventnum=0
     while True:
-        eventnum += 1
         yield inner
         for event in inner:
-            print "Event %d" % (eventnum)
             fields = list()
+            hourminute = None
+            event = sanitize(event,timestamp_column)
+
             for key, values in event.attrs.iteritems():
                 for value in values:
                     fields.append(key + "=" + value)
             body = Element("body")
             body.text = ", ".join(fields)
-            if event.contains(timestamp_column):
-                etime = event.value(timestamp_column)
+            if event.contains('start'):
+                etime = event.value('start')
+                etime = sanitize_time(etime)
                 inner.send(body,event.to_element(),delay_element(etime))
             else:
                 inner.send(body,event.to_element())
 
-def delay_element(strstamp):
-    timestamp = time.mktime(time.strptime(strstamp,"%Y-%m-%dT%H:%M:%SZ"))
+def sanitize(event,timestamp_column):
+    if event.contains(timestamp_column) and event.contains('description'):
+        etime = event.value(timestamp_column)
+        etime = sanitize_time(etime)
+        event.clear(timestamp_column)
+        event.add(timestamp_column,etime)
+
+        hourminute = etime2hourminute(etime)
+        description = event.value('description')
+        description = hourminute + " " + description
+
+        event.clear('description')
+        event.add('description',description)
+    return event
+
+def etime2hourminute(strstamp):
+    timestamp_seconds = timestr_to_seconds(strstamp)
     if time.daylight:
-        timestamp = timestamp + time.altzone
+        timestamp_seconds = timestamp_seconds + time.altzone
     else:
-        timestamp = timestamp + time.timezone
+        timestamp_seconds = timestamp_seconds + time.timezone
+
+    return time.strftime("%H:%M",time.gmtime(timestamp_seconds))
+
+def sanitize_time(strstamp):
+    timestamp_seconds = timestr_to_seconds(strstamp)
+    if time.daylight:
+        timestamp_seconds = timestamp_seconds + time.altzone
+    else:
+        timestamp_seconds = timestamp_seconds + time.timezone
+
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime(timestamp_seconds))
+
+def delay_element(strstamp):
 
     delay = Element("delay")
     delay.text = "Greetings earthlings"
     delay.set_attr("xmlns", 'urn:xmpp:delay')
+
+
     delay.set_attr("stamp", strstamp)
     return delay
 
-def format_time(timestamp, format="%Y-%m-%d %H:%M:%S"):
-    return time.strftime(format, time.localtime(timestamp))
+def timestr_to_seconds(strstamp, format="%Y-%m-%d %H:%M:%SZ"):
+    try:
+        timestamp_seconds = time.mktime(time.strptime(strstamp,"%Y-%m-%dT%H:%M:%SZ"))
+    except ValueError, e:
+        pass
+    else:
 
+        return timestamp_seconds
+
+    try:
+        timestamp_seconds = time.time() + (60*float(strstamp))
+    except ValueError, e:
+        pass
+    else:
+        return float(int(timestamp_seconds))
+
+    #almost like famous, 'this should never happen' ;)
+    return None
 
 if __name__ == "__main__":
     CSV2XMPP.from_command_line().run()
