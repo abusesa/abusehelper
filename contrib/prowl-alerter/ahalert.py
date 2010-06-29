@@ -2,7 +2,7 @@
 
 """
 Receive alerts via prowl to your iPhone when some of your bots leave
-certain XMPP rooms.  This bot watches room presence instead of user's
+XMPP rooms you are observing. This bot watches room presence instead of user's
 presence, as AbuseHelper is build on assumption that user presence is
 sometimes unavailable. (E.g, you would need to be buddy, or the bots would
 need to be on a globally shared roster.)
@@ -10,19 +10,21 @@ need to be on a globally shared roster.)
 Example ini:
 ------
 [ahalert]
-rooms=blah@conference.ah.cert.ee,cert-ee@conference.ah.cert.ee
-xmpp_jid=<user@ah.example.com>
-xmpp_password=<yourpass>
-watch_room_jids=<lobby>@conference.ah.example.com/config
-apikeys = <your api key from http://prowl.weks.net>
-message=Bot in your watchlist AbuseHelper left the room
+rooms=lobby@conference.example.com,another_room@conference.example.com
+xmpp_jid=user@example.com
+xmpp_password=mypass
+watch_room_jids=lobby@conference.example.com/historian,another_room@conference.example.com/imapbot
+watchlist_name=AH
+message=At least one of the bots in your watchlist left.
+debug=True
+apikeys=<your prowl key>
 ------
 See also: http://prowl.weks.net/
 """
 
 from idiokit import threado, jid
 from abusehelper.core import bot
-from abusehelper.year3000.prowl import ProwlConnection
+from prowl import ProwlConnection
 
 class AHAlert(bot.XMPPBot):
     rooms = bot.ListParam("comma separated list of XMPP rooms "+
