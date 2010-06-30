@@ -56,13 +56,10 @@ class REGEXP(_Rule):
         self.key_values = key_values
 
     def __call__(self, event):
-        for key, value in event.attrs.iteritems():
-            for rkey, regex in self.key_values.iteritems():
-                if key != rkey:
-                    continue
+        for rkey, regex in self.key_values.iteritems():
+            for value in event.values(rkey):
                 if regex.search(str(value)):
                     return True
-                    
         return False
         
 REGEXP.serialize_register()

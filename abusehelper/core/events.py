@@ -63,7 +63,7 @@ class _Parsed(object):
         return any(self.filter(imap(self.parsed, values)))
 
 class Event(object):
-    __slots__ = "attrs", "_element"
+    __slots__ = "_attrs", "_element"
 
     @classmethod
     def from_element(self, element):
@@ -79,7 +79,7 @@ class Event(object):
         return event
 
     def __init__(self, *events):
-        self.attrs = dict()
+        self._attrs = dict()
 
         for event in events:
             for key in event.keys():
@@ -114,10 +114,10 @@ class Event(object):
         """
 
         self._element = None
-        if key not in self.attrs:
-            self.attrs[key] = set()
-        self.attrs[key].add(value)
-        self.attrs[key].update(values)
+        if key not in self._attrs:
+            self._attrs[key] = set()
+        self._attrs[key].add(value)
+        self._attrs[key].update(values)
 
     def update(self, key, values):
         """Update the values of a key.
@@ -139,9 +139,9 @@ class Event(object):
             return
 
         self._element = None
-        if key not in self.attrs:
-            self.attrs[key] = set()
-        self.attrs[key].update(values)
+        if key not in self._attrs:
+            self._attrs[key] = set()
+        self._attrs[key].update(values)
 
     def discard(self, key, value, *values):
         """Discard some value(s) of a key.
@@ -161,11 +161,11 @@ class Event(object):
         set([])
         """
         self._element = None
-        value_set = self.attrs.get(key, set())
+        value_set = self._attrs.get(key, set())
         value_set.discard(value)
         value_set.difference_update(values)
         if not value_set:
-            self.attrs.pop(key, None)
+            self._attrs.pop(key, None)
 
     def clear(self, key):
         """Clear all values of a key.
@@ -183,7 +183,7 @@ class Event(object):
         """
 
         self._element = None
-        self.attrs.pop(key, None)
+        self._attrs.pop(key, None)
 
     def values(self, key=_NO_VALUE, parser=None, ignored=[None]):
         """Return event values (for a specific key, if given).
@@ -224,7 +224,7 @@ class Event(object):
         True
         """
 
-        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
+        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
         if key is not _NO_VALUE:
             return attrs.get(key, set())
 
@@ -295,7 +295,7 @@ class Event(object):
         KeyError: 'other'
         """
 
-        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
+        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
         if key is _NO_VALUE:
             for values in attrs.itervalues():
                 for value in values:
@@ -312,7 +312,7 @@ class Event(object):
 
     def contains(self, key=_NO_VALUE, value=_NO_VALUE, 
                  parser=None, ignored=[None]):
-        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
+        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
         if key is not _NO_VALUE:
             if value is _NO_VALUE:
                 return key in attrs
@@ -327,14 +327,14 @@ class Event(object):
         return False
 
     def keys(self, parser=None, ignored=[None]):
-        attrs = _Parsed(self.attrs, parser, ignored) if parser else self.attrs
+        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
         return attrs.keys()
 
     def to_element(self):
         if self._element is None:
             event = Element("event", xmlns=EVENT_NS)
 
-            for key, values in self.attrs.items():
+            for key, values in self._attrs.items():
                 for value in values:
                     attr = Element("attr", key=key, value=value)
                     event.add(attr)
@@ -342,7 +342,7 @@ class Event(object):
         return self._element
 
     def __repr__(self):
-        return self.__class__.__name__ + "(" + repr(self.attrs) + ")"
+        return self.__class__.__name__ + "(" + repr(self._attrs) + ")"
 
 @threado.stream_fast
 def stanzas_to_events(inner):
@@ -363,7 +363,7 @@ def events_to_elements(inner, include_body=True):
         for event in inner:
             if include_body:
                 fields = list()
-                for key, values in event.attrs.iteritems():
+                for key, values in event._attrs.iteritems():
                     for value in values:
                         fields.append(key + "=" + value)
                 body = Element("body")
@@ -393,7 +393,7 @@ class EventCollector(object):
         return state
         
     def append(self, event):
-        self.gz.write(repr(event.attrs) + os.linesep)
+        self.gz.write(repr(event._attrs) + os.linesep)
 
     def purge(self):
         stringio = self.stringio
