@@ -42,13 +42,25 @@ class AbuseInfo():
         if string == None:
             return self.countryCode
         else:
-            return self.parseCountry(string)[1]
+            return self.getCountry(string)[1]
 
     def getCountryName(self, string=None):
         if string == None:
             return self.countryName
         else:
-            return self.parseCountry(string)[0]
+            return self.getCountry(string)[0]
+    
+    def getCountry(self, string=None):
+        if string == None:
+            return [self.countryName, self.countryCode]
+        else:
+            country = self.parseCountry(string)
+            if country != None and len(country) >= 2:
+                self.countryName = country[0]
+                self.countryCode = country[1]
+                return[country[0], country[1]]
+            else:
+                return [None, None]
 
     def parseSource(self, string):
         m = re.search('Source\s+:\s+(.+)', string)
