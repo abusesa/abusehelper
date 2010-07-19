@@ -1,11 +1,14 @@
 import os
 import gzip
+import operator
 from functools import partial
-from operator import contains
-from itertools import ifilterfalse, imap
+from itertools import ifilter, imap
 from cStringIO import StringIO
 from idiokit import threado
 from idiokit.xmlcore import Element
+
+DEFAULT_PARSER = lambda x: x
+DEFAULT_FILTER = partial(operator.is_not, None)
 
 EVENT_NS = "abusehelper#event"
 _NO_VALUE = object()
@@ -13,10 +16,10 @@ _NO_VALUE = object()
 class _Parsed(object):
     __slots__ = "attrs", "parser", "filter"
 
-    def __init__(self, attrs, parser, ignored):
+    def __init__(self, attrs, parser, filter):
         self.attrs = attrs
         self.parser = parser
-        self.filter = partial(ifilterfalse, partial(contains, ignored))
+        self.filter = partial(ifilter, filter)
 
     def get(self, key, default):
         values = self.attrs.get(key, ())
@@ -60,11 +63,11 @@ class _Parsed(object):
     def __contains__(self, key):
         values = self.attrs.get(key, ())
         values = imap(self.parser, values)
-        return any(self.filter(imap(self.parsed, values)))
+        return any(self.filter(imap(self.parser, values)))
 
 class Event(object):
     __slots__ = "_attrs", "_element"
-
+    
     @classmethod
     def from_element(self, element):
         if len(element) != 1:
@@ -86,6 +89,13 @@ class Event(object):
                 self.update(key, event.values())
                 
         self._element = None
+
+    def _parsed(self, parser, filter):
+        if parser or filter:
+            parser = parser or DEFAULT_PARSER
+            filter = filter or DEFAULT_FILTER
+            return _Parsed(self._attrs, parser, filter)
+        return self._attrs
 
     def add(self, key, value, *values):
         """Add value(s) for a key.
@@ -185,7 +195,7 @@ class Event(object):
         self._element = None
         self._attrs.pop(key, None)
 
-    def values(self, key=_NO_VALUE, parser=None, ignored=[None]):
+    def values(self, key=_NO_VALUE, parser=None, filter=None):
         """Return event values (for a specific key, if given).
 
         >>> event = Event()
@@ -196,10 +206,9 @@ class Event(object):
         >>> event.values("key") == set(["1", "2"])
         True
 
-        Perform parsing, validation and filtering by passing in a
-        parsing function and a collection of ignored parsing values
-        ([None] by default, ie. all None objects returned by the
-        parsing function will be ignored).
+        Perform parsing, validation and filtering by passing in
+        parsing and filtering functions (by default all None objects
+        are filtered when a parsing function has been given).
 
         >>> import socket
         >>> def ipv4(string):
@@ -224,7 +233,7 @@ class Event(object):
         True
         """
 
-        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
+        attrs = self._parsed(parser, filter)
         if key is not _NO_VALUE:
             return attrs.get(key, set())
 
@@ -237,12 +246,11 @@ class Event(object):
         except TypeError:
             return result
 
-    def value(self, key=_NO_VALUE, default=_NO_VALUE, 
-              parser=None, ignored=[None]):
+    def value(self, key=_NO_VALUE, default=_NO_VALUE, parser=None, filter=None):
         """Return one event value (for a specific key, if given).
 
         The value can be picked either from the values of some
-        specific key or amongts event values.
+        specific key or amongst event values.
 
         >>> event = Event()
         >>> event.add("key", "1")
@@ -274,9 +282,8 @@ class Event(object):
         ...
         KeyError: 'somekey'
 
-        As with .values(...), a parsing function and a collection of
-        ignored values can be given, and they will be used to modify
-        the results.
+        As with .values(...), parsing and filtering functions can be
+        given, and they will be used to modify the results.
 
         >>> def int_parse(string):
         ...     try:
@@ -295,7 +302,7 @@ class Event(object):
         KeyError: 'other'
         """
 
-        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
+        attrs = self._parsed(parser, filter)
         if key is _NO_VALUE:
             for values in attrs.itervalues():
                 for value in values:
@@ -311,8 +318,43 @@ class Event(object):
         return default
 
     def contains(self, key=_NO_VALUE, value=_NO_VALUE, 
-                 parser=None, ignored=[None]):
-        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
+                 parser=None, filter=None):
+        """Return whether the event contains a key-value pair (for
+        specific key and/or value, if given).
+
+        >>> event = Event()
+        >>> event.contains() # Does the event contain any values at all?
+        False
+
+        >>> event.add("key", "1")
+        >>> event.contains()
+        True
+        >>> event.contains("key") # Any value for key "key"?
+        True
+        >>> event.contains(value="1") # Value "1" for any key?
+        True
+        >>> event.contains("key", "1") # Value "1" for key "key"?
+        True
+
+        >>> event.contains("other", "2") # Value "2" for key "other"?
+        False
+
+        Parsing and filtering functions can be given to modify the results.
+
+        >>> def int_parse(string):
+        ...     try:
+        ...         return int(string)
+        ...     except ValueError:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "1", "a")
+        >>> event.contains(parser=int_parse) # Any int value for any key?
+        True
+        >>> event.contains("key", parser=int_parse)
+        True
+        """
+
+        attrs = self._parsed(parser, filter)
         if key is not _NO_VALUE:
             if value is _NO_VALUE:
                 return key in attrs
@@ -326,9 +368,54 @@ class Event(object):
                 return True
         return False
 
-    def keys(self, parser=None, ignored=[None]):
-        attrs = _Parsed(self._attrs, parser, ignored) if parser else self._attrs
+    def keys(self, parser=None, filter=None):
+        """Return a sequence of keys with at least one value.
+
+        >>> event = Event()
+        >>> set(event.keys()) == set()
+        True
+        >>> event.add("key", "1")
+        >>> event.add("other", "2", "3")
+        >>> set(event.keys()) == set(["key", "other"])
+        True
+
+        Parsing and filtering functions can be given to modify the
+        results.
+
+        >>> def int_parse(string):
+        ...     try:
+        ...         return int(string)
+        ...     except ValueError:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "1")
+        >>> event.add("other", "a")
+        >>> set(event.keys(parser=int_parse)) == set(["key"])
+        True
+        """
+
+        attrs = self._parsed(parser, filter)
         return attrs.keys()
+
+    def is_valid(self):
+        """Return whether the event contains values for keys other than "id".
+
+        >>> event = Event()
+        >>> event.is_valid()
+        False
+        >>> event.add("id", "1")
+        >>> event.is_valid()
+        False
+        >>> event.add("other", "2")
+        >>> event.is_valid()
+        True
+        """
+
+        if len(self._attrs) == 0:
+            return False
+        if "id" in self._attrs and len(self._attrs) == 1:
+            return False
+        return True
 
     def to_element(self):
         if self._element is None:
