@@ -1,3 +1,4 @@
+import re
 import os
 import gzip
 import operator
@@ -6,6 +7,42 @@ from itertools import ifilter, imap
 from cStringIO import StringIO
 from idiokit import threado
 from idiokit.xmlcore import Element
+
+_ESCAPE = re.compile(u"[&\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFF\uFFFE]",
+                     re.U)
+
+def _escape_sub(match):
+    return "&#x%X;" % ord(match.group())
+
+def escape(string):
+    """Return a string where forbidden XML characters and &
+    (ampersand) have been escaped using XML character references.
+
+    >>> escape(u"\u0000\uffff")
+    u'&#x0;&#xFFFF;'
+
+    Other characters are not affected.
+    """
+    return _ESCAPE.sub(_escape_sub, string)
+
+_UNESCAPE = re.compile(u"&#x([0-9a-f]+);", re.I)
+
+def _unescape_sub(match):
+    value = match.group(1)
+    try:
+        return unichr(int(value, 16))
+    except ValueError:
+        return match.group(1)
+
+def unescape(string):
+    """Return a string where XML character references have been
+    substituted with the corresponding unicode characters.
+
+    >>> unescape(u"&#x0;&#xFFFF;")
+    u'\\x00\\uffff'
+    """
+
+    return _UNESCAPE.sub(_unescape_sub, string)
 
 DEFAULT_PARSER = lambda x: x
 DEFAULT_FILTER = partial(operator.is_not, None)
@@ -70,6 +107,24 @@ class Event(object):
     
     @classmethod
     def from_element(self, element):
+        """Return an event parsed from an XML element (None if the
+        element was not suitable).
+        
+        >>> element = Element("event", xmlns=EVENT_NS)
+        >>> Event.from_element(element) == Event()
+        True
+        
+        >>> event = Event()
+        >>> event.add("key", "value")
+        >>> event.add("\uffff", "\x05") # include some forbidden XML chars
+        >>> Event.from_element(event.to_element()) == event
+        True
+
+        >>> element = Element("invalid")
+        >>> Event.from_element(element) is None
+        True
+        """
+
         if len(element) != 1:
             return None
         if not element.named("event", EVENT_NS):
@@ -78,7 +133,9 @@ class Event(object):
         event = Event()
         event._element = element
         for attr in element.children("attr").with_attrs("key", "value"):
-            event.add(attr.get_attr("key"), attr.get_attr("value"))
+            key = unescape(attr.get_attr("key"))
+            value = unescape(attr.get_attr("value"))
+            event.add(key, value)
         return event
 
     def __init__(self, *events):
@@ -422,11 +479,24 @@ class Event(object):
             event = Element("event", xmlns=EVENT_NS)
 
             for key, values in self._attrs.items():
+                key = escape(key)
                 for value in values:
+                    value = escape(value)
                     attr = Element("attr", key=key, value=value)
                     event.add(attr)
             self._element = event
         return self._element
+
+    def __eq__(self, other):
+        if not isinstance(other, Event):
+            return NotImplemented
+        return other._attrs == self._attrs
+
+    def __ne__(self, other):
+        value = self.__eq__(other)
+        if value is NotImplemented:
+            return NotImplemented
+        return not value
 
     def __repr__(self):
         return self.__class__.__name__ + "(" + repr(self._attrs) + ")"
@@ -451,7 +521,9 @@ def events_to_elements(inner, include_body=True):
             if include_body:
                 fields = list()
                 for key, values in event._attrs.iteritems():
+                    key = escape(key)
                     for value in values:
+                        value = escape(value)
                         fields.append(key + "=" + value)
                 body = Element("body")
                 body.text = ", ".join(fields)
