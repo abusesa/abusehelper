@@ -36,7 +36,8 @@ import base64
 import zipfile
 import re
 from cStringIO import StringIO
-from abusehelper.core import utils
+
+import arf
 
 class ABUSIXService(ABUSIXBot):
     filename_rex = bot.Param(default=r"(?P<eventfile>.*)")
@@ -65,7 +66,7 @@ class ABUSIXService(ABUSIXBot):
         if match is None:
             inner.finish(False)
     
-        yield inner.sub(utils.arf_to_events(fileobj)
+        yield inner.sub(arf.arf_to_events(fileobj)
                         | self.normalize(match.groupdict()))
         inner.finish(True)
 
