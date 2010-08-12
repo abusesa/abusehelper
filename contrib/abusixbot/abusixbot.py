@@ -40,7 +40,7 @@ from cStringIO import StringIO
 import arf
 
 class ABUSIXService(ABUSIXBot):
-    filename_rex = bot.Param(default=r"(?P<eventfile>.*)")
+    #filename_rex = bot.Param(default=r"(?P<eventfile>.*)")
 
     def handle(self, parts):
         attachments = list()
@@ -62,12 +62,13 @@ class ABUSIXService(ABUSIXBot):
 
     @threado.stream
     def parse_text(inner, self, filename, fileobj):
-        match = re.match(self.filename_rex, filename)
-        if match is None:
-            inner.finish(False)
+        #match = re.match(self.filename_rex, filename)
+        #if match is None:
+        #    inner.finish(False)
     
         yield inner.sub(arf.arf_to_events(fileobj)
-                        | self.normalize(match.groupdict()))
+                        #| self.normalize(match.groupdict()))
+                        | self.normalize(dict()))
         inner.finish(True)
 
 if __name__ == "__main__":
