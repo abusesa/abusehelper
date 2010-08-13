@@ -16,9 +16,13 @@ class WhoisBot(roomgraph.RoomGraphBot):
             for event in inner:
                 ip = event.value("ip", None)
                 if(ip == None):
+                    self.log.error("No ip found in event %r", event)
                     continue                
                 ai = zcw.searchAbuseInfo(ip)
-                
+                if (ai == None):
+                    self.log.error("No abuse info found for %s", str(ip))
+                    continue               
+ 
                 event.add("abuse_email", ai.getAbuseMail())
                 if not event.contains("as_name"):
                     event.add("as_name", ai.getNetworkName())
