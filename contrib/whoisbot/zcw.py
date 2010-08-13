@@ -58,7 +58,7 @@ class AbuseInfo():
             if country != None and len(country) >= 2:
                 self.countryName = country[0]
                 self.countryCode = country[1]
-                return[country[0], country[1]]
+                return[self.countryName, self.countryCode]
             else:
                 return [None, None]
 
@@ -114,9 +114,9 @@ class AbuseInfo():
     def parse(self, string):
         self.abuseMail = self.parseAbuseMail(string)
         
-        country = self.parseCountry(string)
-        self.countryCode = country[0]
-        self.countryName = country[1]
+        country = self.getCountry(string)
+        self.countryName = country[0]
+        self.countryCode = country[1]
         
         self.networkName = self.parseNetworkName(string)
         self.networkInfo = self.parseInfos(string)
