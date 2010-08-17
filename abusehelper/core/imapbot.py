@@ -302,7 +302,9 @@ class IMAPService(IMAPBot):
             if headers[-1].get_filename(None) is None:
                 if content_type == "text/plain":
                     texts.append((headers, data))
-            elif content_type in ["text/plain", "application/zip"]:
+            elif content_type in ["text/plain", 
+                                  "application/zip",
+                                  "application/octet-stream"]:
                 attachments.append((headers, data))
 
         return IMAPBot.handle(self, attachments + texts)
@@ -354,6 +356,8 @@ class IMAPService(IMAPBot):
             self.log.info("Parsing CSV data from the ZIP attachment")
             result = yield inner.sub(self.parse_csv(filename, csv_data))
             inner.finish(result)
+
+    handle_application_octet__stream = handle_application_zip
 
 if __name__ == "__main__":
     IMAPService.from_command_line().execute()
