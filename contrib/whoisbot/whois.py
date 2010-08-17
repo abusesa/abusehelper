@@ -14,6 +14,10 @@ class WhoisBot(roomgraph.RoomGraphBot):
 
             tests = list(self.srcs.get(name, ()))
             for event in inner:
+                if(event == None):
+                    self.log.error("None event! Skipping!!")
+                    continue
+
                 ip = event.value("ip", None)
                 if(ip == None):
                     self.log.error("No ip found in event %r", event)
@@ -23,7 +27,13 @@ class WhoisBot(roomgraph.RoomGraphBot):
                     self.log.error("No abuse info found for %s", str(ip))
                     continue               
  
-                event.add("abuse_email", ai.getAbuseMail())
+                email = ai.getAbuseMail()
+                if email is None:
+                    self.log.error("No abuse email found for %r", event)
+                else:
+                    event.add("abuse_email", email)
+                
+
                 if not event.contains("as_name"):
                     event.add("as_name", ai.getNetworkName())
                 if not event.contains("as_description"):
