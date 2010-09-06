@@ -143,7 +143,7 @@ class Event(object):
 
         for event in events:
             for key in event.keys():
-                self.update(key, event.values())
+                self.update(key, event.values(key))
                 
         self._element = None
 
