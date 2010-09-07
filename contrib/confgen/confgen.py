@@ -63,7 +63,7 @@ dst = sys.argv[1]
 try:
     shutil.copytree(src, dst)
     try:
-        replaces = dict(XMPP_JID=input("XMPP JID", parser=parse_jid),
+        replaces = dict(XMPP_JID=input("XMPP username", parser=parse_jid),
                         XMPP_PASSWORD=input("XMPP password"),
                         SERVICE_ROOM=input("Lobby"),
                         SMTP_HOST=input("SMTP host"),
