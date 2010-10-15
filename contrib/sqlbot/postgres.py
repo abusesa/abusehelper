@@ -42,7 +42,11 @@ class PostgresConnector():
     def executeAndReturnResult(self, query):
         cursor = self.connection.cursor()
         cursor.execute(query)
-        return cursor.fetchall()
+        try:    
+            result = cursor.fetchall()
+            return result
+        except:
+            return None
 
     def getConnection(self):
         '''

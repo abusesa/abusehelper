@@ -36,6 +36,10 @@ class SQLReport(bot.ServiceBot):
             for event in inner:
                 self.sqlqueries.insertEvent(event)
 
+    @threado.stream
+    def session(inner, self, state, src_room):
+        yield inner.sub(self.rooms.inc(src_room))
+
 class SQLQueries():
     connection = None
 
@@ -44,10 +48,11 @@ class SQLQueries():
 
     def existsASN(self, asn):
         result = self.connection.executeAndReturnResult("SELECT asn FROM asn WHERE asn = " + asn)
-        if(len(result) >= 1):
-            return True
-        else:
+        
+        if(result is None or len(result) < 1):
             return False
+        else:
+            return True
 
     def insertASN(self, asn, asname):
         if(not self.existsASN(asn)):
@@ -67,15 +72,30 @@ class SQLQueries():
             if(not self.existsASN(asn)):
                 self.insertASN(asn, str(event.value("as_name", None)))
 
+            
+            #check values
+            if(type is None):
+                type = ""
+            if(source is None):
+                source = ""
+            if(asn is None):
+                asn = ""
+            if(customer is None):
+                customer = ""
+            if(abuse_email is None):
+                abuse_email = ""
+            
+            #proceed with query
             query =  "INSERT INTO raw_events(time, ip, type, source, asn, customer, abuse_email) VALUES ("
             query += "'" +    time     + "', "
             query += "'" +     ip      + "', "
+            query += "'" +    type     + "', "
             query += "'" +    source   + "', "
             query += "'" +     asn     + "', "
             query += "'" +   customer  + "', "
-            query += "'" + abuse_email + "'"
+            query += "'" + abuse_email + "')"
             
-            self.connection.executeAndReturnResult(query)
+            self.connection.executeAndCommit(query)
     
 if __name__ == "__main__":
     SQLReport.from_command_line().execute()
