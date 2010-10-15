@@ -10,7 +10,7 @@ CREATE TABLE asn(
 CREATE TABLE raw_events(
     id              serial,
     time            timestamp with time zone,
-    ip              char(11),
+    ip              char(15),
     type            char(256),
     source          char(256),
     asn             integer REFERENCES asn (asn),
