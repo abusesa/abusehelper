@@ -13,9 +13,11 @@ class SQLReport(bot.ServiceBot):
         bot.ServiceBot.__init__(self, *args, **keys)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.sqlqueries = SQLQueries(self.dbsrv, self.dbname, self.dbusr, self.dbpwd)
+        self.log.info("SQLBOT initialized")
 
     @threado.stream
     def handle_room(inner, self, name):
+        self.log.info("Calling handle_room")
         self.log.info("Joining room %r", name)
         room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
         self.log.info("Joined room %r", name)
@@ -23,12 +25,12 @@ class SQLReport(bot.ServiceBot):
         try:
             yield inner.sub(room
                             | events.stanzas_to_events()
-                            | self.distribute(name))
+                            | self.collect(name))
         finally:
             self.log.info("Left room %r", name)
 
     @threado.stream_fast
-    def distribute(inner, self, name):
+    def collect(inner, self, name):
         while True:
             yield inner
             for event in inner:
