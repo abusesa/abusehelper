@@ -1,0 +1,3 @@
+contrib/confgen/confgen.py usr/local/abusehelper2/
+contrib/confgen/config-template/custom/*.py usr/local/abusehelper2/config-template/custom/
+contrib/confgen/config-template/template/default usr/local/abusehelper2/config-template/template/

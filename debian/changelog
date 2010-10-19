@@ -1,3 +1,9 @@
+abusehelper2 (561) lucid; urgency=low
+
+  * abusehelper2.install was missing from the repository.
+
+ -- Lari Huttunen <debian@huttu.net>  Tue, 19 Oct 2010 23:43:49 +0300
+
 abusehelper2 (560) lucid; urgency=low
 
   * confgen.py did not make the package repository build, since I accidentally 
