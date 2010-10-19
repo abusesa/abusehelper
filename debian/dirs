@@ -1,4 +1,7 @@
-etc/abusehelper
-etc/abusehelper/templates
-var/log/abusehelper
-var/lib/abusehelper
+var/lib/ah2
+usr/local/abusehelper2
+usr/local/abusehelper2/config-template
+usr/local/abusehelper2/config-template/custom/
+usr/local/abusehelper2/config-template/log/
+usr/local/abusehelper2/config-template/state/
+usr/local/abusehelper2/config-template/template/

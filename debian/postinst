@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for abusehelper
+# postinst script for abusehelper2
 #
 # see: dh_installdeb(1)
 
@@ -20,21 +20,12 @@ set -e
 
 case "$1" in
     configure|reconfigure)
-        if ! dpkg-statoverride --list /etc/abusehelper >/dev/null; then
-            dpkg-statoverride --add abusehel abusehel 750 /etc/abusehelper
-            chmod 750 /etc/abusehelper
+        if ! dpkg-statoverride --list /var/lib/ah2 >/dev/null; then
+            dpkg-statoverride --add abusehel abusehel 750 /var/lib/ah2
+            chmod 750 /var/lib/ah2
+            chown abusehel:abusehel /var/lib/ah2
         fi
-        if ! dpkg-statoverride --list /var/log/abusehelper >/dev/null; then
-            dpkg-statoverride --add abusehel abusehel 750 /var/log/abusehelper
-            chmod 750 /var/log/abusehelper
-        fi
-        if ! dpkg-statoverride --list /var/lib/abusehelper >/dev/null; then
-            dpkg-statoverride --add abusehel abusehel 750 /var/lib/abusehelper
-            chmod 750 /var/lib/abusehelper
-            chown abusehel:abusehel /var/lib/abusehelper
-        fi
-        chown -R abusehel:abusehel /etc/abusehelper /var/log/abusehelper
-        chmod -R o-rwx /etc/abusehelper /var/log/abusehelper
+        chown -R abusehel:abusehel /var/lib/ah2
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

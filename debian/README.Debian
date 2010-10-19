@@ -1,6 +1,11 @@
 abusehelper for Debian
 ----------------------
 
-This package was deabianized with the help of python-central.
+PLEASE NOTE!
 
- -- Lari Huttunen <debian@huttu.net>  Wed, 02 Dec 2009 12:39:36 +0200
+* You will need to create an initial configuration from the example
+  and modify permissions for production use. (AbuseHelper will run with abusehelper id.)
+
+  # python /usr/local/abusehelper2/confgen.py /var/lib/ah2/production
+
+ -- Lari Huttunen <debian@huttu.net>  Wed, 19 Oct 2010 15:46:36 +0300

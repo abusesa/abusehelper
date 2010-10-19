@@ -1,5 +1,5 @@
 #!/bin/sh
-# preinst script for abusehelper
+# preinst script for abusehelper2
 #
 # see: dh_installdeb(1)
 
@@ -17,7 +17,7 @@ set -e
 case "$1" in
     install|upgrade)
         adduser --quiet --system --shell /bin/false --group \
-        --home /var/lib/abusehelper --gecos "Abuse Helper User" abusehel
+        --home /var/lib/ah2 --gecos "Abuse Helper User" abusehel
     ;;
 
     abort-upgrade)

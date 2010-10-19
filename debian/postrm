@@ -1,5 +1,5 @@
 #!/bin/sh
-# postrm script for abusehelper
+# postrm script for abusehelper2
 #
 # see: dh_installdeb(1)
 
@@ -21,20 +21,13 @@ set -e
 
 case "$1" in
     purge) 
+        if dpkg-statoverride --list /var/lib/ah2 >/dev/null; then
+            dpkg-statoverride --remove /var/lib/ah2
+        fi
         if which deluser >/dev/null ; then
             deluser abusehel 2>/dev/null || true
         fi
-        if dpkg-statoverride --list /etc/abusehelper >/dev/null; then
-            dpkg-statoverride --remove /etc/abusehelper
-        fi
-        if dpkg-statoverride --list /var/log/abusehelper >/dev/null; then
-            dpkg-statoverride --remove /var/log/abusehelper
-        fi
-        if dpkg-statoverride --list /var/lib/abusehelper >/dev/null; then
-            dpkg-statoverride --remove /var/lib/abusehelper
-        fi
-        rm -f /etc/default/abusehelper
-        rm -rf /etc/abusehelper /var/log/abusehelper
+        rm -rf /var/lib/ah2
     ;;
 
     remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)

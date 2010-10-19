@@ -1,4 +1,4 @@
-Source: abusehelper
+Source: abusehelper2
 XS-Python-Version: >= 2.5
 Section: net
 Priority: extra
@@ -6,7 +6,7 @@ Maintainer: Lari Huttunen <debian@huttu.net>
 Build-Depends: debhelper (>= 5), python-central, dh-make, dpkg-dev, debconf, perl, subversion
 Standards-Version: 3.7.2
 
-Package: abusehelper
+Package: abusehelper2
 XB-Python-Version: >= 2.5
 Architecture: all
 Depends: python (>=2.5), adduser

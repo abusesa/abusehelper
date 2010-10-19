@@ -44,10 +44,10 @@ clean:
 	dh_clean 
 
 install: $(PYVERS:%=install-python%) 
-	$(MAKE) DESTDIR=$(CURDIR)/debian/abusehelper install
+	$(MAKE) DESTDIR=$(CURDIR)/debian/abusehelper2 install
 
 install-python%:
-	python$* setup.py install --root $(CURDIR)/debian/abusehelper
+	python$* setup.py install --root $(CURDIR)/debian/abusehelper2
 
 # Must not depend on anything. This is to be called by
 # binary-arch/binary-indep
@@ -58,10 +58,10 @@ binary-common:
 	dh_testroot
 	dh_installchangelogs 
 	dh_installdocs
-	dh_installexamples --exclude=.svn contrib/*
+	dh_installexamples --exclude=.svn --exclude=confgen contrib/*
 	dh_installexamples --exclude=.svn examples/*
 	dh_pycentral
-	dh_installinit
+	#dh_installinit
 	dh_install
 	dh_installman man/abusehelperctl.8 man/roomreader.1
 	dh_link
