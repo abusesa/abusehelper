@@ -1,3 +1,10 @@
+abusehelper2 (560) lucid; urgency=low
+
+  * confgen.py did not make the package repository build, since I accidentally 
+    used absolute paths in the debian/abusehelper2.install.
+
+ -- Lari Huttunen <debian@huttu.net>  Tue, 19 Oct 2010 23:33:36 +0300
+
 abusehelper2 (559) lucid; urgency=low
 
   * First debianization release of abusehelper2.
