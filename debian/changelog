@@ -1,3 +1,9 @@
+abusehelper2 (564) lucid; urgency=low
+
+  * Added missing debianization files.
+
+ -- Lari Huttunen <debian@huttu.net>  Wed, 20 Oct 2010 10:32:07 +0300
+
 abusehelper2 (563) lucid; urgency=low
 
   * Minor debian/control versus policy issues resolved.
