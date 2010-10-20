@@ -1,3 +1,9 @@
+abusehelper2 (562) lucid; urgency=low
+
+  * startup.py and runtime.py were missing from the package under confgen.
+
+ -- Lari Huttunen <debian@huttu.net>  Wed, 20 Oct 2010 10:10:09 +0300
+
 abusehelper2 (561) lucid; urgency=low
 
   * abusehelper2.install was missing from the repository.
