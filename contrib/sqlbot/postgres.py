@@ -31,17 +31,17 @@ class PostgresConnector():
         '''
         self.connection.close()
 
-    def executeAndCommit(self, query):
+    def executeAndCommit(self, query, *values):
         '''
             Execute the query given in parameter and commit transaction
         '''
         cursor = self.connection.cursor()
-        cursor.execute(query)
+        cursor.execute(query, values)
         self.connection.commit()
 
-    def executeAndReturnResult(self, query):
+    def executeAndReturnResult(self, query, *values):
         cursor = self.connection.cursor()
-        cursor.execute(query)
+        cursor.execute(query, values)
         try:    
             result = cursor.fetchall()
             return result
@@ -53,13 +53,4 @@ class PostgresConnector():
             Return reference to internal DB pointer
         '''
         return self.connection
-    
-    
-
-# Test
-#psql = PostgresConnector("localhost", "ABUSEHELPER", "abusehelper", "4bus3h3lIstheDev1l") 
-#psql.executeAndCommit("INSERT INTO asn (asn, asname) VALUES (2611, 'BELNET')")
-#print(len(psql.executeAndReturnResult("SELECT * FROM asn")))
-#psql.close()
-#print("Test suceeded")
 

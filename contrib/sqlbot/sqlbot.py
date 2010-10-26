@@ -47,7 +47,7 @@ class SQLQueries():
         self.connection = postgres.PostgresConnector(dbsrv, dbname, dbusr, dbpwd)
 
     def existsASN(self, asn):
-        result = self.connection.executeAndReturnResult("SELECT asn FROM asn WHERE asn = " + asn)
+        result = self.connection.executeAndReturnResult("SELECT asn FROM asn WHERE asn = ?", asn)
         
         if(result is None or len(result) < 1):
             return False
@@ -56,8 +56,8 @@ class SQLQueries():
 
     def insertASN(self, asn, asname):
         if(not self.existsASN(asn)):
-            query = "INSERT INTO asn (asn, asname) VALUES (" + asn + ", '" + asname + "')"
-            self.connection.executeAndCommit(query)
+            query = "INSERT INTO asn (asn, asname) VALUES ( %s, %s )"
+            self.connection.executeAndCommit(query, asn, asname)
         return
 
     def insertEvent(self, event):
@@ -86,16 +86,9 @@ class SQLQueries():
                 abuse_email = ""
             
             #proceed with query
-            query =  "INSERT INTO raw_events(time, ip, type, source, asn, customer, abuse_email) VALUES ("
-            query += "'" +    time     + "', "
-            query += "'" +     ip      + "', "
-            query += "'" +    type     + "', "
-            query += "'" +    source   + "', "
-            query += "'" +     asn     + "', "
-            query += "'" +   customer  + "', "
-            query += "'" + abuse_email + "')"
-            
-            self.connection.executeAndCommit(query)
+            query =  "INSERT INTO raw_events(time, ip, type, source, asn, customer, abuse_email) 
+                                     VALUES (%s,   %s, %s  , %s    , %s , %s      , %s) "
+            self.connection.executeAndCommit(query, time, ip, type, source, asn, customer, abuse_email)
     
 if __name__ == "__main__":
     SQLReport.from_command_line().execute()
