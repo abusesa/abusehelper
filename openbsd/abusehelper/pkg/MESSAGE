@@ -1,16 +1,14 @@
 If you haven't configured AbuseHelper earlier, run the following commands: 
 ## Copy & Paste below
-cp -r /usr/local/share/examples/abusehelper /etc/                                                                     
-chown -R root:_abusehe /etc/abusehelper/ 
-chmod 750 /etc/abusehelper/
+mkdir -p /var/lib/ah2
+chown root:_abusehe /var/lib/ah2
+chmod 750 /var/lib/ah2
 
-mkdir /var/log/abusehelper
-chown _abusehe:_abusehe /var/log/abusehelper
-chmod 770 /var/log/abusehelper
+python -m abusehelper.contrib.confgen.confgen /var/lib/ah2/production
+
+chown -R root:_abusehe /var/lib/ah2/production/
+chmod 750 /var/lib/ah2/production/
+
 ## End Copy & Paste
 
-And then edit the following files:
 
- * /etc/abusehelper/config.ini
- * /etc/abusehelper/customers.ini
- * /etc/abusehelper/templates/*

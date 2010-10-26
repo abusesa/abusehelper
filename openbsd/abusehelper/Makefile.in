@@ -170,8 +170,8 @@ MODULES =		lang/python
 #LDFLAGS =		???
 #MAKE_FILE =		???
 #PKG_ARCH =		???
-WRKDIST =		${WRKDIR}/abusehelper-$V
-#WRKSRC =		??? if other than ${WRKDIST}
+WRKDIST =               ${WRKDIR}/abusehelper-read-only
+#WRKSRC =		${WRKDIR}/abusehelper-read-only
 #WRKBUILD =		??? if other than ${WRKSRC}
 #WRKCONF =		??? if other than ${WRKBUILD}
 
@@ -185,7 +185,5 @@ SUBST_VARS =		ABUSEHELPERLOGDIR
 post-install:
 	${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper
 	${INSTALL_DATA_DIR} ${PREFIX}/share/examples/abusehelper/templates
-	${INSTALL_DATA} ${WRKSRC}/examples/*.ini ${PREFIX}/share/examples/abusehelper	
-	${INSTALL_DATA} ${WRKSRC}/examples/templates/* ${PREFIX}/share/examples/abusehelper/templates
 
 .include <bsd.port.mk>

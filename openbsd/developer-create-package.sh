@@ -11,7 +11,7 @@ AH=abusehelper
 AHPORTS=${PORTSDIR}/${AH}
 
 revision=$(svn info|grep Revision|cut -d" " -f2)
-version=1.r${revision}
+version=2.r${revision}
 
 mydir=$(dirname $0)
 
@@ -21,6 +21,8 @@ makefile=${mydir}/abusehelper/Makefile
 
 cat ${makefile}.in | sed -e "s/REPLACEVERSIONNUMBER/${version}/g" > ${makefile} 
 
+echo "creating /usr/ports/distfiles/abusehelper-${version}.tar.gz"
+(cd ../../; tar -czf /usr/ports/distfiles/abusehelper-${version}.tar.gz abusehelper-read-only) 
 
 pkg_delete abusehelper
 echo 'Running userdel & groupdel'
