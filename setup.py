@@ -20,6 +20,7 @@ def generate_version():
     version_module.generate(base_path)
     return version_module.version()
 
+
 version = generate_version()
 if version is None:
     print >> sys.stderr, "No version info available. Quitting."
@@ -29,9 +30,24 @@ if not version.isdigit():
 
 setup(name="abusehelper",
       version="2.r"+version,
-      packages=["abusehelper", 
-                "abusehelper.core", 
-                "idiokit"],
+      packages=[
+        "abusehelper", 
+        "abusehelper.core", 
+        "idiokit", 
+        "abusehelper.contrib",
+        "abusehelper.contrib.confgen"],
+      package_dir={
+        'abusehelper.contrib.confgen': 'contrib/confgen',
+        'abusehelper.contrib': 'contrib',	
+	},
+      package_data={
+        'abusehelper.contrib.confgen': 
+        [
+	  'config-template/*.py',
+          'config-template/custom/*.py',
+          'config-template/template/default'
+          ]
+       },
       description="A framework for receiving and redistributing Abuse Feeds",
       long_description="AbuseHelper is a modular, scalable and robust " + \
           "framework to help you in your abuse handling.",
