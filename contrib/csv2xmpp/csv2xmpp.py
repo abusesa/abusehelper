@@ -43,8 +43,8 @@ def events_to_elements_with_delay_element(inner,timestamp_column):
             hourminute = None
             event = sanitize(event,timestamp_column)
 
-            for key, values in event.attrs.iteritems():
-                for value in values:
+            for key in event.keys():
+                for value in event.values(key):
                     fields.append(key + "=" + value)
             body = Element("body")
             body.text = ", ".join(fields)
