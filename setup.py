@@ -35,17 +35,20 @@ setup(name="abusehelper",
         "abusehelper.core", 
         "idiokit", 
         "abusehelper.contrib",
-        "abusehelper.contrib.confgen"],
+        "abusehelper.contrib.confgen",
+        "abusehelper.contrib.bridgebot"],
       package_dir={
-        'abusehelper.contrib.confgen': 'contrib/confgen',
         'abusehelper.contrib': 'contrib',	
+        'abusehelper.contrib.confgen': 'contrib/confgen',
+        'abusehelper.contrib.bridgebot': 'contrib/bridgebot'
 	},
       package_data={
-        'abusehelper.contrib.confgen': 
+        'abusehelper.contrib.confgen':
         [
-	  'config-template/*.py',
-          'config-template/custom/*.py',
-          'config-template/template/default'
+          'confgen/*.py',
+	  'confgen/config-template/*.py',
+          'confgen/config-template/custom/*.py',
+          'confgen/config-template/template/default'
           ]
        },
       description="A framework for receiving and redistributing Abuse Feeds",
