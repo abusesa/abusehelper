@@ -22,7 +22,7 @@ makefile=${mydir}/abusehelper/Makefile
 cat ${makefile}.in | sed -e "s/REPLACEVERSIONNUMBER/${version}/g" > ${makefile} 
 
 echo "creating /usr/ports/distfiles/abusehelper-${version}.tar.gz"
-(cd ../../; tar -czf /usr/ports/distfiles/abusehelper-${version}.tar.gz abusehelper-read-only) 
+(cd ../; python setup.py sdist ; cp dist/abusehelper-${version}.tar.gz /usr/ports/distfiles/abusehelper-${version}.tar.gz) ||myerr "copying source file failed"
 
 pkg_delete abusehelper
 echo 'Running userdel & groupdel'
