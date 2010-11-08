@@ -59,6 +59,8 @@ def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
         for key, value in row.items():
             if None in (key, value):
                 continue
+            if not value:
+                continue
             key = decode(key.lower().strip())
             value = decode(value.strip())
             event.add(key, value)
