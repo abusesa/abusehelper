@@ -23,7 +23,7 @@ from idiokit import threado
 from abusehelper.core import imapbot, events, bot, cymru
 
 def get_hosts(url_lines):
-    """
+    r"""
     Return hostnames names parsed from an iterable sequence of URL
     lines. Ignore lines that don't have at least the URL scheme and
     hostname defined.
@@ -33,7 +33,7 @@ def get_hosts(url_lines):
 
     The leading and trailing whitespaces are ignored.
 
-    >>> list(get_hosts(["    http://host    "])
+    >>> list(get_hosts(["    http://host    "]))
     ['host']
 
     The input can be any iterable sequence of lines, e.g. a file-like
@@ -41,7 +41,7 @@ def get_hosts(url_lines):
 
     >>> from StringIO import StringIO
     >>> list(get_hosts(StringIO("ignore this\nhttp://host")))
-    ['host']    
+    ['host']
     """
 
     for line in url_lines:
@@ -53,7 +53,7 @@ def get_hosts(url_lines):
 
 @threado.stream
 def get_resolved_hosts(inner, url_lines):
-    """
+    r"""
     Send out events containing hostnames (parsed from an iterable
     sequence of URL lines) and their respective IPv4 and IPv6
     addresses. 0-n events may be sent per each hostname (one for each
