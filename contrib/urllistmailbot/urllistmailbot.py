@@ -49,38 +49,41 @@ def get_hosts(url_lines):
 
         parsed = urlparse.urlparse(line)
         if parsed.scheme and parsed.hostname:
-            yield parsed.hostname
-
-@threado.stream
-def get_resolved_hosts(inner, url_lines):
-    r"""
-    Send out events containing hostnames (parsed from an iterable
-    sequence of URL lines) and their respective IPv4 and IPv6
-    addresses. 0-n events may be sent per each hostname (one for each
-    resolved IPv4/6 address).
-    """
-
-    for host in get_hosts(url_lines):
-        current = inner.thread(socket.getaddrinfo, host, None)
-        while not current.has_result():
-            yield inner, current
-            
-        for family, socktype, proto, canonname, sockaddr in current.result():
-            if family not in (socket.AF_INET, socket.AF_INET6):
-                continue
-
-            event = events.Event()
-            event.add("host", host)
-            event.add("ip", sockaddr[0])
-            inner.send(event)
+            yield line, parsed.hostname
 
 class URLListMailBot(imapbot.IMAPBot):
+    @threado.stream
+    def get_resolved_hosts(inner, self, url_lines):
+        r"""
+        Send out events containing hostnames (parsed from an iterable
+        sequence of URL lines) and their respective IPv4 and IPv6
+        addresses. 0-n events may be sent per each hostname (one for each
+        resolved IPv4/6 address).
+        """
+        
+        for url, host in get_hosts(url_lines):
+            current = inner.thread(socket.getaddrinfo, host, None)
+            try:
+                while not current.has_result():
+                    yield inner, current
+            except socket.error, error:
+                self.log.info("Could not resolve host %r: %r", host, error)
+                continue
+            
+            for family, _, _, _, sockaddr in current.result():
+                if family not in (socket.AF_INET, socket.AF_INET6):
+                    continue                
+                event = events.Event()
+                event.add("url", url)
+                event.add("ip", sockaddr[0])
+                inner.send(event)
+
     def augment(self):
         return cymru.CymruWhois()
 
     @threado.stream
     def handle_text_plain(inner, self, headers, fileobj):
-        yield inner.sub(get_resolved_hosts(fileobj))
+        yield inner.sub(self.get_resolved_hosts(fileobj))
         inner.finish(True)
 
 if __name__ == "__main__":
