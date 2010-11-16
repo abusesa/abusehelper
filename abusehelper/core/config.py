@@ -39,6 +39,6 @@ def load_configs(module_name, config_func_name="configs"):
     module = load_module(module_name, False)
     configs = getattr(module, config_func_name, None)
 
-    if configs is None or not callable(configs):
+    if not callable(configs):
         raise ImportError("no callable %r defined" % config_func_name)
     return configs()

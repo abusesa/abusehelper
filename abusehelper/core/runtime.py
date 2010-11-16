@@ -123,10 +123,6 @@ class Cancel(Exception):
     pass
 
 class RuntimeBot(bot.XMPPBot):
-    DISCARD = 0
-    UPDATE = 1
-    SET = 2
-
     service_room = bot.Param()
 
     @threado.stream
@@ -137,40 +133,25 @@ class RuntimeBot(bot.XMPPBot):
     @threado.stream
     def _handle_updates(inner, self, lobby):
         sessions = dict()
-        current = dict()
 
         try:
             while True:
-                mode, configs = yield inner
-
-                removed = set()
-                if mode == self.SET:
-                    current = dict()
-                    removed.update(sessions)
-                elif mode in (self.UPDATE, self.DISCARD):
-                    for config, sessions in configs:
-                        removed.update(current.pop(config, set()))
+                configs = yield inner
 
                 added = set()
-                if mode in (self.UPDATE, self.SET):
-                    for config in configs:
-                        config_runtime = getattr(config, "runtime", None)
-                        if config_runtime is None:
-                            continue
+                for config in configs:
+                    config_runtime = getattr(config, "runtime", None)
+                    if not callable(config_runtime):
+                        continue
 
-                        current.setdefault(config, set())
-                        for container in config_runtime():
-                            for session in container.sessions(config):
-                                added.add(session)
-                                current[config].add(session)
+                    for container in config_runtime():
+                        added.update(container.sessions(config))
 
-                removed.difference_update(added)
-                for key in removed:
+                for key in set(sessions) - added:
                     stream = sessions.pop(key)
                     stream.throw(Cancel())
 
-                added.difference_update(sessions)
-                for session in added:
+                for session in added - set(sessions):
                     sessions[session] = self.session(lobby, session)
         finally:
             for stream in sessions.values():
@@ -233,7 +214,7 @@ class DefaultRuntimeBot(RuntimeBot):
                 mtime = os.path.getmtime(conf_path)
                 if last_mtime != mtime:
                     last_mtime = mtime
-                    inner.send(self.SET, config.load_configs(conf_path))
+                    inner.send(config.load_configs(conf_path))
                     error_msg = None
             except BaseException, exception:
                 if error_msg != str(exception):
