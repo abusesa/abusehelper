@@ -36,6 +36,9 @@ class Param(object):
         self.order = Param.param_order
         Param.param_order += 1
 
+    def is_visible(self):
+        return True
+
     def has_default(self):
         return self.default is not self.NO_VALUE
 
@@ -78,6 +81,10 @@ class IntParam(Param):
         except ValueError:
             raise ParamError("not a valid integer value: %r" % value)
 
+class _InternalParam(BoolParam):
+    def is_visible(self):
+        return False
+
 def optparse_name(name):
     return name.replace("_", "-")
 
@@ -116,9 +123,13 @@ class Bot(object):
     ini_section = Param("INI section used for configuration "+
                         "(default: bot's name)",
                         default=None)
-    log_file = Param(default=None)
-    startup = BoolParam(default=None)
-
+    log_file = Param("write logs to the given path (default: log to stdout)",
+                     default=None)
+    read_config_pickle_from_stdin = _InternalParam("internal use only, "+
+                                                   "bot should read its "+
+                                                   "configuration from stdin "+
+                                                   "as a Python pickle")
+    
     class __metaclass__(type):
         def __new__(cls, name, parents, keys):
             bot_name = Param("Name for the bot (default=%default)",
@@ -168,7 +179,7 @@ class Bot(object):
         usage = ["Usage: %prog [options]"]
         positional = list()
         for name, param in cls.params():
-            if not param.has_default():
+            if not param.has_default() and param.is_visible():
                 usage.append(name)
                 positional.append((name, param))
         parser.set_usage(" ".join(usage))
@@ -178,8 +189,12 @@ class Bot(object):
             if param.short is not None:
                 args = ["-" + optparse_name(param.short)]
 
+            help = param.help
+            if not param.is_visible():
+                help = optparse.SUPPRESS_HELP
+
             kwargs = dict(default=param.default,
-                          help=param.help,
+                          help=help,
                           metavar=name,
                           dest=name,
                           action="callback",
@@ -207,7 +222,7 @@ class Bot(object):
         default = cls.param_defaults()
         parser, cli = cls.params_from_command_line(argv)
 
-        if cli.get("startup", False):
+        if cli.get("read_config_pickle_from_stdin", False):
             conf = dict(pickle.load(sys.stdin))
             for name, param in cls.params():
                 if name not in conf:
@@ -335,8 +350,11 @@ class _Service(services.Service):
 from abusehelper.core import version
 
 class ServiceBot(XMPPBot):
-    bot_state_file = Param(default=None)
-    service_room = Param()
+    bot_state_file = Param("save bot state to the given path "+
+                           "(default: do not save state)",
+                           default=None)
+    service_room = Param("name of the multi user chat room used "+
+                         "for bot control")
     service_mock_session = ListParam(default=None)
 
     @threado.stream
@@ -509,7 +527,9 @@ import collections
 from idiokit import timer
 
 class PollingBot(FeedBot):
-    poll_interval = IntParam(default=3600)
+    poll_interval = IntParam("wait at least the given amount of seconds "+
+                             "before polling the data source again "+
+                             "(default: %default seconds)", default=3600)
 
     def __init__(self, *args, **keys):
         FeedBot.__init__(self, *args, **keys)

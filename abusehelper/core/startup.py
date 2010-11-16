@@ -17,10 +17,6 @@ def kill_processes(processes, sig):
                 raise
 
 class StartupBot(bot.Bot):
-    ini_file = None
-    ini_section = None
-    startup = None
-
     def configs(self):
         return []
 
@@ -51,7 +47,7 @@ class StartupBot(bot.Bot):
                     # out which modules are running. Workaround: Use
                     # "-m runpy module" instead of "-m module".
                     args.extend(["-m", "runpy", module])
-                args.append("--startup")
+                args.append("--read-config-pickle-from-stdin")
 
                 process = subprocess.Popen(args, stdin=subprocess.PIPE)
                 processes[startup] = name, process
