@@ -2,9 +2,9 @@ import xml.etree.cElementTree as etree
 import re
 from idiokit import threado
 from abusehelper.core import events,bot,utils
-from abusehelper.core.imapbot import IMAPService
+from abusehelper.core.imapbot import IMAPBot
 
-class AtlasMailReportService(IMAPService):
+class AtlasMailReportService(IMAPBot):
     filter = bot.Param(default=r'(BODY "http://atlas" UNSEEN)')
     url_rex = bot.Param(default=r"http://atlas\S+")
 
