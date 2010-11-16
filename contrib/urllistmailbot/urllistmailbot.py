@@ -55,10 +55,10 @@ class URLListMailBot(imapbot.IMAPBot):
     @threado.stream
     def get_resolved_hosts(inner, self, url_lines):
         r"""
-        Send out events containing hostnames (parsed from an iterable
-        sequence of URL lines) and their respective IPv4 and IPv6
-        addresses. 0-n events may be sent per each hostname (one for each
-        resolved IPv4/6 address).
+        Send out events containing URLs (parsed from an iterable
+        sequence of URL lines) and their respective hostname's IPv4
+        and IPv6 addresses. 0-n events may be sent per each URL (one
+        for each resolved hostname IPv4/6 address).
         """
         
         for url, host in get_hosts(url_lines):
