@@ -24,24 +24,24 @@ from abusehelper.core import imapbot, events, bot, cymru
 
 def get_hosts(url_lines):
     r"""
-    Return hostnames names parsed from an iterable sequence of URL
-    lines. Ignore lines that don't have at least the URL scheme and
-    hostname defined.
+    Return (url, hostname) pairs parsed from an iterable sequence of
+    URL lines. Ignore lines that don't have at least the URL scheme
+    and hostname defined.
 
     >>> list(get_hosts(["ignore this", "http://host"]))
-    ['host']
+    [('http://host', 'host')]
 
     The leading and trailing whitespaces are ignored.
 
     >>> list(get_hosts(["    http://host    "]))
-    ['host']
+    [('http://host', 'host')]
 
     The input can be any iterable sequence of lines, e.g. a file-like
     object.
 
     >>> from StringIO import StringIO
     >>> list(get_hosts(StringIO("ignore this\nhttp://host")))
-    ['host']
+    [('http://host', 'host')]
     """
 
     for line in url_lines:
