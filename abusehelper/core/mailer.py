@@ -5,7 +5,11 @@ from idiokit import threado, timer
 from abusehelper.core import events, taskfarm, services, templates, bot
 
 def next_time(time_string):
-    parsed = list(time.strptime(time_string, "%H:%M"))
+    try:
+        parsed = list(time.strptime(time_string, "%H:%M"))    
+    except (TypeError, ValueError):
+        return float(time_string)
+
     now = time.localtime()
 
     current = list(now)
@@ -16,7 +20,7 @@ def next_time(time_string):
     if delta <= 0.0:
         current[2] += 1
         return time.mktime(current) - current_time
-    return delta
+    return delta    
 
 @threado.stream
 def alert(inner, *times):
@@ -187,6 +191,12 @@ class MailTemplate(templates.Template):
             msg.attach(part)
         return msg
 
+def format_addresses(addrs):
+    from email.utils import getaddresses, formataddr
+
+    # FIXME: Use encoding after getaddresses
+    return ", ".join(map(formataddr, getaddresses(addrs)))
+
 class MailerService(ReportBot):
     mail_sender = bot.Param("from whom it looks like the mails came from")
     smtp_host = bot.Param("hostname of the SMTP service used for sending mails")
@@ -204,42 +214,43 @@ class MailerService(ReportBot):
             self.smtp_auth_password = getpass.getpass("SMTP password: ")
         self.server = None
 
+    def format(self, _events, template="", to=[], cc=[], **keys):
+        """
+        Return a mail object produced based on collected events and
+        session parameters.
+        """
+
         csv = templates.CSVFormatter()
-        attach_csv = templates.AttachUnicode(csv)
-        embed_csv = templates.AttachAndEmbedUnicode(csv)
-        self.formatters = dict(csv=csv,
-                               attach_csv=attach_csv,
-                               attach_and_embed_csv=embed_csv)
+        template = MailTemplate(template,
+                                csv=csv,
+                                attach_csv=templates.AttachUnicode(csv),
+                                embed_csv=templates.AttachAndEmbedUnicode(csv),
+                                to=templates.Const(format_addresses(to)),
+                                cc=templates.Const(format_addresses(cc)))
+        return template.format(_events)
 
     def collect(self, state, **keys):
         return ReportBot.collect(self, state, **keys) | self._collect(**keys)
 
     @threado.stream
-    def _collect(inner, self, to=[], cc=[], template="", **keys):
+    def _collect(inner, self, to=[], cc=[], **keys):
         from email.header import decode_header
         from email.utils import formatdate, make_msgid, getaddresses, formataddr
 
         # FIXME: Use encoding after getaddresses
         from_addr = getaddresses([self.mail_sender])[0]
-        to_addrs = ", ".join(map(formataddr, getaddresses(to)))
-        cc_addrs = ", ".join(map(formataddr, getaddresses(cc)))
-
-        formatters = dict(self.formatters)
-        formatters["to"] = templates.Const(to_addrs)
-        formatters["cc"] = templates.Const(cc_addrs)
-        template = MailTemplate(template, **formatters)
 
         while True:
             events = yield inner
             if not events:
                 continue
 
-            msg = template.format(events)
-    
+            msg = self.format(events, to=to, cc=cc, **keys)
+
             if "To" not in msg:
-                msg["To"] = to_addrs
+                msg["To"] = format_addresses(to)
             if "Cc" not in msg:
-                msg["Cc"] = cc_addrs
+                msg["Cc"] = format_addresses(cc)
 
             del msg["From"]
             msg["From"] = formataddr(from_addr)
