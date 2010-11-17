@@ -46,7 +46,7 @@ class INIStartupBot(startup.StartupBot):
         for section in ini_file.sections():
             params = dict(ini_file.items(section))
 
-            names = set([params["bot_name"], params["module"]])
+            names = set([section, params["bot_name"], params["module"]])
             if self.disable is not None and names & set(self.disable):
                 continue
             if self.enable is not None and not (names & set(self.enable)):
