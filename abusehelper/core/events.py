@@ -8,18 +8,24 @@ from cStringIO import StringIO
 from idiokit import threado
 from idiokit.xmlcore import Element
 
-_ESCAPE = re.compile(u"[&\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFF\uFFFE]",
+_ESCAPE = re.compile(u"&(?=#)|[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFF\uFFFE]",
                      re.U)
 
 def _escape_sub(match):
     return "&#x%X;" % ord(match.group())
 
 def escape(string):
-    """Return a string where forbidden XML characters and &
-    (ampersand) have been escaped using XML character references.
+    """Return a string where forbidden XML characters (and & in some
+    cases) have been escaped using XML character references.
 
     >>> escape(u"\u0000\uffff")
     u'&#x0;&#xFFFF;'
+    
+    & should only be escaped when it is potentially a part of an escape
+    sequence starting with &#.
+
+    >>> escape(u"& &#x26;")
+    u'& &#x26;#x26;'
 
     Other characters are not affected.
     """
