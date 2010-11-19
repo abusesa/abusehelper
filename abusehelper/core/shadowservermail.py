@@ -8,7 +8,10 @@ from abusehelper.core import utils, bot, imapbot
 class ShadowServerMail(imapbot.IMAPBot):
     filter = bot.Param(default=r'(BODY "http://dl.shadowserver.org/" UNSEEN)')
     url_rex = bot.Param(default=r"http://dl.shadowserver.org/\S+")
-    filename_rex = bot.Param(default=r"\d{4}-\d\d-\d\d-(?P<report_type>.*)-[^-]+\..*")
+
+    # Assume the file names to be something like
+    # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
+    filename_rex = bot.Param(default=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>.*)-[^-]+\..*")
 
     @threado.stream
     def normalize(inner, self, groupdict):
