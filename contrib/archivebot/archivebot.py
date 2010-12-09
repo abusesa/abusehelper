@@ -29,7 +29,7 @@ def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
 
     return time.strftime(format, time.gmtime(seconds))
 
-def ensure_dir(dir_name, mode=0700):
+def ensure_dir(dir_name):
     """
     Ensure that the directory exists (create if necessary) and return
     the absolute directory path.
@@ -37,7 +37,7 @@ def ensure_dir(dir_name, mode=0700):
 
     dir_name = os.path.abspath(dir_name)
     try:
-        os.makedirs(dir_name, mode)
+        os.makedirs(dir_name)
     except OSError, (code, error_str):
         if code != errno.EEXIST:
             raise
