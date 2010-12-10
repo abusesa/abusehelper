@@ -2,17 +2,14 @@
 # files into the given archive directory, one file per channel and
 # named after the channel. Each event takes one line, and the format
 # is as follows:
-# 2010-12-09 15:11:34 {"a": ["1"], "b": ["2", "3"]}
-# 2010-12-09 17:12:32 {"a": ["4", "5"], "b": ["6"]}
+# 2010-12-09 15:11:34 a=1,b=2,b=3
+# 2010-12-09 17:12:32 a=4,a=5,b=6
 
+import re
 import os
+import csv
 import time
 import errno
-
-try:
-    import json
-except ImportError:
-    import simplejson as json
 
 from abusehelper.core import bot, taskfarm, services, events
 from idiokit import threado
@@ -43,20 +40,50 @@ def ensure_dir(dir_name):
             raise
     return dir_name
 
+_ESCAPE_RE = re.compile("[\r\n\",=]")
+
+def dump_string(string):
+    r"""
+    Return an escaped utf-8 encoded string. 
+
+    >>> dump_string(u'\u00e4')
+    '\xc3\xa4'
+
+    Escaping is done in two phases. 1) Double quotes are doubled.  2)
+    Add double quote around the string when the string contains any of
+    the following characters: ",\r\n
+    
+    >>> dump_string('"') == '"' * 4
+    True
+    >>> dump_string("a=b")
+    '"a=b"'
+    """
+
+    string = string.encode("utf-8")
+    if _ESCAPE_RE.search(string):
+        return '"' + string.replace('"', '""') + '"'
+    return string
+
 def dump_event(event):
     """
-    Return an event serialized into a JSON dict of lists.
+    Return an event serialized into key-value pairs.
 
     >>> event = events.Event()
-    >>> event.add("a", "1")
+    >>> event.add('a', '1')
     >>> dump_event(event)
-    '{"a": ["1"]}'
-    """
+    'a=1'
 
-    event_dict = dict()
+    >>> event = events.Event()
+    >>> event.add('=', '"')
+    >>> dump_event(event)
+    '"="="\"\""'
+    """
+    
+    result = []
     for key in event.keys():
-        event_dict[key] = list(event.values(key))
-    return json.dumps(event_dict)
+        for value in event.values(key):
+            result.append(dump_string(key) + "=" + dump_string(value))
+    return ",".join(result)
 
 class ArchiveBot(bot.ServiceBot):
     archive_dir = bot.Param("directory where archive files are written")
@@ -98,14 +125,17 @@ class ArchiveBot(bot.ServiceBot):
             while True:
                 yield inner
 
+                timestamp = time.time()
                 for event in inner:
-                    line = isoformat() + " " + dump_event(event)
-                    archive.write(line + os.linesep)
+                    archive.write(self.format(timestamp, event))
 
                 archive.flush()
         finally:
             archive.flush()
             archive.close()
+
+    def format(self, timestamp, event):
+        return isoformat(timestamp) + " " + dump_event(event) + os.linesep
 
 if __name__ == "__main__":
     ArchiveBot.from_command_line().execute()
