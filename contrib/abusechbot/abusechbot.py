@@ -10,13 +10,8 @@ class RSSBot(bot.PollingBot):
     def poll(inner, self, _):
         yield
 
-        for url in self.feeds.split(","):
+        for url in self.feeds:
             yield
-            url = url.strip()
-
-            if not url:
-                continue
-
             try:
                 self.log.info('Downloading feed from: "%s"', url)
                 _, fileobj = yield inner.sub(utils.fetch_url(url))
@@ -65,7 +60,7 @@ class RSSBot(bot.PollingBot):
         return event
 
 class AbuseCHBot(RSSBot):
-    feeds = bot.ListParam(default="https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker,https://zeustracker.abuse.ch/rss.php")
+    feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker", "https://zeustracker.abuse.ch/rss.php"])
 
     def create_event(self, title, link, description, pubdate):
         if description is None:
