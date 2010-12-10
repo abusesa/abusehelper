@@ -44,7 +44,6 @@ class RSSBot(bot.PollingBot):
 
                     event = self.create_event(title,link,description,pubdate)
                     if event:
-                        print event.to_element().serialize()
                         inner.send(event)
 
     def create_event(self, title, link, description, pubdate):
