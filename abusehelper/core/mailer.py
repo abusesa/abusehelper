@@ -208,13 +208,14 @@ class MailerService(ReportBot):
                                    "service", default=None)
 
     def __init__(self, **keys):
-        ReportBot.__init__(self, **keys)
+        super(MailerService, self).__init__(**keys)
 
         if self.smtp_auth_user and not self.smtp_auth_password:
             self.smtp_auth_password = getpass.getpass("SMTP password: ")
         self.server = None
 
-    def format(self, _events, template="", to=[], cc=[], **keys):
+    @threado.stream
+    def build_mail(inner, self, events, template="", to=[], cc=[], **keys):
         """
         Return a mail object produced based on collected events and
         session parameters.
@@ -224,10 +225,11 @@ class MailerService(ReportBot):
         template = MailTemplate(template,
                                 csv=csv,
                                 attach_csv=templates.AttachUnicode(csv),
-                                embed_csv=templates.AttachAndEmbedUnicode(csv),
+                                attach_and_embed_csv=templates.AttachAndEmbedUnicode(csv),
                                 to=templates.Const(format_addresses(to)),
                                 cc=templates.Const(format_addresses(cc)))
-        return template.format(_events)
+        yield
+        inner.finish(template.format(events))
 
     def collect(self, state, **keys):
         return ReportBot.collect(self, state, **keys) | self._collect(**keys)
@@ -245,7 +247,7 @@ class MailerService(ReportBot):
             if not events:
                 continue
 
-            msg = self.format(events, to=to, cc=cc, **keys)
+            msg = yield inner.sub(self.build_mail(events, to=to, cc=cc, **keys))
 
             if "To" not in msg:
                 msg["To"] = format_addresses(to)
@@ -254,8 +256,8 @@ class MailerService(ReportBot):
 
             del msg["From"]
             msg["From"] = formataddr(from_addr)
-            msg['Date'] = formatdate()             
-            msg['Message-ID'] = make_msgid()
+            msg["Date"] = formatdate()             
+            msg["Message-ID"] = make_msgid()
             subject = msg.get("Subject", "")
 
             msg_data = msg.as_string()
