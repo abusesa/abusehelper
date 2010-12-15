@@ -1,5 +1,8 @@
 from idiokit.xmlcore import Element
 from abusehelper.core import serialize
+
+import operator
+import functools
 import re
 
 class RuleError(Exception):
@@ -36,33 +39,49 @@ class _Rule(object):
     def __hash__(self):
         return hash(self.__class__) ^ hash(self.arguments)
 
-class REGEXP(_Rule):
+class MATCH(_Rule):
+    _flags = tuple(sorted("UIXLMS"))
+
     @classmethod
     def dump_rule(cls, dump, name, rule):
-        element = Element(name)
-        element.add(dump(rule.child))
-        return element
+        flags = rule.flags
+        if flags is not None:
+            flags = "".join(x for x in cls._flags if flags & getattr(re, x, 0))
+        return serialize.dump_list(dump, name, [rule.key, rule.pattern, flags])
 
     @classmethod
     def load_rule(cls, load, element):
-        children = list(element.children())
-        if len(children) != 1:
-            raise RuleError(element)
-        return cls(load(children[0]))
+        key, pattern, flags = serialize.load_list(load, element)
+        if flags is not None:
+            flags = reduce(lambda x, y: getattr(re, y, 0) | x, flags, 0)
+            pattern = re.compile(pattern, flags)
+        return cls(key, pattern)
 
-    def __init__(self, *keys, **key_values):
-        _Rule.__init__(self, *keys, **key_values)
-        self.keys = keys
-        self.key_values = key_values
+    def __init__(self, key=None, value=None):
+        if value is None:
+            filter = None
+            pattern = None
+            flags = None
+        elif isinstance(value, basestring):
+            filter = functools.partial(operator.eq, value)
+            pattern = value
+            flags = None
+        else:
+            filter = value.search
+            pattern = value.pattern
+            flags = value.flags
+
+        _Rule.__init__(self, key, value)
+        self.key = key
+        self.filter = filter
+        self.pattern = pattern
+        self.flags = flags
 
     def __call__(self, event):
-        for rkey, regex in self.key_values.iteritems():
-            for value in event.values(rkey):
-                if regex.search(str(value)):
-                    return True
-        return False
-        
-REGEXP.serialize_register()
+        if self.key is None:
+            return event.contains(filter=self.filter)
+        return event.contains(self.key, filter=self.filter)
+MATCH.serialize_register()
 
 class NOT(_Rule):
     @classmethod
@@ -249,43 +268,89 @@ class NETBLOCK(_Rule):
         return False
 NETBLOCK.serialize_register()
 
-import unittest
-from abusehelper.core import events
-
-class MockEvent(events.Event):
-    def __init__(self, **keys):
-        events.Event.__init__(self)
-        for key, values in keys.iteritems():
-            self.update(key, values)
-
-class NetblockTests(unittest.TestCase):
-    def test_match_ipv6(self):
-        rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
-        assert rule(MockEvent(ip=["2001:0db8:aaaa:bbbb:cccc::"]))
-
-    def test_non_match_ipv6(self):
-        rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
-        assert not rule(MockEvent(ip=["::1"]))
-
-    def test_match_arbitrary_key(self):
-        rule = NETBLOCK("1.2.3.4", 24)
-        assert rule(MockEvent(somekey=["1.2.3.255"]))
-
-    def test_non_match_arbitrary_key(self):
-        rule = NETBLOCK("1.2.3.4", 24)
-        assert not rule(MockEvent(somekey=["1.2.4.255"]))
-
-    def test_match_ip_key(self):
-        rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
-        assert rule(MockEvent(somekey=["4.5.6.255"], ip=["1.2.3.255"]))
-
-    def test_nonmatch_ip_key(self):
-        rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
-        assert not rule(MockEvent(somekey=["1.2.3.4"], ip=["1.2.4.255"]))
-
-    def test_non_match_non_ip_data(self):
-        rule = NETBLOCK("1.2.3.4", 24)
-        assert not rule(MockEvent(ip=["this is just some data"]))
-
 if __name__ == "__main__":
+    import unittest
+    from abusehelper.core import events
+
+    class MockEvent(events.Event):
+        def __init__(self, **keys):
+            events.Event.__init__(self)
+            for key, values in keys.iteritems():
+                self.update(key, values)
+
+    class MatchTests(unittest.TestCase):
+        def test_match(self):
+            rule = MATCH()
+            assert not rule(MockEvent())
+            assert rule(MockEvent(a=["b"]))
+            assert rule(MockEvent(x=["y"]))
+
+            rule = MATCH("a")
+            assert not rule(MockEvent())
+            assert rule(MockEvent(a=["b"]))
+            assert not rule(MockEvent(x=["y"]))
+
+            rule = MATCH("a", "b")
+            assert not rule(MockEvent())
+            assert rule(MockEvent(a=["b"]))
+            assert not rule(MockEvent(a=["a"]))
+
+            rule = MATCH("a", re.compile("b"))
+            assert not rule(MockEvent())
+            assert rule(MockEvent(a=["abba"]))
+            assert not rule(MockEvent(a=["aaaa"]))
+
+        def test_eq(self):
+            assert MATCH() == MATCH()
+            assert MATCH() != MATCH("a")
+            assert MATCH("a") == MATCH("a")
+            assert MATCH("a") != MATCH("x")
+            assert MATCH("a") != MATCH("a", "b")
+            assert MATCH("a", "b") == MATCH("a", "b")
+            assert MATCH("a", "b") != MATCH("x", "y")
+            assert MATCH("a", re.compile("b")) == MATCH("a", re.compile("b"))
+            assert MATCH("a", re.compile("b")) != MATCH("x", re.compile("y"))
+            assert MATCH("a", re.compile("b")) != MATCH("a", "b")
+            assert MATCH("a", re.compile("b", re.I)) != MATCH("a", re.compile("a"))
+            assert MATCH("a", re.compile("b", re.I)) != MATCH("a", re.compile("a", re.I))
+
+        def test_serialize(self):
+            rule = MATCH()
+            assert serialize.load(serialize.dump(rule)) == rule
+
+            rule = MATCH("a", "b")
+            assert serialize.load(serialize.dump(rule)) == rule
+
+            rule = MATCH("a", re.compile("b", re.I))
+            assert serialize.load(serialize.dump(rule)) == rule
+
+    class NetblockTests(unittest.TestCase):
+        def test_match_ipv6(self):
+            rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
+            assert rule(MockEvent(ip=["2001:0db8:aaaa:bbbb:cccc::"]))
+
+        def test_non_match_ipv6(self):
+            rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
+            assert not rule(MockEvent(ip=["::1"]))
+
+        def test_match_arbitrary_key(self):
+            rule = NETBLOCK("1.2.3.4", 24)
+            assert rule(MockEvent(somekey=["1.2.3.255"]))
+
+        def test_non_match_arbitrary_key(self):
+            rule = NETBLOCK("1.2.3.4", 24)
+            assert not rule(MockEvent(somekey=["1.2.4.255"]))
+
+        def test_match_ip_key(self):
+            rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
+            assert rule(MockEvent(somekey=["4.5.6.255"], ip=["1.2.3.255"]))
+
+        def test_nonmatch_ip_key(self):
+            rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
+            assert not rule(MockEvent(somekey=["1.2.3.4"], ip=["1.2.4.255"]))
+
+        def test_non_match_non_ip_data(self):
+            rule = NETBLOCK("1.2.3.4", 24)
+            assert not rule(MockEvent(ip=["this is just some data"]))
+
     unittest.main()
