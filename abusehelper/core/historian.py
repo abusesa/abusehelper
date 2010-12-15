@@ -153,16 +153,9 @@ def delay_element(timestamp):
         timestamp = timestamp + time.altzone
     else:
         timestamp = timestamp + time.timezone
-
     delay = Element("delay")
-    delay.text = "Greetings earthlings"
     delay.set_attr("xmlns", 'urn:xmpp:delay')
-#    delay.set_attr("from", 'historian')
     delay.set_attr("stamp", format_time(timestamp, '%Y-%m-%dT%H:%M:%SZ'))
-#    delay = Element("x")
-#    delay.set_attr("xmlns", 'jabber:x:delay')
-#    delay.set_attr("from", 'historian')
-#    delay.set_attr("stamp", format_time(timestamp, '%Y%m%dT%H:%M:%S'))
     return delay
 
 def parse_command(message, name):
@@ -317,47 +310,7 @@ class HistorianService(bot.ServiceBot):
                     if room.nick_jid == sender:
                         return
 
-            if message.children("event"):
-                self.event_parser(element, to, room_jid, **attrs)
-            elif message.children("body"):
-                self.command_parser(element, to, room_jid, **attrs)
-
-    def event_parser(self, message, requester, room_jid, **attrs):
-        for element in message.children("event"):
-            event = events.Event.from_element(element)
-
-            if not event or not event.contains("bot:action") \
-                         or event.value("bot:action") != "historian":
-                continue
-
-            start = event.value("start", None)
-            end = event.value("end", None)
-            
-            match_rule = None
-            for key in event.keys():
-                if(key == "start" or key == "end" or key == "bot:action"):
-                    continue
-                value = event.value(key)
-                rule = { str(key): re.compile(value) }
-                if match_rule == None:
-                    match_rule = rules.REGEXP(**rule)
-                else:
-                    match_rule = rules.OR(match_rule, rules.REGEXP(**rule))
-            
-            self.log.info("Got history request from %r for %r", requester, 
-                                                                room_jid)
-            counter = 0
-            for etime, eroom, event in self.history.find(room_jid, start, end):
-                if match_rule and not match_rule(event):
-                    continue
-
-                counter += 1
-                elements = [event.to_element(), delay_element(etime)]
-                self.xmpp.core.message(requester, *elements, **attrs)
-
-            if counter == 0:
-                event = events.Event()
-                self.xmpp.core.message(requester, event.to_element(), **attrs) 
+            self.command_parser(element, to, room_jid, **attrs)
 
     def command_parser(self, message, requester, room_jid, **attrs):
         for body in message.children("body"):
