@@ -308,8 +308,11 @@ from abusehelper.core import log
 
 class XMPPBot(Bot):
     xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
-    xmpp_password = Param("the XMPP password", 
-                          default=None)
+    xmpp_password = Param("the XMPP password", default=None)
+    xmpp_host = Param("the XMPP service host (default: autodetect)",
+                      default=None)
+    xmpp_port = IntParam("the XMPP service port (default: autodetect)",
+                         default=None)
     
     def __init__(self, **keys):
         Bot.__init__(self, **keys)
@@ -328,9 +331,12 @@ class XMPPBot(Bot):
 
     @threado.stream
     def xmpp_connect(inner, self):
-        self.log.info("Connecting to XMPP server with JID %r", self.xmpp_jid)
-        xmpp = yield inner.sub(connect(self.xmpp_jid, self.xmpp_password))
-        self.log.info("Connected to XMPP server with JID %r", self.xmpp_jid)
+        self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
+        xmpp = yield inner.sub(connect(self.xmpp_jid, 
+                                       self.xmpp_password,
+                                       host=self.xmpp_host,
+                                       port=self.xmpp_port))
+        self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
         xmpp.core.presence()
         inner.finish(xmpp)
 
