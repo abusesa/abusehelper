@@ -22,17 +22,14 @@ def customer_room(customer):
 def fallback_room(name):
     return Room(room_prefix + "fallback." + name)
 
-def meta_to_event(meta):
-    event = events.Event()
-    for key in meta.keys():
-        event.update(key, meta[key])
-    return event
-
-def map_asn(string):
+def parse_asn(string):
     try:
-        return rules.MATCH(u"asn", unicode(int(string)))
+        return unicode(int(string))
     except ValueError:
         return None
+
+def map_asn(asn):
+    return rules.MATCH(u"asn", unicode(int(asn)))
 
 def map_netblock(netblock):
     split = netblock.split("/", 1)
@@ -57,7 +54,8 @@ def map_netblock(netblock):
     return rules.NETBLOCK(ip, bits)
 
 def map_alias_rule((alias, ruleset)):
-    return rules.AND(rules.MATCH("feed", alias), combine_rules(rules.OR, ruleset))
+    return rules.AND(rules.MATCH("feed", alias), 
+                     combine_rules(rules.OR, ruleset))
 
 def filter_value(string):
     return string.strip() not in ("", "-")
@@ -73,35 +71,20 @@ def combine_rules(base, ruleset):
     return base(*ruleset)
 
 class Source(object):
-    def __init__(self, name, alias, **attrs):
-        self.name = name
+    def __init__(self, wiki_name, bot_name, alias, **attrs):
+        self.wiki_name = wiki_name
+        self.bot_name = bot_name
         self.alias = alias
         self.attrs = attrs
 
     def runtime(self):
-        yield (Session(self.name, **self.attrs)
+        yield (Session(self.bot_name, **self.attrs)
                | raw_room(self.alias)
-               | Session(self.name + ".sanitizer")
+               | Session(self.bot_name + ".sanitizer")
                | sanitized_room(self.alias)
                | sources_room)
         yield raw_room(self.alias) | Session("historian")
         yield sanitized_room(self.alias) | Session("historian")
-
-class Fallback(object):
-    def __init__(self, name, customer_rules, rule):
-        self.name = name
-
-        ruleset = list()
-        if customer_rules:
-            ruleset.append(rules.NOT(combine_rules(rules.OR, customer_rules)))
-        if rule is not None:
-            ruleset.append(rule)
-        self.rule = combine_rules(rules.AND, ruleset)
-
-    def runtime(self):
-        yield (sources_room
-               | Session("roomgraph", rule=self.rule)
-               | fallback_room(self.name))
 
 class Customer(object):
     mail_to = []
@@ -130,6 +113,28 @@ class Customer(object):
                          template=template,
                          times=self.mail_times))
         yield customer_room(self.name) | Session("historian")
+
+class Fallback(object):
+    def __init__(self, name, rule=None):
+        self.name = name
+        self.rule = rule
+        self.customer_rules = None
+
+    def set_customer_rules(self, customer_rules):
+        self.customer_rules = customer_rules
+
+    def runtime(self):
+        ruleset = list()
+        if self.customer_rules:
+            ruleset.append(rules.NOT(combine_rules(rules.OR, 
+                                                   self.customer_rules)))
+        if self.rule is not None:
+            ruleset.append(self.rule)
+        rule = combine_rules(rules.AND, ruleset)
+
+        yield (sources_room
+               | Session("roomgraph", rule=rule)
+               | fallback_room(self.name))
 
 class WikiRuntimeBot(RuntimeBot):
     url = bot.Param("wiki url")
@@ -166,32 +171,65 @@ class WikiRuntimeBot(RuntimeBot):
 
     def get_pages(self, category):
         try:
-            return self.wiki.getMeta(category)
-        except:
+            pages = self.wiki.getMeta(category)
+        except Exception:
             self.wiki = None
+
             self.log.info("Trying to reconnect to wiki")
             try:
                 self.connect()
-                try:
-                    return self.wiki.getMeta(category)
-                except:
-                    self.info.log("Failed to get category %s" % category)
-            except:
-                return
- 
+            except Exception, e:
+                self.info.log("Could not reconnect to wiki: %r" % e)
+                return dict()
+
+            try:
+                pages = self.wiki.getMeta(category)
+            except Exception, e:
+                self.info.log("Failed to get category %s: %r" % category, e)
+                return dict()
+
+        result = dict()
+        for page, meta in pages.iteritems():
+            event = events.Event()
+            for key in meta.keys():
+                event.update(key, meta[key])
+            result[page] = event
+        return result
+
     def load_template(self, page):
         if not self.template_cache.get(page, None):
             self.template_cache[page] = self.wiki.getPage(page)
         return self.template_cache[page]
 
-    def get_customers(self, pages):
+    @threado.stream
+    def configs(inner, self):
+        while True:
+            confs = list()
+
+            pages = self.get_pages(self.category)
+            self.log.info("Got %i config pages from wiki.", len(pages))
+
+            sources = list(self.sources(pages))
+            confs.extend(sources)
+
+            customer_rules = set()
+            for customer in self.customers(pages, sources):
+                customer_rules.add(customer.rule)
+                confs.append(customer)
+
+            for fallback in self.fallbacks():
+                fallback.set_customer_rules(customer_rules)
+                confs.append(fallback)
+
+            inner.send(confs)
+            yield inner, timer.sleep(self.poll_interval)
+
+    def customers(self, pages, sources):
         templates = dict()
         customers = dict()
         self.template_cache.clear()
 
-        for asn_page, meta in pages.items():
-            event = meta_to_event(meta)
-
+        for event in pages.values():
             asn_rules = event.values("ASN1", parser=map_asn)
             if not asn_rules:
                 continue
@@ -203,64 +241,44 @@ class WikiRuntimeBot(RuntimeBot):
 
             default_emails = event.values("Abuse email", filter=filter_email)
             default_template = event.value("Mail template", self.mail_template)
-            for wiki_name, (_, alias) in self.sources.items():
-                template = event.value("Mail template "+wiki_name, 
+            for source in sources:
+                template = event.value("Mail template "+source.wiki_name, 
                                        default_template,
                                        filter=filter_value)
 
-                emails = event.values("Abuse email "+wiki_name, 
+                emails = event.values("Abuse email "+source.wiki_name, 
                                       filter=filter_email)
                 for email in (emails or default_emails):
                     try:
                         template_data = self.load_template(template)
-                    except:
-                        self.log.info("Failed to get mail template %r" % template)
+                    except Exception:
+                        self.log.info("Failed to get template %r", template)
                         continue
                     templates[email] = template_data
 
-                    customers.setdefault(email, dict()).setdefault(alias, set())
-                    customers[email][alias].add(rule)
+                    customers.setdefault(email, dict())
+                    customers[email].setdefault(source.alias, set())
+                    customers[email][source.alias].add(rule)
 
         for email, aliases in customers.items():
             name = "".join(map(lambda x: x if x.isalnum() else "_", email))
             template = templates[email]
             rule = combine_rules(rules.OR, map(map_alias_rule, aliases.items()))
-            yield name, template, rule
+            yield Customer(name, template, rule, mail_to=[email])
 
-    @threado.stream
-    def configs(inner, self):
-        while True:
-            confs = list()
-            customer_rules = set()
-
-            pages = self.get_pages(self.category)
-            self.log.info("Got %i config pages from wiki.", len(pages.keys()))
-            for name, template, rule in self.get_customers(pages):
-                customer_rules.add(rule)
-                confs.append(Customer(name, template, rule))
-
-            for key, rule in self.fallbacks.items():
-                confs.append(Fallback(key, customer_rules, rule))
+    def sources(self, pages):
+        asns = set()
+        for event in pages.values():
+            asns.update(event.values("ASN1", parse_asn))
             
-            for wiki_name, (bot_name, alias) in self.sources.items():
-                confs.append(Source(bot_name, alias))
+        yield Source("DShield", "dshield", "d", asns=asns)
+        yield Source("Arbor", "arbor", "a")
+        yield Source("Shadowserver", "shadowserver", "s")
 
-            inner.send(confs)
-            yield inner, timer.sleep(self.poll_interval)
-
-    # These keys should match with the contact pages source specific email
-    # and template keys. Example:
-    #  Abuse email Arbor:: arbor@example.com
-    #  Mail template Shadowserver:: ShadowMailTemplate
-    sources = {
-        "Arbor": ("arbor", "a"),
-        "Shadowserver": ("shadowserver", "s"),
-        }
+    def fallbacks(self):
+        yield Fallback("all-unhandled")
+        yield Fallback("containing-a-keyword", 
+                       rules.MATCH("somekey", re.compile("keyword")))
     
-    fallbacks = {
-        "all-unhandled": None,
-        "containing-a-keyword": rules.MATCH("somekey", re.compile("keyword"))
-        }
-
 if __name__ == "__main__":
     WikiRuntimeBot.from_command_line().execute()
