@@ -82,7 +82,7 @@ class OpenCollabBot(bot.PollingBot):
                     response = self.wiki.request("IncGetMeta", self.query, \
                         self.handle)
                 except:
-                    self.info.log("Failed to get category %s" % category)
+                    self.log.info("Failed to get category %s" % category)
                     return None, None
 
         if len(response) < 3 or len(response[2]) < 2:
@@ -104,6 +104,9 @@ class OpenCollabBot(bot.PollingBot):
         for page in updated:
             event = self.events.get(page, None)
             if event:
+                if len(event.keys()) > 1 and event.contains("id"):
+                    link = "%s%s" % (self.url, page)
+                    event.add("source", link)
                 inner.send(event)
 
 if __name__ == "__main__":
