@@ -1,5 +1,5 @@
 import opencollab.wiki
-from idiokit import threado
+from idiokit import threado,timer
 from abusehelper.core import bot, events
 
 class OpenCollabBot(bot.PollingBot):
@@ -81,8 +81,8 @@ class OpenCollabBot(bot.PollingBot):
                 try:    
                     response = self.wiki.request("IncGetMeta", self.query, \
                         self.handle)
-                except:
-                    self.log.info("Failed to get category %s" % category)
+                except Exception, e:
+                    self.log.info("IncGetMeta failed: %s" % e)
                     return None, None
 
         if len(response) < 3 or len(response[2]) < 2:
@@ -93,9 +93,11 @@ class OpenCollabBot(bot.PollingBot):
 
     @threado.stream
     def poll(inner, self, _):
-        yield
-
+        yield timer.sleep(1)
+        
         incremental, diff = self.get_events()
+        if diff == None: 
+            return
         if len(diff) < 2 or (not diff[0] and not diff[1]):
             return
 
@@ -103,6 +105,7 @@ class OpenCollabBot(bot.PollingBot):
         self.log.info("%s updated events.", str(len(updated)))
         for page in updated:
             event = self.events.get(page, None)
+
             if event:
                 if len(event.keys()) > 1 and event.contains("id"):
                     link = "%s%s" % (self.url, page)
