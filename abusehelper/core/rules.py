@@ -278,6 +278,38 @@ if __name__ == "__main__":
             for key, values in keys.iteritems():
                 self.update(key, values)
 
+    class ContainsTests(unittest.TestCase):
+        def test_match(self):
+            rule = CONTAINS()
+            assert rule(MockEvent())
+
+            rule = CONTAINS("a")
+            assert not rule(MockEvent())
+            assert not rule(MockEvent(x=["y"]))
+            assert rule(MockEvent(a=["b"]))
+
+            rule = CONTAINS(a="b")
+            assert not rule(MockEvent(a=["a"]))
+            assert rule(MockEvent(a=["b"]))
+
+            rule = CONTAINS(a="b", x="y")
+            assert not rule(MockEvent(x=["y"]))
+            assert not rule(MockEvent(a=["b"]))
+            assert rule(MockEvent(a=["b"], x=["y"]))
+
+        def test_serialize(self):
+            rule = CONTAINS()
+            assert serialize.load(serialize.dump(rule)) == rule
+
+            rule = CONTAINS("a")
+            assert serialize.load(serialize.dump(rule)) == rule
+
+            rule = CONTAINS(a="a")
+            assert serialize.load(serialize.dump(rule)) == rule
+
+            rule = CONTAINS("key", a="a", x="y")
+            assert serialize.load(serialize.dump(rule)) == rule
+
     class MatchTests(unittest.TestCase):
         def test_match(self):
             rule = MATCH()
