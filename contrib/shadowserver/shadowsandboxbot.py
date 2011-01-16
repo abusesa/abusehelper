@@ -1,8 +1,7 @@
-from abusehelper.core import imapbot
+from abusehelper.core import shadowservermail
 
-class ShadowSandboxBot(imapbot.IMAPService):
-    def __init__(self, **keys):
-        imapbot.IMAPService.__init__(self, **keys)
+class ShadowSandboxBot(shadowservermail.ShadowServerMail):
+    pass
 
 if __name__ == "__main__":
     ShadowSandboxBot.from_command_line().execute()

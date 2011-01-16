@@ -255,32 +255,3 @@ class IMAPBot(bot.FeedBot):
             skip_rest = yield inner.sub(handler(headers, fileobj))
             if skip_rest:
                 return
-
-# Warning: The code below is deprecated and preserved only for
-# compatibility purposes. Use shadowservermail for running standalone
-# ShadowServer mail bots, and use IMAPBot class for subclassing.
-
-import warnings
-
-class IMAPService(IMAPBot):
-    filter = bot.Param(default=r'(BODY "http://" UNSEEN)')
-    url_rex = bot.Param(default=r"http://\S+")
-    filename_rex = bot.Param(default=r"(?P<eventfile>.*)")
-    
-    def __init__(self, *args, **keys):
-        warnings.warn("IMAPService is deprecated. Use shadowservermail "+
-                      "module for running ShadowServer mail bots instead, "+
-                      "and use IMAPBot class for subclassing.",
-                      DeprecationWarning, stacklevel=3)
-
-        # A hack to avoid problems with cyclical imports.
-        from abusehelper.core import shadowservermail
-        IMAPService.__bases__ = (shadowservermail.ShadowServerMail,)
-
-        super(IMAPService, self).__init__(*args, **keys)
-
-if __name__ == "__main__":
-    warnings.warn("Running imapbot module as a standalone bot is deprecated. "+
-                  "Use shadowservermail module instead.",
-                  DeprecationWarning, stacklevel=2)
-    IMAPService.from_command_line().execute()
