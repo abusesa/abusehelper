@@ -15,12 +15,13 @@ class _Rule(object):
         serialize.register(cls.dump_rule, cls.load_rule, cls, name)
     
     def __init__(self, *args, **keys):
-        self.arguments = tuple(args), frozenset(keys.items())
+        self._hash = None
+        self._arguments = tuple(args), frozenset(keys.items())
 
     def __eq__(self, other):
         if other.__class__ is not self.__class__:
             return NotImplemented
-        return self.arguments == other.arguments
+        return self._arguments == other._arguments
 
     def __ne__(self, other):
         result = self.__eq__(other)
@@ -29,7 +30,7 @@ class _Rule(object):
         return not result
 
     def __repr__(self):
-        args, keys = self.arguments
+        args, keys = self._arguments
 
         reprs = list()
         reprs.extend(map(repr, args))
@@ -37,7 +38,9 @@ class _Rule(object):
         return self.__class__.__name__ + "(" + ", ".join(reprs) + ")"
 
     def __hash__(self):
-        return hash(self.__class__) ^ hash(self.arguments)
+        if self._hash is None:
+            self._hash = hash(self.__class__) ^ hash(self.arguments)
+        return self._hash
 
 class MATCH(_Rule):
     _flags = tuple(sorted("UIXLMS"))
@@ -151,42 +154,27 @@ class AND(_Rule):
         return True
 AND.serialize_register()
 
-class CONTAINS(_Rule):
+class ANYTHING(_Rule):
     @classmethod
     def dump_rule(cls, dump, name, rule):
         element = Element(name)
-        element.add(serialize.dump_list(dump, "keys", rule.keys))
-        element.add(serialize.dump_dict(dump, "key-values", rule.key_values))
         return element
 
     @classmethod
     def load_rule(cls, load, element):
-        children = list(element.children())
-        if len(children) != 2:
-            raise RuleError(element)
-        keys = set(serialize.load_list(load, children[0]))
-        key_values = serialize.load_dict(load, children[1])
-        return cls(*keys, **key_values)
-                 
-    def __init__(self, *keys, **key_values):
-        _Rule.__init__(self, *keys, **key_values)
-        self.keys = keys
-        self.key_values = key_values
+        return ANYTHING()
 
-    def __call__(self, event):
-        for key in self.keys:
-            if not event.contains(key):
-                return False
-        for key, value in self.key_values.items():
-            if not event.contains(key, value):
-                return False
-        return True
-CONTAINS.serialize_register()
+    def __init__(self):
+        _Rule.__init__(self)
+
+    def __call__(self, *args, **keys):
+        return self
+ANYTHING.serialize_register()
 
 import struct
 from socket import inet_pton, AF_INET, AF_INET6, error
 
-class NETBLOCKError(Exception):
+class NETBLOCKError(RuleError):
     pass
 
 class NETBLOCK(_Rule):
@@ -267,6 +255,37 @@ class NETBLOCK(_Rule):
                     return True
         return False
 NETBLOCK.serialize_register()
+
+# CONTAINS rule type is deprecated. The following compatibility code
+# implements CONTAINS using the current supported rule types.
+
+import warnings
+
+def CONTAINS(*keys, **key_values):
+    warnings.warn("abusehelper.core.rules.CONTAINS is deprecated. "+
+                  "Use abusehelper.core.rules.MATCH instead.")
+    return _CONTAINS(keys, key_values)
+
+def _CONTAINS(keys, key_values):
+    keys = [MATCH(key) for key in keys]
+    key_values = [MATCH(key, value) for (key, value) in key_values.items()]
+
+    children = keys + key_values
+    if len(children) == 0:
+        return ANYTHING()
+    if len(children) == 1:
+        return children[0]
+    return AND(*children)
+
+def _CONTAINS_load(load, element):
+    children = list(element.children())
+    if len(children) != 2:
+        raise RuleError(element)
+
+    keys = set(serialize.load_list(load, children[0]))
+    key_values = serialize.load_dict(load, children[1])
+    return _CONTAINS(keys, key_values)
+serialize.register(None, _CONTAINS_load, [], "rule-contains")
 
 if __name__ == "__main__":
     import unittest
