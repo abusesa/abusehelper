@@ -43,7 +43,7 @@ class RoomGraphBot(bot.ServiceBot):
             self.log.info("Left room %r", name)
 
     @threado.stream
-    def session(inner, self, _, src_room, dst_room, rule=rules.CONTAINS(), **keys):
+    def session(inner, self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
         counter = self.srcs.setdefault(src_room, taskfarm.Counter())
         counter.inc(dst_room, rule)
         try:

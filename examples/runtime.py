@@ -68,7 +68,7 @@ def configs():
             netblocks.setdefault(customer.asn, set()).update(parsed)
 
     for customer in CUSTOMERS:
-        rule = rules.CONTAINS(asn=str(customer.asn))
+        rule = rules.MATCH("asn", unicode(customer.asn))
 
         if customer.netblocks:
             rule = rules.AND(rule,

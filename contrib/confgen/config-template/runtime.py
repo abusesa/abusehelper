@@ -45,9 +45,8 @@ class Type(Base):
         self.name = name
 
     def main(self):
-        rule = rules.CONTAINS(type=self.name)
         yield (Source.class_room() 
-               | Session("roomgraph", rule=rule) 
+               | Session("roomgraph", rule=rules.MATCH("type", self.name))
                | self.room() 
                | self.class_room())
 
@@ -88,7 +87,7 @@ def parse_asn_netblock(item):
         string = string[match.end():]
 
         if data.isdigit():
-            rule = rules.CONTAINS(asn=str(int(data)))
+            rule = rules.MATCH("asn", unicode(int(data)))
             if prefix == "-":
                 minus_asn.append(rule)
             else:
