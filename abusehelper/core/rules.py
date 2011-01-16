@@ -39,7 +39,7 @@ class _Rule(object):
 
     def __hash__(self):
         if self._hash is None:
-            self._hash = hash(self.__class__) ^ hash(self.arguments)
+            self._hash = hash(self.__class__) ^ hash(self._arguments)
         return self._hash
 
 class MATCH(_Rule):
