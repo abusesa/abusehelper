@@ -6,19 +6,6 @@ import logging
 import optparse
 import traceback
 import cPickle as pickle
-from ConfigParser import SafeConfigParser
-
-class ConfigParser(SafeConfigParser):
-    def __init__(self, filename):
-        filename = os.path.abspath(filename)
-        directory, _ = os.path.split(filename)
-        SafeConfigParser.__init__(self, dict(__dir__=directory))
-
-        opened = open(filename, "r")
-        try:
-            self.readfp(opened)
-        finally:
-            opened.close() 
 
 class ParamError(Exception):
     pass
@@ -118,11 +105,6 @@ class LineFormatter(logging.Formatter):
         return "".join(lines)
 
 class Bot(object):
-    ini_file = Param("INI file used for configuration", 
-                     default=None)
-    ini_section = Param("INI section used for configuration "+
-                        "(default: bot's name)",
-                        default=None)
     log_file = Param("write logs to the given path (default: log to stdout)",
                      default=None)
     read_config_pickle_from_stdin = _InternalParam("internal use only, "+
@@ -132,7 +114,7 @@ class Bot(object):
     
     class __metaclass__(type):
         def __new__(cls, name, parents, keys):
-            bot_name = Param("Name for the bot (default=%default)",
+            bot_name = Param("name for the bot (default=%default)",
                              default=name)
             bot_name.order = -1
             keys.setdefault("bot_name", bot_name)
@@ -235,22 +217,6 @@ class Bot(object):
                         message = "startup parameter " + name + ": " + error.args[0]
                         parser.error(message)                    
                 default[name] = value
-
-        ini_file = cli.get("ini_file", None)
-        if ini_file is not None:
-            ini_section = cli.get("ini_section", None)
-            if ini_section is None:
-                ini_section = cli.get("bot_name", default["bot_name"])
-            
-            config = ConfigParser(ini_file)
-            for name, param in cls.params():
-                if config.has_option(ini_section, name):
-                    try:
-                        value = config.get(ini_section, name)
-                        default[name] = param.parse(value)
-                    except ParamError, error:
-                        message = "parameter " + name + ": " + error.args[0]
-                        parser.error(message)
 
         default.update(cli)
         for name, param in cls.params():
