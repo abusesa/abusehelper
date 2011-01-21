@@ -201,16 +201,19 @@ class Event(object):
         """Iterate through parsed and filtered values of either a
         specific key or all keys."""
 
-        filter = DEFAULT_FILTER if filter is None else filter
+        if filter is None:
+            filter = DEFAULT_FILTER
 
         if key is not _UNDEFINED:
             values = self._attrs.get(key, ())
-            values = values if parser is None else imap(parser, values)
+            if parser is not None:
+                values = imap(parser, values)
             for value in ifilter(filter, values):
                 yield value
         else:
             for key, values in self._attrs.iteritems():
-                values = values if parser is None else imap(parser, values)
+                if parser is not None:
+                    values = imap(parser, values)
                 for value in ifilter(filter, values):
                     yield value
 
@@ -319,7 +322,9 @@ class Event(object):
             return value
 
         if default is _UNDEFINED:
-            raise KeyError("no value available" if key is _UNDEFINED else key)
+            if key is _UNDEFINED:
+                raise KeyError("no value available")
+            raise KeyError(key)
         return default
 
     def contains(self, key=_UNDEFINED, value=_UNDEFINED, 
@@ -399,26 +404,6 @@ class Event(object):
                 keys.append(key)
                 break
         return keys
-
-    def is_valid(self):
-        """Return whether the event contains values for keys other than "id".
-
-        >>> event = Event()
-        >>> event.is_valid()
-        False
-        >>> event.add("id", "1")
-        >>> event.is_valid()
-        False
-        >>> event.add("other", "2")
-        >>> event.is_valid()
-        True
-        """
-
-        if len(self._attrs) == 0:
-            return False
-        if "id" in self._attrs and len(self._attrs) == 1:
-            return False
-        return True
 
     def to_element(self):
         if self._element is None:
