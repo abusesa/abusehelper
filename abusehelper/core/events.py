@@ -50,62 +50,9 @@ def unescape(string):
 
     return _UNESCAPE.sub(_unescape_sub, string)
 
-DEFAULT_PARSER = lambda x: x
+_UNDEFINED = object()
 DEFAULT_FILTER = partial(operator.is_not, None)
-
 EVENT_NS = "abusehelper#event"
-_NO_VALUE = object()
-
-class _Parsed(object):
-    __slots__ = "attrs", "parser", "filter"
-
-    def __init__(self, attrs, parser, filter):
-        self.attrs = attrs
-        self.parser = parser
-        self.filter = partial(ifilter, filter)
-
-    def get(self, key, default):
-        values = self.attrs.get(key, ())
-        values = imap(self.parser, values)
-        values = list(self.filter(values))
-
-        if values:
-            try:
-                return set(values)
-            except TypeError:
-                return values
-        return default
-
-    def keys(self):
-        return list(self.iterkeys())
-
-    def iterkeys(self):
-        for key, values in self.attrs.iteritems():
-            for _ in self.filter(imap(self.parser, values)):
-                yield key
-                break
-
-    def itervalues(self):
-        for key, values in self.attrs.iteritems():
-            values = imap(self.parser, values)
-            values = list(self.filter(values))
-
-            try:
-                yield set(values)
-            except TypeError:
-                yield values
-
-    def values(self):
-        return list(self.itervalues())
-
-    def __nonzero__(self):
-        for key in self.iterkeys():
-            return True
-        return False
-
-    def __contains__(self, key):
-        values = self.attrs.get(key, ())
-        return any(self.filter(imap(self.parser, values)))
 
 class Event(object):
     __slots__ = "_attrs", "_element"
@@ -151,13 +98,6 @@ class Event(object):
                 self.update(key, event.values(key))
                 
         self._element = None
-
-    def _parsed(self, parser, filter):
-        if parser or filter:
-            parser = parser or DEFAULT_PARSER
-            filter = filter or DEFAULT_FILTER
-            return _Parsed(self._attrs, parser, filter)
-        return self._attrs
 
     def add(self, key, value, *values):
         """Add value(s) for a key.
@@ -257,7 +197,24 @@ class Event(object):
         self._element = None
         self._attrs.pop(key, None)
 
-    def values(self, key=_NO_VALUE, parser=None, filter=None):
+    def _itervalues(self, key, parser, filter):
+        """Iterate through parsed and filtered values of either a
+        specific key or all keys."""
+
+        filter = DEFAULT_FILTER if filter is None else filter
+
+        if key is not _UNDEFINED:
+            values = self._attrs.get(key, ())
+            values = values if parser is None else imap(parser, values)
+            for value in ifilter(filter, values):
+                yield value
+        else:
+            for key, values in self._attrs.iteritems():
+                values = values if parser is None else imap(parser, values)
+                for value in ifilter(filter, values):
+                    yield value
+
+    def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return event values (for a specific key, if given).
 
         >>> event = Event()
@@ -295,20 +252,14 @@ class Event(object):
         True
         """
 
-        attrs = self._parsed(parser, filter)
-        if key is not _NO_VALUE:
-            return attrs.get(key, set())
-
-        result = list()
-        for values in attrs.values():
-            result.extend(values)
-
+        result = list(self._itervalues(key, parser, filter))
         try:
             return set(result)
         except TypeError:
             return result
 
-    def value(self, key=_NO_VALUE, default=_NO_VALUE, parser=None, filter=None):
+    def value(self, key=_UNDEFINED, default=_UNDEFINED, 
+              parser=None, filter=None):
         """Return one event value (for a specific key, if given).
 
         The value can be picked either from the values of some
@@ -364,22 +315,14 @@ class Event(object):
         KeyError: 'other'
         """
 
-        attrs = self._parsed(parser, filter)
-        if key is _NO_VALUE:
-            for values in attrs.itervalues():
-                for value in values:
-                    return value
-        else:
-            for value in attrs.get(key, ()):
-                return value
+        for value in self._itervalues(key, parser, filter):
+            return value
 
-        if default is _NO_VALUE:
-            if key is _NO_VALUE:
-                raise KeyError("no value available")
-            raise KeyError(key)
+        if default is _UNDEFINED:
+            raise KeyError("no value available" if key is _UNDEFINED else key)
         return default
 
-    def contains(self, key=_NO_VALUE, value=_NO_VALUE, 
+    def contains(self, key=_UNDEFINED, value=_UNDEFINED, 
                  parser=None, filter=None):
         """Return whether the event contains a key-value pair (for
         specific key and/or value, if given).
@@ -419,17 +362,8 @@ class Event(object):
         False
         """
 
-        attrs = self._parsed(parser, filter)
-        if key is not _NO_VALUE:
-            if value is _NO_VALUE:
-                return key in attrs
-            return value in attrs.get(key, ())
-
-        if value is _NO_VALUE:
-            return not not attrs
-
-        for value_set in attrs.itervalues():
-            if value in value_set:
+        for parsed in self._itervalues(key, parser, filter):
+            if value is _UNDEFINED or parsed == value:
                 return True
         return False
 
@@ -454,13 +388,17 @@ class Event(object):
         ...         return None
         >>> event = Event()
         >>> event.add("key", "1")
-        >>> event.add("other", "a")
+        >>> event.add("other", "x")
         >>> set(event.keys(parser=int_parse)) == set(["key"])
         True
         """
 
-        attrs = self._parsed(parser, filter)
-        return attrs.keys()
+        keys = list()
+        for key in self._attrs:
+            for value in self._itervalues(key, parser, filter):
+                keys.append(key)
+                break
+        return keys
 
     def is_valid(self):
         """Return whether the event contains values for keys other than "id".
