@@ -105,7 +105,6 @@ class _Parsed(object):
 
     def __contains__(self, key):
         values = self.attrs.get(key, ())
-        values = imap(self.parser, values)
         return any(self.filter(imap(self.parser, values)))
 
 class Event(object):
@@ -415,6 +414,9 @@ class Event(object):
         True
         >>> event.contains("key", parser=int_parse)
         True
+        >>> event.add("other", "x")
+        >>> event.contains("other", parser=int_parse)
+        False
         """
 
         attrs = self._parsed(parser, filter)
