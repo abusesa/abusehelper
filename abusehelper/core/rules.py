@@ -14,14 +14,14 @@ class _Rule(object):
         name = "rule-" + cls.__name__.lower()
         serialize.register(cls.dump_rule, cls.load_rule, cls, name)
     
-    def __init__(self, *args, **keys):
+    def __init__(self, identity):
         self._hash = None
-        self._arguments = tuple(args), frozenset(keys.items())
+        self._identity = identity
 
     def __eq__(self, other):
         if other.__class__ is not self.__class__:
             return NotImplemented
-        return self._arguments == other._arguments
+        return self._identity == other._identity
 
     def __ne__(self, other):
         result = self.__eq__(other)
@@ -29,17 +29,9 @@ class _Rule(object):
             return result
         return not result
 
-    def __repr__(self):
-        args, keys = self._arguments
-
-        reprs = list()
-        reprs.extend(map(repr, args))
-        reprs.extend(key + "=" + repr(value) for (key, value) in keys)
-        return self.__class__.__name__ + "(" + ", ".join(reprs) + ")"
-
     def __hash__(self):
         if self._hash is None:
-            self._hash = hash(self.__class__) ^ hash(self._arguments)
+            self._hash = hash(self.__class__) ^ hash(self._identity)
         return self._hash
 
 class MATCH(_Rule):
@@ -74,11 +66,15 @@ class MATCH(_Rule):
             pattern = value.pattern
             flags = value.flags
 
-        _Rule.__init__(self, key, value)
+        _Rule.__init__(self, (key, value))
         self.key = key
+        self.value = value
         self.filter = filter
         self.pattern = pattern
         self.flags = flags
+
+    def __repr__(self):
+        return self.__class__.__name__ + ("(%r, %r)" % (self.key, self.value))
 
     def __call__(self, event):
         if self.key is None:
@@ -104,6 +100,9 @@ class NOT(_Rule):
         _Rule.__init__(self, child)
         self.child = child
 
+    def __repr__(self):
+        return self.__class__.__name__ + "(" + repr(self.child) + ")"
+
     def __call__(self, *args, **keys):
         return not self.child(*args, **keys)
 NOT.serialize_register()
@@ -121,8 +120,12 @@ class OR(_Rule):
         return cls(*children)
 
     def __init__(self, first, *rest):
-        _Rule.__init__(self, first, *rest)
         self.children = (first,) + rest
+        _Rule.__init__(self, frozenset(self.children))
+
+    def __repr__(self):
+        children = ", ".join(map(repr, self.children))
+        return self.__class__.__name__ + "(" + children + ")"
 
     def __call__(self, *args, **keys):
         for child in self.children:
@@ -144,8 +147,12 @@ class AND(_Rule):
         return cls(*children)
     
     def __init__(self, first, *rest):
-        _Rule.__init__(self, first, *rest)
         self.children = (first,) + rest
+        _Rule.__init__(self, frozenset(self.children))
+
+    def __repr__(self):
+        children = ", ".join(map(repr, self.children))
+        return self.__class__.__name__ + "(" + children + ")"
 
     def __call__(self, *args, **keys):
         for child in self.children:
@@ -165,7 +172,10 @@ class ANYTHING(_Rule):
         return ANYTHING()
 
     def __init__(self):
-        _Rule.__init__(self)
+        _Rule.__init__(self, None)
+
+    def __repr__(self):
+        return self.__class__.__name__ + "()"
 
     def __call__(self, *args, **keys):
         return self
@@ -219,8 +229,6 @@ class NETBLOCK(_Rule):
         if keys is not None:
             keys = frozenset(keys)
 
-        _Rule.__init__(self, ip, bits, keys)
-
         self.ip = ip
         self.bits = bits
         self.keys = keys
@@ -236,6 +244,15 @@ class NETBLOCK(_Rule):
         elif self.version == 6:
             self.mask = ((1<<128)-1) ^ ((1<<(128-bits))-1)
         self.ip_num &= self.mask
+
+        _Rule.__init__(self, (self.ip_num, self.bits, self.keys))
+
+    def __repr__(self):
+        keys = self.keys
+        if keys is not None:
+            keys = tuple(keys)
+        args = ", ".join(map(repr, (self.ip, self.bits, keys)))
+        return self.__class__.__name__ + "(" + args + ")"
 
     def __call__(self, event):
         if self.keys is None:
@@ -375,7 +392,28 @@ if __name__ == "__main__":
             rule = MATCH("a", re.compile("b", re.I))
             assert serialize.load(serialize.dump(rule)) == rule
 
+    class OrTests(unittest.TestCase):
+        def test_eq(self):
+            a = MATCH("a")
+            b = MATCH("b")
+            assert OR(a, b) == OR(a, b)
+            assert OR(a, b) == OR(b, a)
+            assert OR(a, a) != OR(b, b)
+
+    class AndTests(unittest.TestCase):
+        def test_eq(self):
+            a = MATCH("a")
+            b = MATCH("b")
+            assert AND(a, b) == AND(a, b)
+            assert AND(a, b) == AND(b, a)            
+            assert AND(a, a) != AND(b, b)
+
     class NetblockTests(unittest.TestCase):
+        def test_eq(self):
+            assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.0.0", 16)
+            assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.255.255", 16)
+            assert NETBLOCK("0.0.0.0", 24) != NETBLOCK("0.0.255.255", 24)
+
         def test_match_ipv6(self):
             rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
             assert rule(MockEvent(ip=["2001:0db8:aaaa:bbbb:cccc::"]))
