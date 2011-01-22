@@ -34,8 +34,11 @@ class _Rule(object):
             self._hash = hash(self.__class__) ^ hash(self._identity)
         return self._hash
 
+class MATCHError(RuleError):
+    pass
+
 class MATCH(_Rule):
-    _flags = tuple(sorted("UIXLMS"))
+    _flags = tuple(sorted("UIXMS"))
 
     @classmethod
     def dump_rule(cls, dump, name, rule):
@@ -65,6 +68,9 @@ class MATCH(_Rule):
             filter = value.search
             pattern = value.pattern
             flags = value.flags
+
+            if (flags & re.LOCALE) != 0:
+                raise MATCHError("LOCALE flag is not supported")
 
         _Rule.__init__(self, (key, value))
         self.key = key
@@ -347,6 +353,9 @@ if __name__ == "__main__":
             assert serialize.load(serialize.dump(rule)) == rule
 
     class MatchTests(unittest.TestCase):
+        def test_init(self):
+            self.assertRaises(MATCHError, MATCH, "key", re.compile(".", re.L))
+
         def test_match(self):
             rule = MATCH()
             assert not rule(MockEvent())
