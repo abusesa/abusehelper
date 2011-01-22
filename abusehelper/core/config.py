@@ -35,10 +35,37 @@ def load_module(module_name, relative_to_caller=True):
     finally:
         module_file.close()
 
+def flatten(obj):
+    try:
+        iterable = iter(obj)
+    except TypeError:
+        yield obj
+        return
+
+    for item in iterable:
+        for obj in flatten(item):
+            yield obj
+
 def load_configs(module_name, config_func_name="configs"):
     module = load_module(module_name, False)
-    configs = getattr(module, config_func_name, None)
+    config_func = getattr(module, config_func_name, None)
 
-    if not callable(configs):
+    if not callable(config_func):
         raise ImportError("no callable %r defined" % config_func_name)
-    return configs()
+    return flatten(config_func())
+
+if __name__ == "__main__":
+    import unittest
+
+    class FlattenTests(unittest.TestCase):
+        def test_basic(self):
+            assert list(flatten([1, 2])) == [1, 2]
+            assert list(flatten([[1, [2, 3]], 4])) == [1, 2, 3, 4]
+
+        def test_order(self):
+            def iterator(start, end):
+                for i in range(start, end):
+                    yield i
+            assert list(flatten([iterator(1, 3), iterator(3, 5)])) == [1, 2, 3, 4]
+
+    unittest.main()
