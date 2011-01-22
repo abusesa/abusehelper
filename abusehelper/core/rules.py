@@ -245,7 +245,7 @@ class NETBLOCK(_Rule):
             self.mask = ((1<<128)-1) ^ ((1<<(128-bits))-1)
         self.ip_num &= self.mask
 
-        _Rule.__init__(self, (self.ip_num, self.bits, self.keys))
+        _Rule.__init__(self, (self.version, self.ip_num, self.bits, self.keys))
 
     def __repr__(self):
         keys = self.keys
@@ -413,6 +413,7 @@ if __name__ == "__main__":
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.0.0", 16)
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.255.255", 16)
             assert NETBLOCK("0.0.0.0", 24) != NETBLOCK("0.0.255.255", 24)
+            assert NETBLOCK("::", 24) != NETBLOCK("0.0.0.0", 24)
 
         def test_match_ipv6(self):
             rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
