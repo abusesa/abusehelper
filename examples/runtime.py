@@ -41,18 +41,16 @@ class Customer(object):
             setattr(self, key, value)
 
     def __iter__(self):
-        return [
-            Session("dshield", asns=[self.asn])
-            | Room(self.prefix + "asn" + unicode(self.asn))
-            | Session("roomgraph", rule=self.filter_rule)
-            | Room(self.prefix + "customer." + self.name)
-            | Session("mailer",
-                      "customer", self.name,
-                      to=self.to,
-                      cc=self.cc,
-                      times=self.times,
-                      template=self.template)
-            ]
+        yield (Session("dshield", asns=[self.asn])
+               | Room(self.prefix + "asn" + unicode(self.asn))
+               | Session("roomgraph", rule=self.filter_rule)
+               | Room(self.prefix + "customer." + self.name)
+               | Session("mailer",
+                         "customer", self.name,
+                         to=self.to,
+                         cc=self.cc,
+                         times=self.times,
+                         template=self.template))
 
 CUSTOMERS = [
     Customer("customer1", 123),
