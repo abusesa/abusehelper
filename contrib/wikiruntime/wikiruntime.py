@@ -278,7 +278,7 @@ class WikiRuntimeBot(RuntimeBot):
     def fallbacks(self):
         yield Fallback("all-unhandled")
         yield Fallback("containing-a-keyword", 
-                       rules.MATCH("somekey", re.compile("keyword")))
+                       rules.MATCH("somekey", re.compile("keyword", re.U)))
     
 if __name__ == "__main__":
     WikiRuntimeBot.from_command_line().execute()
