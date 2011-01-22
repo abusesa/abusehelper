@@ -40,7 +40,7 @@ class Customer(object):
         for key, value in keys.items():
             setattr(self, key, value)
 
-    def runtime(self):
+    def __iter__(self):
         return [
             Session("dshield", asns=[self.asn])
             | Room(self.prefix + "asn" + unicode(self.asn))

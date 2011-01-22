@@ -21,10 +21,9 @@ class Base(object):
         return Room(self.prefix+"."+self.class_name()+"."+self.name)
 
     # The session pipes yielded here are collected and then run.
-    def runtime(self):
+    def __iter__(self):
         yield self.room() | Session("historian")
-        for item in self.main():
-            yield item
+        yield self.main()
 
     def main(self):
         return []

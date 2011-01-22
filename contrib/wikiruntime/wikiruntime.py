@@ -77,7 +77,7 @@ class Source(object):
         self.alias = alias
         self.attrs = attrs
 
-    def runtime(self):
+    def __iter__(self):
         yield (Session(self.bot_name, **self.attrs)
                | raw_room(self.alias)
                | Session(self.bot_name + ".sanitizer")
@@ -99,7 +99,7 @@ class Customer(object):
         for key, value in attrs.items():
             setattr(self, key, value)
 
-    def runtime(self):
+    def __iter__(self):
         template = "Subject: AbuseHelper report for " + self.name + "\n"
         template += self.template
 
@@ -123,7 +123,7 @@ class Fallback(object):
     def set_customer_rules(self, customer_rules):
         self.customer_rules = customer_rules
 
-    def runtime(self):
+    def __iter__(self):
         ruleset = list()
         if self.customer_rules:
             ruleset.append(rules.NOT(combine_rules(rules.OR, 

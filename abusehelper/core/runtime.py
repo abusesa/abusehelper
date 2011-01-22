@@ -4,11 +4,8 @@ from idiokit import jid
 from abusehelper.core import serialize, config
 
 class Pipeable(object):
-    def sessions(self, runtime):
-        return [self]
-
-    def collect(self):
-        return [self]
+    def _collect(self):
+        return self
 
     def __or__(self, other):
         if not isinstance(other, Pipeable):
@@ -18,18 +15,16 @@ class Pipeable(object):
 class Pipe(Pipeable):
     def __init__(self, *pieces):
         self.pieces = pieces
-
-    def collect(self, pieces=None):
-        result = list()
+    
+    def _collect(self, pieces=None):
         for piece in self.pieces:
-            result.extend(piece.collect())
-        return result
+            yield piece._collect()
 
-    def sessions(self, runtime):
+    def __iter__(self):
         prev = None
         sessions = list()
 
-        for piece in self.collect():
+        for piece in config.flatten(self._collect()):
             if prev is None:
                 if isinstance(piece, Session):
                     sessions.append(piece)
@@ -49,7 +44,9 @@ class Pipe(Pipeable):
                     sessions.append(piece.updated(src_room=room.name))
 
             prev = piece
-        return sessions
+
+        for session in sessions:
+            yield session
 
 class SessionError(Exception):
     pass
@@ -71,6 +68,7 @@ class Session(Pipeable):
                                    (key, value))
             conf[key] = value
         self.__dict__["_conf"] = frozenset(conf.items())
+        self.__dict__["_hash"] = None
 
     def updated(self, **conf):
         new_conf = dict(self._conf)
@@ -84,7 +82,9 @@ class Session(Pipeable):
         raise AttributeError("%r instances are immutable" % self.__class__)
 
     def __hash__(self):
-        return hash(self.service) ^ hash(self._conf) ^ hash(self.path)
+        if self._hash is None:
+            self._hash = hash(self.service) ^ hash(self._conf) ^ hash(self.path)
+        return self._hash
 
     def __eq__(self, other):
         if not isinstance(other, Session):
@@ -113,9 +113,6 @@ class Room(Pipeable):
 
         self.name = name
 
-    def sessions(self, runtime):
-        return []
-
 from idiokit import threado, timer
 from abusehelper.core import bot, services, log
 
@@ -138,14 +135,7 @@ class RuntimeBot(bot.XMPPBot):
             while True:
                 configs = yield inner
 
-                added = set()
-                for config in configs:
-                    config_runtime = getattr(config, "runtime", None)
-                    if not callable(config_runtime):
-                        continue
-
-                    for container in config_runtime():
-                        added.update(container.sessions(config))
+                added = set(config.flatten(configs))
 
                 for key in set(sessions) - added:
                     stream = sessions.pop(key)
@@ -203,6 +193,14 @@ class DefaultRuntimeBot(RuntimeBot):
                                  "for updates (default: %default)",
                                  default=1)
 
+    def _flatten_runtime_methods(self, configs):
+        # Backwards compatibility
+        for obj in configs:
+            runtime = getattr(obj, "runtime", None)
+            if callable(runtime):
+                obj = runtime()
+            yield obj
+
     @threado.stream
     def configs(inner, self):
         conf_path = os.path.abspath(self.config)
@@ -214,7 +212,11 @@ class DefaultRuntimeBot(RuntimeBot):
                 mtime = os.path.getmtime(conf_path)
                 if last_mtime != mtime:
                     last_mtime = mtime
-                    inner.send(config.load_configs(conf_path))
+
+                    configs = config.load_configs(conf_path)
+                    configs = list(self._flatten_runtime_methods(configs))
+                    inner.send(configs)
+
                     error_msg = None
             except BaseException, exception:
                 if error_msg != str(exception):
