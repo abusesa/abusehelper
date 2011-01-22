@@ -38,20 +38,22 @@ class MATCHError(RuleError):
     pass
 
 class MATCH(_Rule):
-    _flags = tuple(sorted("UIXMS"))
+    _flags = dict(I=re.I, X=re.X, M=re.M, S=re.S)
 
     @classmethod
     def dump_rule(cls, dump, name, rule):
         flags = rule.flags
         if flags is not None:
-            flags = "".join(x for x in cls._flags if flags & getattr(re, x, 0))
+            flags = "".join(x for x in cls._flags if flags & cls._flags[x])
         return serialize.dump_list(dump, name, [rule.key, rule.pattern, flags])
 
     @classmethod
     def load_rule(cls, load, element):
-        key, pattern, flags = serialize.load_list(load, element)
-        if flags is not None:
-            flags = reduce(lambda x, y: getattr(re, y, 0) | x, flags, 0)
+        key, pattern, flag_string = serialize.load_list(load, element)
+        if flag_string is not None:
+            flags = re.UNICODE
+            for flag in flag_string:
+                flags |= cls._flags.get(flag, 0)
             pattern = re.compile(pattern, flags)
         return cls(key, pattern)
 
@@ -70,7 +72,9 @@ class MATCH(_Rule):
             flags = value.flags
 
             if (flags & re.LOCALE) != 0:
-                raise MATCHError("LOCALE flag is not supported")
+                raise MATCHError("re.LOCALE regexp flag is not supported")
+            if (flags & re.UNICODE) == 0:
+                raise MATCHError("re.UNICODE regexp flag is required")
 
         _Rule.__init__(self, (key, value))
         self.key = key
@@ -354,6 +358,7 @@ if __name__ == "__main__":
 
     class MatchTests(unittest.TestCase):
         def test_init(self):
+            self.assertRaises(MATCHError, MATCH, "key", re.compile("."))
             self.assertRaises(MATCHError, MATCH, "key", re.compile(".", re.L))
 
         def test_match(self):
@@ -372,7 +377,7 @@ if __name__ == "__main__":
             assert rule(MockEvent(a=["b"]))
             assert not rule(MockEvent(a=["a"]))
 
-            rule = MATCH("a", re.compile("b"))
+            rule = MATCH("a", re.compile("b", re.U))
             assert not rule(MockEvent())
             assert rule(MockEvent(a=["abba"]))
             assert not rule(MockEvent(a=["aaaa"]))
@@ -385,11 +390,11 @@ if __name__ == "__main__":
             assert MATCH("a") != MATCH("a", "b")
             assert MATCH("a", "b") == MATCH("a", "b")
             assert MATCH("a", "b") != MATCH("x", "y")
-            assert MATCH("a", re.compile("b")) == MATCH("a", re.compile("b"))
-            assert MATCH("a", re.compile("b")) != MATCH("x", re.compile("y"))
-            assert MATCH("a", re.compile("b")) != MATCH("a", "b")
-            assert MATCH("a", re.compile("b", re.I)) != MATCH("a", re.compile("a"))
-            assert MATCH("a", re.compile("b", re.I)) != MATCH("a", re.compile("a", re.I))
+            assert MATCH("a", re.compile("b", re.U)) == MATCH("a", re.compile("b", re.U))
+            assert MATCH("a", re.compile("b", re.U)) != MATCH("x", re.compile("y", re.U))
+            assert MATCH("a", re.compile("b", re.U)) != MATCH("a", "b")
+            assert MATCH("a", re.compile("b", re.I | re.U)) != MATCH("a", re.compile("a", re.U))
+            assert MATCH("a", re.compile("b", re.I | re.U)) != MATCH("a", re.compile("a", re.I | re.U))
 
         def test_serialize(self):
             rule = MATCH()
@@ -398,7 +403,7 @@ if __name__ == "__main__":
             rule = MATCH("a", "b")
             assert serialize.load(serialize.dump(rule)) == rule
 
-            rule = MATCH("a", re.compile("b", re.I))
+            rule = MATCH("a", re.compile("b", re.I | re.U))
             assert serialize.load(serialize.dump(rule)) == rule
 
     class OrTests(unittest.TestCase):
