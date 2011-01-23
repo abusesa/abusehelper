@@ -1,5 +1,4 @@
 import os
-import uuid
 from idiokit import jid
 from abusehelper.core import serialize, config
 
@@ -12,6 +11,9 @@ class Pipeable(object):
             raise TypeError("%r is not pipeable" % other)
         return Pipe(self, other)
 
+class PipeError(Exception):
+    pass
+
 class Pipe(Pipeable):
     def __init__(self, *pieces):
         self.pieces = pieces
@@ -22,31 +24,24 @@ class Pipe(Pipeable):
 
     def __iter__(self):
         prev = None
-        sessions = list()
 
         for piece in config.flatten(self._collect()):
-            if prev is None:
-                if isinstance(piece, Session):
-                    sessions.append(piece)
-            else:
-                if isinstance(piece, Room) and isinstance(prev, Room):
-                    sessions.append(Session("roomgraph", 
-                                            src_room=prev.name,
-                                            dst_room=piece.name))
-                elif isinstance(prev, Room):
-                    sessions.append(piece.updated(src_room=prev.name))
-                elif isinstance(piece, Room):
-                    if sessions:
-                        sessions[-1] = sessions[-1].updated(dst_room=piece.name)
-                else:
-                    room = Room()
-                    sessions[-1] = sessions[-1].updated(dst_room=room.name)
-                    sessions.append(piece.updated(src_room=room.name))
-
+            if prev is not None:
+                if isinstance(prev, Room) and isinstance(piece, Session):
+                    piece = piece.updated(src_room=prev.name)
+                elif isinstance(prev, Session) and isinstance(piece, Room):
+                    yield prev.updated(dst_room=piece.name)
+                elif isinstance(prev, Room) and isinstance(piece, Room):
+                    yield Session("roomgraph", 
+                                  src_room=prev.name,
+                                  dst_room=piece.name)
+                elif isinstance(piece, Session):
+                    raise PipeError("a Session instance has to be piped "+
+                                    "directly after a Room instance")
             prev = piece
 
-        for session in sessions:
-            yield session
+        if isinstance(prev, Session):
+            yield prev
 
 class SessionError(Exception):
     pass
@@ -100,17 +95,12 @@ class Session(Pipeable):
         return not result
 
 class Room(Pipeable):
-    def __init__(self, name=None):
-        if name is None:
-            name = uuid.uuid4().hex
-        if not isinstance(name, unicode):
-            name = unicode(name)
-
+    def __init__(self, name):
+        name = unicode(name)
         try:
             jid.nodeprep(name)
         except jid.JIDError:
             jid.JID(name)
-
         self.name = name
 
 from idiokit import threado, timer
