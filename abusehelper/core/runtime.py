@@ -86,6 +86,8 @@ class Session(Pipeable):
             return NotImplemented
         if self.service != other.service:
             return False
+        if self.path != self.path:
+            return False
         return self._conf == other._conf
 
     def __ne__(self, other):
