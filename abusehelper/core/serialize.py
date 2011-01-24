@@ -34,7 +34,7 @@ class Marshal(object):
             self.types[obj_type] = dump, name
 
         if name in self.names and not overwrite:
-            raise NameAlreadyRegistered(name)
+            raise AlreadyRegistered(name)
         self.names[name] = load
 
     def dump(self, obj):
