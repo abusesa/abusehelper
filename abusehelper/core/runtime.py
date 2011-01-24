@@ -148,7 +148,7 @@ class RuntimeBot(bot.XMPPBot):
                                                     self.service_room,
                                                     self.bot_name))
         self.log.addHandler(log.RoomHandler(lobby.room))
-        yield inner.sub(self.configs() | self._handle_updates(lobby))
+        yield inner.sub(self.configs() | self._handle_updates(lobby) | lobby)
 
     @threado.stream
     def session(inner, self, lobby, session):
