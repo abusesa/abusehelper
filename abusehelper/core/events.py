@@ -105,13 +105,13 @@ class Event(object):
         >>> event = Event()
         >>> event.add("key", "1")
         >>> event.values("key")
-        set(['1'])
+        ('1',)
 
         More than one value can be added with one call.
 
         >>> event = Event()
         >>> event.add("key", "1", "2")
-        >>> event.values("key") == set(["1", "2"])
+        >>> set(event.values("key")) == set(["1", "2"])
         True
 
         Key-value pairs is already contained by the event are ignored.
@@ -119,10 +119,10 @@ class Event(object):
         >>> event = Event()
         >>> event.add("key", "1")
         >>> event.values("key")
-        set(['1'])
+        ('1',)
         >>> event.add("key", "1")
         >>> event.values("key")
-        set(['1'])
+        ('1',)
         """
 
         self._element = None
@@ -136,7 +136,7 @@ class Event(object):
 
         >>> event = Event()
         >>> event.update("key", ["1", "2"])
-        >>> event.values("key") == set(["1", "2"])
+        >>> set(event.values("key")) == set(["1", "2"])
         True
 
         The event will not be modified if there are no values to add.
@@ -146,9 +146,6 @@ class Event(object):
         >>> event.contains("key")
         False
         """
-
-        if not values:
-            return
 
         self._element = None
         if key not in self._attrs:
@@ -162,7 +159,7 @@ class Event(object):
         >>> event.add("key", "1", "2", "3")
         >>> event.discard("key", "1", "3")
         >>> event.values("key")
-        set(['2'])
+        ('2',)
 
         Values that don't exist for the given key are silently ignored.
 
@@ -170,7 +167,7 @@ class Event(object):
         >>> event.add("key", "2")
         >>> event.discard("key", "1", "2")
         >>> event.values("key")
-        set([])
+        ()
         """
         self._element = None
         value_set = self._attrs.get(key, set())
@@ -218,14 +215,15 @@ class Event(object):
                     yield value
 
     def values(self, key=_UNDEFINED, parser=None, filter=None):
-        """Return event values (for a specific key, if given).
+        """Return a tuple of event values (for a specific key, if
+        given).
 
         >>> event = Event()
         >>> event.add("key", "1", "2")
         >>> event.add("other", "3", "4")
-        >>> event.values() == set(["1", "2", "3", "4"])
+        >>> set(event.values()) == set(["1", "2", "3", "4"])
         True
-        >>> event.values("key") == set(["1", "2"])
+        >>> set(event.values("key")) == set(["1", "2"])
         True
 
         Perform parsing, validation and filtering by passing in
@@ -241,25 +239,13 @@ class Event(object):
         >>> event = Event()
         >>> event.add("key", "1.2.3.4", "abba")
         >>> event.add("other", "10.10.10.10")
-        >>> event.values("key", parser=ipv4) == set(["1.2.3.4"])
+        >>> set(event.values("key", parser=ipv4)) == set(["1.2.3.4"])
         True
-        >>> event.values(parser=ipv4) == set(["1.2.3.4", "10.10.10.10"])
-        True
-
-        The returned value collection is always a set unless the
-        parsing function returns unhashable objects (e.g. lists):
-
-        >>> event = Event()
-        >>> event.add("key", "ab", "cd")
-        >>> event.values(parser=list) == [["a", "b"], ["c", "d"]]
+        >>> set(event.values(parser=ipv4)) == set(["1.2.3.4", "10.10.10.10"])
         True
         """
 
-        result = list(self._itervalues(key, parser, filter))
-        try:
-            return set(result)
-        except TypeError:
-            return result
+        return tuple(self._itervalues(key, parser, filter))
 
     def value(self, key=_UNDEFINED, default=_UNDEFINED, 
               parser=None, filter=None):
@@ -373,7 +359,7 @@ class Event(object):
         return False
 
     def keys(self, parser=None, filter=None):
-        """Return a sequence of keys with at least one value.
+        """Return a tuple of keys with at least one value.
 
         >>> event = Event()
         >>> set(event.keys()) == set()
@@ -403,7 +389,7 @@ class Event(object):
             for value in self._itervalues(key, parser, filter):
                 keys.append(key)
                 break
-        return keys
+        return tuple(keys)
 
     def to_element(self):
         if self._element is None:
