@@ -55,7 +55,8 @@ class DotBot(bot.Bot):
 
             sessions = set()
             for container in config_runtime():
-                sessions.update(container.sessions(config))
+                for session in container:
+                    sessions.add(session)
 
             for session in sessions:
                 conf = dict(session.conf)
