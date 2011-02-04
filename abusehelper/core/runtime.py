@@ -180,6 +180,10 @@ class RuntimeBot(bot.XMPPBot):
 
 class DefaultRuntimeBot(RuntimeBot):
     config = bot.Param("configuration module")
+    poll_interval = bot.IntParam("how often (in seconds) the "+
+                                 "configuration module is checked "+
+                                 "for updates (default: %default)",
+                                 default=1)
 
     def _flatten_runtime_methods(self, configs):
         # Backwards compatibility
@@ -192,18 +196,27 @@ class DefaultRuntimeBot(RuntimeBot):
     @threado.stream
     def configs(inner, self):
         conf_path = os.path.abspath(self.config)
-
-        try:
-            configs = config.load_configs(conf_path)
-            configs = list(self._flatten_runtime_methods(configs))
-        except BaseException, exc:
-            self.log.error("Couldn't load module %r: %s", self.config, exc)
-            return
-
-        inner.send(configs)
+        last_mtime = None
+        error_msg = None
 
         while True:
-            yield inner
+            try:
+                mtime = os.path.getmtime(conf_path)
+                if last_mtime != mtime:
+                    last_mtime = mtime
+
+                    configs = config.load_configs(conf_path)
+                    configs = list(self._flatten_runtime_methods(configs))
+                    inner.send(configs)
+
+                    error_msg = None
+            except BaseException, exception:
+                if error_msg != str(exception):
+                    error_msg = str(exception)
+                    self.log.error("Couldn't load module %r: %s", 
+                                   self.config, error_msg)
+
+            yield inner, timer.sleep(self.poll_interval)
 
 if __name__ == "__main__":
     DefaultRuntimeBot.from_command_line().execute()
