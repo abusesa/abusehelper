@@ -50,13 +50,15 @@ class DotBot(bot.Bot):
         names = Clusters()
         type_names = dict()
 
-        for config in load_configs(self.runtime_config):
-            config_runtime = getattr(config, "runtime", lambda x: [])
+        module = load_module(self.runtime_config, False)
+        configs = getattr(module, "configs", None)
+        if not callable(configs):
+            raise ImportError("no callable configs defined")
 
+        for config in configs():
             sessions = set()
-            for container in config_runtime():
-                for session in container:
-                    sessions.add(session)
+            for session in flatten(config):
+                sessions.add(session)
 
             for session in sessions:
                 conf = dict(session.conf)
