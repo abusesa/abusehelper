@@ -16,13 +16,12 @@ def version():
 
 def version_str():
     ver = version()
-
     if ver is None:
         return "<unknown>"
-    return ver
+    return ver[1]
 
-def generate(base_path):
-    popen = subprocess.Popen(["svnversion", base_path],
+def _call_hg(base_path, *args):
+    popen = subprocess.Popen(["hg"] + list(args) + [base_path],
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
 
@@ -30,7 +29,16 @@ def generate(base_path):
     if popen.returncode:
         raise VersionError(stderr.strip())
 
-    ver = stdout.strip()
+    return stdout.strip()
+
+def generate(base_path):
+    global_id = _call_hg(base_path, "identify", "-i")
+    local_id = _call_hg(base_path, "identify", "-n")
+
+    is_clean = not local_id.endswith("+")
+    if not is_clean:
+        local_id = local_id[:-1]
+    ver = (is_clean, local_id+":"+global_id)
 
     version_dir, _ = os.path.split(__file__)
     module_file = open(os.path.join(version_dir, "_version.py"), "w")

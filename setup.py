@@ -20,16 +20,15 @@ def generate_version():
     version_module.generate(base_path)
     return version_module.version()
 
-
 version = generate_version()
 if version is None:
     print >> sys.stderr, "No version info available. Quitting."
     sys.exit(1)
-if not version.isdigit():
-    warnings.warn("This is not a clean checkout (version %r)." % version)
+if not version[0]:
+    warnings.warn("This is not a clean checkout (version %r)." % version[1])
 
 setup(name="abusehelper",
-      version="2.r"+version,
+      version="2.r"+version[1],
       packages=[
         "abusehelper", 
         "abusehelper.core", 
