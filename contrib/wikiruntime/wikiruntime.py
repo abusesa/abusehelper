@@ -179,13 +179,13 @@ class WikiRuntimeBot(RuntimeBot):
             try:
                 self.connect()
             except Exception, e:
-                self.info.log("Could not reconnect to wiki: %r" % e)
+                self.log.info("Could not reconnect to wiki: %r" % e)
                 return dict()
 
             try:
                 pages = self.wiki.getMeta(category)
             except Exception, e:
-                self.info.log("Failed to get category %s: %r" % category, e)
+                self.log.info("Failed to get category %s: %r" % category, e)
                 return dict()
 
         result = dict()
