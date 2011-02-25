@@ -192,7 +192,26 @@ class ANYTHING(_Rule):
 ANYTHING.serialize_register()
 
 import struct
-from socket import inet_pton, AF_INET, AF_INET6, error
+from socket import inet_aton, inet_pton, AF_INET6, error
+
+_ACCEPTABLE_ERRORS = (error, UnicodeEncodeError, TypeError)
+
+_unpack_ipv4 = struct.Struct("!I").unpack
+def _parse_ipv4(string):
+    try:
+        packed = inet_aton(string)
+        return _unpack_ipv4(packed)[0]
+    except _ACCEPTABLE_ERRORS:
+        return None
+
+_unpack_ipv6 = struct.Struct("!QQ").unpack
+def _parse_ipv6(string):
+    try:
+        packed = inet_pton(AF_INET6, string)
+    except _ACCEPTABLE_ERRORS:
+        return None
+    hi, lo = _unpack_ipv6(packed)
+    return ((hi << 64) | lo)
 
 class NETBLOCKError(RuleError):
     pass
@@ -221,41 +240,24 @@ class NETBLOCK(_Rule):
             keys = serialize.load_list(load, child)
         return cls(ip, bits, keys)
 
-    _unpack_ipv4 = struct.Struct("!I").unpack
-    _unpack_ipv6 = struct.Struct("!QQ").unpack
-    def parse_ip(self, ip):
-        try:
-            packed = inet_pton(AF_INET, ip)
-            return 4, self._unpack_ipv4(packed)[0]
-        except error:
-            try:
-                packed = inet_pton(AF_INET6, ip)
-                hi, lo = self._unpack_ipv6(packed)
-                return 6, ((hi << 64) | lo)
-            except error:
-                return None
-
     def __init__(self, ip, bits, keys=None):
         if keys is not None:
             keys = frozenset(keys)
-
+        self.keys = keys
         self.ip = ip
         self.bits = bits
-        self.keys = keys
 
-        parsed = self.parse_ip(ip)
-        if parsed is None:
-            raise NETBLOCKError("could not parse IP %r" % ip)
-        self.version, self.ip_num = parsed
-        assert self.version in (4, 6)
+        for (parser, size) in ((_parse_ipv4, 32), (_parse_ipv6, 128)):
+            ip_num = parser(ip)
+            if ip_num is not None:
+                self.parser = parser
+                self.mask = ((1 << size) - 1) ^ ((1 << (size-bits)) - 1)
+                self.ip_num = ip_num & self.mask
+                break
+        else:
+            raise NETBLOCKError("could not parse IP %r" % ip)            
 
-        if self.version == 4:
-            self.mask = ((1<<32)-1) ^ ((1<<(32-bits))-1)
-        elif self.version == 6:
-            self.mask = ((1<<128)-1) ^ ((1<<(128-bits))-1)
-        self.ip_num &= self.mask
-
-        _Rule.__init__(self, (self.version, self.ip_num, self.bits, self.keys))
+        _Rule.__init__(self, (self.parser, self.ip_num, self.bits, self.keys))
 
     def __repr__(self):
         keys = self.keys
@@ -264,6 +266,9 @@ class NETBLOCK(_Rule):
         args = ", ".join(map(repr, (self.ip, self.bits, keys)))
         return self.__class__.__name__ + "(" + args + ")"
 
+    def _filter(self, value):
+        return value is not None and value & self.mask == self.ip_num
+
     def __call__(self, event):
         if self.keys is None:
             keys = event.keys()
@@ -271,15 +276,8 @@ class NETBLOCK(_Rule):
             keys = self.keys
 
         for key in keys:
-            for value in event.values(key):
-                parsed = self.parse_ip(value)
-                if parsed is None:
-                    continue
-                version, ip_num = parsed
-                if version != self.version:
-                    continue
-                if ip_num & self.mask == self.ip_num:
-                    return True
+            if event.contains(key, parser=self.parser, filter=self._filter):
+                return True
         return False
 NETBLOCK.serialize_register()
 
