@@ -423,6 +423,12 @@ if __name__ == "__main__":
             assert AND(a, a) != AND(b, b)
 
     class NetblockTests(unittest.TestCase):
+        def test_bad_data(self):
+            rule = NETBLOCK("0.0.0.0", 0)
+            assert not rule(MockEvent(ip=[u"not valid"]))
+            assert not rule(MockEvent(ip=[u"\xe4 not convertible to ascii"]))
+            assert not rule(MockEvent(ip=[object()]))
+
         def test_eq(self):
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.0.0", 16)
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.255.255", 16)
