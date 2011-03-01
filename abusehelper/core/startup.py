@@ -2,89 +2,150 @@ import os
 import sys
 import time
 import errno
+import heapq
 import signal
-import inspect
 import subprocess
 import cPickle as pickle
 from abusehelper.core import bot, config
 
-def kill_processes(processes, sig):
-    for process in processes:
-        try:
-            os.kill(process.pid, sig)
-        except OSError, ose:
-            if ose.errno != errno.ESRCH:
-                raise
+class Bot(object):
+    _defaults = dict()
+
+    @classmethod
+    def template(cls, **attrs):
+        defaults = dict(cls._defaults)
+        defaults.update(attrs)
+
+        class BotTemplate(cls):
+            _defaults = defaults
+        return BotTemplate
+
+    @property
+    def module(self):
+        if self._module is None:
+            return "abusehelper.core." + self.name
+        return self._module
+
+    @property
+    def params(self):
+        params = dict(self._params)
+        params.setdefault("bot_name", self.name)
+        return params
+
+    def __init__(self, name, _module=None, **params):
+        self.name = name
+
+        self._module = _module
+
+        self._params = dict(self._defaults)
+        self._params.update(params)
 
 class StartupBot(bot.Bot):
+    def __init__(self, *args, **keys):
+        bot.Bot.__init__(self, *args, **keys)
+
+        self._behaviors = list()
+        self._processes = set()
+
     def configs(self):
         return []
+
+    def behavior(self, conf, delay=15):
+        while True:
+            yield conf
+            
+            self.log.info("Relaunching %r in %d seconds", conf.name, delay)
+            yield delay
+
+    def _launch(self, module, params):
+        args = [sys.executable]
+        path, _ = os.path.split(module)
+        if path:
+            args.extend([module])
+        else:
+            # At least Python 2.5 on OpenBSD replaces the
+            # argument right after the -m option with "-c" in
+            # the process listing, making it harder to figure
+            # out which modules are running. Workaround: Use
+            # "-m runpy module" instead of "-m module".
+            args.extend(["-m", "runpy", module])
+        args.append("--read-config-pickle-from-stdin")
+
+        process = subprocess.Popen(args, stdin=subprocess.PIPE)
+
+        pickle.dump(params, process.stdin)
+        process.stdin.flush()
+
+        return process
+
+    def _poll(self):
+        for process, behavior, conf in list(self._processes):
+            retval = process.poll()
+            if retval is not None:
+                self.log.info("Bot %r exited with return value %d", conf.name, retval)
+                self._processes.remove((process, behavior, conf))
+                heapq.heappush(self._behaviors, (time.time(), behavior))
+
+    def _signal(self, sig):
+        for process, behavior, conf in self._processes:
+            try:
+                os.kill(process.pid, sig)
+            except OSError, ose:
+                if ose.errno != errno.ESRCH:
+                    raise
+
+    def _purge(self):
+        now = time.time()
+        while self._behaviors and self._behaviors[0][0] <= now:
+            _, behavior = heapq.heappop(self._behaviors)
+
+            try:
+                output_value = behavior.next()
+            except StopIteration:
+                continue
+
+            if isinstance(output_value, (int, float)):
+                next = output_value + now
+                heapq.heappush(self._behaviors, (next, behavior))
+            else:
+                yield output_value, behavior
+
+    def _close(self):
+        for _, behavior in self._behaviors:
+            behavior.close()
+        self._behaviors = list()
 
     def run(self, poll_interval=0.1):
         def signal_handler(sig, frame):
             sys.exit()
         signal.signal(signal.SIGTERM, signal_handler)
 
-        processes = dict()
         try:
-            for startup in self.configs():
-                if not hasattr(startup, "startup"):
-                    continue
-                params = dict(startup.startup())
-                
-                module = params["module"]
-                name = params["bot_name"]
-                self.log.info("Launching bot %r from module %r", name, module)
+            for conf in config.flatten(self.configs()):
+                behavior = self.behavior(conf)
+                heapq.heappush(self._behaviors, (time.time(), behavior))
 
-                args = [sys.executable]
-                path, _ = os.path.split(module)
-                if path:
-                    args.extend([module])
-                else:
-                    # At least Python 2.5 on OpenBSD replaces the
-                    # argument right after the -m option with "-c" in
-                    # the process listing, making it harder to figure
-                    # out which modules are running. Workaround: Use
-                    # "-m runpy module" instead of "-m module".
-                    args.extend(["-m", "runpy", module])
-                args.append("--read-config-pickle-from-stdin")
+            while self._behaviors or self._processes:
+                self._poll()
 
-                process = subprocess.Popen(args, stdin=subprocess.PIPE)
-                processes[startup] = name, process
+                for conf, behavior in self._purge():
+                    self.log.info("Launching bot %r from module %r", 
+                                  conf.name, conf.module)
+                    process = self._launch(conf.module, conf.params)
+                    self._processes.add((process, behavior, conf))
 
-                pickle.dump(params, process.stdin)
-                process.stdin.flush()
-
-            while True:
-                for startup, (_, process) in processes.items():
-                    retval = process.poll()
-                    if retval is not None:
-                        return
                 time.sleep(poll_interval)
         finally:
-            processes = self.check_processes(processes)
+            self._poll()
 
-            if processes:
+            if self._processes:
                 self.log.info("Sending SIGTERM to alive bots")
-                kill_processes([x[1] for x in processes.values()], 
-                               signal.SIGTERM)
+                self._signal(signal.SIGTERM)
 
-            while processes:
-                processes = self.check_processes(processes)
+            while self._processes or self._behaviors:
+                self._poll()
+                self._close()
                 time.sleep(poll_interval)
-
-    def check_processes(self, processes):
-        processes = dict(processes)
-
-        for startup, (name, process) in list(processes.items()):
-            retval = process.poll()
-            if retval is None:
-                continue
-
-            del processes[startup]
-            self.log.info("Bot %r exited with return value %d", name, retval)
-
-        return processes
 
 class DefaultStartupBot(StartupBot):
     config = bot.Param("configuration module")
@@ -93,19 +154,28 @@ class DefaultStartupBot(StartupBot):
     disable = bot.ListParam("bots that are not run (default: run all bots)", 
                             default=None)
 
-    def configs(self):
-        for conf_obj in set(config.load_configs(os.path.abspath(self.config))):
-            startup = getattr(conf_obj, "startup", None)
-            if startup is None:
-                continue
+    def _wrap(self, conf):
+        # Backwards compatibility
+        startup_method = getattr(conf, "startup", None)
+        if callable(startup_method):
+            params = startup_method()
+            name = params["bot_name"]
+            module = params.pop("module", None)
+            return Bot(name, module, **params)
+        return conf
 
-            params = startup()
-            names = set([params["bot_name"], params["module"]])
+    def configs(self):
+        configs = config.load_configs(os.path.abspath(self.config))
+        for conf in configs:
+            conf = self._wrap(conf)
+
+            names = set([conf.name, conf.module])
             if self.disable is not None and names & set(self.disable):
                 continue
             if self.enable is not None and not (names & set(self.enable)):
                 continue
-            yield conf_obj
 
+            yield conf
+ 
 if __name__ == "__main__":
     DefaultStartupBot.from_command_line().execute()
