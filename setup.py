@@ -1,13 +1,12 @@
 import os
 import sys
 import imp
-import warnings
 import platform
 from distutils.core import setup
 
 if sys.version_info < (2, 5):
     print >> sys.stderr, "Error: AbuseHelper requires Python 2.5 or higher",
-    print >> sys.stderr, "(you are running Python %s)." % platform.python_version()
+    print >> sys.stderr, "(you are running %s)." % platform.python_version()
     sys.exit(1)
 
 def generate_version():
@@ -18,17 +17,11 @@ def generate_version():
     version_module = imp.load_module("version", *module_info)
     
     version_module.generate(base_path)
-    return version_module.version()
-
+    return version_module.version_str()
 version = generate_version()
-if version is None:
-    print >> sys.stderr, "No version info available. Quitting."
-    sys.exit(1)
-if not version[0]:
-    warnings.warn("This is not a clean checkout (version %r)." % version[1])
 
 setup(name="abusehelper",
-      version="2.r"+version[1],
+      version="2." + version,
       packages=[
         "abusehelper", 
         "abusehelper.core", 
@@ -45,30 +38,33 @@ setup(name="abusehelper",
 	},
       package_data={
         'abusehelper.contrib.confgen':
-        [
-          'confgen/*.py',
-	  'confgen/config-template/*.py',
-          'confgen/config-template/custom/*.py',
-          'confgen/config-template/template/default'
-          ]
-       },
-      description="A framework for receiving and redistributing Abuse Feeds",
+            [
+            'confgen/*.py',
+            'confgen/config-template/*.py',
+            'confgen/config-template/custom/*.py',
+            'confgen/config-template/template/default'
+            ]
+        },
+      description="A framework for receiving and redistributing abuse feeds",
       long_description="AbuseHelper is a modular, scalable and robust " + \
           "framework to help you in your abuse handling.",
       author="Clarified Networks",
       author_email="contact@clarifiednetworks.com",
-      url="http://code.google.com/p/abusehelper",
-      download_url="http://code.google.com/p/abusehelper/downloads/list",      
-      scripts=["scripts/abusehelperctl","scripts/roomreader"],
+      url="https://bitbucket.org/clarifiednetworks/abusehelper",
+      download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
+      scripts=[
+        "scripts/abusehelperctl",
+        "scripts/roomreader"
+        ],
       license="MIT",
       classifiers=[
-          "Development Status :: 4 - Beta",
-          "Environment :: Other Environment",
-          "Topic :: Internet",
-          "Topic :: Security",
-          "Intended Audience :: Information Technology",
-          "Intended Audience :: Telecommunications Industry",
-          "License :: Freely Distributable",
-          "Programming Language :: Python"],
+        "Development Status :: 4 - Beta",
+        "Environment :: Other Environment",
+        "Topic :: Internet",
+        "Topic :: Security",
+        "Intended Audience :: Information Technology",
+        "Intended Audience :: Telecommunications Industry",
+        "License :: Freely Distributable",
+        "Programming Language :: Python"
+        ],
       )
-
