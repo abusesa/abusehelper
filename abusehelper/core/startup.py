@@ -44,13 +44,13 @@ class StartupBot(bot.Bot):
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
 
-        self._behaviors = list()
+        self._strategies = list()
         self._processes = set()
 
     def configs(self):
         return []
 
-    def behavior(self, conf, delay=15):
+    def strategy(self, conf, delay=15):
         while True:
             yield conf
             
@@ -79,15 +79,16 @@ class StartupBot(bot.Bot):
         return process
 
     def _poll(self):
-        for process, behavior, conf in list(self._processes):
+        for process, strategy, conf in list(self._processes):
             retval = process.poll()
             if retval is not None:
-                self.log.info("Bot %r exited with return value %d", conf.name, retval)
-                self._processes.remove((process, behavior, conf))
-                heapq.heappush(self._behaviors, (time.time(), behavior))
+                self.log.info("Bot %r exited with return value %d", 
+                              conf.name, retval)
+                self._processes.remove((process, strategy, conf))
+                heapq.heappush(self._strategies, (time.time(), strategy))
 
     def _signal(self, sig):
-        for process, behavior, conf in self._processes:
+        for process, strategy, conf in self._processes:
             try:
                 os.kill(process.pid, sig)
             except OSError, ose:
@@ -96,24 +97,24 @@ class StartupBot(bot.Bot):
 
     def _purge(self):
         now = time.time()
-        while self._behaviors and self._behaviors[0][0] <= now:
-            _, behavior = heapq.heappop(self._behaviors)
+        while self._strategies and self._strategies[0][0] <= now:
+            _, strategy = heapq.heappop(self._strategies)
 
             try:
-                output_value = behavior.next()
+                output_value = strategy.next()
             except StopIteration:
                 continue
 
             if isinstance(output_value, (int, float)):
                 next = output_value + now
-                heapq.heappush(self._behaviors, (next, behavior))
+                heapq.heappush(self._strategies, (next, strategy))
             else:
-                yield output_value, behavior
+                yield output_value, strategy
 
     def _close(self):
-        for _, behavior in self._behaviors:
-            behavior.close()
-        self._behaviors = list()
+        for _, strategy in self._strategies:
+            strategy.close()
+        self._strategies = list()
 
     def run(self, poll_interval=0.1):
         def signal_handler(sig, frame):
@@ -122,17 +123,17 @@ class StartupBot(bot.Bot):
 
         try:
             for conf in config.flatten(self.configs()):
-                behavior = self.behavior(conf)
-                heapq.heappush(self._behaviors, (time.time(), behavior))
+                strategy = self.strategy(conf)
+                heapq.heappush(self._strategies, (time.time(), strategy))
 
-            while self._behaviors or self._processes:
+            while self._strategies or self._processes:
                 self._poll()
 
-                for conf, behavior in self._purge():
+                for conf, strategy in self._purge():
                     self.log.info("Launching bot %r from module %r", 
                                   conf.name, conf.module)
                     process = self._launch(conf.module, conf.params)
-                    self._processes.add((process, behavior, conf))
+                    self._processes.add((process, strategy, conf))
 
                 time.sleep(poll_interval)
         finally:
@@ -142,7 +143,7 @@ class StartupBot(bot.Bot):
                 self.log.info("Sending SIGTERM to alive bots")
                 self._signal(signal.SIGTERM)
 
-            while self._processes or self._behaviors:
+            while self._processes or self._strategies:
                 self._poll()
                 self._close()
                 time.sleep(poll_interval)
