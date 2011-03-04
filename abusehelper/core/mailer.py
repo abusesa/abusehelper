@@ -330,8 +330,12 @@ class MailerService(ReportBot):
                 yield inner.thread(self.server.quit)
             except:
                 pass
+
             self.server = None
-            inner.finish(False)
+            if exc and len(exc) > 0 and exc[0] >= 500:
+                inner.finish(True)
+            else:
+                inner.finish(False)
 
         self.log.info("Sent message to %r", to_addr)
         inner.finish(True)
