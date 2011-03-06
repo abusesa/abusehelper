@@ -1,9 +1,8 @@
 """
-Read 'mr: ip=ptr, ip=cymru, name=a, name=aaaa,   
-name=mx, name=soa, name=xmpp, name=stun' 
-style messages from a messgae body, resolve those 
-through mresolve and return resolved triplets
-in a similar message which includes machine readable
+Read '/resolve rr type' style messages from a 
+message body, resolve those through mresolve 
+and return resolved triplets in a similar 
+message which includes machine readable
 idiokit namespace.
 """
 from idiokit import threado
@@ -18,9 +17,8 @@ class MrBot(bot.XMPPBot):
     """
     MrBot implmentation
     """
-    # Define two parameters (in addition to the default XMPPBot ones)
     room = bot.Param("mr room")
-
+    mresolve = bot.Param(default='/usr/bin/mresolve', help='mresolve path (default: %default)')
 
     @threado.stream
     def main(inner, self):
@@ -40,7 +38,7 @@ class MrBot(bot.XMPPBot):
     @threado.stream
     def mr(inner, self, own_jid):
         """Create idiokit events and filter own messages."""
-        rtypes = set(['ipv4', 'ipv6', 'name', 'xmpp', 'stun', 'as', 'soa'])
+        rtypes = set(['ipv4', 'ipv6', 'name', 'xmpp', 'sip', 'as', 'soa'])
 
         def resolveRequests(expanded,mresolve):
             mr = Popen(mresolve, shell=True, stdin=subprocess.PIPE,
@@ -83,7 +81,7 @@ class MrBot(bot.XMPPBot):
                 expanded.append("_xmpp-client._tcp." + rr + ";SRV")
                 expanded.append("_xmpp-server._tcp." + rr + ";SRV")
                 expanded.append("_jabber._tcp." + rr + ";SRV")
-            elif rtype == 'stun':
+            elif rtype == 'sip':
                 expanded.append("_sips._tcp." + rr + ";SRV")
                 expanded.append("_sip._tcp." + rr + ";SRV")
                 expanded.append("_sip._udp." + rr + ";SRV")
@@ -99,9 +97,10 @@ class MrBot(bot.XMPPBot):
 
             for body in element.named("message").children("body"):
                 pieces = body.text.split()
-                event = events.Event()
-                if len(pieces) < 2 or pieces[0].lower() != "/resolve":
+                if pieces[0].lower() != "/resolve" or len(pieces) < 2:
                     event.add('syntax', '/resolve rr type')
+                    event = events.Event()
+                    inner.send(event)
                 else:
                     rr = pieces[1]
                     types = pieces[2:] or ['soa']
@@ -109,9 +108,13 @@ class MrBot(bot.XMPPBot):
                         if rtype not in rtypes:
                             continue
                         expanded = expandRequest(rr, rtype)
-                        answer,err = resolveRequests(expanded, '/usr/bin/mresolve')
-                        event.add(rr, answer)
-                inner.send(event)
-                 
+                        answer,err = resolveRequests(expanded, self.mresolve)
+                        answers = dict()
+                        for subj, pred, obj in [a.split(";") for a in answer.splitlines()]:
+                            answers.setdefault(subj, events.Event()).add(pred, obj)
+                    for page, event in answers.items():
+                        event.add("subject", page)
+                        inner.send(event)
+
 # Instantiate a MrBot from command line parameters and run it.
 MrBot.from_command_line().run()
