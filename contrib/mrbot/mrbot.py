@@ -98,9 +98,7 @@ class MrBot(bot.XMPPBot):
             for body in element.named("message").children("body"):
                 pieces = body.text.split()
                 if pieces[0].lower() != "/resolve" or len(pieces) < 2:
-                    event.add('syntax', '/resolve rr type')
-                    event = events.Event()
-                    inner.send(event)
+                    pass
                 else:
                     rr = pieces[1]
                     types = pieces[2:] or ['soa']
