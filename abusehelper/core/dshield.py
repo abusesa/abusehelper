@@ -2,24 +2,26 @@ from idiokit import threado
 from abusehelper.core import utils, cymru, bot, events
 
 class DShieldBot(bot.PollingBot):
+    COLUMNS = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
+
     use_cymru_whois = bot.BoolParam(default=False)
 
-    def augment(self):
-        if not self.use_cymru_whois:
-            return bot.PollingBot.augment(self)
-        return cymru.CymruWhois()
+    def __init__(self, *args, **keys):
+        bot.PollingBot.__init__(self, *args, **keys)
+        self.whois = cymru.CymruWhoisAugmenter()
 
-    def feed_keys(self, asns, **keys):
-        return map(str, asns)
+    def feed_keys(self, asns=(), **keys):
+        for asn in asns:
+            yield (str(asn),)
 
-    def room_keys(self, asns, **keys):
-        return map(str, asns)
-
-    def event_keys(self, event):
-        return list(event.values("asn"))
+    def poll(self, asn):
+        tail = self.normalize(asn)
+        if self.use_cymru_whois:
+            tail = tail | self.whois.augment() | self.filter(asn)
+        return self._poll(asn) | tail
 
     @threado.stream
-    def poll(inner, self, asn, url="http://dshield.org/asdetailsascii.html"):
+    def _poll(inner, self, asn, url="http://dshield.org/asdetailsascii.html"):
         url += "?as=%s" % asn
 
         self.log.info("ASN%s: downloading", asn)
@@ -31,18 +33,21 @@ class DShieldBot(bot.PollingBot):
         self.log.info("ASN%s: downloaded", asn)
 
         charset = info.get_param("charset")
-        columns = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
         filtered = (x for x in fileobj if x.strip() and not x.startswith("#"))
         yield inner.sub(utils.csv_to_events(filtered,
                                             delimiter="\t", 
-                                            columns=columns,
-                                            charset=charset)
-                        | self.normalize(asn))
+                                            columns=self.COLUMNS,
+                                            charset=charset))
 
     @threado.stream
     def normalize(inner, self, asn):
         while True:
             event = yield inner
+
+            if self.use_cymru_whois:
+                event.add("dshield asn", asn)
+            else:
+                event.add("asn", asn)
 
             ips = list(event.values("ip"))
             event.clear("ip")
@@ -53,13 +58,15 @@ class DShieldBot(bot.PollingBot):
                     pass
                 event.add("ip", ip)
             
-            if self.use_cymru_whois:
-                event.add("dshield asn", asn)
-            else:
-                event.add("asn", asn)
             event.add("feed", "dshield")
-
             inner.send(event)
+
+    @threado.stream
+    def filter(inner, self, asn):
+        while True:
+            event = yield inner
+            if event.contains("asn", asn):
+                inner.send(event)
 
 if __name__ == "__main__":
     DShieldBot.from_command_line().execute()

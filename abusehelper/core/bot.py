@@ -339,7 +339,8 @@ class ServiceBot(XMPPBot):
         service.start()
 
         if self.service_mock_session is not None:
-            keys = dict(item.split("=", 1) for item in self.service_mock_session)
+            keys = dict(item.split("=", 1) 
+                        for item in self.service_mock_session)
             self.log.info("Running a mock ression with keys %r" % keys)
             yield inner.sub(service.session(None, **keys) | service)
             return
@@ -375,102 +376,98 @@ class ServiceBot(XMPPBot):
         except services.Stop:
             inner.finish()
 
-from abusehelper.core.dedup import Dedup
 from abusehelper.core import events, taskfarm
 
 class FeedBot(ServiceBot):
     def __init__(self, *args, **keys):
         ServiceBot.__init__(self, *args, **keys)
 
-        self.rooms = taskfarm.TaskFarm(self._room)
-        self._room_keys = taskfarm.Counter()
+        self._feeds = taskfarm.TaskFarm(self.manage_feed)
+        self._rooms = taskfarm.TaskFarm(self.manage_room)
+        self._dsts = taskfarm.Counter()
+
+    def feed_keys(self, *args, **keys):
+        yield ()
 
     @threado.stream
-    def session(inner, self, state, dst_room, **keys):
-        room_keys = self.room_keys(dst_room=dst_room, **keys)
-        for room_key in room_keys:
-            self._room_keys.inc(room_key, dst_room)
-
-        try:
-            yield inner.sub(self.rooms.inc(dst_room))
-        except services.Stop:
-            inner.finish()
-        finally:
-            for room_key in room_keys:
-                self._room_keys.dec(room_key, dst_room)
-
-    @threado.stream
-    def feed(inner, self):
+    def feed(inner, self, *args, **keys):
         while True:
             yield inner
 
-    def room_keys(self, **keys):
-        return [None]
+    @threado.stream
+    def session(inner, self, state, dst_room, **keys):
+        feeds = [self._rooms.inc(dst_room)]
+        feed_keys = set(self.feed_keys(dst_room=dst_room, **keys))
 
-    def event_keys(self, event):
-        return [None]
+        for key in feed_keys:
+            self._dsts.inc(key, dst_room)
+            feeds.append(self._feeds.inc(key))
+
+        try:
+            yield inner.sub(threado.pipe(*feeds))
+        except services.Stop:
+            inner.finish()
+        finally:
+            for key in feed_keys:
+                self._dsts.dec(key, dst_room)
+
+    def manage_feed(self, key):
+        return threado.pipe(self.feed(*key),
+                            self.augment(),
+                            self._distribute(key))
 
     @threado.stream
-    def _room(inner, self, name):
+    def manage_room(inner, self, name):
         self.log.info("Joining room %r", name)
         room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
 
         self.log.info("Joined room %r", name)
         try:
             yield inner.sub(events.events_to_elements()
+                            | self._stats(name)
                             | room
                             | threado.dev_null())
         finally:
             self.log.info("Left room %r", name)
 
     @threado.stream_fast
-    def _distribute(inner, self):
+    def _distribute(inner, self, key):
         while True:
             yield inner
 
-            for event in inner:
-                for room_key in self.event_keys(event):
-                    dst_rooms = self._room_keys.get(room_key)
-
-                    for dst_room in dst_rooms:
-                        room = self.rooms.get(dst_room)
-                        if room is None:
-                            continue
-                        room.send(event)
-
-                    if dst_rooms:
-                        inner.send(event)
-
-    @threado.stream_fast
-    def _dedup(inner, self, dedup):
-        while True:
-            yield inner
+            rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
+            rooms.discard(None)
 
             for event in inner:
-                items = [(key, event.values(key)) for key in event.keys()]
-                items.sort()
-                if dedup.add(repr(items)):
+                for room in rooms:
+                    room.send(event)
+                if rooms:
                     inner.send(event)
 
     @threado.stream_fast
-    def _stats(inner, self, interval=60.0):
+    def _stats(inner, self, name, interval=60.0):
         count = 0
-        sleeper = timer.sleep(interval)
+        sleeper = timer.sleep(interval / 2.0)
 
-        while True:
-            yield inner, sleeper
+        try:
+            while True:
+                yield inner, sleeper
+            
+                for event in inner:
+                    count += 1
+                    inner.send(event)
 
-            for event in inner:
-                count += 1
-                inner.send(event)
-
-            try:
-                list(sleeper)
-            except threado.Finished:
-                if count > 0:
-                    self.log.info("Sent out %d new events", count)
-                count = 0
-                sleeper = timer.sleep(interval)
+                try:
+                    for _ in sleeper:
+                        pass
+                except threado.Finished:
+                    if count > 0:
+                        self.log.info("Sent %d events to room %r", count, name)
+                    count = 0
+                    sleeper = timer.sleep(interval)
+        finally:
+            if count > 0:
+                self.log.info("Sent %d events to room %r", count, name)
 
     @threado.stream_fast
     def augment(inner, self):
@@ -478,21 +475,6 @@ class FeedBot(ServiceBot):
             yield inner
             for event in inner:
                 inner.send(event)
-
-    @threado.stream
-    def main(inner, self, dedup):
-        if dedup is None:
-            dedup = Dedup(10**6)
-
-        try:
-            yield inner.sub(self.feed() 
-                            | self._dedup(dedup)
-                            | self.augment()
-                            | self._distribute()
-                            | self._stats()
-                            | threado.dev_null())
-        except services.Stop:
-            inner.finish(dedup)
 
 import time
 import collections
@@ -506,42 +488,76 @@ class PollingBot(FeedBot):
     def __init__(self, *args, **keys):
         FeedBot.__init__(self, *args, **keys)
 
-        self.feed_queue = collections.deque()
-        self._feed_keys = taskfarm.Counter()
+        self._poll_queue = collections.deque()
+        self._poll_dedup = dict()
+        self._poll_cleanup = set()
 
     @threado.stream
-    def session(inner, self, state, **keys):
-        feed_keys = set(self.feed_keys(**keys))
-        for feed_key in feed_keys:
-            if self._feed_keys.inc(feed_key):
-                self.feed_queue.appendleft((time.time(), feed_key))
+    def poll(inner, self, *args, **keys):
+        yield
+
+    def feed_keys(self, *args, **keys):
+        # Return (None,) instead of () for backwards compatibility.
+        yield (None,)
+
+    @threado.stream
+    def manage_feed(inner, self, key):
+        if key not in self._poll_cleanup:
+            self._poll_queue.appendleft((time.time(), key))
+            self._poll_dedup.setdefault(key, set())
+        else:
+            self._poll_cleanup.discard(key)
 
         try:
-            yield inner.sub(FeedBot.session(self, state, **keys))
-        except services.Stop:
-            inner.finish()
-        finally:
-            for feed_key in feed_keys:
-                self._feed_keys.dec(feed_key)
-
-    def feed_keys(self, **keys):
-        return [None]
+            while True:
+                yield inner
+        except:
+            self._poll_cleanup.add(key)
 
     @threado.stream
-    def feed(inner, self):
-        while True:
+    def main(inner, self, state):
+        try:
             while True:
-                current_time = time.time()
-                if self.feed_queue and self.feed_queue[0][0] <= current_time:
-                    break
-                yield inner, timer.sleep(1.0)
-                continue
-            
-            _, feed_key = self.feed_queue.popleft()
-            if not self._feed_keys.contains(feed_key):
-                continue
-            
-            yield inner.sub(self.poll(feed_key))
-                
-            expire_time = time.time() + self.poll_interval
-            self.feed_queue.append((expire_time, feed_key))
+                while (not self._poll_queue or
+                       self._poll_queue[0][0] > time.time()):
+                    yield inner, timer.sleep(1.0)
+
+                _, key = self._poll_queue.popleft()
+                if key in self._poll_cleanup:
+                    self._poll_cleanup.remove(key)
+                    self._poll_dedup.pop(key, None)
+                    continue
+
+                yield inner.sub(self.poll(*key)
+                                | self.augment()
+                                | self._distribute(key))
+                expire_time = time.time() + self.poll_interval
+                self._poll_queue.append((expire_time, key))
+        except services.Stop:
+            inner.finish()
+
+    @threado.stream_fast
+    def _distribute(inner, self, key):
+        old_dedup = self._poll_dedup[key]
+        new_dedup = self._poll_dedup[key] = set()
+
+        while True:
+            yield inner
+
+            rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
+            rooms.discard(None)
+
+            for event in inner:
+                if not rooms:
+                    continue
+
+                event_key = frozenset((key, frozenset(event.values(key)))
+                                       for key in event.keys())
+                for room in rooms:
+                    room_key = event_key, room
+                    if room_key not in old_dedup and room_key not in new_dedup:
+                        room.send(event)
+                    new_dedup.add(room_key)
+
+                if rooms:
+                    inner.send(event)
