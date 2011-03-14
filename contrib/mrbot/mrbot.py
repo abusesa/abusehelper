@@ -42,11 +42,11 @@ class MrBot(bot.XMPPBot):
 
         def resolveRequests(expanded,mresolve):
             mr = Popen(mresolve, shell=True, stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=1)
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
             for rr in expanded:
-                mr.stdin.write(rr + '\n')
+                mr.stdin.write(rr.encode('utf8', 'replace') + '\n')
             (sout, err) = mr.communicate()
-            return sout, err
+            return sout.decode('utf8', 'replace'), err
 
         def expandRequest(rr, rtype):
             expanded = []
