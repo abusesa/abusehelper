@@ -332,11 +332,14 @@ class MailerService(ReportBot):
                 pass
 
             self.server = None
-            if exc and len(exc) > 0 and exc[0] >= 500:
-                self.log.info("Error %i. Dropping message from queue.", exc[0])
-                inner.finish(True)
-            else:
-                inner.finish(False)
+            success = False
+            try:
+                if exc[0] >= 500:
+                    success = True
+                    self.log.info("Error %i. Dropping message from queue.",
+                                  exc[0])
+            finally:
+                inner.finish(success)
 
         self.log.info("Sent message to %r", to_addr)
         inner.finish(True)
