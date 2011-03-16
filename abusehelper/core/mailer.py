@@ -338,6 +338,8 @@ class MailerService(ReportBot):
                     success = True
                     self.log.info("Error %i. Dropping message from queue.",
                                   exc[0])
+            except:
+                pass
             finally:
                 inner.finish(success)
 
