@@ -1,8 +1,17 @@
 import time
-import collections
+import socket
 import getpass
+import smtplib
+import collections
 from idiokit import threado, timer
 from abusehelper.core import events, taskfarm, services, templates, bot
+
+@threado.stream
+def wait(inner, amount):
+    sleeper = timer.sleep(amount)
+
+    while not sleeper.has_result():
+        yield inner, sleeper
 
 def next_time(time_string):
     try:
@@ -46,7 +55,6 @@ class ReportBot(bot.ServiceBot):
 
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.collectors = dict()
-        self.waker = threado.Channel()
         self.queue = collections.deque()
 
     @threado.stream
@@ -79,16 +87,13 @@ class ReportBot(bot.ServiceBot):
 
         try:
             while True:
-                yield inner, self.waker
-
-                list(self.waker)
-                list(inner)
-
                 while self.queue:
-                    first = self.queue.popleft()
-                    success = yield inner.sub(self.report(first))
+                    item = self.queue.popleft()
+                    success = yield inner.sub(self.report(item))
                     if not success:
-                        self.queue.append(first)
+                        self.queue.append(item)
+
+                yield inner.sub(wait(1.0))
         except services.Stop:
             inner.finish(self.queue)
 
@@ -113,7 +118,6 @@ class ReportBot(bot.ServiceBot):
                 
                 for item in inner:
                     self.queue.append(item)
-                    self.waker.send()
 
         collector = _alert() | self.collect(state, **keys) | _collect()
         self.collectors.setdefault(src_room, set()).add(collector)
@@ -198,6 +202,8 @@ def format_addresses(addrs):
     return ", ".join(map(formataddr, getaddresses(addrs)))
 
 class MailerService(ReportBot):
+    TOLERATED_EXCEPTIONS = (socket.error, smtplib.SMTPException)
+
     mail_sender = bot.Param("from whom it looks like the mails came from")
     smtp_host = bot.Param("hostname of the SMTP service used for sending mails")
     smtp_port = bot.IntParam("port of the SMTP service used for sending mails",
@@ -262,31 +268,11 @@ class MailerService(ReportBot):
 
             msg_data = msg.as_string()
 
-            mail_to = (msg.get_all("To", list()) 
-                       + msg.get_all("Cc", list()))
+            mail_to = msg.get_all("To", list()) + msg.get_all("Cc", list())
             mail_to = [addr for (name, addr) in getaddresses(mail_to)]
             mail_to = filter(None, map(str.strip, mail_to))
             for address in mail_to:
                 inner.send(from_addr[1], address, subject, msg_data)
-
-    def _connect(self):
-        import smtplib
-
-        server = smtplib.SMTP(self.smtp_host, self.smtp_port)
-        try:
-            server.ehlo()
-            try:
-                if server.has_extn('starttls'):
-                    server.starttls()
-                    # redundant ehlo, yeah!
-                    server.ehlo()
-                    server.login(self.smtp_auth_user, self.smtp_auth_password)
-            except:
-                pass
-        except:
-            server.quit()
-            raise
-        return server
 
     @threado.stream
     def main(inner, self, state):
@@ -294,57 +280,93 @@ class MailerService(ReportBot):
             result = yield inner.sub(ReportBot.main(self, state))
         finally:
             if self.server is not None:
-                try:
-                    yield inner.thread(self.server.quit)
-                except:
-                    pass
+                _, server = self.server
                 self.server = None
+
+                try:
+                    yield inner.thread(server.quit)
+                except self.TOLERATED_EXCEPTIONS, exc:
+                    pass
         inner.finish(result)
 
     @threado.stream
-    def report(inner, self, item):
-        from_addr, to_addr, subject, msg_str = item
-
-        # Try to connect to the SMTP server if we're haven't done that yet
+    def _ensure_connection(inner, self):
         while self.server is None:
-            list(inner)
+            host, port = self.smtp_host, self.smtp_port
+            self.log.info("Connecting %r port %d", host, port)
             try:
-                self.log.info("Connecting %r port %d", 
-                              self.smtp_host, self.smtp_port)
-                self.server = yield inner.thread(self._connect)
-            except:
-                self.log.error("Error connecting SMTP server, "+
-                               "retrying in 10 seconds")
-                yield inner.sub(timer.sleep(10.0))
+                server = yield inner.thread(smtplib.SMTP, host, port)
+            except self.TOLERATED_EXCEPTIONS, exc:
+                self.log.error("Error connecting SMTP server: %r", exc)
             else:
                 self.log.info("Connected to the SMTP server")
-        list(inner)
-                
+                self.server = False, server
+                break
+
+            self.log.info("Retrying SMTP connection in 10 seconds")
+            yield inner.sub(wait(10.0))
+
+    def _try_to_authenticate(self, server):
+        if server.has_extn("starttls"):
+            server.starttls()
+            server.ehlo()
+
+        if server.has_extn("auth"):
+            server.login(self.smtp_auth_user, self.smtp_auth_password)
+
+    @threado.stream
+    def _try_to_send(inner, self, item):
+        from_addr, to_addr, subject, msg = item
+
+        yield inner.sub(self._ensure_connection())
+
+        ehlo_done, server = self.server
+
         self.log.info("Sending message %r to %r", subject, to_addr)
         try:
-            yield inner.thread(self.server.sendmail, 
-                               from_addr, to_addr, msg_str)
-        except Exception, exc:
-            self.log.info("Could not send message to %r: %s", to_addr, exc)
-            try:
-                yield inner.thread(self.server.quit)
-            except:
-                pass
+            if not ehlo_done:
+                yield inner.thread(server.ehlo)
+                self.server = True, server
 
-            self.server = None
-            success = False
             try:
-                if exc[0] >= 500:
-                    success = True
-                    self.log.info("Error %i. Dropping message from queue.",
-                                  exc[0])
-            except:
+                yield inner.thread(server.sendmail, from_addr, to_addr, msg)
+            except smtplib.SMTPSenderRefused, refused:
+                if self.smtp_auth_user is None or refused.smtp_code != 530:
+                    raise
+                yield inner.thread(self._try_to_authenticate, server)
+                yield inner.thread(server.sendmail, from_addr, to_addr, msg)
+        except smtplib.SMTPDataError, data_error:
+            self.log.error("Could not send message to %r: %r. "+
+                           "Dropping message from queue.", 
+                           to_addr, data_error)
+            inner.finish(True)
+        except smtplib.SMTPRecipientsRefused, refused:
+            for recipient, reason in refused.recipients.iteritems():
+                self.log.error("Could not send message to %r: %r. "+
+                               "Dropping message from queue.", 
+                               recipient, reason)
+            inner.finish(True)
+        except self.TOLERATED_EXCEPTIONS, exc:
+            self.log.error("Could not send message to %r: %r", to_addr, exc)
+            self.server = None
+            try:
+                yield inner.thread(server.quit)
+            except self.TOLERATED_EXCEPTIONS:
                 pass
-            finally:
-                inner.finish(success)
+            inner.finish(False)
 
         self.log.info("Sent message to %r", to_addr)
         inner.finish(True)
+
+    @threado.stream
+    def report(inner, self, item):
+        while True:
+            result = yield inner.sub(self._try_to_send(item))
+            if result:
+                inner.finish(True)
+
+            self.log.info("Retrying sending in 10 seconds")
+            yield inner.sub(wait(10.0))
 
 if __name__ == "__main__":
     MailerService.from_command_line().execute()
