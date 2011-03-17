@@ -15,7 +15,7 @@ from subprocess import Popen
 
 class MrBot(bot.XMPPBot):
     """
-    MrBot implmentation
+    MrBot implementation
     """
     room = bot.Param("mr room")
     mresolve = bot.Param(default='/usr/bin/mresolve', help='mresolve path (default: %default)')
@@ -38,7 +38,7 @@ class MrBot(bot.XMPPBot):
     @threado.stream
     def mr(inner, self, own_jid):
         """Create idiokit events and filter own messages."""
-        rtypes = set(['ipv4', 'ipv6', 'name', 'xmpp', 'sip', 'as', 'soa'])
+        rtypes = set(['ipv4', 'ipv6', 'name', 'xmpp', 'sip', 'as', 'soa', 'stun'])
 
         def resolveRequests(expanded,mresolve):
             mr = Popen(mresolve, shell=True, stdin=subprocess.PIPE,
@@ -85,6 +85,10 @@ class MrBot(bot.XMPPBot):
                 expanded.append("_sips._tcp." + rr + ";SRV")
                 expanded.append("_sip._tcp." + rr + ";SRV")
                 expanded.append("_sip._udp." + rr + ";SRV")
+            elif rtype == 'stun':
+                expanded.append("_stuns._tcp." + rr + ";SRV")
+                expanded.append("_stun._tcp." + rr + ";SRV")
+                expanded.append("_stun._udp." + rr + ";SRV")
             return expanded
 
         while True:
