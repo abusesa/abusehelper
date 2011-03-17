@@ -69,8 +69,8 @@ class ReportBot(bot.ServiceBot):
 
             collectors = self.collectors.get(name)
             for event in inner:
-                for collectors in collectors:
-                    collectors.send(event)
+                for collector in collectors:
+                    collector.send(event)
 
     @threado.stream
     def main(inner, self, queue):
