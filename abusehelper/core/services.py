@@ -310,9 +310,12 @@ class Service(threado.GeneratorStream):
     @threado.stream
     def kill_sessions(inner, self):
         try:
-            while True:
-                item = yield inner
-                inner.send(item)
+            try:
+                while True:
+                    item = yield inner
+                    inner.send(item)
+            except threado.Finished:
+                raise Stop()
         except:
             self.shutting_down = True
             type, exc, tb = sys.exc_info()
