@@ -11,7 +11,7 @@ class TailBot(bot.FeedBot):
         except IOError, e:
             self.log.info("Failed to open file %s. %s", path, e)
             raise IOError, e
-        except OSError, e
+        except OSError, e:
             self.log.info("Failed to open file %s. %s", path, e)
             return None
 
