@@ -1,6 +1,7 @@
 import os
 import sys
 import imp
+import errno
 import platform
 from distutils.core import setup
 
@@ -22,7 +23,16 @@ version = generate_version()
 
 def install_other(subdir):
     cwd = os.getcwd()
-    os.chdir(os.path.join(cwd, subdir))
+    path = os.path.join(cwd, subdir)
+
+    try:
+        os.chdir(path)
+    except OSError, error:
+        if error.errno not in (errno.ENOENT, errno.ENOTDIR):
+            raise
+        print >> sys.stderr, "Could not find directory %r" % path
+        return
+
     try:
         module_info = imp.find_module("setup", ["."])
         imp.load_module("setup", *module_info)
