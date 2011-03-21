@@ -20,12 +20,21 @@ def generate_version():
     return version_module.version_str()
 version = generate_version()
 
+def install_other(subdir):
+    cwd = os.getcwd()
+    os.chdir(os.path.join(cwd, subdir))
+    try:
+        module_info = imp.find_module("setup", ["."])
+        imp.load_module("setup", *module_info)
+    finally:
+        os.chdir(cwd)
+install_other("idiokit")
+
 setup(name="abusehelper",
       version="2." + version,
       packages=[
         "abusehelper", 
         "abusehelper.core", 
-        "idiokit", 
         "abusehelper.contrib",
         "abusehelper.contrib.confgen",
         "abusehelper.contrib.archivebot",
