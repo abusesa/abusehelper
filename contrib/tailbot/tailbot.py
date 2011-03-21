@@ -9,8 +9,11 @@ class TailBot(bot.FeedBot):
         try:
             return os.open(path, os.O_RDONLY)
         except IOError, e:
-            self.log.info("Failed to open file %s", path)
+            self.log.info("Failed to open file %s. %s", path, e)
             raise IOError, e
+        except OSError, e
+            self.log.info("Failed to open file %s. %s", path, e)
+            return None
 
     @threado.stream
     def feed(inner, self):
@@ -24,6 +27,8 @@ class TailBot(bot.FeedBot):
         while True:
             yield inner, timer.sleep(1)
 
+            if not fileobj:
+                continue
             stats = os.fstat(fileobj)
             inode = stats[1]
             size = stats[6]
