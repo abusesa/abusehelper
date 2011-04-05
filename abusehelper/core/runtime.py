@@ -111,6 +111,14 @@ from abusehelper.core import bot, services, log
 class Cancel(Exception):
     pass
 
+@threado.stream
+def forward_errors(inner):
+    while True:
+        try:
+            yield inner
+        except threado.Finished:
+            pass
+
 class RuntimeBot(bot.XMPPBot):
     service_room = bot.Param()
 
@@ -122,10 +130,13 @@ class RuntimeBot(bot.XMPPBot):
     @threado.stream
     def _handle_updates(inner, self, lobby):
         sessions = dict()
+        forward = forward_errors()
 
         try:
             while True:
-                configs = yield inner
+                configs = yield inner, forward
+                if forward.was_source:
+                    continue
 
                 added = set(config.flatten(configs))
 
@@ -134,10 +145,11 @@ class RuntimeBot(bot.XMPPBot):
                     stream.throw(Cancel())
 
                 for session in added - set(sessions):
-                    sessions[session] = self.session(lobby, session)
+                    sessions[session] = self.session(lobby, session) | forward
         finally:
             for stream in sessions.values():
-                stream.throw(Cancel())        
+                stream.throw(Cancel())
+            forward.throw(Cancel())
 
     @threado.stream
     def main(inner, self):
