@@ -51,6 +51,7 @@ class Lobby(threado.GeneratorStream):
         self.services = dict()
         self.catalogue = dict()
         self.waiters = dict()
+        self.guarded = dict()
 
         for participant in self.room.participants:
             self._update_catalogue(participant.name, participant.payload)
@@ -59,27 +60,36 @@ class Lobby(threado.GeneratorStream):
         self.start()
 
     @threado.stream
-    def _try_session(inner, self, service_id, *path, **conf):
-        matches = list()
-        for jid, service_ids in self.catalogue.items():
-            if service_id in service_ids:
-                matches.append(jid)
+    def session(inner, self, service_id, *path, **conf):
+        while True:
+            matches = list()
+            for jid, service_ids in self.catalogue.items():
+                if service_id in service_ids:
+                    matches.append(jid)
+
+            if not matches:
+                if service_id not in self.waiters:
+                    channel = threado.Channel()
+                    self.waiters[service_id] = channel
+                channel = self.waiters[service_id]
                 
-        if matches:
-            jid = random.choice(matches)
-        else:
-            channel = threado.Channel()
-            self.waiters.setdefault(service_id, set()).add(channel)
-
-            try:
                 while not channel.was_source:
-                    jid = yield inner, channel
-            finally:
-                waiters = self.waiters.get(service_id, set())
-                waiters.discard(channel)
-                if not waiters:
-                    self.waiters.pop(service_id, None)
+                    yield inner, channel
+                continue
 
+            jid = random.choice(matches)
+            task = self._establish_session(jid, service_id, path, conf)
+            self.guarded.setdefault((jid, service_id), set()).add(task)
+            try:
+                session = yield inner.sub(task)
+            finally:
+                self.guarded.get((jid, service_id), set()).discard(task)
+
+            if session is not None:
+                inner.finish(session)
+
+    @threado.stream
+    def _establish_session(inner, self, jid, service_id, path, conf):
         start = Element("start", xmlns=SERVICE_NS, id=service_id)
         if path:
             path_element = Element("path")
@@ -90,16 +100,19 @@ class Lobby(threado.GeneratorStream):
         start.add(conf_element)
 
         try:
+            # Check that the service has not become unavailable.
+            for _ in inner: pass
+
             result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
+
+            # Check again that the service has not become unavailable.
+            for _ in inner: pass
         except XMPPError, error:
             if error.type != "cancel":
                 raise
             inner.finish()
-        inner.finish(jid, result)
-
-    @threado.stream
-    def session(inner, self, service_id, *path, **conf):
-        jid, result = yield inner.sub(self._try_session(service_id, *path, **conf))
+        except Unavailable:
+            inner.finish()
 
         for start in result.children("start", SERVICE_NS).with_attrs("id"):
             session_id = start.get_attr("id")
@@ -112,16 +125,22 @@ class Lobby(threado.GeneratorStream):
         else:
             raise SessionError("No session ID received")
 
-    def _update_catalogue(self, jid, payload):
-        self.catalogue.setdefault(jid, set())
-        for services in payload.named("services", SERVICE_NS):
-            for service in services.children("service").with_attrs("id"):
-                service_id = service.get_attr("id")
-                self.catalogue[jid].add(service_id)
+    def _update_catalogue(self, jid, payload=None):
+        previous = self.catalogue.pop(jid, set())
 
-                waiters = self.waiters.get(service_id, set())
-                for channel in waiters:
-                    channel.send(jid)
+        if payload:
+            self.catalogue[jid] = set()
+            for services in payload.named("services", SERVICE_NS):
+                for service in services.children("service").with_attrs("id"):
+                    service_id = service.get_attr("id")
+                    self.catalogue[jid].add(service_id)
+
+                    if service_id in self.waiters:
+                        self.waiters.pop(service_id).finish()
+
+        for service_id in previous - self.catalogue.get(jid, set()):
+            for task in self.guarded.pop((jid, service_id), ()):
+                task.throw(Unavailable())
 
     def handle_iq(self, iq, payload):
         if not iq.with_attrs("from", type="set"):
@@ -182,11 +201,11 @@ class Lobby(threado.GeneratorStream):
                 del self.jids[jid]
 
     def _discard_jid(self, jid, reason=Stop()):
-        self.catalogue.pop(jid, None)
         if jid in self.jids:
             sessions = self.jids[jid]
             for session_id in list(sessions):
                 self._discard_session(jid, session_id, reason)
+        self._update_catalogue(jid, None)
                 
     def _update_presence(self):
         services = Element("services", xmlns=SERVICE_NS)
