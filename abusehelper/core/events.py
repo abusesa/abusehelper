@@ -437,9 +437,9 @@ def events_to_elements(inner, include_body=True):
         for event in inner:
             if include_body:
                 fields = list()
-                for key, values in event._attrs.iteritems():
+                for key in event.keys():
                     key = escape(key)
-                    for value in values:
+                    for value in event.values(key):
                         value = escape(value)
                         fields.append(key + "=" + value)
                 body = Element("body")
@@ -469,7 +469,8 @@ class EventCollector(object):
         return state
         
     def append(self, event):
-        self.gz.write(repr(event._attrs) + os.linesep)
+        attrs = dict((key, event.values(key)) for key in event.keys())
+        self.gz.write(repr(attrs) + os.linesep)
 
     def purge(self):
         stringio = self.stringio
