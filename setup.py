@@ -49,13 +49,15 @@ setup(name="abusehelper",
         "abusehelper.contrib.confgen",
         "abusehelper.contrib.archivebot",
         "abusehelper.contrib.tailbot",
-        "abusehelper.contrib.bridgebot"],
+        "abusehelper.contrib.bridgebot",
+        "abusehelper.contrib.windowbot"],
       package_dir={
         'abusehelper.contrib': 'contrib',	
         'abusehelper.contrib.confgen': 'contrib/confgen',
         'abusehelper.contrib.archivebot': 'contrib/archivebot',
         'abusehelper.contrib.bridgebot': 'contrib/bridgebot',
-        'abusehelper.contrib.tailbot': 'contrib/tailbot'
+        'abusehelper.contrib.tailbot': 'contrib/tailbot',
+        'abusehelper.contrib.windowbot': 'contrib/windowbot'
 	},
       package_data={
         'abusehelper.contrib.confgen':
