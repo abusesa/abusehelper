@@ -311,7 +311,9 @@ class MailerService(ReportBot):
             server.starttls()
             server.ehlo()
 
-        if server.has_extn("auth"):
+        if (self.smtp_auth_user is not None and
+            self.smtp_auth_password is not None and
+            server.has_extn("auth")):
             server.login(self.smtp_auth_user, self.smtp_auth_password)
 
     @threado.stream
@@ -331,7 +333,7 @@ class MailerService(ReportBot):
             try:
                 yield inner.thread(server.sendmail, from_addr, to_addr, msg)
             except smtplib.SMTPSenderRefused, refused:
-                if self.smtp_auth_user is None or refused.smtp_code != 530:
+                if refused.smtp_code != 530:
                     raise
                 yield inner.thread(self._try_to_authenticate, server)
                 yield inner.thread(server.sendmail, from_addr, to_addr, msg)
