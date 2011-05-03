@@ -69,8 +69,8 @@ class CymruWhoisExpert(combiner.Expert):
             try:
                 for ip, values in inner:
                     augmentation = CymruWhoisEvent(ip, values)
-                    for event in local_pending.pop(ip, ()):
-                        inner.send(event, augmentation)
+                    for eid in local_pending.pop(ip, ()):
+                        inner.send(eid, augmentation)
             except threado.Finished:
                 should_stop = True
                 global_main.send()
@@ -80,9 +80,9 @@ class CymruWhoisExpert(combiner.Expert):
         while True:
             yield inner
 
-            for event in inner:
+            for eid, event in inner:
                 for ip in event.values(key):
-                    local_pending.setdefault(ip, list()).append(event)
+                    local_pending.setdefault(ip, set()).add(eid)
 
                     values = self.cache.get(ip, None)
                     if values is not None:

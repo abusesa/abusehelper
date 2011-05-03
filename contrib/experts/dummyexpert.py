@@ -8,13 +8,13 @@ class DummyExpert(Expert):
         counter = 0
 
         while True:
-            event = yield inner
+            eid, event = yield inner
 
             augment = events.Event()
             augment.add("dummy counter", unicode(counter))
             counter += 1
 
-            inner.send(event, augment)
+            inner.send(eid, augment)
 
 if __name__ == "__main__":
     DummyExpert.from_command_line().execute()

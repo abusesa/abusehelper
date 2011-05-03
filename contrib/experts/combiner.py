@@ -105,22 +105,30 @@ def ignore_augmentations(inner, ignore):
                 continue
             inner.send(event)
 
+@threado.stream_fast
+def create_eids(inner):
+    while True:
+        yield inner
+
+        for event in inner:
+            inner.send(event_id(event), event)
+
+@threado.stream_fast
+def embed_eids(inner):
+    while True:
+        yield inner
+
+        for eid, event in inner:
+            event.add(AUGMENT_KEY, eid)
+            inner.send(event)
+
 class Expert(RoomBot):
     @threado.stream
     def augment(inner, self):
         while True:
-            original_event = yield inner
+            eid, event = yield inner
             # Skip augmenting by default.
-            # Implement inner.send(original_event, augmented_event).
-
-    @threado.stream_fast
-    def _handle(inner, self):
-        while True:
-            yield inner
-
-            for original_event, augmented_event in inner:
-                augmented_event.add(AUGMENT_KEY, event_id(original_event))
-                inner.send(augmented_event)
+            # Implement inner.send(eid, augmentation).
 
     @threado.stream
     def session(inner, self, state, src_room, dst_room=None):
@@ -130,8 +138,9 @@ class Expert(RoomBot):
         yield inner.sub(self.from_room(src_room)
                         | events.stanzas_to_events()
                         | ignore_augmentations(src_room == dst_room)
+                        | create_eids()
                         | self.augment()
-                        | self._handle()
+                        | embed_eids()
                         | events.events_to_elements()
                         | self.to_room(dst_room))
 
@@ -175,8 +184,8 @@ class Combiner(RoomBot):
                 
                 for eid in eids:
                     if eid in ids:
-                        original_event = ids[eid]
-                        ids[eid] = events.Event(original_event, augmentation)
+                        event = ids[eid]
+                        ids[eid] = events.Event(event, augmentation)
 
     @threado.stream
     def session(inner, self, state, src_room, dst_room, 
