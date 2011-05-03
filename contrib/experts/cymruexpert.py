@@ -20,7 +20,7 @@ class CymruWhoisEvent(Event):
         Event.__init__(self, self.event)
 
     def __unicode__(self):
-        return "IP %r has values %r" % (self.ip, unicode(self.event))
+        return u"IP " + self.ip + " has values " + unicode(self.event)
 
 class CymruWhoisExpert(combiner.Expert):
     THROTTLE_TIME = 2.0
