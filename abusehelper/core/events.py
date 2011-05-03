@@ -1,6 +1,7 @@
 import re
 import os
 import gzip
+import inspect
 import operator
 from functools import partial
 from itertools import ifilter, imap
@@ -14,17 +15,17 @@ _ESCAPE = re.compile(u"&(?=#)|[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFF\uFF
 def _escape_sub(match):
     return "&#x%X;" % ord(match.group())
 
-def escape(string):
+def _escape(string):
     """Return a string where forbidden XML characters (and & in some
     cases) have been escaped using XML character references.
 
-    >>> escape(u"\u0000\uffff")
+    >>> _escape(u"\u0000\uffff")
     u'&#x0;&#xFFFF;'
     
     & should only be escaped when it is potentially a part of an escape
     sequence starting with &#.
 
-    >>> escape(u"& &#x26;")
+    >>> _escape(u"& &#x26;")
     u'& &#x26;#x26;'
 
     Other characters are not affected.
@@ -40,11 +41,11 @@ def _unescape_sub(match):
     except ValueError:
         return match.group(1)
 
-def unescape(string):
+def _unescape(string):
     """Return a string where XML character references have been
     substituted with the corresponding unicode characters.
 
-    >>> unescape(u"&#x0;&#xFFFF;")
+    >>> _unescape(u"&#x0;&#xFFFF;")
     u'\\x00\\uffff'
     """
 
@@ -54,8 +55,40 @@ _UNDEFINED = object()
 DEFAULT_FILTER = partial(operator.is_not, None)
 EVENT_NS = "abusehelper#event"
 
+def _normalize(value):
+    """Return the value converted to unicode. Raise a TypeError if the
+    value is not a string.
+    
+    >>> _normalize("a")
+    u'a'
+    >>> _normalize(u"b")
+    u'b'
+    >>> _normalize(1)
+    Traceback (most recent call last):
+    ...
+    TypeError: expected a string value, got the value 1 of type int
+
+    When converting str objects the default encoding is tried, and an
+    UnicodeDecodeError is raised if the value can not bot converted.
+
+    >>> _normalize("\xe4") #doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+    ...
+    UnicodeDecodeError: <the error goes here>
+    """
+
+    if isinstance(value, basestring):
+        return unicode(value)
+
+    name = type(value).__name__
+    module = inspect.getmodule(value)
+    if module is not None and module.__name__ != "__builtin__":
+        name = module.__name__ + "." + name
+    msg = "expected a string value, got the value %r of type %s" % (value, name)
+    raise TypeError(msg)
+
 class Event(object):
-    __slots__ = "_attrs", "_element"
+    __slots__ = ("_attrs",)
     
     @classmethod
     def from_element(self, element):
@@ -83,10 +116,9 @@ class Event(object):
             return None
 
         event = Event()
-        event._element = element
         for attr in element.children("attr").with_attrs("key", "value"):
-            key = unescape(attr.get_attr("key"))
-            value = unescape(attr.get_attr("value"))
+            key = _unescape(attr.get_attr("key"))
+            value = _unescape(attr.get_attr("value"))
             event.add(key, value)
         return event
 
@@ -97,15 +129,13 @@ class Event(object):
             for key in event.keys():
                 self.update(key, event.values(key))
                 
-        self._element = None
-
     def add(self, key, value, *values):
         """Add value(s) for a key.
 
         >>> event = Event()
         >>> event.add("key", "1")
         >>> event.values("key")
-        ('1',)
+        (u'1',)
 
         More than one value can be added with one call.
 
@@ -119,17 +149,13 @@ class Event(object):
         >>> event = Event()
         >>> event.add("key", "1")
         >>> event.values("key")
-        ('1',)
+        (u'1',)
         >>> event.add("key", "1")
         >>> event.values("key")
-        ('1',)
+        (u'1',)
         """
 
-        self._element = None
-        if key not in self._attrs:
-            self._attrs[key] = set()
-        self._attrs[key].add(value)
-        self._attrs[key].update(values)
+        self.update(key, (value,) + values)
 
     def update(self, key, values):
         """Update the values of a key.
@@ -147,10 +173,10 @@ class Event(object):
         False
         """
 
-        self._element = None
+        key = _normalize(key)
         if key not in self._attrs:
             self._attrs[key] = set()
-        self._attrs[key].update(values)
+        self._attrs[key].update(_normalize(value) for value in values)
 
     def discard(self, key, value, *values):
         """Discard some value(s) of a key.
@@ -159,7 +185,7 @@ class Event(object):
         >>> event.add("key", "1", "2", "3")
         >>> event.discard("key", "1", "3")
         >>> event.values("key")
-        ('2',)
+        (u'2',)
 
         Values that don't exist for the given key are silently ignored.
 
@@ -169,10 +195,11 @@ class Event(object):
         >>> event.values("key")
         ()
         """
-        self._element = None
+
+        key = _normalize(key)
         value_set = self._attrs.get(key, set())
-        value_set.discard(value)
-        value_set.difference_update(values)
+        value_set.discard(_normalize(value))
+        value_set.difference_update(_normalize(value) for value in values)
         if not value_set:
             self._attrs.pop(key, None)
 
@@ -191,8 +218,7 @@ class Event(object):
         >>> event.clear("key")
         """
 
-        self._element = None
-        self._attrs.pop(key, None)
+        self._attrs.pop(_normalize(key), None)
 
     def _itervalues(self, key, parser, filter):
         """Iterate through parsed and filtered values of either a
@@ -202,6 +228,7 @@ class Event(object):
             filter = DEFAULT_FILTER
 
         if key is not _UNDEFINED:
+            key = _normalize(key)
             values = self._attrs.get(key, ())
             if parser is not None:
                 values = imap(parser, values)
@@ -258,7 +285,7 @@ class Event(object):
         >>> event.add("key", "1")
         >>> event.add("other", "2")
         >>> event.value("key")
-        '1'
+        u'1'
         >>> event.value() in ["1", "2"]
         True
 
@@ -392,17 +419,16 @@ class Event(object):
         return tuple(keys)
 
     def to_element(self):
-        if self._element is None:
-            event = Element("event", xmlns=EVENT_NS)
+        event = Element("event", xmlns=EVENT_NS)
 
-            for key, values in self._attrs.items():
-                key = escape(key)
-                for value in values:
-                    value = escape(value)
-                    attr = Element("attr", key=key, value=value)
-                    event.add(attr)
-            self._element = event
-        return self._element
+        for key, values in self._attrs.items():
+            key = _escape(key)
+            for value in values:
+                value = _escape(value)
+                attr = Element("attr", key=key, value=value)
+                event.add(attr)
+
+        return event
 
     def __eq__(self, other):
         if not isinstance(other, Event):
@@ -413,7 +439,7 @@ class Event(object):
         value = self.__eq__(other)
         if value is NotImplemented:
             return NotImplemented
-        return not value
+        return not value    
 
     def __repr__(self):
         return self.__class__.__name__ + "(" + repr(self._attrs) + ")"
@@ -438,9 +464,9 @@ def events_to_elements(inner, include_body=True):
             if include_body:
                 fields = list()
                 for key in event.keys():
-                    key = escape(key)
+                    key = _escape(key)
                     for value in event.values(key):
-                        value = escape(value)
+                        value = _escape(value)
                         fields.append(key + "=" + value)
                 body = Element("body")
                 body.text = ", ".join(fields)
