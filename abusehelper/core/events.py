@@ -482,7 +482,7 @@ def events_to_elements(inner, include_body=True):
         for event in inner:
             if include_body:
                 body = Element("body")
-                body.text = unicode(event)
+                body.text = _escape(unicode(event))
                 inner.send(body, event.to_element())
             else:
                 inner.send(event.to_element())
