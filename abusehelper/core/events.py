@@ -441,6 +441,25 @@ class Event(object):
             return NotImplemented
         return not value    
 
+    def __unicode__(self):
+        """Return an unicode representation of the event.
+
+        >>> e = Event()
+        >>> unicode(e)
+        u''
+        >>> e.add("a", "b")
+        >>> unicode(e)
+        u'a=b'
+        """
+
+        fields = list()
+        for key, values in self._attrs.iteritems():
+            key = _escape(key)
+            for value in values:
+                value = _escape(value)
+                fields.append(key + u"=" + value)
+        return u", ".join(fields)
+
     def __repr__(self):
         return self.__class__.__name__ + "(" + repr(self._attrs) + ")"
 
@@ -462,14 +481,8 @@ def events_to_elements(inner, include_body=True):
 
         for event in inner:
             if include_body:
-                fields = list()
-                for key in event.keys():
-                    key = _escape(key)
-                    for value in event.values(key):
-                        value = _escape(value)
-                        fields.append(key + "=" + value)
                 body = Element("body")
-                body.text = ", ".join(fields)
+                body.text = unicode(event)
                 inner.send(body, event.to_element())
             else:
                 inner.send(event.to_element())
