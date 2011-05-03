@@ -45,6 +45,9 @@ class _EventDict(object):
         return self.encoder(value)
 
 class CSVFormatter(object):
+    def __init__(self, keys=True):
+        self.keys = keys
+
     def _encode(self, string):
         return string.encode("utf-8")
 
@@ -64,7 +67,8 @@ class CSVFormatter(object):
         fields = list(self.parse_fields(fields))
 
         writer = csv.writer(stringio, delimiter=delimiter)
-        writer.writerow([key for (key, _) in fields])
+        if self.keys:
+            writer.writerow([key for (key, _) in fields])
 
         for event in events:
             event = _EventDict(event, self._encode)
