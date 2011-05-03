@@ -83,7 +83,7 @@ def event_id(event):
 
     for key in sorted(event.keys()):
         key = key.encode("utf-8")
-        for value in sorted(event.values()):
+        for value in sorted(event.values(key)):
             value = value.encode("utf-8")
             result.append(key)
             result.append(value)
