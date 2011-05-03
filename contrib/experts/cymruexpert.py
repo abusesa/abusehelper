@@ -6,11 +6,25 @@ from idiokit import util, threado, sockets, timer
 class Stop(Exception):
     pass
 
+class CymruWhoisEvent(Event):
+    LINE_KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
+
+    def __init__(self, ip, bites):
+        self.ip = ip
+
+        self.event = Event()
+        for key, value in zip(self.LINE_KEYS, bites):
+            if value is not None:
+                self.event.add(key, value)
+
+        Event.__init__(self, self.event)
+
+    def __unicode__(self):
+        return "IP %r has values %r" % (self.ip, unicode(self.event))
+
 class CymruWhoisExpert(combiner.Expert):
     THROTTLE_TIME = 2.0
     CACHE_TIME = 60 * 60.0
-
-    LINE_KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
 
     def __init__(self, *args, **keys):
         combiner.Expert.__init__(self, *args, **keys)
@@ -54,15 +68,8 @@ class CymruWhoisExpert(combiner.Expert):
                 
             try:
                 for ip, values in inner:
-                    events = local_pending.pop(ip, ())
-
-                    augmentation = Event()
-                    for key, value in zip(self.LINE_KEYS, values):
-                        if value is None:
-                            continue
-                        augmentation.add(key, value)
-                    
-                    for event in events:
+                    augmentation = CymruWhoisEvent(ip, values)
+                    for event in local_pending.pop(ip, ()):
                         inner.send(event, augmentation)
             except threado.Finished:
                 should_stop = True
