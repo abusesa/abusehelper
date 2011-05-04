@@ -450,13 +450,13 @@ class Event(object):
         >>> e.add("a", "b")
         >>> unicode(e)
         u'a=b'
+
+        The specific order of the key-value pairs is undefined.
         """
 
         fields = list()
         for key, values in self._attrs.iteritems():
-            key = _escape(key)
             for value in values:
-                value = _escape(value)
                 fields.append(key + u"=" + value)
         return u", ".join(fields)
 
