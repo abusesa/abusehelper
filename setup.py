@@ -50,22 +50,24 @@ setup(name="abusehelper",
         "abusehelper.contrib.archivebot",
         "abusehelper.contrib.tailbot",
         "abusehelper.contrib.bridgebot",
-        "abusehelper.contrib.windowbot"],
+        "abusehelper.contrib.windowbot",
+        "abusehelper.contrib.reprbot"],
       package_dir={
-        'abusehelper.contrib': 'contrib',	
-        'abusehelper.contrib.confgen': 'contrib/confgen',
-        'abusehelper.contrib.archivebot': 'contrib/archivebot',
-        'abusehelper.contrib.bridgebot': 'contrib/bridgebot',
-        'abusehelper.contrib.tailbot': 'contrib/tailbot',
-        'abusehelper.contrib.windowbot': 'contrib/windowbot'
+        "abusehelper.contrib": "contrib",	
+        "abusehelper.contrib.confgen": "contrib/confgen",
+        "abusehelper.contrib.archivebot": "contrib/archivebot",
+        "abusehelper.contrib.bridgebot": "contrib/bridgebot",
+        "abusehelper.contrib.tailbot": "contrib/tailbot",
+        "abusehelper.contrib.windowbot": "contrib/windowbot",
+        "abusehelper.contrib.reprbot": "contrib/reprbot"
 	},
       package_data={
-        'abusehelper.contrib.confgen':
+        "abusehelper.contrib.confgen":
             [
-            'confgen/*.py',
-            'confgen/config-template/*.py',
-            'confgen/config-template/custom/*.py',
-            'confgen/config-template/template/default'
+            "confgen/*.py",
+            "confgen/config-template/*.py",
+            "confgen/config-template/custom/*.py",
+            "confgen/config-template/template/default"
             ]
         },
       description="A framework for receiving and redistributing abuse feeds",
