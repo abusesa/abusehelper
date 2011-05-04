@@ -52,7 +52,8 @@ class CymruWhoisAugmenter(object):
                     
                     for event in events:
                         for key, value in zip(self.LINE_KEYS, values):
-                            event.add(key, value)
+                            if value is not None:
+                                event.add(key, value)
                         inner.send(event)
             except threado.Finished:
                 should_stop = True
