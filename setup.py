@@ -51,7 +51,8 @@ setup(name="abusehelper",
         "abusehelper.contrib.tailbot",
         "abusehelper.contrib.bridgebot",
         "abusehelper.contrib.windowbot",
-        "abusehelper.contrib.reprbot"],
+        "abusehelper.contrib.reprbot",
+        "abusehelper.contrib.experts"],
       package_dir={
         "abusehelper.contrib": "contrib",	
         "abusehelper.contrib.confgen": "contrib/confgen",
@@ -59,7 +60,8 @@ setup(name="abusehelper",
         "abusehelper.contrib.bridgebot": "contrib/bridgebot",
         "abusehelper.contrib.tailbot": "contrib/tailbot",
         "abusehelper.contrib.windowbot": "contrib/windowbot",
-        "abusehelper.contrib.reprbot": "contrib/reprbot"
+        "abusehelper.contrib.reprbot": "contrib/reprbot",
+        "abusehelper.contrib.experts": "contrib/experts",
 	},
       package_data={
         "abusehelper.contrib.confgen":

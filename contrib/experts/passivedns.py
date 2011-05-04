@@ -38,7 +38,7 @@ class PassiveDNSExpert(Expert):
         while True:
             eid, event = yield inner
             
-            for name in event.values("domain") + event.values("ip"):
+            for name in event.values("domain") + event.values("ip") + event.values("soa"):
                 yield inner.sub(lookup(self.host, eid, name))
 
 if __name__ == "__main__":
