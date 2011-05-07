@@ -220,7 +220,7 @@ class Event(object):
 
         self._attrs.pop(_normalize(key), None)
 
-    def _itervalues(self, key, parser, filter):
+    def _iteritems(self, key, parser, filter):
         """Iterate through parsed and filtered values of either a
         specific key or all keys."""
 
@@ -233,13 +233,13 @@ class Event(object):
             if parser is not None:
                 values = imap(parser, values)
             for value in ifilter(filter, values):
-                yield value
+                yield key, value
         else:
             for key, values in self._attrs.iteritems():
                 if parser is not None:
                     values = imap(parser, values)
                 for value in ifilter(filter, values):
-                    yield value
+                    yield key, value
 
     def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return a tuple of event values (for a specific key, if
@@ -272,7 +272,7 @@ class Event(object):
         True
         """
 
-        return tuple(self._itervalues(key, parser, filter))
+        return tuple(x[1] for x in self._iteritems(key, parser, filter))
 
     def value(self, key=_UNDEFINED, default=_UNDEFINED, 
               parser=None, filter=None):
@@ -331,7 +331,7 @@ class Event(object):
         KeyError: 'other'
         """
 
-        for value in self._itervalues(key, parser, filter):
+        for _, value in self._iteritems(key, parser, filter):
             return value
 
         if default is _UNDEFINED:
@@ -380,10 +380,40 @@ class Event(object):
         False
         """
 
-        for parsed in self._itervalues(key, parser, filter):
+        for _, parsed in self._iteritems(key, parser, filter):
             if value is _UNDEFINED or parsed == value:
                 return True
         return False
+
+    def items(self, parser=None, filter=None):
+        """Return a tuple of key-value pairs contained by the event.
+
+        >>> event = Event()
+        >>> event.items()
+        ()
+
+        >>> event.add("key", "1")
+        >>> event.add("other", "2")
+        >>> sorted(event.items())
+        [(u'key', u'1'), (u'other', u'2')]
+
+        Parsing and filtering functions can be given to modify the results.
+
+        >>> def int_parse(string):
+        ...     try:
+        ...         return int(string)
+        ...     except ValueError:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "1", "a")
+        >>> event.add("other", "x")
+        >>> event.items(parser=int_parse)
+        ((u'key', 1),)
+
+        The order of the key-value pairs is undefined.
+        """
+
+        return tuple(self._iteritems(_UNDEFINED, parser, filter))
 
     def keys(self, parser=None, filter=None):
         """Return a tuple of keys with at least one value.
@@ -413,7 +443,7 @@ class Event(object):
 
         keys = list()
         for key in self._attrs:
-            for value in self._itervalues(key, parser, filter):
+            for _, value in self._iteritems(key, parser, filter):
                 keys.append(key)
                 break
         return tuple(keys)
@@ -508,10 +538,28 @@ class EventCollector(object):
         return state
         
     def append(self, event):
-        attrs = dict((key, event.values(key)) for key in event.keys())
+        attrs = dict()
+        for key, value in event.items():
+            attrs.setdefault(key, list()).append(value)
         self.gz.write(repr(attrs) + os.linesep)
 
     def purge(self):
+        """
+        >>> collector = EventCollector()
+
+        >>> event = Event()
+        >>> event.add("1", "2")
+        >>> collector.append(event)
+
+        >>> event2 = Event()
+        >>> event2.add("x", "y")
+        >>> collector.append(event2)
+
+        >>> collector.append(event)
+        >>> list(collector.purge()) == [event, event2, event]
+        True
+        """
+
         stringio = self.stringio
         self.stringio = StringIO()
 
@@ -538,8 +586,7 @@ class EventList(object):
                 for line in gz:
                     event = Event()
                     for key, values in eval(line).items():
-                        for value in values:
-                            event.add(key, value)
+                        event.update(key, values)
                     pos = tell()
                     yield event
                     seek(pos)
