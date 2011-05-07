@@ -477,8 +477,19 @@ class FeedBot(ServiceBot):
                 inner.send(event)
 
 import time
+import codecs
 import collections
+from hashlib import md5
 from idiokit import timer
+
+_utf8encoder = codecs.getencoder("utf-8")
+
+def event_hash(event):
+    result = list()
+    for key, value in sorted(event.items()):
+        result.append(_utf8encoder(key)[0])
+        result.append(_utf8encoder(value)[0])
+    return md5("\x80".join(result)).digest()
 
 class PollingBot(FeedBot):
     poll_interval = IntParam("wait at least the given amount of seconds "+
@@ -504,7 +515,7 @@ class PollingBot(FeedBot):
     def manage_feed(inner, self, key):
         if key not in self._poll_cleanup:
             self._poll_queue.appendleft((time.time(), key))
-            self._poll_dedup.setdefault(key, set())
+            self._poll_dedup.setdefault(key, dict())
         else:
             self._poll_cleanup.discard(key)
 
@@ -539,7 +550,7 @@ class PollingBot(FeedBot):
     @threado.stream_fast
     def _distribute(inner, self, key):
         old_dedup = self._poll_dedup[key]
-        new_dedup = self._poll_dedup[key] = set()
+        new_dedup = self._poll_dedup[key] = dict()
 
         while True:
             yield inner
@@ -551,13 +562,12 @@ class PollingBot(FeedBot):
                 if not rooms:
                     continue
 
-                event_key = frozenset((key, frozenset(event.values(key)))
-                                       for key in event.keys())
+                event_key = event_hash(event)
                 for room in rooms:
-                    room_key = event_key, room
-                    if room_key not in old_dedup and room_key not in new_dedup:
-                        room.send(event)
-                    new_dedup.add(room_key)
+                    if event_key in new_dedup.get(room, ()):
+                        continue
+                    new_dedup.setdefault(room, set()).add(event_key)
 
-                if rooms:
-                    inner.send(event)
+                    if event_key in old_dedup.get(room, ()):
+                        continue
+                    room.send(event)
