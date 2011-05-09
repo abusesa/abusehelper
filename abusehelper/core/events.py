@@ -1,6 +1,7 @@
 import re
 import os
 import gzip
+import codecs
 import inspect
 from bisect import bisect_left
 from cStringIO import StringIO
@@ -80,6 +81,16 @@ def _normalize(value):
         name = module.__name__ + "." + name
     msg = "expected a string value, got the value %r of type %s" % (value, name)
     raise TypeError(msg)
+
+_ENCODING = "utf-8"
+_encoder = codecs.getencoder(_ENCODING)
+_decoder = codecs.getdecoder(_ENCODING)
+
+def _internal(string):
+    return _encoder(string)[0]
+
+def _external(string):
+    return _decoder(string)[0]
 
 EVENT_NS = "abusehelper#event"
 
@@ -175,12 +186,12 @@ class Event(object):
         False
         """
 
-        key = _normalize(key)
+        key = _internal(_normalize(key))
         items = self._items
         length = len(items)
 
         for value in values:
-            item = key, _normalize(value)
+            item = key, _internal(_normalize(value))
             index = bisect_left(items, item)
 
             if index >= length or items[index] != item:
@@ -207,12 +218,12 @@ class Event(object):
         ()
         """
 
-        key = _normalize(key)
+        key = _internal(_normalize(key))
         items = self._items
         length = len(items)
 
         for value in (value,) + values:
-            item = key, _normalize(value)
+            item = key, _internal(_normalize(value))
             index = bisect_left(items, item)
 
             if index < length and items[index] == item:
@@ -236,7 +247,7 @@ class Event(object):
         >>> event.clear("key")
         """
 
-        key = _normalize(key)
+        key = _internal(_normalize(key))
         items = self._items
         length = len(items)
 
@@ -253,34 +264,35 @@ class Event(object):
 
         if key is self._UNDEFINED:
             for key, value in self._items:
+                value = _external(value)
                 if parser is not None:
                     value = parser(value)
 
-                if filter is None:
-                    if value is not None:
-                        yield key, value
-                elif filter(value):
-                    yield key, value
+                if filter is None and value is None:
+                    continue
+                if filter is not None and not filter(value):
+                    continue
+                yield _external(key), value
             return
 
         key = _normalize(key)
+        internal_key = _internal(key)
         items = self._items
         length = len(items)
 
-        index = bisect_left(items, (key,))
-        while index < length and items[index][0] == key:
-            value = items[index][1]
+        index = bisect_left(items, (internal_key,))
+        while index < length and items[index][0] == internal_key:
+            value = _external(items[index][1])
+            index += 1
 
             if parser is not None:
                 value = parser(value)
 
-            if filter is None:
-                if value is not None:
-                    yield key, value
-            elif filter(value):
-                yield key, value
-
-            index += 1
+            if filter is None and value is None:
+                continue
+            if filter is not None and not filter(value):
+                continue
+            yield key, value
 
     def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return a tuple of event values (for a specific key, if
@@ -482,6 +494,7 @@ class Event(object):
                 continue
             prev_key = None
 
+            value = _external(value)
             if parser is not None:
                 value = parser(value)
 
@@ -489,7 +502,7 @@ class Event(object):
                 continue
             if filter is not None and not filter(value):
                 continue
-            keys.append(key)
+            keys.append(_external(key))
             prev_key = key
 
         return tuple(keys)
@@ -497,7 +510,7 @@ class Event(object):
     def to_element(self):
         event = Element("event", xmlns=EVENT_NS)
 
-        for key, value in self._items:
+        for key, value in self.items():
             key = _escape(key)
             value = _escape(value)
             attr = Element("attr", key=key, value=value)
@@ -529,11 +542,11 @@ class Event(object):
         The specific order of the key-value pairs is undefined.
         """
 
-        return u", ".join(key + u"=" + value for (key, value) in self._items)
+        return u", ".join(key + u"=" + value for (key, value) in self.items())
 
     def __repr__(self):
         attrs = dict()
-        for key, value in self._items:
+        for key, value in self.items():
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
