@@ -2,9 +2,7 @@ import re
 import os
 import gzip
 import inspect
-import operator
-from functools import partial
-from itertools import ifilter, imap
+from bisect import bisect_left
 from cStringIO import StringIO
 from idiokit import threado
 from idiokit.xmlcore import Element
@@ -51,10 +49,6 @@ def _unescape(string):
 
     return _UNESCAPE.sub(_unescape_sub, string)
 
-_UNDEFINED = object()
-DEFAULT_FILTER = partial(operator.is_not, None)
-EVENT_NS = "abusehelper#event"
-
 def _normalize(value):
     """Return the value converted to unicode. Raise a TypeError if the
     value is not a string.
@@ -87,8 +81,12 @@ def _normalize(value):
     msg = "expected a string value, got the value %r of type %s" % (value, name)
     raise TypeError(msg)
 
+EVENT_NS = "abusehelper#event"
+
 class Event(object):
-    __slots__ = ("_attrs",)
+    __slots__ = ["_items"]
+
+    _UNDEFINED = object()
     
     @classmethod
     def from_element(self, element):
@@ -123,11 +121,15 @@ class Event(object):
         return event
 
     def __init__(self, *events):
-        self._attrs = dict()
+        items = ()
 
-        for event in events:
-            for key in event.keys():
-                self.update(key, event.values(key))
+        if events:
+            items = set()
+            for event in events:
+                items.update(event.items())
+            items = tuple(sorted(items))
+
+        self._items = items
                 
     def add(self, key, value, *values):
         """Add value(s) for a key.
@@ -141,8 +143,8 @@ class Event(object):
 
         >>> event = Event()
         >>> event.add("key", "1", "2")
-        >>> set(event.values("key")) == set(["1", "2"])
-        True
+        >>> sorted(event.values("key"))
+        [u'1', u'2']
 
         Key-value pairs is already contained by the event are ignored.
 
@@ -162,8 +164,8 @@ class Event(object):
 
         >>> event = Event()
         >>> event.update("key", ["1", "2"])
-        >>> set(event.values("key")) == set(["1", "2"])
-        True
+        >>> sorted(event.values("key"))
+        [u'1', u'2']
 
         The event will not be modified if there are no values to add.
 
@@ -174,9 +176,18 @@ class Event(object):
         """
 
         key = _normalize(key)
-        if key not in self._attrs:
-            self._attrs[key] = set()
-        self._attrs[key].update(_normalize(value) for value in values)
+        items = self._items
+        length = len(items)
+
+        for value in values:
+            item = key, _normalize(value)
+            index = bisect_left(items, item)
+
+            if index >= length or items[index] != item:
+                items = items[:index] + (item,) + items[index:]
+                length += 1
+
+        self._items = items
 
     def discard(self, key, value, *values):
         """Discard some value(s) of a key.
@@ -197,11 +208,18 @@ class Event(object):
         """
 
         key = _normalize(key)
-        value_set = self._attrs.get(key, set())
-        value_set.discard(_normalize(value))
-        value_set.difference_update(_normalize(value) for value in values)
-        if not value_set:
-            self._attrs.pop(key, None)
+        items = self._items
+        length = len(items)
+
+        for value in (value,) + values:
+            item = key, _normalize(value)
+            index = bisect_left(items, item)
+
+            if index < length and items[index] == item:
+                items = items[:index] + items[index+1:]
+                length -= 1
+
+        self._items = items
 
     def clear(self, key):
         """Clear all values of a key.
@@ -218,28 +236,51 @@ class Event(object):
         >>> event.clear("key")
         """
 
-        self._attrs.pop(_normalize(key), None)
+        key = _normalize(key)
+        items = self._items
+        length = len(items)
+
+        start = bisect_left(items, (key,))
+        end = start
+        while end < length and items[end][0] == key:
+            end += 1
+
+        self._items = items[:start] + items[end:]
 
     def _iteritems(self, key, parser, filter):
         """Iterate through parsed and filtered values of either a
         specific key or all keys."""
 
-        if filter is None:
-            filter = DEFAULT_FILTER
-
-        if key is not _UNDEFINED:
-            key = _normalize(key)
-            values = self._attrs.get(key, ())
-            if parser is not None:
-                values = imap(parser, values)
-            for value in ifilter(filter, values):
-                yield key, value
-        else:
-            for key, values in self._attrs.iteritems():
+        if key is self._UNDEFINED:
+            for key, value in self._items:
                 if parser is not None:
-                    values = imap(parser, values)
-                for value in ifilter(filter, values):
+                    value = parser(value)
+
+                if filter is None:
+                    if value is not None:
+                        yield key, value
+                elif filter(value):
                     yield key, value
+            return
+
+        key = _normalize(key)
+        items = self._items
+        length = len(items)
+
+        index = bisect_left(items, (key,))
+        while index < length and items[index][0] == key:
+            value = items[index][1]
+
+            if parser is not None:
+                value = parser(value)
+
+            if filter is None:
+                if value is not None:
+                    yield key, value
+            elif filter(value):
+                yield key, value
+
+            index += 1
 
     def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return a tuple of event values (for a specific key, if
@@ -248,10 +289,10 @@ class Event(object):
         >>> event = Event()
         >>> event.add("key", "1", "2")
         >>> event.add("other", "3", "4")
-        >>> set(event.values()) == set(["1", "2", "3", "4"])
-        True
-        >>> set(event.values("key")) == set(["1", "2"])
-        True
+        >>> sorted(event.values())
+        [u'1', u'2', u'3', u'4']
+        >>> sorted(event.values("key"))
+        [u'1', u'2']
 
         Perform parsing, validation and filtering by passing in
         parsing and filtering functions (by default all None objects
@@ -266,10 +307,10 @@ class Event(object):
         >>> event = Event()
         >>> event.add("key", "1.2.3.4", "abba")
         >>> event.add("other", "10.10.10.10")
-        >>> set(event.values("key", parser=ipv4)) == set(["1.2.3.4"])
-        True
-        >>> set(event.values(parser=ipv4)) == set(["1.2.3.4", "10.10.10.10"])
-        True
+        >>> event.values("key", parser=ipv4)
+        ('1.2.3.4',)
+        >>> sorted(event.values(parser=ipv4))
+        ['1.2.3.4', '10.10.10.10']
         """
 
         return tuple(x[1] for x in self._iteritems(key, parser, filter))
@@ -286,7 +327,7 @@ class Event(object):
         >>> event.add("other", "2")
         >>> event.value("key")
         u'1'
-        >>> event.value() in ["1", "2"]
+        >>> event.value() in [u"1", u"2"]
         True
 
         A default return value can be defined in case no suitable
@@ -334,8 +375,8 @@ class Event(object):
         for _, value in self._iteritems(key, parser, filter):
             return value
 
-        if default is _UNDEFINED:
-            if key is _UNDEFINED:
+        if default is self._UNDEFINED:
+            if key is self._UNDEFINED:
                 raise KeyError("no value available")
             raise KeyError(key)
         return default
@@ -358,7 +399,6 @@ class Event(object):
         True
         >>> event.contains("key", "1") # Value "1" for key "key"?
         True
-
         >>> event.contains("other", "2") # Value "2" for key "other"?
         False
 
@@ -369,8 +409,6 @@ class Event(object):
         ...         return int(string)
         ...     except ValueError:
         ...         return None
-        >>> event = Event()
-        >>> event.add("key", "1", "a")
         >>> event.contains(parser=int_parse) # Any int value for any key?
         True
         >>> event.contains("key", parser=int_parse)
@@ -380,8 +418,10 @@ class Event(object):
         False
         """
 
+        undef = self._UNDEFINED
+
         for _, parsed in self._iteritems(key, parser, filter):
-            if value is _UNDEFINED or parsed == value:
+            if value is undef or parsed == value:
                 return True
         return False
 
@@ -391,11 +431,10 @@ class Event(object):
         >>> event = Event()
         >>> event.items()
         ()
-
         >>> event.add("key", "1")
-        >>> event.add("other", "2")
+        >>> event.add("other", "x", "y")
         >>> sorted(event.items())
-        [(u'key', u'1'), (u'other', u'2')]
+        [(u'key', u'1'), (u'other', u'x'), (u'other', u'y')]
 
         Parsing and filtering functions can be given to modify the results.
 
@@ -404,27 +443,24 @@ class Event(object):
         ...         return int(string)
         ...     except ValueError:
         ...         return None
-        >>> event = Event()
-        >>> event.add("key", "1", "a")
-        >>> event.add("other", "x")
         >>> event.items(parser=int_parse)
         ((u'key', 1),)
 
         The order of the key-value pairs is undefined.
         """
 
-        return tuple(self._iteritems(_UNDEFINED, parser, filter))
+        return tuple(self._iteritems(self._UNDEFINED, parser, filter))
 
     def keys(self, parser=None, filter=None):
         """Return a tuple of keys with at least one value.
 
         >>> event = Event()
-        >>> set(event.keys()) == set()
-        True
+        >>> event.keys()
+        ()
         >>> event.add("key", "1")
-        >>> event.add("other", "2", "3")
-        >>> set(event.keys()) == set(["key", "other"])
-        True
+        >>> event.add("other", "x", "y")
+        >>> sorted(event.keys())
+        [u'key', u'other']
 
         Parsing and filtering functions can be given to modify the
         results.
@@ -434,36 +470,45 @@ class Event(object):
         ...         return int(string)
         ...     except ValueError:
         ...         return None
-        >>> event = Event()
-        >>> event.add("key", "1")
-        >>> event.add("other", "x")
-        >>> set(event.keys(parser=int_parse)) == set(["key"])
-        True
+        >>> sorted(event.keys(parser=int_parse))
+        [u'key']
         """
 
         keys = list()
-        for key in self._attrs:
-            for _, value in self._iteritems(key, parser, filter):
-                keys.append(key)
-                break
+        prev_key = None
+
+        for key, value in self._items:
+            if key == prev_key:
+                continue
+            prev_key = None
+
+            if parser is not None:
+                value = parser(value)
+
+            if filter is None and value is None:
+                continue
+            if filter is not None and not filter(value):
+                continue
+            keys.append(key)
+            prev_key = key
+
         return tuple(keys)
 
     def to_element(self):
         event = Element("event", xmlns=EVENT_NS)
 
-        for key, values in self._attrs.items():
+        for key, value in self._items:
             key = _escape(key)
-            for value in values:
-                value = _escape(value)
-                attr = Element("attr", key=key, value=value)
-                event.add(attr)
+            value = _escape(value)
+            attr = Element("attr", key=key, value=value)
+            event.add(attr)
 
         return event
 
     def __eq__(self, other):
         if not isinstance(other, Event):
             return NotImplemented
-        return other._attrs == self._attrs
+        return other._items == self._items
 
     def __ne__(self, other):
         value = self.__eq__(other)
@@ -484,14 +529,13 @@ class Event(object):
         The specific order of the key-value pairs is undefined.
         """
 
-        fields = list()
-        for key, values in self._attrs.iteritems():
-            for value in values:
-                fields.append(key + u"=" + value)
-        return u", ".join(fields)
+        return u", ".join(key + u"=" + value for (key, value) in self._items)
 
     def __repr__(self):
-        return self.__class__.__name__ + "(" + repr(self._attrs) + ")"
+        attrs = dict()
+        for key, value in self._items:
+            attrs.setdefault(key, list()).append(value)
+        return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
 @threado.stream_fast
 def stanzas_to_events(inner):
