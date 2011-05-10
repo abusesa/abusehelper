@@ -7,6 +7,7 @@ class OpenCollabBot(bot.PollingBot):
     user = bot.Param("Open Collab wiki user.")
     password = bot.Param("Open Collab wiki password.")
     query = bot.Param("Metatable query string.")
+    type = bot.Param("Event type.", default=None)
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
@@ -110,6 +111,9 @@ class OpenCollabBot(bot.PollingBot):
                 if len(event.keys()) > 1 and event.contains("id"):
                     link = "%s%s" % (self.url, page)
                     event.add("source", link)
+                    if self.type:
+                        event.add("type", self.type)
+
                 inner.send(event)
 
 if __name__ == "__main__":

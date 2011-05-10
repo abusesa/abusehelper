@@ -8,7 +8,7 @@ from abusehelper.core import bot, events
 from combiner import Expert
 
 @threado.stream
-def lookup(inner, host, eid, name, keys=["key1", "key2", "key3", "key4"]):
+def lookup(inner, host, eid, name, keys=["domain", "ip", "first seen", "last seen"]):
     process = subprocess.Popen(["whois", "-h", host, name],
                                stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE,
