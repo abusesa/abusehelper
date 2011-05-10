@@ -132,15 +132,24 @@ class Event(object):
         return event
 
     def __init__(self, *events):
-        items = ()
+        """
+        Regression test: Keep the the correct internal encoding in the
+        copy/merge constructor.
+
+        >>> e1 = Event()
+        >>> e1.add(u"\xe4", u"\xe4")
+        >>> e2 = Event(e1)
+        >>> e2.items()
+        ((u'\\xe4', u'\\xe4'),)
+        """
 
         if events:
             items = set()
             for event in events:
-                items.update(event.items())
-            items = tuple(sorted(items))
-
-        self._items = items
+                items.update(event._items)
+            self._items = tuple(sorted(items))
+        else:
+            self._items = ()
                 
     def add(self, key, value, *values):
         """Add value(s) for a key.
