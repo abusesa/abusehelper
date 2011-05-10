@@ -110,6 +110,8 @@ class Lobby(threado.GeneratorStream):
         except XMPPError, error:
             if error.type != "cancel":
                 raise
+            if error.condition == "session-failure":
+                raise SessionError(error.text)
             inner.finish()
         except Unavailable:
             inner.finish()
@@ -152,21 +154,45 @@ class Lobby(threado.GeneratorStream):
             return False
 
         service_id = payload.get_attr("id")
+        self._start(iq, jid, service_id, payload)
+        return True
+
+    @threado.stream
+    def _start(inner, self, iq, jid, service_id, element):
         try:
-            try:
-                result = self._start(jid, service_id, payload)
-            except SessionError:
-                raise
-            except:
-                _, exc, tb = sys.exc_info()
-                raise SessionError("Session handling failed: " + repr(exc))
+            service = self.services.get(service_id, None)
+            if service is None:
+                raise SessionError("Service '%s' not available" % service_id)
+
+            path = None
+            for child in element.children("path").children():
+                path = serialize.load(child)
+                break
+
+            for child in element.children("config").children():
+                conf = serialize.load(child)
+                break
+            else:
+                raise SessionError("Did not get session configuration")
+            
+            session = yield inner.sub(service.open_session(path, conf))
+            session_id = uuid.uuid4().hex
+            
+            sessions = self.jids.setdefault(jid, dict())
+            sessions[session_id] = session
+            session | self._catch(jid, session_id)
         except SessionError, se:
             msg = se.args[0]
             error = self.xmpp.core.build_error("cancel", "session-failure", msg)
             self.xmpp.core.iq_error(iq, error)
+        except:
+            _, exc, _ = sys.exc_info()
+            msg = "Session handling failed: %r" % exc
+            error = self.xmpp.core.build_error("cancel", "session-failure", msg)
+            self.xmpp.core.iq_error(iq, error)
         else:
+            result = Element("start", xmlns=SERVICE_NS, id=session_id)
             self.xmpp.core.iq_result(iq, result)
-        return True
 
     def run(self):
         yield self.inner.sub(self.room | self._run())
@@ -228,30 +254,6 @@ class Lobby(threado.GeneratorStream):
                 self.services.pop(service_id, None)
             self._update_presence()
 
-    def _start(self, jid, service_id, element):
-        service = self.services.get(service_id, None)
-        if service is None:
-            raise SessionError("Service '%s' not available" % service_id)
-
-        path = None
-        for child in element.children("path").children():
-            path = serialize.load(child)
-            break
-
-        for child in element.children("config").children():
-            conf = serialize.load(child)
-            break
-        else:
-            raise SessionError("Did not get session configuration")
-
-        session_id = uuid.uuid4().hex
-        session = service.open_session(path, conf)
-
-        sessions = self.jids.setdefault(jid, dict())
-        sessions[session_id] = session
-        session | self._catch(jid, session_id)
-        return Element("start", xmlns=SERVICE_NS, id=session_id)
-
     @threado.stream
     def _catch(inner, self, jid, session_id):
         try:
@@ -302,26 +304,18 @@ class Service(threado.GeneratorStream):
             bite = bite.encode("unicode-escape")
             bites.append(bite.replace("/", r"\/"))
         return "/" + "/".join(bites)
-
-    def run(self):
+    
+    @threado.stream
+    def _wrapped_main(inner, self):
         state = self._get(self.root_key)
         self._put(self.root_key, None)
+
+        state = yield inner.sub(self.main(state))
+        self._put(self.root_key, state)
+
+    def run(self):
         try:
-            state = yield self.inner.sub(self.kill_sessions()
-                                         | self.main(state))
-
-            self._put(self.root_key, state)
-
-            for path, session in self.sessions.iteritems():
-                try:
-                    state = session.result()
-                except:
-                    pass
-                else:
-                    key = self.path_key(path)
-                    self._put(key, state)
-            for key, session in self.sessions.iteritems():
-                session.result()
+            yield self.inner.sub(self.kill_sessions() | self._wrapped_main())
         finally:
             self.db.commit()
             self.db.close()
@@ -335,61 +329,48 @@ class Service(threado.GeneratorStream):
                     inner.send(item)
             except threado.Finished:
                 raise Stop()
-        except:
+        finally:
             self.shutting_down = True
-            type, exc, tb = sys.exc_info()
 
-            for session in self.sessions.values():
+            for session in self.sessions.itervalues():
                 session.throw(Stop())
-            for session in self.sessions.values():
+
+            while self.sessions:
+                session = tuple(self.sessions.itervalues())[0]
                 while not session.has_result():
-                    try:
-                        yield session
-                    except:
-                        pass
-            raise type, exc, tb
+                    yield inner, session
 
-    def open_session(self, path, conf):
+    @threado.stream
+    def open_session(inner, self, path, conf):
         assert not self.shutting_down
 
+        @threado.stream
+        def _guarded(inner, path, key, session):
+            try:
+                state = yield inner.sub(session)
+                if path is not None:
+                    self._put(key, state)
+            finally:
+                del self.sessions[path]
+
         if path is None:
-            session = self.session(None, **conf)
-        elif path in self.sessions:
-            old_session = self.sessions.pop(path)
-            old_session.throw(Stop())
-            session = self.wait(old_session, conf)
-            self.sessions[path] = session
+            path = object()
+            session = _guarded(path, None, self.session(None, **conf))
         else:
+            while path in self.sessions:
+                old_session = self.sessions[path]
+                old_session.throw(Stop())
+                while not old_session.has_result():
+                    yield inner, old_session
+
             key = self.path_key(path)
-            session = self.session(self._get(key), **conf)
+            state = self._get(key)
+            session = _guarded(path, key, self.session(state, **conf))
             self._put(key, None)
-            self.sessions[path] = session
-        bind(self, session)
-        return session
 
-    @threado.stream
-    def wait(inner, self, session, conf):
-        state = yield session
-        state = yield inner.sub(self.session(state, **conf))
-        inner.finish(state)
-
-    def delete_session(self, path):
-        assert not self.shutting_down
-
-        if path is None:
-            return
-        if path not in self.sessions:
-            return
-        old_session = self.sessions.pop(path)
-        session = self.scrap(old_session)
         self.sessions[path] = session
-        return session
-
-    @threado.stream
-    def scrap(inner, self, session):
-        yield session
-        del session
-        inner.finish()
+        bind(self, session)
+        inner.finish(session)
 
     @threado.stream
     def main(inner, self, state):
