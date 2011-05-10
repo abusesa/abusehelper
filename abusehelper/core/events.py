@@ -244,7 +244,7 @@ class Event(object):
         False
         """
 
-        key = _internal(_normalize(key))
+        key = intern(_internal(_normalize(key)))
         items = self._items
         length = len(items)
 
