@@ -132,9 +132,9 @@ class CymruWhoisAugmenter(object):
                     continue
 
                 for line in line_buffer.feed(data):
+                    line = line.decode("utf-8", "replace")
                     bites = [x.strip() for x in line.split("|")]
                     bites = [x if x not in ("", "NA") else None for x in bites]
-                    bites = [x.decode("utf-8", "replace") for x in bites]
                     if len(bites) != 7:
                         continue
                     ip = bites.pop(1)
