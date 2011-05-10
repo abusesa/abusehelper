@@ -3,7 +3,6 @@ import os
 import gzip
 import codecs
 import inspect
-from bisect import bisect_left
 from cStringIO import StringIO
 from idiokit import threado
 from idiokit.xmlcore import Element
@@ -94,6 +93,56 @@ def _external(string):
 
 EVENT_NS = "abusehelper#event"
 
+def _bisect(items, key, value):
+    """
+    >>> _bisect([], "a", "b")
+    0
+    >>> _bisect(["a", "b"], "a", "b")
+    0
+    >>> _bisect(["a", "a", "a", "c"], "a", "b")
+    2
+    """
+
+    lo = 0
+    hi = len(items) // 2
+
+    while lo < hi:
+        mid = (lo + hi) // 2
+        mid2 = 2 * mid
+        mid_key = items[mid2]
+
+        if mid_key < key:
+            lo = mid + 1
+        elif mid_key > key:
+            hi = mid
+        elif items[mid2 + 1] < value:
+            lo = mid + 1
+        else:
+            hi = mid
+
+    return 2 * lo
+
+def _zip(items, start=0):
+    """
+    >>> list(_zip([1, 2, 3, 4]))
+    [(1, 2), (3, 4)]
+    >>> list(_zip([1, 2, 3, 4], 2))
+    [(3, 4)]
+    """
+
+    for idx in xrange(start, len(items), 2):
+        yield items[idx], items[idx+1]
+
+def _unzip(items):
+    """
+    >>> list(_unzip([(1, 2), (3, 4)]))
+    [1, 2, 3, 4]
+    """
+
+    for left, right in items:
+        yield left
+        yield right
+
 class Event(object):
     __slots__ = ["_items"]
 
@@ -146,8 +195,8 @@ class Event(object):
         if events:
             items = set()
             for event in events:
-                items.update(event._items)
-            self._items = tuple(sorted(items))
+                items.update(_zip(event._items))
+            self._items = tuple(_unzip(sorted(items)))
         else:
             self._items = ()
                 
@@ -200,12 +249,12 @@ class Event(object):
         length = len(items)
 
         for value in values:
-            item = key, _internal(_normalize(value))
-            index = bisect_left(items, item)
+            value = _internal(_normalize(value))
+            idx = _bisect(items, key, value)
 
-            if index >= length or items[index] != item:
-                items = items[:index] + (item,) + items[index:]
-                length += 1
+            if idx >= length or items[idx] != key or items[idx+1] != value:
+                items = items[:idx] + (key, value) + items[idx:]
+                length += 2
 
         self._items = items
 
@@ -232,12 +281,12 @@ class Event(object):
         length = len(items)
 
         for value in (value,) + values:
-            item = key, _internal(_normalize(value))
-            index = bisect_left(items, item)
+            value = _internal(_normalize(value))
+            idx = _bisect(items, key, value)
 
-            if index < length and items[index] == item:
-                items = items[:index] + items[index+1:]
-                length -= 1
+            if idx < length and items[idx] == key and items[idx+1] == value:
+                items = items[:idx] + items[idx+2:]
+                length -= 2
 
         self._items = items
 
@@ -260,10 +309,10 @@ class Event(object):
         items = self._items
         length = len(items)
 
-        start = bisect_left(items, (key,))
+        start = _bisect(items, key, "")
         end = start
-        while end < length and items[end][0] == key:
-            end += 1
+        while end < length and items[end] == key:
+            end += 2
 
         self._items = items[:start] + items[end:]
 
@@ -272,7 +321,7 @@ class Event(object):
         specific key or all keys."""
 
         if key is self._UNDEFINED:
-            for key, value in self._items:
+            for key, value in _zip(self._items):
                 value = _external(value)
                 if parser is not None:
                     value = parser(value)
@@ -286,14 +335,12 @@ class Event(object):
 
         key = _normalize(key)
         internal_key = _internal(key)
-        items = self._items
-        length = len(items)
+        idx = _bisect(self._items, internal_key, "")
+        for other_key, value in _zip(self._items):
+            if other_key != internal_key:
+                break
 
-        index = bisect_left(items, (internal_key,))
-        while index < length and items[index][0] == internal_key:
-            value = _external(items[index][1])
-            index += 1
-
+            value = _external(value)
             if parser is not None:
                 value = parser(value)
 
@@ -498,7 +545,7 @@ class Event(object):
         keys = list()
         prev_key = None
 
-        for key, value in self._items:
+        for key, value in _zip(self._items):
             if key == prev_key:
                 continue
             prev_key = None
