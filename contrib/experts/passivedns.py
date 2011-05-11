@@ -39,15 +39,26 @@ class PassiveDNSExpert(Expert):
     host = bot.Param()
     port = bot.IntParam(default=43)
 
-    @threado.stream
-    def augment(inner, self):
-        while True:
-            eid, event = yield inner
-            
-            for name in set(event.values("domain") + 
-                            event.values("ip") + 
-                            event.values("soa")):
+    def augment(self):
+        channel = threado.Channel()
+
+        @threado.stream
+        def collect(inner):
+            while True:
+                eid, event = yield inner
+
+                for name in set(event.values("domain") + 
+                                event.values("ip") + 
+                                event.values("soa")):
+                    channel.send(eid, name)
+
+        @threado.stream
+        def work(inner):
+            while True:
+                eid, name = yield inner, channel
                 yield inner.sub(lookup(self.host, self.port, eid, name))
+
+        return collect() | work()
 
 if __name__ == "__main__":
     PassiveDNSExpert.from_command_line().execute()
