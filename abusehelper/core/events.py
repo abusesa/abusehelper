@@ -616,14 +616,6 @@ class Event(object):
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
-event = Event()
-event.add("a", "1")
-event.add("b", "2")
-event.add("c", "4")
-print event.values("b")
-
-
-
 @threado.stream_fast
 def stanzas_to_events(inner):
     while True:
