@@ -318,7 +318,17 @@ class Event(object):
 
     def _iteritems(self, key, parser, filter):
         """Iterate through parsed and filtered values of either a
-        specific key or all keys."""
+        specific key or all keys.
+
+        Regression test, start iterating from the correct index when
+        iterating through values for a given key:
+
+        >>> event = Event()
+        >>> event.add("a", "1")
+        >>> event.add("b", "2")
+        >>> list(event._iteritems("b", None, None))
+        [(u'b', u'2')]
+        """
 
         if key is self._UNDEFINED:
             for key, value in _zip(self._items):
@@ -336,7 +346,7 @@ class Event(object):
         key = _normalize(key)
         internal_key = _internal(key)
         idx = _bisect(self._items, internal_key, "")
-        for other_key, value in _zip(self._items):
+        for other_key, value in _zip(self._items, idx):
             if other_key != internal_key:
                 break
 
@@ -605,6 +615,14 @@ class Event(object):
         for key, value in self.items():
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
+
+event = Event()
+event.add("a", "1")
+event.add("b", "2")
+event.add("c", "4")
+print event.values("b")
+
+
 
 @threado.stream_fast
 def stanzas_to_events(inner):
