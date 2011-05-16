@@ -279,6 +279,10 @@ class XMPPBot(Bot):
                       default=None)
     xmpp_port = IntParam("the XMPP service port (default: autodetect)",
                          default=None)
+    xmpp_extra_ca_certs = Param("a PEM formatted file of CAs to be used "+
+                                "in addition to the system CAs", default=None)
+    xmpp_ignore_cert = BoolParam("do not perform any verification "+
+                                 "for the XMPP service's SSL certificate")
     
     def __init__(self, **keys):
         Bot.__init__(self, **keys)
@@ -297,11 +301,15 @@ class XMPPBot(Bot):
 
     @threado.stream
     def xmpp_connect(inner, self):
+        verify_cert = not self.xmpp_ignore_cert
+
         self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
         xmpp = yield inner.sub(connect(self.xmpp_jid, 
                                        self.xmpp_password,
                                        host=self.xmpp_host,
-                                       port=self.xmpp_port))
+                                       port=self.xmpp_port,
+                                       ssl_verify_cert=verify_cert,
+                                       ssl_ca_certs=self.xmpp_extra_ca_certs))
         self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
         xmpp.core.presence()
         inner.finish(xmpp)
