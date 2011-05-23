@@ -4,6 +4,9 @@
 import hashlib
 
 from abusehelper.core import templates
+from abusehelper.core import config
+sanitizer = config.load_module("sanitizer")
+
 from idiokit.xmlcore import Element
 
 # Some XML output helpers
@@ -15,7 +18,9 @@ def node_id_and_text(parent, nodename, text=None, **kw):
 
     return node
 
-HEADER = "<?xml version=\"1.0\" ?>"
+HEADER = """<?xml version=\"1.0\" ?>
+<!DOCTYPE IODEF-Message PUBLIC "-//IETF//DTD RFC 5070 IODEF v1.0//EN" "IODEF-Document.dtd">
+"""
 
 class XMLFormatter(templates.Formatter):
     def __init__(self, **kw):
@@ -67,9 +72,11 @@ class XMLFormatter(templates.Formatter):
             inc_tag = node_id_and_text(top, 'Incident', purpose='mitigation')
 
             if not inc.contains('case'):
-                hashlib.md5("".join(repr((k, v)) 
-                                    for k in sorted(inc.keys()) for v in 
-                                    sorted(inc.values(k)))).hexdigest()
+                t_id = hashlib.md5("".join(repr((k, v)) 
+                                           for k in sorted(inc.keys()) for v in 
+                                           sorted(inc.values(k)))).hexdigest()
+                node_id_and_text(inc_tag, 'IncidentID', 
+                                 t_id, name=kw.get("irt_website", ''))
             else:
                 for ticket in inc.values('case'):
                     node_id_and_text(inc_tag, 'IncidentID', 
