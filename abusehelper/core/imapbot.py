@@ -198,6 +198,9 @@ class IMAPBot(bot.FeedBot):
             header = yield inner.sub(self.get_header(uid, "HEADER"))
             if header is None:
                 return
+            if header.get_content_maintype() != "multipart":
+                inner.send("TEXT", tuple(headers + [header]))
+                return
             headers = headers + [header]
 
         path = list(path) + [0]
