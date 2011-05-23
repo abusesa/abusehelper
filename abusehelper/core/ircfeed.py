@@ -12,6 +12,11 @@ class IRCFeedBot(bot.FeedBot):
     irc_own_nick = bot.Param(default="ircbot")
     irc_password = bot.Param(default=None)
     irc_use_ssl = bot.BoolParam()
+    irc_extra_ca_certs = bot.Param("a PEM formatted file of CAs to be used "+
+                                   "in addition to the system CAs", 
+                                   default=None)
+    irc_ignore_cert = bot.BoolParam("do not perform any verification "+
+                                    "for the IRC server's SSL certificate")
 
     def filter(self, prefix, command, params):
         if command != "PRIVMSG":
@@ -44,7 +49,10 @@ class IRCFeedBot(bot.FeedBot):
 
     @threado.stream
     def feed(inner, self):
-        irc = IRC(self.irc_host, self.irc_port, ssl=self.irc_use_ssl)
+        irc = IRC(self.irc_host, self.irc_port, 
+                  ssl=self.irc_use_ssl,
+                  ssl_verify_cert=not self.irc_ignore_cert,
+                  ssl_ca_certs=self.irc_extra_ca_certs)
 
         self.log.info("Connecting to IRC server %r port %d", 
                       self.irc_host, self.irc_port)
