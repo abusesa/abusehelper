@@ -4,21 +4,18 @@
 import hashlib
 
 from abusehelper.core import templates
-
-from xml.dom.minidom import Document, DocumentType, getDOMImplementation
+from idiokit.xmlcore import Element
 
 # Some XML output helpers
-def node_id_and_text(doc, parent, nodename, text='', **kw):
-    node = doc.createElement(nodename)
-    for key, value in kw.items():
-        node.setAttribute(key, value)
-    parent.appendChild(node)
-
-    if text:
-        text = doc.createTextNode(text)
-        node.appendChild(text)
+def node_id_and_text(parent, nodename, text=None, **kw):
+    node = Element(nodename, **kw)
+    if text is not None:
+        node.text = text
+    parent.add(node)
 
     return node
+
+HEADER = "<?xml version=\"1.0\" ?>"
 
 class XMLFormatter(templates.Formatter):
     def __init__(self, **kw):
@@ -53,24 +50,21 @@ class XMLFormatter(templates.Formatter):
         kw = self.kw
 
         # First, make the header
-        impl = getDOMImplementation()
-        doc = impl.createDocument(None, 'IODEF-Document', None)
-        top = doc.documentElement
-        top.setAttribute('lang', 'en')
-        top.setAttribute('version', "1.00")
-        top.setAttribute('xmlns', "urn:ietf:params:xml:ns:iodef-1.0")
-        top.setAttribute('xmlns:xsi', 
-                         "http://www.w3.org/2001/XMLSchema-instance")
-        top.setAttribute('xsi:schemaLocation',
-                         "https://www.cert.fi/autoreporter/IODEF-Document.xsd")
+        top = Element('IODEF-Document')
+        top.set_attr('lang', 'en')
+        top.set_attr('version', "1.00")
+        top.set_attr('xmlns', "urn:ietf:params:xml:ns:iodef-1.0")
+        top.set_attr('xmlns:xsi', 
+                     "http://www.w3.org/2001/XMLSchema-instance")
+        top.set_attr('xsi:schemaLocation',
+                     "https://www.cert.fi/autoreporter/IODEF-Document.xsd")
 
         def ts_to_xml(ts):
             return ts.replace(' ', 'T') + '+00:00'
 
         for inc in events:
             # Hardcoded purpose string, for now
-            inc_tag = node_id_and_text(doc, top, 
-                                       'Incident', purpose='mitigation')
+            inc_tag = node_id_and_text(top, 'Incident', purpose='mitigation')
 
             if not inc.contains('case'):
                 hashlib.md5("".join(repr((k, v)) 
@@ -78,60 +72,60 @@ class XMLFormatter(templates.Formatter):
                                     sorted(inc.values(k)))).hexdigest()
             else:
                 for ticket in inc.values('case'):
-                    node_id_and_text(doc, inc_tag, 'IncidentID', 
+                    node_id_and_text(inc_tag, 'IncidentID', 
                                      ticket, name=kw.get("irt_website", ''))
 
             if not inc.contains('time'):
-                node_id_and_text(doc, inc_tag, 'ReportTime', 
+                node_id_and_text(inc_tag, 'ReportTime', 
                                  ts_to_xml(sanitizer.format_time()))
             else:
                 for ts in inc.values('time'):
-                    node_id_and_text(doc, inc_tag, 'ReportTime', 
+                    node_id_and_text(inc_tag, 'ReportTime', 
                                      ts_to_xml(ts))
 
-            inc_ass = node_id_and_text(doc, inc_tag, 'Assessment')
+            inc_ass = node_id_and_text(inc_tag, 'Assessment')
             impact = inc.value("impact", "unknown")
             for info in inc.values('info'):
-                node_id_and_text(doc, inc_ass, 'Impact', info,
+                node_id_and_text(inc_ass, 'Impact', info,
                                  lang='en', type=impact)
         
             # Provide contact details as described in config
-            contact = node_id_and_text(doc, inc_tag, 'Contact',
+            contact = node_id_and_text(inc_tag, 'Contact',
                                        role="creator", type="organization")
             if kw.has_key("irt_name"):
-                node_id_and_text(doc, contact, 'ContactName', kw["irt_name"])
+                node_id_and_text(contact, 'ContactName', kw["irt_name"])
             if kw.has_key("irt_email"):
-                node_id_and_text(doc, contact, 'Email', kw["irt_email"])
+                node_id_and_text(contact, 'Email', kw["irt_email"])
             if kw.has_key("irt_phone"):
-                node_id_and_text(doc, contact, 'Telephone', kw["irt_phone"])
+                node_id_and_text(contact, 'Telephone', kw["irt_phone"])
 
-            event = node_id_and_text(doc, inc_tag, 'EventData')
+            event = node_id_and_text(inc_tag, 'EventData')
 
             # These are some default values for all entries, for now
             for value in inc.values('type'):
-                node_id_and_text(doc, event, 'Description', value)
-            node_id_and_text(doc, event, 'Expectation', action="investigate")
-            event = node_id_and_text(doc, event, 'EventData')
-            event = node_id_and_text(doc, event, 'Flow')
+                node_id_and_text(event, 'Description', value)
+            node_id_and_text(event, 'Expectation', action="investigate")
+            event = node_id_and_text(event, 'EventData')
+            event = node_id_and_text(event, 'Flow')
 
             # Category required, source is the default
             cat = inc.value('category', "source", filter=lambda x: 
                              x in ['source', 'target'])
 
             # Target system information is provided, whenever available
-            system = node_id_and_text(doc, event, 'System', 
+            system = node_id_and_text(event, 'System', 
                                       category=cat)
             # Only show node if data exists
             if (inc.contains("ptr") or inc.contains("ip") or 
                 inc.contains("asn")):
-                node = node_id_and_text(doc, system, 'Node')
+                node = node_id_and_text(system, 'Node')
             for value in inc.values("ptr"):
-                node_id_and_text(doc, node, 'NodeName', value)
+                node_id_and_text(node, 'NodeName', value)
             for value in inc.values("ip"):
-                node_id_and_text(doc, node, 'Address', value, 
+                node_id_and_text(node, 'Address', value, 
                                  category='ipv4-addr')
             for value in inc.values("asn"):
-                node_id_and_text(doc, node, 'Address', value, 
+                node_id_and_text(node, 'Address', value, 
                                  category='asn')
 
-        return doc.toxml()
+        return (HEADER + top.serialize()).decode("utf-8")
