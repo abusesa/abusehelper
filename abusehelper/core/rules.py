@@ -425,7 +425,6 @@ if __name__ == "__main__":
             rule = NETBLOCK("0.0.0.0", 0)
             assert not rule(MockEvent(ip=[u"not valid"]))
             assert not rule(MockEvent(ip=[u"\xe4 not convertible to ascii"]))
-            assert not rule(MockEvent(ip=[object()]))
 
         def test_eq(self):
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.0.0", 16)
