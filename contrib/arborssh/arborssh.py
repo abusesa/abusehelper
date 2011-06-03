@@ -42,13 +42,6 @@ class ArborSshBot(bot.PollingBot):
                                             columns=self.COLUMNS,
                                             charset=charset))
 
-    @threado.stream
-    def normalize(inner, self,asn):
-        while True:
-            event = yield inner
-            event.add("feed", "arborssh")
-            event.add("type", "ssh-scan")
-            inner.send(event)
 
 if __name__ == "__main__":
     ArborSshBot.from_command_line().execute()
