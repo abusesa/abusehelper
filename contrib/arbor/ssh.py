@@ -30,7 +30,6 @@ class ArborSshBot(bot.PollingBot):
         else:
             decode = lambda x: x.decode(charset)
 
-        print 'd', decode
         filtered = (x for x in fileobj if x.strip() and not x.startswith("other"))
         rows = list()
         #sanitize delimiter
