@@ -32,8 +32,6 @@ class MDLBot(bot.PollingBot):
         except utils.FetchUrlFailed, fuf:
             self.log.error("MDL IP-list downloading failed: %r", fuf)
             return
-        except:
-            import pdb;pdb.set_trace()
         self.log.info("MDL IP-list downloaded")
 
         charset = info.get_param("charset")

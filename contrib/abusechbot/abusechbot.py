@@ -42,11 +42,11 @@ class RSSBot(bot.PollingBot):
                     if pubdate is not None:
                         pubdate = pubdate.text
 
-                    event = self.create_event(title,link,description,pubdate)
+                    event = self.create_event(title,link,description,pubdate,url)
                     if event:
                         inner.send(event)
 
-    def create_event(self, title, link, description, pubdate):
+    def create_event(self, title, link, description, pubdate, url=None):
         event = events.Event()
         if title:
             event.add("title", title)
@@ -56,18 +56,21 @@ class RSSBot(bot.PollingBot):
             event.add("description", description)
         if pubdate:
             event.add("pubdate", pubdate)
+        if url:
+            event.add("source", url)
         return event
 
 class AbuseCHBot(RSSBot):
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker", "https://zeustracker.abuse.ch/rss.php"])
 
-    def create_event(self, title, link, description, pubdate):
+    def create_event(self, title, link, description, pubdate, url=None):
         if description is None:
             return
 
         event = events.Event()
         event.add("feed", "abuse.ch")
-
+        if url:
+            event.add("source",url)
         for part in description.split(","):
             pair = part.split(":")
             if len(pair) < 2:
