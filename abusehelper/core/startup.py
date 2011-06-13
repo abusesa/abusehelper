@@ -57,35 +57,46 @@ class StartupBot(bot.Bot):
             self.log.info("Relaunching %r in %d seconds", conf.name, delay)
             yield delay
 
-    def _launch(self, module, params):
+    def _launch(self, conf):
         args = [sys.executable]
-        path, _ = os.path.split(module)
+        path, _ = os.path.split(conf.module)
         if path:
-            args.extend([module])
+            args.extend([conf.module])
         else:
             # At least Python 2.5 on OpenBSD replaces the
             # argument right after the -m option with "-c" in
             # the process listing, making it harder to figure
             # out which modules are running. Workaround: Use
             # "-m runpy module" instead of "-m module".
-            args.extend(["-m", "runpy", module])
+            args.extend(["-m", "runpy", conf.module])
         args.append("--read-config-pickle-from-stdin")
 
-        process = subprocess.Popen(args, stdin=subprocess.PIPE)
+        try:
+            process = subprocess.Popen(args, stdin=subprocess.PIPE)
+        except OSError, ose:
+            self.log.error("Failed launching bot %r: %r", conf.name, ose)
+            return None
 
-        pickle.dump(params, process.stdin)
-        process.stdin.flush()
+        try:
+            pickle.dump(conf.params, process.stdin)
+            process.stdin.flush()
+        except IOError, ioe:
+            self.log.error("Failed sending configuration to bot %r: %r", 
+                           conf.name, ioe)
 
         return process
 
     def _poll(self):
         for process, strategy, conf in list(self._processes):
-            retval = process.poll()
-            if retval is not None:
+            if process is not None and process.poll() is None:
+                continue
+
+            if process is not None and process.poll() is not None:
                 self.log.info("Bot %r exited with return value %d", 
-                              conf.name, retval)
-                self._processes.remove((process, strategy, conf))
-                heapq.heappush(self._strategies, (time.time(), strategy))
+                              conf.name, process.poll())
+
+            self._processes.remove((process, strategy, conf))
+            heapq.heappush(self._strategies, (time.time(), strategy))
 
     def _signal(self, sig):
         for process, strategy, conf in self._processes:
@@ -132,7 +143,7 @@ class StartupBot(bot.Bot):
                 for conf, strategy in self._purge():
                     self.log.info("Launching bot %r from module %r", 
                                   conf.name, conf.module)
-                    process = self._launch(conf.module, conf.params)
+                    process = self._launch(conf)
                     self._processes.add((process, strategy, conf))
 
                 time.sleep(poll_interval)
