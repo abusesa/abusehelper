@@ -8,6 +8,22 @@ import subprocess
 import cPickle as pickle
 from abusehelper.core import bot, config
 
+def iter_startups(iterable):
+    for obj in iterable:
+        startup = getattr(obj, "__startup__", None)
+        if callable(startup):
+            yield startup()
+            continue
+
+        # Backwards compatibility
+        startup_method = getattr(obj, "startup", None)
+        if callable(startup_method):
+            params = startup_method()
+            name = params["bot_name"]
+            module = params.pop("module", None)
+            yield Bot(name, module, **params)
+            continue
+
 class Bot(object):
     _defaults = dict()
 
@@ -39,6 +55,9 @@ class Bot(object):
 
         self._params = dict(self._defaults)
         self._params.update(params)
+
+    def __startup__(self):
+        return self
 
 class StartupBot(bot.Bot):
     def __init__(self, *args, **keys):
@@ -133,7 +152,7 @@ class StartupBot(bot.Bot):
         signal.signal(signal.SIGTERM, signal_handler)
 
         try:
-            for conf in config.flatten(self.configs()):
+            for conf in iter_startups(config.flatten(self.configs())):
                 strategy = self.strategy(conf)
                 heapq.heappush(self._strategies, (time.time(), strategy))
 
@@ -166,27 +185,15 @@ class DefaultStartupBot(StartupBot):
     disable = bot.ListParam("bots that are not run (default: run all bots)", 
                             default=None)
 
-    def _wrap(self, conf):
-        # Backwards compatibility
-        startup_method = getattr(conf, "startup", None)
-        if callable(startup_method):
-            params = startup_method()
-            name = params["bot_name"]
-            module = params.pop("module", None)
-            return Bot(name, module, **params)
-        return conf
-
     def configs(self):
         configs = config.load_configs(os.path.abspath(self.config))
-        for conf in configs:
-            conf = self._wrap(conf)
 
+        for conf in iter_startups(configs):
             names = set([conf.name, conf.module])
             if self.disable is not None and names & set(self.disable):
                 continue
             if self.enable is not None and not (names & set(self.enable)):
                 continue
-
             yield conf
  
 if __name__ == "__main__":

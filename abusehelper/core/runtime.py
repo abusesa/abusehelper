@@ -2,6 +2,19 @@ import os
 from idiokit import jid
 from abusehelper.core import serialize, config
 
+def iter_runtimes(obj):
+    for obj in config.flatten(obj):
+        runtime = getattr(obj, "__runtime__", None)
+        if callable(runtime):
+            yield runtime()
+            continue
+
+        # Backwards compatibility
+        runtime_method = getattr(obj, "runtime", None)
+        if callable(runtime_method):
+            yield runtime_method()
+            continue
+
 class Pipeable(object):
     def _collect(self):
         return self
@@ -96,6 +109,9 @@ class Session(Pipeable):
             return result
         return not result
 
+    def __runtime__(self):
+        return self
+
 class Room(Pipeable):
     def __init__(self, name):
         name = unicode(name)
@@ -138,7 +154,7 @@ class RuntimeBot(bot.XMPPBot):
                 if forward.was_source:
                     continue
 
-                added = set(config.flatten(configs))
+                added = set(iter_runtimes(config.flatten(configs)))
 
                 for key in set(sessions) - added:
                     stream = sessions.pop(key)
@@ -197,14 +213,6 @@ class DefaultRuntimeBot(RuntimeBot):
                                  "for updates (default: %default)",
                                  default=1)
 
-    def _flatten_runtime_methods(self, configs):
-        # Backwards compatibility
-        for obj in configs:
-            runtime = getattr(obj, "runtime", None)
-            if callable(runtime):
-                obj = runtime()
-            yield obj
-
     @threado.stream
     def configs(inner, self):
         conf_path = os.path.abspath(self.config)
@@ -217,9 +225,7 @@ class DefaultRuntimeBot(RuntimeBot):
                 if last_mtime != mtime:
                     last_mtime = mtime
 
-                    configs = config.load_configs(conf_path)
-                    configs = list(self._flatten_runtime_methods(configs))
-                    inner.send(configs)
+                    inner.send(config.load_configs(conf_path))
 
                     error_msg = None
             except BaseException, exception:
