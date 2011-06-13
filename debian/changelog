@@ -1,3 +1,9 @@
+abusehelper2 (20110429) lucid; urgency=low
+
+  * New upstream release pulled from bitbucket for the first time.
+
+ -- Lari Huttunen <debian@huttu.net>  Fri, 29 Apr 2011 09:57:10 +0300
+
 abusehelper2 (638) lucid; urgency=low
 
   * New revision to test packaging. 
