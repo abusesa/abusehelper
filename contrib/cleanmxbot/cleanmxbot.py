@@ -28,14 +28,14 @@ class cleanmxbot(bot.PollingBot):
 	data = csv.reader(fileobj,delimiter=",",quotechar='"')
 	fields = data.next()
 	for line in data:
-	        event = events.Event()
-	        event.add("feed", name)
+	    event = events.Event()
+	    event.add("feed", name)
 
-	        line = dict(zip(fields,line))
-	        for item in line:
-			event.add(item, unicode(line[item], 'utf8'))
-		if line:
-			inner.send(event)
+	    line = dict(zip(fields,line))
+	    for item in line:
+	        event.add(item, unicode(line[item], 'utf8'))
+	    if line:
+	        inner.send(event)
 
 
     def feed_keys(self, csv_url=(), csv_name=(), **keys):
