@@ -68,7 +68,6 @@ class netwatchmanbot(bot.PollingBot):
 
 	# Incidents by IP Range
 	for site in sites1:
-	    self.log.info('Downloading page from: "%s"', "http://mynetwatchman.com/"+site)
 	    soup = yield self.url_to_soup("http://mynetwatchman.com/"+site)
 	    soup = soup.find('table', border="1", bgcolor=None)
 	    if soup == None: break
