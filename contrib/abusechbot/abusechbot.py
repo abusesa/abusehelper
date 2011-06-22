@@ -4,6 +4,8 @@ from abusehelper.core import bot, events, utils
 
 class RSSBot(bot.PollingBot):
     feeds = bot.ListParam("a list of RSS feed URLs")
+    keys = bot.ListParam("a list of RSS keys", default=["title", "pubdate",
+                                                        "description", "link"])
 
     def feed_keys(self, **_):
         for feed in self.feeds:
@@ -18,6 +20,7 @@ class RSSBot(bot.PollingBot):
             self.log.error('Failed to download feed "%s": %r', url, e)
             return
 
+        self.log.info("Finished downloading the feed.")
         for _, elem in etree.iterparse(fileobj):
             items = elem.findall("item")
             if not items:
@@ -27,18 +30,15 @@ class RSSBot(bot.PollingBot):
                 yield
                 for _ in inner: pass
 
-                keys = ["title", "link", "description", "pubdate"]
-                args = [item.findtext(key) for key in keys]
-                args.append(url)
+                args = {"source":url}
+                for key in self.keys:
+                    args[key] = item.findtext(key)
 
-                event = self.create_event(*args)
+                event = self.create_event(**args)
                 if event:
                     inner.send(event)
 
-    def create_event(self, title, link, description, pubdate, url):
-        keys = dict(title=title, link=link, description=description, 
-                    pubdate=pubdate, url=url)
-
+    def create_event(self, **keys):
         event = events.Event()
         for key, value in keys.iteritems():
             if value:
@@ -50,14 +50,17 @@ class AbuseCHBot(RSSBot):
         default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker", 
                  "https://zeustracker.abuse.ch/rss.php"])
 
-    def create_event(self, title, link, description, pubdate, url):
+    def create_event(self, **keys):
+        description = keys.get("description", None)
         if description is None:
             return None
 
         event = events.Event()
         event.add("feed", "abuse.ch")
+
+        url = keys.get("source", None)
         if url:
-            event.add("source",url)
+            event.add("source", url)
 
         for part in description.split(","):
             pair = part.split(":", 1)
