@@ -15,10 +15,22 @@ class BridgeBot(bot.Bot):
     xmpp_src_jid = bot.Param("the XMPP src JID")
     xmpp_src_password = bot.Param("the XMPP src password", default=None)
     xmpp_src_room = bot.Param("the XMPP src room")
+    xmpp_src_ignore_cert = bot.BoolParam("a PEM formatted file of CAs to be "+
+                                         "used in addition to the system CAs", 
+                                         default=None)
+    xmpp_src_extra_ca_certs = bot.Param("do not perform any verification for "+
+                                        "the XMPP service's SSL certificate",
+                                        default=None)
 
     xmpp_dst_jid = bot.Param("the XMPP dst JID")
     xmpp_dst_password = bot.Param("the XMPP dst password", default=None)
     xmpp_dst_room = bot.Param("the XMPP dst room")
+    xmpp_dst_ignore_cert = bot.BoolParam("a PEM formatted file of CAs to be "+
+                                         "used in addition to the system CAs", 
+                                         default=None)
+    xmpp_dst_extra_ca_certs = bot.Param("do not perform any verification for "+
+                                        "the XMPP service's SSL certificate",
+                                        default=None)
     
     def __init__(self, **keys):
         bot.Bot.__init__(self, **keys)
@@ -32,9 +44,14 @@ class BridgeBot(bot.Bot):
         return threado.run(self.main())
 
     @threado.stream
-    def _join(inner, self, _type, jid, password, room_name):
+    def _join(inner, self, _type, jid, password, 
+              ignore_cert, ca_certs, room_name):
+        verify_cert = not ignore_cert
+
         self.log.info("Connecting to XMPP %s server with JID %r", _type, jid)
-        connection = yield inner.sub(xmpp.connect(jid, password))
+        connection = yield inner.sub(xmpp.connect(jid, password,
+                                                  ssl_verify_cert=verify_cert,
+                                                  ssl_ca_certs=ca_certs))
         
         self.log.info("Connected to XMPP %s server with JID %r", _type, jid)
         connection.core.presence()
@@ -50,10 +67,14 @@ class BridgeBot(bot.Bot):
         dst = yield inner.sub(self._join("dst",
                                          self.xmpp_dst_jid,
                                          self.xmpp_dst_password,
+                                         self.xmpp_dst_ignore_cert,
+                                         self.xmpp_dst_extra_ca_certs,
                                          self.xmpp_dst_room))
         src = yield inner.sub(self._join("src",
                                          self.xmpp_src_jid,
                                          self.xmpp_src_password,
+                                         self.xmpp_src_ignore_cert,
+                                         self.xmpp_src_extra_ca_certs,
                                          self.xmpp_src_room))
         yield inner.sub(src | peel_messages() | dst | threado.dev_null())
 
