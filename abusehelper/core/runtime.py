@@ -12,7 +12,7 @@ def iter_runtimes(obj):
         # Backwards compatibility
         runtime_method = getattr(obj, "runtime", None)
         if callable(runtime_method):
-            for obj in runtime_method():
+            for obj in config.flatten(runtime_method()):
                 yield obj
             continue
 
