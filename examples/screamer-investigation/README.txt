@@ -2,7 +2,9 @@ This example contains:
  * a repr bot, which represents human input as events
  * cymruwhois screaming expert bot
  * passivedns screaming expert bot
-
+ * combiner bot, which combines the original event and the screaming expert results. 
+ * to see which rooms are used, see startup.py
+ 
 You may define an investigation channel in startup.py. The bots will join there.
 Then you can go to the channel with your chat client and start asking questions, 
 see below: 
