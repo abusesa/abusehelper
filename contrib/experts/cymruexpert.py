@@ -1,30 +1,16 @@
 import sys
 import combiner
-from abusehelper.core.events import Event
+from abusehelper.core import events
 from idiokit import util, threado, sockets, timer
 
 class Stop(Exception):
     pass
 
-class CymruWhoisEvent(Event):
-    LINE_KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
-
-    def __init__(self, ip, bites):
-        self.ip = ip
-
-        self.event = Event()
-        for key, value in zip(self.LINE_KEYS, bites):
-            if value is not None:
-                self.event.add(key, value)
-
-        Event.__init__(self, self.event)
-
-    def __unicode__(self):
-        return u"IP " + self.ip + " has values " + unicode(self.event)
-
 class CymruWhoisExpert(combiner.Expert):
     THROTTLE_TIME = 2.0
     CACHE_TIME = 60 * 60.0
+
+    LINE_KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
 
     def __init__(self, *args, **keys):
         combiner.Expert.__init__(self, *args, **keys)
@@ -68,8 +54,13 @@ class CymruWhoisExpert(combiner.Expert):
                 
             try:
                 for ip, values in inner:
-                    augmentation = CymruWhoisEvent(ip, values)
                     for eid in local_pending.pop(ip, ()):
+                        augmentation = events.Event()
+
+                        for key, value in zip(self.LINE_KEYS, values):
+                            if value is not None:
+                                augmentation.add(key, value)
+
                         inner.send(eid, augmentation)
             except threado.Finished:
                 should_stop = True
