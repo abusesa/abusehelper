@@ -1,5 +1,6 @@
 import re
 import base64
+import quopri
 import zipfile
 from cStringIO import StringIO
 from idiokit import threado
@@ -12,6 +13,26 @@ class ShadowServerMail(imapbot.IMAPBot):
     # Assume the file names to be something like
     # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
     filename_rex = bot.Param(default=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>.*)-[^-]+\..*")
+
+    def _decode(self, headers, fileobj):
+        encoding = headers[-1].get_all("content-transfer-encoding", ["7bit"])[0]
+        encoding = encoding.lower()
+
+        if encoding == "base64":
+            try:
+                data = base64.b64decode(fileobj.read())
+            except TypeError, error:
+                self.log.error("Base64 decoding failed: %s", error)
+                raise threado.Finished(False)
+            return StringIO(data)
+
+        if encoding == "quoted-printable":
+            output = StringIO()
+            quopri.decode(fileobj, output)
+            output.seek(0)
+            return output
+
+        return fileobj
 
     @threado.stream
     def normalize(inner, self, groupdict):
@@ -46,12 +67,11 @@ class ShadowServerMail(imapbot.IMAPBot):
 
         for headers, data in parts:
             content_type = headers[-1].get_content_type()
+
             if headers[-1].get_filename(None) is None:
                 if content_type == "text/plain":
                     texts.append((headers, data))
-            elif content_type in ["text/plain", 
-                                  "application/zip",
-                                  "application/octet-stream"]:
+            else:
                 attachments.append((headers, data))
 
         return imapbot.IMAPBot.handle(self, attachments + texts)
@@ -61,6 +81,7 @@ class ShadowServerMail(imapbot.IMAPBot):
         filename = headers[-1].get_filename(None)
         if filename is not None:
             self.log.info("Parsing CSV data from an attachment")
+            fileobj = self._decode(headers, fileobj)
             result = yield inner.sub(self.parse_csv(filename, fileobj))
             inner.finish(result)
 
@@ -78,24 +99,31 @@ class ShadowServerMail(imapbot.IMAPBot):
                 continue
             
             self.log.info("Parsing CSV data from the URL")
+            fileobj = self._decode(headers, fileobj)
             result = yield inner.sub(self.parse_csv(filename, fileobj))
             inner.finish(result)
 
     @threado.stream
+    def handle_text_csv(inner, self, headers, fileobj):
+        filename = headers[-1].get_filename(None)
+        if filename is None:
+            self.log.error("No filename given for the data")
+            inner.finish(False)
+
+        self.log.info("Parsing CSV data from an attachment")
+        fileobj = self._decode(headers, fileobj)
+        result = yield inner.sub(self.parse_csv(filename, fileobj))
+        inner.finish(result)
+
+    @threado.stream
     def handle_application_zip(inner, self, headers, fileobj):
         self.log.info("Opening a ZIP attachment")
+        fileobj = self._decode(headers, fileobj)
         try:
-            data = base64.b64decode(fileobj.read())
-        except TypeError, error:
-            self.log.error("Base64 decoding failed: %s", error)
-            return
-
-        temp = StringIO(data)
-        try:
-            zip = zipfile.ZipFile(temp)
+            zip = zipfile.ZipFile(fileobj)
         except zipfile.BadZipfile, error:
             self.log.error("ZIP handling failed: %s", error)
-            return
+            inner.finish(False)
 
         for filename in zip.namelist():
             csv_data = StringIO(zip.read(filename))
@@ -104,7 +132,11 @@ class ShadowServerMail(imapbot.IMAPBot):
             result = yield inner.sub(self.parse_csv(filename, csv_data))
             inner.finish(result)
 
-    handle_application_octet__stream = handle_application_zip
+    def handle_application_octet__stream(self, headers, fileobj):
+        filename = headers[-1].get_filename(None)
+        if filename is not None and filename.lower().endswith(".csv"):
+            return self.handle_text_csv(headers, fileobj)
+        return self.handle_application_zip(headers, fileobj)
 
 if __name__ == "__main__":
     ShadowServerMail.from_command_line().execute()
