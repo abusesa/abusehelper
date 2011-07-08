@@ -143,11 +143,82 @@ def _unzip(items):
         yield left
         yield right
 
+_UNICODE_QUOTE_CHECK = re.compile(r'[\s"\\,=]', re.U)
+_UNICODE_QUOTE = re.compile(r'["\\]', re.U)
+def _unicode_quote(string):
+    r"""
+    >>> _unicode_quote(u"a")
+    u'a'
+    >>> _unicode_quote(u"=")
+    u'"="'
+    >>> _unicode_quote(u"\n")
+    u'"\n"'
+    """
+
+    if _UNICODE_QUOTE_CHECK.search(string):
+        return u'"' + _UNICODE_QUOTE.sub(r'\\\g<0>', string) + u'"'
+    return string
+
+_UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
+_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\"|[^"])*)")|([^"=,]+)|)\s*', re.U)
+def _unicode_parse_part(string, start):
+    match = _UNICODE_PART.match(string, start)    
+    quoted, unquoted = match.groups()
+    end = match.end()
+
+    if quoted is not None:
+        return _UNICODE_UNQUOTE.sub("\\1", quoted), end
+    if unquoted is not None:
+        return unquoted, end
+    return u"", end
+
 class Event(object):
     __slots__ = ["_items"]
 
     _UNDEFINED = object()
     
+    @classmethod
+    def from_unicode(cls, string):
+        r"""
+        >>> event = Event()
+        >>> event.add(u"a", u"b")
+        >>> Event.from_unicode(unicode(event)) == event
+        True
+
+        >>> event.add(u'=', u'"')
+        >>> Event.from_unicode(unicode(event)) == event
+        True
+        """
+
+        result = cls()
+
+        string = string.strip()
+        if not string:
+            return result
+
+        index = 0
+        length = len(string)
+
+        while True:
+            key, index = _unicode_parse_part(string, index)
+            if index >= length:
+                raise ValueError("unexpected string end")
+            if string[index] != u"=":
+                raise ValueError("unexpected character %r at index %d" % 
+                                 (string[index], index))
+            index += 1
+
+            value, index = _unicode_parse_part(string, index)
+            result.add(key, value)
+
+            if index >= length:
+                return result
+
+            if string[index] != u",":
+                raise ValueError("unexpected character %r at index %d" %
+                                 (string[index], index))
+            index += 1
+
     @classmethod
     def from_element(self, element):
         """Return an event parsed from an XML element (None if the
@@ -601,14 +672,15 @@ class Event(object):
         >>> e = Event()
         >>> unicode(e)
         u''
-        >>> e.add("a", "b")
+        >>> e.add("a,", "b")
         >>> unicode(e)
-        u'a=b'
+        u'"a,"=b'
 
         The specific order of the key-value pairs is undefined.
         """
 
-        return u", ".join(key + u"=" + value for (key, value) in self.items())
+        return u", ".join(_unicode_quote(key) + u"=" + _unicode_quote(value) 
+                          for (key, value) in self.items())
 
     def __repr__(self):
         attrs = dict()
