@@ -40,51 +40,6 @@ def ensure_dir(dir_name):
             raise
     return dir_name
 
-_ESCAPE_RE = re.compile("[\r\n\",=]")
-
-def dump_string(string):
-    r"""
-    Return an escaped utf-8 encoded string. 
-
-    >>> dump_string(u'\u00e4')
-    '\xc3\xa4'
-
-    Escaping is done in two phases. 1) Double quotes are doubled.  2)
-    Add double quote around the string when the string contains any of
-    the following characters: ",\r\n
-    
-    >>> dump_string('"') == '"' * 4
-    True
-    >>> dump_string("a=b")
-    '"a=b"'
-    """
-
-    string = string.encode("utf-8")
-    if _ESCAPE_RE.search(string):
-        return '"' + string.replace('"', '""') + '"'
-    return string
-
-def dump_event(event):
-    """
-    Return an event serialized into key-value pairs.
-
-    >>> event = events.Event()
-    >>> event.add('a', '1')
-    >>> dump_event(event)
-    'a=1'
-
-    >>> event = events.Event()
-    >>> event.add('=', '"')
-    >>> dump_event(event)
-    '"="="\"\""'
-    """
-    
-    result = []
-    for key in event.keys():
-        for value in event.values(key):
-            result.append(dump_string(key) + "=" + dump_string(value))
-    return ",".join(result)
-
 class ArchiveBot(bot.ServiceBot):
     archive_dir = bot.Param("directory where archive files are written")
     bot_state_file = None
@@ -135,7 +90,8 @@ class ArchiveBot(bot.ServiceBot):
             archive.close()
 
     def format(self, timestamp, event):
-        return isoformat(timestamp) + " " + dump_event(event) + os.linesep
+        data = unicode(event).encode("utf-8")
+        return isoformat(timestamp) + " " + data + os.linesep
 
 if __name__ == "__main__":
     ArchiveBot.from_command_line().execute()
