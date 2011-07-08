@@ -160,7 +160,8 @@ def _unicode_quote(string):
     return string
 
 _UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
-_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\"|[^"])*)")|([^"=,]+)|)\s*', re.U)
+_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\"|[^"])*)")|([^\s"=,]+)|)\s*', 
+                           re.U)
 def _unicode_parse_part(string, start):
     match = _UNICODE_PART.match(string, start)    
     quoted, unquoted = match.groups()
