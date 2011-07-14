@@ -4,6 +4,7 @@ from abusehelper.core import bot, events, utils
 
 class RSSBot(bot.PollingBot):
     feeds = bot.ListParam("a list of RSS feed URLs")
+    past_events = set()
 
     def feed_keys(self, **_):
         for feed in self.feeds:
@@ -19,6 +20,7 @@ class RSSBot(bot.PollingBot):
             return
 
         self.log.info("Finished downloading the feed.")
+        new_events = set()
         for _, elem in etree.iterparse(fileobj):
             items = elem.findall("item")
             if not items:
@@ -35,7 +37,16 @@ class RSSBot(bot.PollingBot):
 
                 event = self.create_event(**args)
                 if event:
+                    id = event.value("id", None)
+                    if id:
+                        new_events.add(id)
                     inner.send(event)
+
+        for id in self.past_events:
+            if id not in new_events:
+                event = events.Event()
+                event.add("id", id)
+                inner.send(event)
 
     def create_event(self, **keys):
         event = events.Event()
