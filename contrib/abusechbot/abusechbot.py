@@ -4,8 +4,6 @@ from abusehelper.core import bot, events, utils
 
 class RSSBot(bot.PollingBot):
     feeds = bot.ListParam("a list of RSS feed URLs")
-    keys = bot.ListParam("a list of RSS keys", default=["title", "pubdate",
-                                                        "description", "link"])
 
     def feed_keys(self, **_):
         for feed in self.feeds:
@@ -31,8 +29,9 @@ class RSSBot(bot.PollingBot):
                 for _ in inner: pass
 
                 args = {"source":url}
-                for key in self.keys:
-                    args[key] = item.findtext(key)
+                for element in list(item):
+                    if element.text and element.tag:
+                        args[element.tag] = element.text
 
                 event = self.create_event(**args)
                 if event:
