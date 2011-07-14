@@ -47,6 +47,7 @@ class RSSBot(bot.PollingBot):
                 event = events.Event()
                 event.add("id", id)
                 inner.send(event)
+        self.past_events = new_events
 
     def create_event(self, **keys):
         event = events.Event()
