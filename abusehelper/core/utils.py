@@ -11,6 +11,18 @@ from cStringIO import StringIO
 class FetchUrlFailed(Exception):
     pass
 
+class HTTPError(FetchUrlFailed):
+    def __init__(self, code, msg, headers, fileobj):
+        FetchUrlFailed.__init__(self, code, msg)
+
+        self.code = code
+        self.msg = msg
+        self.headers = headers
+        self.fileobj = fileobj
+
+    def __str__(self):
+        return "HTTP Error %d: %s" % (self.code, self.msg)
+
 @threado.stream
 def fetch_url(inner, url, opener=None):
     if opener is None:
@@ -33,8 +45,10 @@ def fetch_url(inner, url, opener=None):
         info = email.parser.Parser().parsestr(str(info), headersonly=True)
 
         inner.finish(info, StringIO(reader.result()))
+    except urllib2.HTTPError, he:
+        raise HTTPError(he.code, he.msg, he.headers, he.fp)
     except (urllib2.URLError, httplib.HTTPException, socket.error), error:
-        raise FetchUrlFailed(*error.args)
+        raise FetchUrlFailed(str(error))
 
 @threado.stream
 def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
