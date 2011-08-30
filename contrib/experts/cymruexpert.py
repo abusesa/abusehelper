@@ -1,6 +1,6 @@
 import sys
 import combiner
-from abusehelper.core import events
+from abusehelper.core import events, utils
 from idiokit import util, threado, sockets, timer
 
 class Stop(Exception):
@@ -16,7 +16,7 @@ class CymruWhoisExpert(combiner.Expert):
         combiner.Expert.__init__(self, *args, **keys)
 
         self.throttle_time = self.THROTTLE_TIME
-        self.cache = util.TimedCache(self.CACHE_TIME)
+        self.cache = utils.TimedCache(self.CACHE_TIME)
 
         self.global_main = None
         self.global_channels = set()
