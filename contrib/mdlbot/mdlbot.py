@@ -44,6 +44,7 @@ class MDLBot(bot.PollingBot):
         i = 0
         for line in fileobj:
             event = events.Event()
+            event.add("type", "malware")
             ip = decode(line.strip())
             event.add("ip", ip)
             inner.send(event)
