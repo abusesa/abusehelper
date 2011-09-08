@@ -91,6 +91,8 @@ class BGPRankingBot(combiner.Expert):
                                      "bgpranking@p.smile.public.lu",
                                      "ip " + ip)
                 augmented.add("bgpranking", rank["Rank"])
+		augmented.add("bgprankpos", rank["Position"])
+		augmented.add("bgprankmax", rank["HighRank"])
 
             inner.send(eid, augmented)
 
