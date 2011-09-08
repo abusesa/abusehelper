@@ -253,7 +253,7 @@ class Bot(object):
         handler.setLevel(logging.INFO)
 
         logger.addHandler(handler)
-        return logger
+        return log.EventLogger(logger)
 
     def execute(self):
         try:
