@@ -6,7 +6,7 @@ class MDLBot2(bot.PollingBot):
 	
 	def augment(self):
 		if not self.use_cymru_whois:
-        	return bot.PollingBot.augment(self)
+			return bot.PollingBot.augment(self)
 		return cymru.CymruWhois() | self.printer()
 
 	@threado.stream
@@ -29,6 +29,7 @@ class MDLBot2(bot.PollingBot):
 		self.log.info("Downloading MDL active sites list")
 		try:
 			info, fileobj = yield inner.sub(utils.fetch_url(url))
+			print info, fileobj
 		except utils.FetchUrlFailed, fuf:
 			self.log.error("MDL active sites downloading failed: %r", fuf)
 			return
@@ -48,5 +49,5 @@ class MDLBot2(bot.PollingBot):
 		csv_to_events(inner, fileobj, ",", columns, charset)
 
 if __name__ == "__main__":
-	MDLBot.from_command_line().execute()
+	MDLBot2.from_command_line().execute()
 
