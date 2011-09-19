@@ -1,4 +1,6 @@
 import sys
+
+from abusehelper.core import utils
 from idiokit import util, threado, sockets, timer
 
 class Stop(Exception):
@@ -10,7 +12,7 @@ class CymruWhoisAugmenter(object):
     def __init__(self, throttle_time=2.0, cache_time=60*60.0):
         self.throttle_time = throttle_time
 
-        self.cache = util.TimedCache(cache_time)
+        self.cache = utils.TimedCache(cache_time)
 
         self.global_main = None
         self.global_channels = set()
