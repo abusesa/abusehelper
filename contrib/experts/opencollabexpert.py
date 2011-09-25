@@ -22,8 +22,8 @@ class OpenCollabExpert(Expert):
         self.cache = dict()
 
         self.collab = wiki.GraphingWiki(self.collab_url,
-                                       ssl_verify_cert=self.collab_ignore_cert,
-                                       ssl_ca_certs=self.collab_extra_ca_certs)
+                                        ssl_verify_cert=not self.collab_ignore_cert,
+                                        ssl_ca_certs=self.collab_extra_ca_certs)
         self.collab.authenticate(self.collab_user, self.collab_password)
         self.cache_handler.inc(self.cache_query)
 
