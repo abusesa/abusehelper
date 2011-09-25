@@ -11,7 +11,7 @@ class OpenCollabExpert(Expert):
     collab_ignore_cert = bot.BoolParam()
     collab_extra_ca_certs = bot.Param(default=None)
     cache_query = bot.Param()
-    page_key = bot.Param()
+    page_keys = bot.ListParam()
     poll_interval = bot.IntParam("wait at least the given amount of seconds "+
                                  "before polling the collab again "+
                                  "(default: %default seconds)", default=600)
@@ -72,13 +72,14 @@ class OpenCollabExpert(Expert):
         while True:
             eid, event = yield inner
 
-            for value in event.values(self.page_key):
-                page = self.cache.get(value, None)
-                if not page:
-                    continue
+            for page_key in self.page_keys:
+                for value in event.values(page_key):
+                    page = self.cache.get(value, None)
+                    if not page:
+                        continue
 
-                for key, value in page.items():
-                    event.add(key, value)
+                    for key, value in page.items():
+                        event.add("%s_%s" % (page_key,key), value.lstrip("[[").rtrip("]]"))
 
             inner.send(eid, event)
 
