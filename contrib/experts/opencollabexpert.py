@@ -79,7 +79,7 @@ class OpenCollabExpert(Expert):
                         continue
 
                     for key, value in page.items():
-                        event.add("%s_%s" % (page_key,key), value.lstrip("[[").rtrip("]]"))
+                        event.add("%s_%s" % (page_key,key), value.lstrip("[[").rstrip("]]"))
 
             inner.send(eid, event)
 
