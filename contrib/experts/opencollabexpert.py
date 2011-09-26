@@ -2,7 +2,6 @@ from idiokit import threado, timer
 from abusehelper.core import bot, events, taskfarm
 from abusehelper.contrib.experts.combiner import Expert
 from opencollab import wiki
-import random, hashlib
 
 class OpenCollabExpert(Expert):
     collab_url = bot.Param()
@@ -11,7 +10,7 @@ class OpenCollabExpert(Expert):
     collab_ignore_cert = bot.BoolParam()
     collab_extra_ca_certs = bot.Param(default=None)
     cache_query = bot.Param()
-    page_keys = bot.ListParam()
+    page_keys = bot.ListParam("pagekey=wikikey[,pagekey=wikikey]")
     poll_interval = bot.IntParam("wait at least the given amount of seconds "+
                                  "before polling the collab again "+
                                  "(default: %default seconds)", default=600)
@@ -20,6 +19,15 @@ class OpenCollabExpert(Expert):
         Expert.__init__(self, *args, **keys)
         self.cache_handler = taskfarm.TaskFarm(self._manage_cache)
         self.cache = dict()
+
+        self.keys = dict()
+        for pair in self.page_keys:
+            parts = pair.split("=")
+            if len(parts) < 2:
+                continue
+
+            wikikeys = self.keys.setdefault(parts[0], set())
+            wikikeys.add("=".join(parts[1:]))
 
         self.collab = wiki.GraphingWiki(self.collab_url,
                                         ssl_verify_cert=not self.collab_ignore_cert,
@@ -30,6 +38,10 @@ class OpenCollabExpert(Expert):
     @threado.stream
     def _manage_cache(inner, self, query):
         token = None
+        wikikeys = set()
+        for valueset in self.keys.values():
+            wikikeys.update(valueset)
+
         while True:
             try:
                 result = yield inner.thread(self.collab.request, 
@@ -54,7 +66,8 @@ class OpenCollabExpert(Expert):
                             event.discard(key, value)
 
                         for value in added:
-                            event.add(key, value)
+                            if key in wikikeys:
+                                event.add(key, value)
 
                 for page in removed:
                     self.cache.pop(page, None)
@@ -72,14 +85,16 @@ class OpenCollabExpert(Expert):
         while True:
             eid, event = yield inner
 
-            for page_key in self.page_keys:
-                for value in event.values(page_key):
-                    page = self.cache.get(value, None)
+            for pagekey in self.keys:
+                for pagename in event.values(pagekey):
+                    page = self.cache.get(pagename, None)
                     if not page:
                         continue
 
-                    for key, value in page.items():
-                        event.add("%s_%s" % (page_key,key), value.lstrip("[[").rstrip("]]"))
+                    for wikikey in self.keys[pagekey]:
+                        newkey = str(pagekey+"_"+wikikey)
+                        for value in page.values(wikikey):
+                            event.add(newkey, value.strip("[[]]"))
 
             inner.send(eid, event)
 
