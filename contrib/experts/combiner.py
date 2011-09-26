@@ -54,7 +54,7 @@ class RoomBot(bot.ServiceBot):
 
             for _ in inner:
                 pass
-            
+
             for elements in channel:
                 inner.send(elements)
 
@@ -65,7 +65,7 @@ class RoomBot(bot.ServiceBot):
 
         try:
             yield inner.sub(threado.dev_null()
-                            | self.room_handlers.inc(name) 
+                            | self.room_handlers.inc(name)
                             | self._from_room(channel))
         finally:
             channels = self.room_channels.get(name, set())
@@ -146,8 +146,7 @@ class Expert(RoomBot):
 
 class Combiner(RoomBot):
     @threado.stream_fast
-    def collect(inner, self, ids, time_window):
-        queue = collections.deque()
+    def collect(inner, self, ids, queue, time_window):
         sleeper = timer.sleep(1.0)
 
         while True:
@@ -163,17 +162,21 @@ class Combiner(RoomBot):
 
             for event in inner:
                 eid = event_id(event)
-                ids[eid] = event
-                queue.append((expire_time, eid))
+                if eid not in ids:
+                    queue.append((expire_time, eid))
+                    ids[eid] = event, list()
+                else:
+                    _, augmentations = ids[eid]
+                    ids[eid] = event, augmentations
 
             while queue and queue[0][0] <= current_time:
                 expire_time, eid = queue.popleft()
-                event = ids.pop(eid, None)
+                event, augmentations = ids.pop(eid)
                 if event is not None:
-                    inner.send(event)
+                    inner.send(events.Event(event, *augmentations))
 
     @threado.stream_fast
-    def combine(inner, self, ids):
+    def combine(inner, self, ids, queue, time_window):
         while True:
             yield inner
 
@@ -181,28 +184,32 @@ class Combiner(RoomBot):
                 augmentation = events.Event(augmentation)
                 eids = augmentation.values(AUGMENT_KEY)
                 augmentation.clear(AUGMENT_KEY)
-                
+
                 for eid in eids:
-                    if eid in ids:
-                        event = ids[eid]
-                        ids[eid] = events.Event(event, augmentation)
+                    if eid not in ids:
+                        expire_time = time.time() + time_window
+                        queue.append((expire_time, eid))
+                        ids[eid] = None, list()
+                    event, augmentations = ids[eid]
+                    augmentations.append(augmentation)
 
     @threado.stream
-    def session(inner, self, state, src_room, dst_room, 
+    def session(inner, self, state, src_room, dst_room,
                 augment_room=None, time_window=10.0):
         if augment_room is None:
             augment_room = src_room
 
         ids = dict()
+        queue = collections.deque()
         yield inner.sub(self.from_room(src_room)
                         | events.stanzas_to_events()
                         | ignore_augmentations(augment_room == src_room)
-                        | self.collect(ids, time_window)
+                        | self.collect(ids, queue, time_window)
                         | events.events_to_elements()
                         | self.to_room(dst_room)
                         | self.from_room(augment_room)
                         | events.stanzas_to_events()
-                        | self.combine(ids))
+                        | self.combine(ids, queue, time_window))
 
 if __name__ == "__main__":
     Combiner.from_command_line().execute()
