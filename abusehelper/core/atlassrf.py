@@ -27,9 +27,40 @@ def fetch_extras(inner, opener, url):
     table = etree.XML(match.group(1))
     keys = [th.text or "" for th in table.findall("thead/tr/th")]
     keys = map(str.strip, keys)
-    values = [th.text or "" for th in table.findall("tbody/tr/td")]
+
+    def get_values(all):
+        # Long urls are formatted in the following format, this code
+        # is needed to get the full url
+        # 
+        # <td><span class="long_hover_default"
+        # onmouseout="MochiKit.DOM.setElementClass(this,
+        # 'long_hover_default')">http://x<wbr />y</span><span
+        # onmouseover="MochiKit.DOM.setElementClass(this.previousSibling,
+        # 'long_hover_on')">http://x......</span></td>
+        out = list()
+        for th in all:
+            val = ''
+            if th.text:
+                if not th.get('onmouseover'):
+                    val = th.text
+            if th.tail and th.tail.strip():
+                val += th.tail
+            if th.getchildren():
+                val += ''.join(get_values(th))
+            if not val:
+                out.append('')
+            else:
+                out.append(val)
+
+        return out
+
+    values = get_values(table.findall("tbody/tr/td"))
     values = map(str.strip, values)
-    items = [item for item in zip(keys, values) if all(item)]
+    # Keys and values do not match in the table
+    if (len(values) % len(keys)):
+        inner.finish(list())
+    items = [item for item in zip((len(values) / len(keys)) * keys, values)]
+    items = zip(*[items[i::len(keys)] for i in range(len(keys))]) 
     inner.finish(items)
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
@@ -57,6 +88,8 @@ class AtlasSRFBot(bot.PollingBot):
             if elem.tag != etree.QName(ATOM_NS, "entry"):
                 continue
 
+            all_events = list()
+
             event = events.Event()
             event.add("feed", "atlassrf")
 
@@ -77,16 +110,25 @@ class AtlasSRFBot(bot.PollingBot):
 
                 event.add("url", url)
 
-                if not self.no_extras:
-                    extras = yield inner.sub(fetch_extras(opener, url))
-                    for key, value in extras:
-                        event.add(key, value)
-
                 parsed = urlparse.urlparse(url)
                 for key, value in cgi.parse_qsl(parsed.query):
                     event.add(key, value)
 
-            inner.send(event)
+                if not self.no_extras:
+                    extras = yield inner.sub(fetch_extras(opener, url))
+                    if not extras:
+                        all_events.append(event)
+                    for line in extras:
+                        new_event = events.Event(event)
+                        for key, value in line:
+                            if value:
+                                new_event.add(key, value)
+                        all_events.append(new_event)
+                else:
+                    all_events.append(event)
+
+            for cur in all_events:
+                inner.send(cur)
             yield
             list(inner)
 
