@@ -35,13 +35,12 @@ class OpenCollabReader(bot.FeedBot):
     @threado.stream
     def feed(inner, self, query):
         salt = str(random.randint(2**31, 2**32))
-
         def page_id(page):
             return hashlib.md5(page + salt).hexdigest()
 
         token = None
         current = dict()
-
+        yield timer.sleep(5)
         while True:
             try:
                 result = yield inner.thread(self.collab.request, 
@@ -67,8 +66,7 @@ class OpenCollabReader(bot.FeedBot):
                             event.discard(key, value)
 
                         for value in added:
-                            event.add(key, value)
-
+                            event.add(key, value.lstrip("[[").rstrip("]]"))
                     inner.send(event)
 
                 for page in removed:
