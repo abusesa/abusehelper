@@ -22,7 +22,7 @@ class ProjectHoneypotBot(bot.XMPPBot):
         # Info contains e.g. the HTTP(S) headers, ignored for now.
         info, fileobj = yield utils.fetch_url(self.url)
         self.log.info("Opened URL %r", self.url)
-        
+
         yield self.parse(fileobj) | events.events_to_elements() | room | threado.dev_null()
 
     @threado.stream
@@ -44,8 +44,7 @@ class ProjectHoneypotBot(bot.XMPPBot):
             event.add("date", date)
             inner.send(event)
 
-            yield
-            list(inner)
+            yield inner.flush()
 
-if __name__ == "__main__":        
+if __name__ == "__main__":
     ProjectHoneypotBot.from_command_line().run()

@@ -59,7 +59,7 @@ class HistoryDB(threado.GeneratorStream):
         try:
             while True:
                 yield self.inner.sub(timer.sleep(interval))
-                list(self.inner)
+                yield self.inner.flush()
 
                 if self.keeptime is not None:
                     cutoff = int(time.time() - self.keeptime)

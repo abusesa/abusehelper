@@ -41,7 +41,7 @@ class PhishtankBot(bot.PollingBot):
 
     @threado.stream
     def poll(inner, self, _):
-        yield
+        yield inner.flush()
 
         if not self.urlIsModified(self.full_feed):
             return
@@ -61,11 +61,11 @@ class PhishtankBot(bot.PollingBot):
                 continue
 
             for entry in entries:
-                yield
+                yield inner.flush()
                 url = entry.find("url")
                 if url is None:
                     continue
-  
+
                 verification = entry.find("verification")
                 if verification is None:
                     continue
@@ -96,11 +96,11 @@ class PhishtankBot(bot.PollingBot):
                         url = url.text
                     ip = ip.text
                     announcer = announcer.text
-   
+
                     url_data = sites.setdefault(url, list())
                     if (ip, announcer) not in url_data:
                         url_data.append((ip, announcer))
- 
+
                         event = events.Event()
                         event.add("feed", "phishtank")
                         event.add("url", url)

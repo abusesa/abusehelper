@@ -31,7 +31,7 @@ def fetch_extras(inner, opener, url):
     def get_values(all):
         # Long urls are formatted in the following format, this code
         # is needed to get the full url
-        # 
+        #
         # <td><span class="long_hover_default"
         # onmouseout="MochiKit.DOM.setElementClass(this,
         # 'long_hover_default')">http://x<wbr />y</span><span
@@ -60,7 +60,7 @@ def fetch_extras(inner, opener, url):
     if (len(values) % len(keys)):
         inner.finish(list())
     items = [item for item in zip((len(values) / len(keys)) * keys, values)]
-    items = zip(*[items[i::len(keys)] for i in range(len(keys))]) 
+    items = zip(*[items[i::len(keys)] for i in range(len(keys))])
     inner.finish(items)
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
@@ -129,8 +129,7 @@ class AtlasSRFBot(bot.PollingBot):
 
             for cur in all_events:
                 inner.send(cur)
-            yield
-            list(inner)
+            yield inner.flush()
 
 if __name__ == "__main__":
     AtlasSRFBot.from_command_line().run()

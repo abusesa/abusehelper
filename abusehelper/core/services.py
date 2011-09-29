@@ -101,12 +101,12 @@ class Lobby(threado.GeneratorStream):
 
         try:
             # Check that the service has not become unavailable.
-            for _ in inner: pass
+            yield inner.flush()
 
             result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
 
             # Check again that the service has not become unavailable.
-            for _ in inner: pass
+            yield inner.flush()
         except XMPPError, error:
             if error.type != "cancel":
                 raise

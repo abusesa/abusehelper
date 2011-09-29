@@ -6,10 +6,10 @@ from abusehelper.core import events
 @threado.stream
 def arf_to_events(inner, fileobj, charset=None):
     if charset is None:
-        decode = util.guess_encoding    
+        decode = util.guess_encoding
     else:
         decode = lambda x: x.decode(charset)
-    
+
     event = events.Event()
     yield
     for row in fileobj:

@@ -27,8 +27,7 @@ class RSSBot(bot.PollingBot):
                 continue
 
             for item in items:
-                yield
-                for _ in inner: pass
+                yield inner.flush()
 
                 args = {"source":url}
                 for element in list(item):
@@ -58,7 +57,7 @@ class RSSBot(bot.PollingBot):
 
 class AbuseCHBot(RSSBot):
     feeds = bot.ListParam(
-        default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker", 
+        default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker",
                  "https://zeustracker.abuse.ch/rss.php"])
 
     def create_event(self, **keys):

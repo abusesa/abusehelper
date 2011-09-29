@@ -42,7 +42,7 @@ def fetch_url(inner, url, opener=None):
                 yield inner, reader
         finally:
             fileobj.close()
-            
+
         info = fileobj.info()
         info = email.parser.Parser().parsestr(str(info), headersonly=True)
 
@@ -65,12 +65,11 @@ def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
         decode = lambda x: x.decode(charset)
 
     for row in reader:
-        yield
-        list(inner)
+        yield inner.flush()
 
         if columns is not None:
             row = dict(zip(columns, row))
-            
+
         event = events.Event()
         for key, value in row.items():
             if None in (key, value):
@@ -80,7 +79,7 @@ def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
             key = decode(key.lower().strip())
             value = decode(value.strip())
             event.add(key, value)
-                
+
         inner.send(event)
 
 class TimedCache(object):

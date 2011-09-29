@@ -41,7 +41,7 @@ def parse(string, base_time):
         result["message"] = bites[5][:match.start()]
     else:
         result["message"] = bites[5]
-    
+
     return result
 
 def follow_file(filename):
@@ -89,17 +89,12 @@ def follow_file(filename):
 from idiokit import threado, timer
 from abusehelper.core import bot, events
 
-def flush(inner):
-    for _ in inner:
-        pass
-
 @threado.stream
 def sleep(inner, delay):
     sleeper = timer.sleep(delay)
 
     while not sleeper.has_result():
         yield inner, sleeper
-        flush(inner)
 
 class SSHLogBot(bot.FeedBot):
     file = bot.Param()
@@ -126,7 +121,7 @@ class SSHLogBot(bot.FeedBot):
                         event.add(key, value)
                     inner.send(event)
 
-                    yield flush(inner)
+                    yield inner.flush()
 
             first = False
 

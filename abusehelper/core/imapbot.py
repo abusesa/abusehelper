@@ -134,7 +134,6 @@ class IMAPBot(bot.FeedBot):
         try:
             while not channel.has_result():
                 yield inner, channel
-                for _ in inner: pass
         except:
             raise
         else:
