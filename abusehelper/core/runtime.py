@@ -31,7 +31,7 @@ class PipeError(Exception):
 class Pipe(Pipeable):
     def __init__(self, *pieces):
         self.pieces = pieces
-    
+
     def _collect(self, pieces=None):
         for piece in self.pieces:
             yield piece._collect()
@@ -46,7 +46,7 @@ class Pipe(Pipeable):
                 elif isinstance(prev, Session) and isinstance(piece, Room):
                     yield prev.updated(dst_room=piece.name)
                 elif isinstance(prev, Room) and isinstance(piece, Room):
-                    yield Session("roomgraph", 
+                    yield Session("roomgraph",
                                   src_room=prev.name,
                                   dst_room=piece.name)
                 elif isinstance(piece, Session):
@@ -68,12 +68,12 @@ class Session(Pipeable):
     def __init__(self, service, *path, **conf):
         self.__dict__["service"] = service
         self.__dict__["path"] = tuple(path)
-        
+
         for key, value in conf.items():
             try:
                 value  = serialize.load(serialize.dump(value))
             except serialize.UnregisteredType:
-                raise SessionError("can not serialize key %r value %r" % 
+                raise SessionError("can not serialize key %r value %r" %
                                    (key, value))
             conf[key] = value
         self.__dict__["_conf"] = frozenset(conf.items())
@@ -151,8 +151,8 @@ class RuntimeBot(bot.XMPPBot):
 
         try:
             while True:
-                configs = yield inner, forward
-                if forward.was_source:
+                source, configs = yield threado.any(inner, forward)
+                if forward is source:
                     continue
 
                 added = set(iter_runtimes(config.flatten(configs)))
@@ -173,7 +173,7 @@ class RuntimeBot(bot.XMPPBot):
         xmpp = yield inner.sub(self.xmpp_connect())
 
         self.log.info("Joining lobby %r", self.service_room)
-        lobby = yield inner.sub(services.join_lobby(xmpp, 
+        lobby = yield inner.sub(services.join_lobby(xmpp,
                                                     self.service_room,
                                                     self.bot_name))
         self.log.addHandler(log.RoomHandler(lobby.room))
@@ -184,21 +184,21 @@ class RuntimeBot(bot.XMPPBot):
         name = session.service
         if session.path:
             name += "(" + ".".join(session.path) + ")"
-        
+
         while True:
             self.log.info("Waiting for %r", name)
             try:
-                stream = yield inner.sub(lobby.session(session.service, 
-                                                       *session.path, 
+                stream = yield inner.sub(lobby.session(session.service,
+                                                       *session.path,
                                                        **session.conf))
             except Cancel:
                 self.log.info("Stopped waiting for %r", name)
                 break
 
-            conf_str = "\n".join(" %r=%r" % item for item 
+            conf_str = "\n".join(" %r=%r" % item for item
                                  in session.conf.items())
             self.log.info("Sent %r conf:\n%s", name, conf_str)
-                
+
             try:
                 yield inner.sub(stream)
             except services.Stop:
@@ -232,7 +232,7 @@ class DefaultRuntimeBot(RuntimeBot):
             except BaseException, exception:
                 if error_msg != str(exception):
                     error_msg = str(exception)
-                    self.log.error("Couldn't load module %r: %s", 
+                    self.log.error("Couldn't load module %r: %s",
                                    self.config, error_msg)
 
             yield inner, timer.sleep(self.poll_interval)

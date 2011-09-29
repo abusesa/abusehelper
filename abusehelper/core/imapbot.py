@@ -54,11 +54,9 @@ class IMAPBot(bot.FeedBot):
 
         try:
             while True:
-                item = yield inner, self.queue
-                if inner.was_source:
+                source, item = yield threado.any(inner, self.queue)
+                if inner is source:
                     continue
-                for _ in inner:
-                    pass
 
                 while True:
                     delay = min(min_delay, max_delay)
@@ -69,11 +67,11 @@ class IMAPBot(bot.FeedBot):
                             self.log.error("Failed IMAP connection: %r", error)
                         else:
                             break
-                        
+
                         self.log.info("Retrying connection in %.02f seconds", delay)
                         yield inner, timer.sleep(delay)
                         delay = min(2 * delay, max_delay)
-                            
+
                     channel, name, args, keys = item
                     if channel.has_result():
                         break
@@ -99,7 +97,7 @@ class IMAPBot(bot.FeedBot):
         self.log.info("Connecting to IMAP server %r port %d",
                       self.mail_server, self.mail_port)
         mailbox = imaplib.IMAP4_SSL(self.mail_server, self.mail_port)
-        
+
         self.log.info("Logging in to IMAP server %s port %d",
                       self.mail_server, self.mail_port)
         mailbox.login(self.mail_user, self.mail_password)
@@ -132,7 +130,7 @@ class IMAPBot(bot.FeedBot):
     def call(inner, self, name, *args, **keys):
         channel = threado.Channel()
         self.queue.send(channel, name, args, keys)
-        
+
         try:
             while not channel.has_result():
                 yield inner, channel
@@ -164,7 +162,7 @@ class IMAPBot(bot.FeedBot):
     def get_header(inner, self, uid, section):
         body_rex_str = r"\s*\d+\s+\(UID %s\s+BODY\[%s\]\s+" % (uid, section)
         body_rex = re.compile(body_rex_str, re.I)
-        
+
         fetch = "(UID BODY.PEEK[%s])" % section
         result, data = yield inner.sub(self.call("uid", "FETCH", uid, fetch))
 
@@ -184,7 +182,7 @@ class IMAPBot(bot.FeedBot):
         def fetch(inner):
             fetch = "(BODY.PEEK[%s])" % path
             result, data = yield inner.sub(self.call("uid", "FETCH", uid, fetch))
-            
+
             for parts in data:
                 if not isinstance(parts, tuple) or len(parts) != 2:
                     continue
@@ -206,7 +204,7 @@ class IMAPBot(bot.FeedBot):
         path = list(path) + [0]
         while True:
             path[-1] += 1
-            path_str = ".".join(map(str, path))        
+            path_str = ".".join(map(str, path))
 
             header = yield inner.sub(self.get_header(uid, path_str + ".MIME"))
             if header is None:
@@ -229,7 +227,7 @@ class IMAPBot(bot.FeedBot):
             parts = list()
             for path, headers in collected:
                 parts.append((headers, self.fetcher(uid, path)))
-                
+
             if parts:
                 top_header = parts[0][0][0]
                 subject = top_header["Subject"] or "<no subject>"

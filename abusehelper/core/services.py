@@ -72,8 +72,8 @@ class Lobby(threado.GeneratorStream):
                     channel = threado.Channel()
                     self.waiters[service_id] = channel
                 channel = self.waiters[service_id]
-                
-                while not channel.was_source:
+
+                while not channel.has_result():
                     yield inner, channel
                 continue
 
@@ -174,10 +174,10 @@ class Lobby(threado.GeneratorStream):
                 break
             else:
                 raise SessionError("Did not get session configuration")
-            
+
             session = yield inner.sub(service.open_session(path, conf))
             session_id = uuid.uuid4().hex
-            
+
             sessions = self.jids.setdefault(jid, dict())
             sessions[session_id] = session
             session | self._catch(jid, session_id)
@@ -232,7 +232,7 @@ class Lobby(threado.GeneratorStream):
             for session_id in list(sessions):
                 self._discard_session(jid, session_id, reason)
         self._update_catalogue(jid, None)
-                
+
     def _update_presence(self):
         services = Element("services", xmlns=SERVICE_NS)
         for service_id, service in self.services.items():
@@ -304,7 +304,7 @@ class Service(threado.GeneratorStream):
             bite = bite.encode("unicode-escape")
             bites.append(bite.replace("/", r"\/"))
         return "/" + "/".join(bites)
-    
+
     @threado.stream
     def _wrapped_main(inner, self):
         state = self._get(self.root_key)

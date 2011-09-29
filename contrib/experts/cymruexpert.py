@@ -21,7 +21,7 @@ class CymruWhoisExpert(combiner.Expert):
         self.global_main = None
         self.global_channels = set()
         self.global_pending = dict()
-        
+
     @threado.stream
     def main_loop(inner, self, channels, pending):
         sleeper = timer.sleep(self.throttle_time / 2.0)
@@ -51,7 +51,7 @@ class CymruWhoisExpert(combiner.Expert):
 
         while not should_stop or local_pending:
             yield inner
-                
+
             try:
                 for ip, values in inner:
                     for eid in local_pending.pop(ip, ()):
@@ -84,7 +84,7 @@ class CymruWhoisExpert(combiner.Expert):
     @threado.stream
     def augment(inner, self, key="ip"):
         if self.global_main is None:
-            self.global_main = self.main_loop(self.global_channels, 
+            self.global_main = self.main_loop(self.global_channels,
                                               self.global_pending)
 
         global_channels = self.global_channels
@@ -134,8 +134,8 @@ class CymruWhoisExpert(combiner.Expert):
 
             line_buffer = util.LineBuffer()
             while ips:
-                data = yield inner, socket
-                if inner.was_source:
+                source, data = yield threado.any(inner, socket)
+                if inner is source:
                     continue
 
                 for line in line_buffer.feed(data):
@@ -148,7 +148,7 @@ class CymruWhoisExpert(combiner.Expert):
 
                     ips.discard(ip)
                     self.cache.set(ip, bites)
-                    
+
                     channels = pending.pop(ip, ())
                     for channel in channels:
                         channel.send(ip, bites)

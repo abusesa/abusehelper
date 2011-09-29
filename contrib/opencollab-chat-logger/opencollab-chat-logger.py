@@ -38,7 +38,7 @@ class Txt2Collab(object):
 <<Include(^CollabChatLog/2.*,,sort=descending,items=1,editlink)>>
 
 = Past Topics =
- 
+
 <<MetaTable(CollabChatLog Attachment=/.*/, >>Date, ||Date||CollabChatLog Attachment||<gwikiname=\"URLS\" gwikistyle=\"list\">url||)>>
 """
 
@@ -76,10 +76,10 @@ class Txt2Collab(object):
 @threado.stream
 def logger(inner,txt2collab, base_time, interval):
     sleeper = timer.sleep(interval / 2.0)
-    
+
     while True:
-        event = yield inner,sleeper
-        if sleeper.was_source:
+        event = yield inner, sleeper
+        if sleeper.has_result():
             sleeper = timer.sleep(interval)
             txt2collab.log()
         else:
@@ -107,7 +107,7 @@ def roomparser(inner,srcjid_re):
             for body in message.children("body"):
                 text = "<%s> %s" % (sender.resource, body.text)
                 timestamp = time.strftime("%Y-%m-%d %H:%M",time.gmtime())
-            
+
                 message = "%s %s" % ( timestamp, text )
 
                 inner.send(sender, message)
@@ -121,7 +121,7 @@ def main(inner,username,password):
         print 'non-allowed chars in collab instance'
         sys.exit(1)
 
-        
+
     xmppuser = '%s@clarifiednetworks.com' % (re.sub('@','%',username))
     xmppmucs = "conference.clarifiednetworks.com"
     room = "%s@%s" % (collabinstance,xmppmucs)
@@ -129,26 +129,26 @@ def main(inner,username,password):
     myxmpp = yield xmpp.connect(xmppuser,password)
     myxmpp.core.presence()
     room = yield myxmpp.muc.join(room,"/collablogger")
-    print 'joined room'                                                      
+    print 'joined room'
     collab = CLIWiki('https://www.clarifiednetworks.com/collab/%s/' %
                      (collabinstance))
     collab.authenticate(username=username,password=password)
 
     attachFilename = "log.txt"
     basePage = "CollabChatLog"
-    
+
     txt2collab = Txt2Collab(collab,basePage,attachFilename,
                             timestampformat="%Y-%m-%d")
     srcjid_filter = "conference.clarifiednetworks.com"
 
     yield inner.sub(room |roomparser(srcjid_filter)|
                     logger(txt2collab,0,delay) )
-        
+
 if __name__ == "__main__":
     import getpass
 
     username = raw_input("Collab & XMPP Username (without the @domain): ")
     password = getpass.getpass()
-    
+
     threado.run(main(username, password))
-                
+

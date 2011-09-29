@@ -26,25 +26,26 @@ class WikiIdentityExpert(Expert):
 
     @threado.stream
     def poll_from_wiki(inner, self):
-	sleeper = timer.sleep(self.poll_interval)
+        sleeper = timer.sleep(self.poll_interval)
 
         while True:
             yield sleeper, inner
 
-	    if sleeper.was_source:
+            if sleeper.has_result():
                 self.log.info("Polling identity data from wiki.")
                 try:
-                    self.metas = yield inner.thread(self.wiki.getMeta, 
-						    "TYPE=%s" % self.wiki_identity)
+                    self.metas = yield inner.thread(self.wiki.getMeta,
+				                                    "TYPE=%s" % self.wiki_identity)
                 except WikiFailure:
                     self.log.error("There was an error on the wiki side.")
-            sleeper = timer.sleep(self.poll_interval)
+
+                sleeper = timer.sleep(self.poll_interval)
 
     @threado.stream
     def augment(inner, self):
         while True:
             eid, event = yield inner
-            ips = set(event.values(self.expert_key)) 
+            ips = set(event.values(self.expert_key))
             for ip in ips:
                 augment = events.Event()
                 if ip in self.metas:

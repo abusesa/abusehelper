@@ -11,7 +11,7 @@ class Wiki:
             self.wiki = opencollab.wiki.CLIWiki(url, user, password)
         elif self.type == "doku":
             self.separator = ":"
-            fullurl = "%s/lib/exe/xmlrpc.php?%s" % (url, 
+            fullurl = "%s/lib/exe/xmlrpc.php?%s" % (url,
                                                     urlencode({'u':user,
                                                                'p':password}))
             self.wiki = xmlrpclib.ServerProxy(fullurl).wiki
@@ -51,7 +51,7 @@ class CollectorBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
-        self.events = dict()       
+        self.events = dict()
 
     @threado.stream_fast
     def collect(inner, self, name):
@@ -68,7 +68,7 @@ class CollectorBot(bot.ServiceBot):
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room 
+            yield inner.sub(room
                             | events.stanzas_to_events()
                             | self.collect(name))
         finally:
@@ -136,25 +136,23 @@ class WikiBot(CollectorBot):
                 if success:
                     self.log.info("Events written to wiki")
                 else:
-                    self.log.info("Could not write events to wiki")            
+                    self.log.info("Could not write events to wiki")
 
     @threado.stream
     def timed(inner, self, interval):
         sleeper = timer.sleep(interval)
-        while True:
+        while not sleeper.has_result():
             for room, events in self.events.iteritems():
                 self.write_to_wiki(room, events)
                 self.events[room] = list()
 
-            item = yield inner, sleeper
-            if sleeper.was_source:
-                inner.finish()
+            yield inner, sleeper
 
     @threado.stream
     def main(inner, self, state):
         try:
             while True:
-                yield inner.sub(self.timed(self.write_interval) 
+                yield inner.sub(self.timed(self.write_interval)
                                 | threado.dev_null())
         except services.Stop:
             inner.finish()
@@ -163,7 +161,7 @@ class WikiBot(CollectorBot):
     def session(inner, self, state, src_room, wiki_url, wiki_user,
                 wiki_password, wiki_type="opencollab", parent="", **keys):
 
-        self.wikis[src_room] = (wiki_url, wiki_user, wiki_password, 
+        self.wikis[src_room] = (wiki_url, wiki_user, wiki_password,
                                 wiki_type, parent)
 
         self.events.setdefault(src_room, list())

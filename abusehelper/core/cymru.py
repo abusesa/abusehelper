@@ -17,7 +17,7 @@ class CymruWhoisAugmenter(object):
         self.global_main = None
         self.global_channels = set()
         self.global_pending = dict()
-        
+
     @threado.stream
     def main(inner, self, channels, pending):
         sleeper = timer.sleep(self.throttle_time / 2.0)
@@ -47,11 +47,11 @@ class CymruWhoisAugmenter(object):
 
         while not should_stop or local_pending:
             yield inner
-                
+
             try:
                 for ip, values in inner:
                     events = local_pending.pop(ip, ())
-                    
+
                     for event in events:
                         for key, value in zip(self.LINE_KEYS, values):
                             if value is not None:
@@ -79,7 +79,7 @@ class CymruWhoisAugmenter(object):
     @threado.stream
     def augment(inner, self, key="ip"):
         if self.global_main is None:
-            self.global_main = self.main(self.global_channels, 
+            self.global_main = self.main(self.global_channels,
                                          self.global_pending)
 
         global_channels = self.global_channels
@@ -129,8 +129,8 @@ class CymruWhoisAugmenter(object):
 
             line_buffer = util.LineBuffer()
             while ips:
-                data = yield inner, socket
-                if inner.was_source:
+                source, data = yield threado.any(inner, socket)
+                if inner is source:
                     continue
 
                 for line in line_buffer.feed(data):
@@ -143,7 +143,7 @@ class CymruWhoisAugmenter(object):
 
                     ips.discard(ip)
                     self.cache.set(ip, bites)
-                    
+
                     channels = pending.pop(ip, ())
                     for channel in channels:
                         channel.send(ip, bites)
