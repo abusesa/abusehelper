@@ -23,7 +23,7 @@ class HistoryDB(threado.GeneratorStream):
         cursor.execute("CREATE INDEX IF NOT EXISTS events_room_ts_index ON events(room, timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS events_room_index ON events(room)")
         cursor.execute("CREATE INDEX IF NOT EXISTS events_ts_index ON events(timestamp)")
-        
+
         cursor.execute("CREATE TABLE IF NOT EXISTS attrs "+
                        "(eventid INTEGER, key TEXT, value TEXT)")
         cursor.execute("CREATE INDEX IF NOT EXISTS attrs_eventid_index ON attrs(eventid)")
@@ -39,23 +39,21 @@ class HistoryDB(threado.GeneratorStream):
         services.bind(self, collect)
         return collect
 
-    @threado.stream_fast
+    @threado.stream
     def _collect(inner, self, room_name):
         while True:
-            yield inner
-                
-            for event in inner:
-                if event.contains("bot:action"):
-                    continue
+            event = yield inner
+            if event.contains("bot:action"):
+                continue
 
-                self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
-                                    (int(time.time()), room_name))
-                eventid = self.cursor.lastrowid
-                
-                for key in event.keys():
-                    values = event.values(key)
-                    self.cursor.executemany("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
-                                            [(eventid, key, value) for value in values])
+            self.cursor.execute("INSERT INTO events(timestamp, room) VALUES (?, ?)",
+                                (int(time.time()), room_name))
+            eventid = self.cursor.lastrowid
+
+            for key in event.keys():
+                values = event.values(key)
+                self.cursor.executemany("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
+                                        [(eventid, key, value) for value in values])
 
     def run(self, interval=1.0):
         try:
@@ -65,10 +63,10 @@ class HistoryDB(threado.GeneratorStream):
 
                 if self.keeptime is not None:
                     cutoff = int(time.time() - self.keeptime)
-                    
+
                     max_id = self.cursor.execute("SELECT MAX(events.id) FROM events "+
                                                  "WHERE events.timestamp <= ?", (cutoff,))
-                    
+
                     max_id = list(max_id)[0][0]
                     if max_id is not None:
                         self.cursor.execute("DELETE FROM events WHERE events.id <= ?",
@@ -90,7 +88,7 @@ class HistoryDB(threado.GeneratorStream):
                  "INNER JOIN events ON events.id=attrs.eventid ")
         args = list()
         where = list()
-    
+
         if room_name is not None:
             where.append("events.room = ?")
             args.append(room_name)
@@ -108,7 +106,7 @@ class HistoryDB(threado.GeneratorStream):
 
         if where:
             query += "WHERE " + " AND ".join(where) + " "
-        
+
         query += "ORDER BY events.id"
 
         event = events.Event()
@@ -266,20 +264,19 @@ class HistorianService(bot.ServiceBot):
         except services.Stop:
             inner.finish()
 
-    @threado.stream_fast
+    @threado.stream
     def skip_own(inner, self, room):
         while True:
-            yield inner
+            element = yield inner
 
-            for element in inner:
-                own = False
-                for owned in element.with_attrs("from"):
-                    sender = JID(owned.get_attr("from"))
-                    if room.nick_jid == sender:
-                        own = True
-                        break
-                if not own:
-                    inner.send(element)
+            own = False
+            for owned in element.with_attrs("from"):
+                sender = JID(owned.get_attr("from"))
+                if room.nick_jid == sender:
+                    own = True
+                    break
+            if not own:
+                inner.send(element)
 
     def query_handler(self, success, element):
         if not success:
@@ -296,7 +293,7 @@ class HistorianService(bot.ServiceBot):
             else:
                 attrs = dict()
                 to = sender
-            
+
             if room_jid not in self.xmpp.muc.rooms:
                 return
 
@@ -318,7 +315,7 @@ class HistorianService(bot.ServiceBot):
             if matcher is None:
                 continue
 
-            self.log.info("Got command %r, responding to %r", body.text, 
+            self.log.info("Got command %r, responding to %r", body.text,
                                                               requester)
             counter = 0
             for etime, eroom, event in self.history.find(room_jid, start, end):

@@ -8,7 +8,7 @@ class SQLReport(bot.ServiceBot):
     dbname = bot.Param()
     dbusr = bot.Param()
     dbpwd = bot.Param()
-    
+
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
@@ -29,12 +29,11 @@ class SQLReport(bot.ServiceBot):
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream_fast
+    @threado.stream
     def collect(inner, self, name):
         while True:
-            yield inner
-            for event in inner:
-                self.sqlqueries.insertEvent(event)
+            event = yield inner
+            self.sqlqueries.insertEvent(event)
 
     @threado.stream
     def session(inner, self, state, src_room):
@@ -48,7 +47,7 @@ class SQLQueries():
 
     def existsASN(self, asn):
         result = self.connection.executeAndReturnResult("SELECT asn FROM asn WHERE asn = ?", asn)
-        
+
         if(result is None or len(result) < 1):
             return False
         else:
@@ -72,7 +71,7 @@ class SQLQueries():
             if(not self.existsASN(asn)):
                 self.insertASN(asn, str(event.value("as_name", None)))
 
-            
+
             #check values
             if(type is None):
                 type = ""
@@ -84,12 +83,12 @@ class SQLQueries():
                 customer = ""
             if(abuse_email is None):
                 abuse_email = ""
-            
+
             #proceed with query
-            query =  "INSERT INTO raw_events(time, ip, type, source, asn, customer, abuse_email) 
+            query =  "INSERT INTO raw_events(time, ip, type, source, asn, customer, abuse_email)
                                      VALUES (%s,   %s, %s  , %s    , %s , %s      , %s) "
             self.connection.executeAndCommit(query, time, ip, type, source, asn, customer, abuse_email)
-    
+
 if __name__ == "__main__":
     SQLReport.from_command_line().execute()
 

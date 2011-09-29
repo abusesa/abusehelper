@@ -45,41 +45,39 @@ class CymruWhoisExpert(combiner.Expert):
         for channel in channels:
             channel.throw(Stop())
 
-    @threado.stream_fast
+    @threado.stream
     def _forward(inner, self, global_main, local_pending):
         should_stop = False
 
         while not should_stop or local_pending:
-            yield inner
-
             try:
-                for ip, values in inner:
-                    for eid in local_pending.pop(ip, ()):
-                        augmentation = events.Event()
+                ip, values = yield inner
 
-                        for key, value in zip(self.LINE_KEYS, values):
-                            if value is not None:
-                                augmentation.add(key, value)
+                for eid in local_pending.pop(ip, ()):
+                    augmentation = events.Event()
 
-                        inner.send(eid, augmentation)
+                    for key, value in zip(self.LINE_KEYS, values):
+                        if value is not None:
+                            augmentation.add(key, value)
+
+                    inner.send(eid, augmentation)
             except threado.Finished:
                 should_stop = True
                 global_main.send()
 
-    @threado.stream_fast
+    @threado.stream
     def _collect(inner, self, key, channel, local_pending, global_pending):
         while True:
-            yield inner
+            eid, event = yield inner
 
-            for eid, event in inner:
-                for ip in event.values(key):
-                    local_pending.setdefault(ip, set()).add(eid)
+            for ip in event.values(key):
+                local_pending.setdefault(ip, set()).add(eid)
 
-                    values = self.cache.get(ip, None)
-                    if values is not None:
-                        inner.send(ip, values)
-                    else:
-                        global_pending.setdefault(ip, set()).add(channel)
+                values = self.cache.get(ip, None)
+                if values is not None:
+                    inner.send(ip, values)
+                else:
+                    global_pending.setdefault(ip, set()).add(channel)
 
     @threado.stream
     def augment(inner, self, key="ip"):

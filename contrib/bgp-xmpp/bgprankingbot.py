@@ -25,7 +25,7 @@ def parse(text):
             return bgpranking
     return None
 
-@threado.stream_fast
+@threado.stream
 def request(inner, xmpp, to, text):
     channel = threado.Channel()
 
@@ -45,11 +45,8 @@ def request(inner, xmpp, to, text):
 
 
         while True:
-            yield inner, channel
-            for _ in inner:
-                pass
-
-            for elements in channel:
+            source, elements = yield threado.any(inner, channel)
+            if channel is source:
                 for msg in elements.named("message"):
                     if(msg.with_attrs("from")):
                         sender = jid.JID(msg.get_attr("from"))

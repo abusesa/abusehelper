@@ -8,15 +8,14 @@ class RoomBot(bot.ServiceBot):
         self.room_handlers = taskfarm.TaskFarm(self._handle_room)
         self.room_channels = dict()
 
-    @threado.stream_fast
+    @threado.stream
     def _distribute_room(inner, self, name):
         while True:
-            yield inner
+            elements = yield inner
 
             channels = self.room_channels.get(name, ())
-            for elements in inner:
-                for channel in channels:
-                    channel.send(elements)
+            for channel in channels:
+                channel.send(elements)
 
     @threado.stream
     def _handle_room(inner, self, name):
@@ -29,15 +28,11 @@ class RoomBot(bot.ServiceBot):
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream_fast
+    @threado.stream
     def _to_room(inner, self, room):
         while True:
-            yield inner, room
-
-            for _ in room:
-                pass
-
-            for elements in inner:
+            source, elements = yield threado.any(inner, room)
+            if inner is source:
                 room.send(elements)
 
     @threado.stream
@@ -47,15 +42,11 @@ class RoomBot(bot.ServiceBot):
 
         yield inner.sub(self._to_room(room) | inc)
 
-    @threado.stream_fast
+    @threado.stream
     def _from_room(inner, self, channel):
         while True:
-            yield inner, channel
-
-            for _ in inner:
-                pass
-
-            for elements in channel:
+            source, elements = yield threado.any(inner, channel)
+            if inner is channel:
                 inner.send(elements)
 
     @threado.stream
@@ -95,32 +86,26 @@ def event_id(event):
 
 AUGMENT_KEY = "augment sha-1"
 
-@threado.stream_fast
+@threado.stream
 def ignore_augmentations(inner, ignore):
     while True:
-        yield inner
+        event = yield inner
+        if ignore and event.contains(AUGMENT_KEY):
+            continue
+        inner.send(event)
 
-        for event in inner:
-            if ignore and event.contains(AUGMENT_KEY):
-                continue
-            inner.send(event)
-
-@threado.stream_fast
+@threado.stream
 def create_eids(inner):
     while True:
-        yield inner
+        event = yield inner
+        inner.send(event_id(event), event)
 
-        for event in inner:
-            inner.send(event_id(event), event)
-
-@threado.stream_fast
+@threado.stream
 def embed_eids(inner):
     while True:
-        yield inner
-
-        for eid, event in inner:
-            event.add(AUGMENT_KEY, eid)
-            inner.send(event)
+        eid, event = yield inner
+        event.add(AUGMENT_KEY, eid)
+        inner.send(event)
 
 class Expert(RoomBot):
     @threado.stream
@@ -145,22 +130,19 @@ class Expert(RoomBot):
                         | self.to_room(dst_room))
 
 class Combiner(RoomBot):
-    @threado.stream_fast
+    @threado.stream
     def collect(inner, self, ids, queue, time_window):
         sleeper = timer.sleep(1.0)
 
         while True:
-            try:
-                for _ in sleeper: pass
-            except threado.Finished:
+            if sleeper.has_result():
                 sleeper = timer.sleep(1.0)
-
-            yield inner, sleeper
+            source, event = yield threado.any(inner, sleeper)
 
             current_time = time.time()
             expire_time = current_time + time_window
 
-            for event in inner:
+            if inner is source:
                 eid = event_id(event)
                 if eid not in ids:
                     queue.append((expire_time, eid))
@@ -175,23 +157,22 @@ class Combiner(RoomBot):
                 if event is not None:
                     inner.send(events.Event(event, *augmentations))
 
-    @threado.stream_fast
+    @threado.stream
     def combine(inner, self, ids, queue, time_window):
         while True:
-            yield inner
+            augmentation = yield inner
 
-            for augmentation in inner:
-                augmentation = events.Event(augmentation)
-                eids = augmentation.values(AUGMENT_KEY)
-                augmentation.clear(AUGMENT_KEY)
+            augmentation = events.Event(augmentation)
+            eids = augmentation.values(AUGMENT_KEY)
+            augmentation.clear(AUGMENT_KEY)
 
-                for eid in eids:
-                    if eid not in ids:
-                        expire_time = time.time() + time_window
-                        queue.append((expire_time, eid))
-                        ids[eid] = None, list()
-                    event, augmentations = ids[eid]
-                    augmentations.append(augmentation)
+            for eid in eids:
+                if eid not in ids:
+                    expire_time = time.time() + time_window
+                    queue.append((expire_time, eid))
+                    ids[eid] = None, list()
+                event, augmentations = ids[eid]
+                augmentations.append(augmentation)
 
     @threado.stream
     def session(inner, self, state, src_room, dst_room,

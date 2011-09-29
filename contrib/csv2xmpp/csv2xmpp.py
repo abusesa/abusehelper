@@ -27,33 +27,33 @@ class CSV2XMPP(bot.XMPPBot):
 
         if self.timestamp_column == None:
             yield inner.sub(utils.csv_to_events(fileobj, self.csv_delimiter, self.csv_columns)
-                            | events.events_to_elements() 
+                            | events.events_to_elements()
                             | room)
         else:
             yield inner.sub(utils.csv_to_events(fileobj, self.csv_delimiter, self.csv_columns)
                             | events_to_elements_with_delay_element(self.timestamp_column) |room)
 
-@threado.stream_fast
+@threado.stream
 def events_to_elements_with_delay_element(inner,timestamp_column):
     eventnum=0
     while True:
-        yield inner
-        for event in inner:
-            fields = list()
-            hourminute = None
-            event = sanitize(event,timestamp_column)
+        event = yield inner
 
-            for key in event.keys():
-                for value in event.values(key):
-                    fields.append(key + "=" + value)
-            body = Element("body")
-            body.text = ", ".join(fields)
-            if event.contains('start'):
-                etime = event.value('start')
-                etime = sanitize_time(etime)
-                inner.send(body,event.to_element(),delay_element(etime))
-            else:
-                inner.send(body,event.to_element())
+        fields = list()
+        hourminute = None
+        event = sanitize(event,timestamp_column)
+
+        for key in event.keys():
+            for value in event.values(key):
+                fields.append(key + "=" + value)
+        body = Element("body")
+        body.text = ", ".join(fields)
+        if event.contains('start'):
+            etime = event.value('start')
+            etime = sanitize_time(etime)
+            inner.send(body,event.to_element(),delay_element(etime))
+        else:
+            inner.send(body,event.to_element())
 
 def sanitize(event,timestamp_column):
     if event.contains(timestamp_column) and event.contains('description'):

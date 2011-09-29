@@ -15,7 +15,7 @@ def wait(inner, amount):
 
 def next_time(time_string):
     try:
-        parsed = list(time.strptime(time_string, "%H:%M"))    
+        parsed = list(time.strptime(time_string, "%H:%M"))
     except (TypeError, ValueError):
         return float(time_string)
 
@@ -29,7 +29,7 @@ def next_time(time_string):
     if delta <= 0.0:
         current[2] += 1
         return time.mktime(current) - current_time
-    return delta    
+    return delta
 
 @threado.stream
 def alert(inner, *times):
@@ -49,7 +49,7 @@ def alert(inner, *times):
 
 class ReportBot(bot.ServiceBot):
     REPORT_NOW = object()
-    
+
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
 
@@ -70,15 +70,14 @@ class ReportBot(bot.ServiceBot):
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream_fast
+    @threado.stream
     def distribute(inner, self, name):
         while True:
-            yield inner
+            event = yield inner
 
             collectors = self.collectors.get(name)
-            for event in inner:
-                for collector in collectors:
-                    collector.send(event)
+            for collector in collectors:
+                collector.send(event)
 
     @threado.stream
     def main(inner, self, queue):
@@ -99,25 +98,21 @@ class ReportBot(bot.ServiceBot):
 
     @threado.stream
     def session(inner, self, state, src_room, **keys):
-        @threado.stream_fast
+        @threado.stream
         def _alert(inner):
             alert = self.alert(**keys)
             while True:
-                yield inner, alert
-                
-                for item in inner:
+                source, item = yield threado.any(inner, alert)
+                if inner is source:
                     inner.send(item)
-                    
-                if list(alert):
+                else:
                     inner.send(self.REPORT_NOW)
 
-        @threado.stream_fast
+        @threado.stream
         def _collect(inner):
             while True:
-                yield inner
-                
-                for item in inner:
-                    self.queue.append(item)
+                item = yield inner
+                self.queue.append(item)
 
         collector = _alert() | self.collect(state, **keys) | _collect()
         self.collectors.setdefault(src_room, set()).add(collector)
@@ -136,20 +131,18 @@ class ReportBot(bot.ServiceBot):
     def alert(inner, self, times, **keys):
         yield inner.sub(alert(*times))
 
-    @threado.stream_fast
+    @threado.stream
     def collect(inner, self, state, **keys):
         if state is None:
             state = events.EventCollector()
 
         try:
             while True:
-                yield inner
-
-                for event in inner:
-                    if event is self.REPORT_NOW:
-                        inner.send(state.purge())
-                    else:
-                        state.append(event)
+                event = yield inner
+                if event is self.REPORT_NOW:
+                    inner.send(state.purge())
+                else:
+                    state.append(event)
         except services.Stop:
             inner.finish(state)
 
@@ -262,7 +255,7 @@ class MailerService(ReportBot):
 
             del msg["From"]
             msg["From"] = formataddr(from_addr)
-            msg["Date"] = formatdate()             
+            msg["Date"] = formatdate()
             msg["Message-ID"] = make_msgid()
             subject = msg.get("Subject", "")
 
@@ -339,13 +332,13 @@ class MailerService(ReportBot):
                 yield inner.thread(server.sendmail, from_addr, to_addr, msg)
         except smtplib.SMTPDataError, data_error:
             self.log.error("Could not send message to %r: %r. "+
-                           "Dropping message from queue.", 
+                           "Dropping message from queue.",
                            to_addr, data_error)
             inner.finish(True)
         except smtplib.SMTPRecipientsRefused, refused:
             for recipient, reason in refused.recipients.iteritems():
                 self.log.error("Could not send message to %r: %r. "+
-                               "Dropping message from queue.", 
+                               "Dropping message from queue.",
                                recipient, reason)
             inner.finish(True)
         except self.TOLERATED_EXCEPTIONS, exc:

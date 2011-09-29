@@ -40,30 +40,27 @@ class Sanitizer(bot.ServiceBot):
         room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
         self.log.info("Joined room %r", name)
         try:
-            yield inner.sub(events.events_to_elements() 
-                            | room 
+            yield inner.sub(events.events_to_elements()
+                            | room
                             | events.stanzas_to_events()
                             | self.distribute(name))
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream_fast
+    @threado.stream
     def distribute(inner, self, name):
         while True:
-            yield inner
-            
+            event = yield inner
+
             rooms = set(map(self.rooms.get, self.srcs.get(name)))
             rooms.discard(None)
 
             if not rooms:
-                for _ in inner:
-                    pass
                 continue
 
-            for event in inner:
-                for sanitized_event in self.sanitize(event):
-                    for room in rooms:
-                        room.send(sanitized_event)
+            for sanitized_event in self.sanitize(event):
+                for room in rooms:
+                    room.send(sanitized_event)
 
     @threado.stream
     def session(inner, self, _, src_room, dst_room, **keys):

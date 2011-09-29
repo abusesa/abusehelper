@@ -8,15 +8,14 @@ class RoomBot(bot.ServiceBot):
         self.room_handlers = taskfarm.TaskFarm(self._handle_room)
         self.room_channels = dict()
 
-    @threado.stream_fast
+    @threado.stream
     def _distribute_room(inner, self, name):
         while True:
-            yield inner
+            elements = yield inner
 
             channels = self.room_channels.get(name, ())
-            for elements in inner:
-                for channel in channels:
-                    channel.send(elements)
+            for channel in channels:
+                channel.send(elements)
 
     @threado.stream
     def _handle_room(inner, self, name):
@@ -29,15 +28,11 @@ class RoomBot(bot.ServiceBot):
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream_fast
+    @threado.stream
     def _to_room(inner, self, room):
         while True:
-            yield inner, room
-
-            for _ in room:
-                pass
-
-            for elements in inner:
+            source, elements = yield threado.any(inner, room)
+            if inner is source:
                 room.send(elements)
 
     @threado.stream
@@ -47,15 +42,11 @@ class RoomBot(bot.ServiceBot):
 
         yield inner.sub(self._to_room(room) | inc)
 
-    @threado.stream_fast
+    @threado.stream
     def _from_room(inner, self, channel):
         while True:
-            yield inner, channel
-
-            for _ in inner:
-                pass
-            
-            for elements in channel:
+            elements = yield threado.any(inner, channel)
+            if channel is source:
                 inner.send(elements)
 
     @threado.stream
@@ -65,7 +56,7 @@ class RoomBot(bot.ServiceBot):
 
         try:
             yield inner.sub(threado.dev_null()
-                            | self.room_handlers.inc(name) 
+                            | self.room_handlers.inc(name)
                             | self._from_room(channel))
         finally:
             channels = self.room_channels.get(name, set())
@@ -89,26 +80,23 @@ def event_id(event):
             result.append(value)
 
     return hashlib.md5("\x80".join(result)).hexdigest()
-        
+
 class WindowBot(RoomBot):
-    @threado.stream_fast
+    @threado.stream
     def process(inner, self, window_time):
         ids = dict()
         queue = collections.deque()
         sleeper = timer.sleep(1.0)
 
         while True:
-            try:
-                for _ in sleeper: pass
-            except threado.Finished:
+            if sleeper.has_result():
                 sleeper = timer.sleep(1.0)
-
-            yield inner, sleeper
+            source, event = yield threado.any(inner, sleeper)
 
             current_time = time.time()
             expire_time = current_time + window_time
 
-            for event in inner:
+            if inner is source:
                 eid = event_id(event)
 
                 event.add("id", eid)

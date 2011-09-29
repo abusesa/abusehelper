@@ -53,13 +53,11 @@ class CollectorBot(bot.ServiceBot):
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.events = dict()
 
-    @threado.stream_fast
+    @threado.stream
     def collect(inner, self, name):
         while True:
-            yield inner
-
-            for event in inner:
-                self.events[name].append(event)
+            event = yield inner
+            self.events[name].append(event)
 
     @threado.stream
     def handle_room(inner, self, name):

@@ -71,18 +71,17 @@ class ArchiveBot(bot.ServiceBot):
         except services.Stop:
             inner.finish()
 
-    @threado.stream_fast
+    @threado.stream
     def collect(inner, self, room_name):
         room_name = unicode(room_name).encode("utf-8")
         archive = open(os.path.join(self.archive_dir, room_name), "ab")
 
         try:
             while True:
-                yield inner
+                event = yield inner
 
                 timestamp = time.time()
-                for event in inner:
-                    archive.write(self.format(timestamp, event))
+                archive.write(self.format(timestamp, event))
 
                 archive.flush()
         finally:

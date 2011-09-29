@@ -7,27 +7,26 @@ class RoomGraphBot(bot.ServiceBot):
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.srcs = dict()
 
-    @threado.stream_fast
+    @threado.stream
     def distribute(inner, self, name):
         count = 0
         while True:
-            yield inner
+            event = yield inner
 
             tests = list(self.srcs.get(name, ()))
-            for event in inner:
-                count += 1
-                if count % 100 == 0:
-                    self.log.info("Seen %d events in room %r", count, name)
+            count += 1
+            if count % 100 == 0:
+                self.log.info("Seen %d events in room %r", count, name)
 
-                for dst_room, rules in tests:
-                    dst = self.rooms.get(dst_room)
-                    if dst is None:
-                        continue
+            for dst_room, rules in tests:
+                dst = self.rooms.get(dst_room)
+                if dst is None:
+                    continue
 
-                    for rule in rules:
-                        if rule(event):
-                            dst.send(event)
-                            break
+                for rule in rules:
+                    if rule(event):
+                        dst.send(event)
+                        break
 
     @threado.stream
     def handle_room(inner, self, name):
@@ -35,8 +34,8 @@ class RoomGraphBot(bot.ServiceBot):
         room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
         self.log.info("Joined room %r", name)
         try:
-            yield inner.sub(events.events_to_elements() 
-                            | room 
+            yield inner.sub(events.events_to_elements()
+                            | room
                             | events.stanzas_to_events()
                             | self.distribute(name))
         finally:
