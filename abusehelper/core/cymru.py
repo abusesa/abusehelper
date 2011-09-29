@@ -41,40 +41,38 @@ class CymruWhoisAugmenter(object):
         for channel in channels:
             channel.throw(Stop())
 
-    @threado.stream_fast
+    @threado.stream
     def _forward(inner, self, global_main, local_pending):
         should_stop = False
 
         while not should_stop or local_pending:
-            yield inner
-
             try:
-                for ip, values in inner:
-                    events = local_pending.pop(ip, ())
+                ip, values = yield inner
 
-                    for event in events:
-                        for key, value in zip(self.LINE_KEYS, values):
-                            if value is not None:
-                                event.add(key, value)
-                        inner.send(event)
+                events = local_pending.pop(ip, ())
+
+                for event in events:
+                    for key, value in zip(self.LINE_KEYS, values):
+                        if value is not None:
+                            event.add(key, value)
+                    inner.send(event)
             except threado.Finished:
                 should_stop = True
                 global_main.send()
 
-    @threado.stream_fast
+    @threado.stream
     def _collect(inner, self, key, channel, local_pending, global_pending):
         while True:
-            yield inner
+            event = yield inner
 
-            for event in inner:
-                for ip in event.values(key):
-                    local_pending.setdefault(ip, list()).append(event)
+            for ip in event.values(key):
+                local_pending.setdefault(ip, list()).append(event)
 
-                    values = self.cache.get(ip, None)
-                    if values is not None:
-                        inner.send(ip, values)
-                    else:
-                        global_pending.setdefault(ip, set()).add(channel)
+                values = self.cache.get(ip, None)
+                if values is not None:
+                    inner.send(ip, values)
+                else:
+                    global_pending.setdefault(ip, set()).add(channel)
 
     @threado.stream
     def augment(inner, self, key="ip"):

@@ -111,7 +111,7 @@ class Bot(object):
                                                    "bot should read its "+
                                                    "configuration from stdin "+
                                                    "as a Python pickle")
-    
+
     class __metaclass__(type):
         def __new__(cls, name, parents, keys):
             bot_name = Param("name for the bot (default=%default)",
@@ -119,11 +119,11 @@ class Bot(object):
             bot_name.order = -1
             keys.setdefault("bot_name", bot_name)
             return type.__new__(cls, name, parents, keys)
-    
+
     @classmethod
     def params(cls):
         params = list()
-        for name, value in inspect.getmembers(cls):            
+        for name, value in inspect.getmembers(cls):
             if not isinstance(value, Param):
                 continue
             params.append((name, value))
@@ -147,7 +147,7 @@ class Bot(object):
 
     @classmethod
     def param_defaults(cls):
-        return dict((name, param.default) 
+        return dict((name, param.default)
                     for (name, param) in cls.params()
                     if param.has_default())
 
@@ -195,7 +195,7 @@ class Bot(object):
                 parsed[name] = param.parse(value)
             except ParamError:
                 message = "parameter " + name + ": " + error.args[0]
-                parser.error(message)                
+                parser.error(message)
 
         return parser, parsed
 
@@ -215,7 +215,7 @@ class Bot(object):
                         value = param.parse(value)
                     except ParamError, error:
                         message = "startup parameter " + name + ": " + error.args[0]
-                        parser.error(message)                    
+                        parser.error(message)
                 default[name] = value
 
         default.update(cli)
@@ -283,7 +283,7 @@ class XMPPBot(Bot):
                                 "in addition to the system CAs", default=None)
     xmpp_ignore_cert = BoolParam("do not perform any verification "+
                                  "for the XMPP service's SSL certificate")
-    
+
     def __init__(self, **keys):
         Bot.__init__(self, **keys)
 
@@ -293,18 +293,17 @@ class XMPPBot(Bot):
     def run(self):
         return threado.run(self.main())
 
-    @threado.stream_fast
+    @threado.stream
     def main(inner, self):
         while True:
             yield inner
-            list(inner)
 
     @threado.stream
     def xmpp_connect(inner, self):
         verify_cert = not self.xmpp_ignore_cert
 
         self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
-        xmpp = yield inner.sub(connect(self.xmpp_jid, 
+        xmpp = yield inner.sub(connect(self.xmpp_jid,
                                        self.xmpp_password,
                                        host=self.xmpp_host,
                                        port=self.xmpp_port,
@@ -347,15 +346,15 @@ class ServiceBot(XMPPBot):
         service.start()
 
         if self.service_mock_session is not None:
-            keys = dict(item.split("=", 1) 
+            keys = dict(item.split("=", 1)
                         for item in self.service_mock_session)
             self.log.info("Running a mock ression with keys %r" % keys)
             yield inner.sub(service.session(None, **keys) | service)
             return
 
         self.log.info("Joining lobby %r", self.service_room)
-        self.lobby = yield inner.sub(services.join_lobby(self.xmpp, 
-                                                         self.service_room, 
+        self.lobby = yield inner.sub(services.join_lobby(self.xmpp,
+                                                         self.service_room,
                                                          self.bot_name))
         self.log.addHandler(log.RoomHandler(self.lobby.room))
 
@@ -438,37 +437,31 @@ class FeedBot(ServiceBot):
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream_fast
+    @threado.stream
     def _distribute(inner, self, key):
         while True:
-            yield inner
+            event = yield inner
 
             rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
             rooms.discard(None)
 
-            for event in inner:
-                for room in rooms:
-                    room.send(event)
-                if rooms:
-                    inner.send(event)
+            for room in rooms:
+                room.send(event)
+            if rooms:
+                inner.send(event)
 
-    @threado.stream_fast
+    @threado.stream
     def _stats(inner, self, name, interval=60.0):
         count = 0
         sleeper = timer.sleep(interval / 2.0)
 
         try:
             while True:
-                yield inner, sleeper
-            
-                for event in inner:
+                source, event = yield threado.any(inner, sleeper)
+                if inner is source:
                     count += 1
                     inner.send(event)
-
-                try:
-                    for _ in sleeper:
-                        pass
-                except threado.Finished:
+                else:
                     if count > 0:
                         self.log.info("Sent %d events to room %r", count, name)
                     count = 0
@@ -477,12 +470,11 @@ class FeedBot(ServiceBot):
             if count > 0:
                 self.log.info("Sent %d events to room %r", count, name)
 
-    @threado.stream_fast
+    @threado.stream
     def augment(inner, self):
         while True:
-            yield inner
-            for event in inner:
-                inner.send(event)
+            event = yield inner
+            inner.send(event)
 
 import time
 import codecs
@@ -555,27 +547,25 @@ class PollingBot(FeedBot):
         except services.Stop:
             inner.finish()
 
-    @threado.stream_fast
+    @threado.stream
     def _distribute(inner, self, key):
         old_dedup = self._poll_dedup[key]
         new_dedup = self._poll_dedup[key] = dict()
 
         while True:
-            yield inner
+            event = yield inner
 
             rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
             rooms.discard(None)
+            if not rooms:
+                continue
 
-            for event in inner:
-                if not rooms:
+            event_key = event_hash(event)
+            for room in rooms:
+                if event_key in new_dedup.get(room, ()):
                     continue
+                new_dedup.setdefault(room, set()).add(event_key)
 
-                event_key = event_hash(event)
-                for room in rooms:
-                    if event_key in new_dedup.get(room, ()):
-                        continue
-                    new_dedup.setdefault(room, set()).add(event_key)
-
-                    if event_key in old_dedup.get(room, ()):
-                        continue
-                    room.send(event)
+                if event_key in old_dedup.get(room, ()):
+                    continue
+                room.send(event)

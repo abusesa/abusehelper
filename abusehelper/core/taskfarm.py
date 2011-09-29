@@ -59,24 +59,22 @@ class TaskFarm(object):
         task, _ = self.tasks.pop(key)
         task.throw(self.throw)
 
-    @threado.stream_fast
+    @threado.stream
     def _guard(inner, self, channels):
         try:
             while True:
-                yield inner
-                for item in inner:
-                    inner.send(item)
+                item = yield inner
+                inner.send(item)
         except:
             for channel in channels:
                 channel.rethrow()
 
-    @threado.stream_fast
+    @threado.stream
     def _inc(inner, self, key):
         try:
             while True:
-                yield inner
-                for item in inner:
-                    inner.send(item)
+                item = yield inner
+                inner.send(item)
         finally:
             if self.counter.dec(key):
                 callqueue.add(self._check, key)
@@ -98,7 +96,7 @@ class TaskFarm(object):
         return channel
 
     def get(self, *args, **keys):
-        key = self._key(*args, **keys)        
+        key = self._key(*args, **keys)
         if key not in self.tasks:
             return None
         return self.tasks[key][0]

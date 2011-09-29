@@ -19,7 +19,7 @@ def _escape(string):
 
     >>> _escape(u"\u0000\uffff")
     u'&#x0;&#xFFFF;'
-    
+
     & should only be escaped when it is potentially a part of an escape
     sequence starting with &#.
 
@@ -52,7 +52,7 @@ def _unescape(string):
 def _normalize(value):
     """Return the value converted to unicode. Raise a TypeError if the
     value is not a string.
-    
+
     >>> _normalize("a")
     u'a'
     >>> _normalize(u"b")
@@ -160,10 +160,10 @@ def _unicode_quote(string):
     return string
 
 _UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
-_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\"|[^"])*)")|([^\s"=,]+)|)\s*', 
+_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\"|[^"])*)")|([^\s"=,]+)|)\s*',
                            re.U)
 def _unicode_parse_part(string, start):
-    match = _UNICODE_PART.match(string, start)    
+    match = _UNICODE_PART.match(string, start)
     quoted, unquoted = match.groups()
     end = match.end()
 
@@ -177,7 +177,7 @@ class Event(object):
     __slots__ = ["_items"]
 
     _UNDEFINED = object()
-    
+
     @classmethod
     def from_unicode(cls, string):
         r"""
@@ -205,7 +205,7 @@ class Event(object):
             if index >= length:
                 raise ValueError("unexpected string end")
             if string[index] != u"=":
-                raise ValueError("unexpected character %r at index %d" % 
+                raise ValueError("unexpected character %r at index %d" %
                                  (string[index], index))
             index += 1
 
@@ -224,11 +224,11 @@ class Event(object):
     def from_element(self, element):
         """Return an event parsed from an XML element (None if the
         element was not suitable).
-        
+
         >>> element = Element("event", xmlns=EVENT_NS)
         >>> Event.from_element(element) == Event()
         True
-        
+
         >>> event = Event()
         >>> event.add("key", "value")
         >>> event.add("\uffff", "\x05") # include some forbidden XML chars
@@ -271,7 +271,7 @@ class Event(object):
             self._items = tuple(_unzip(sorted(items)))
         else:
             self._items = ()
-                
+
     def add(self, key, value, *values):
         """Add value(s) for a key.
 
@@ -370,7 +370,7 @@ class Event(object):
         >>> event.clear("key")
         >>> event.contains("key")
         False
-        
+
         Clearing keys that do not exist does nothing.
 
         >>> event = Event()
@@ -465,7 +465,7 @@ class Event(object):
 
         return tuple(x[1] for x in self._iteritems(key, parser, filter))
 
-    def value(self, key=_UNDEFINED, default=_UNDEFINED, 
+    def value(self, key=_UNDEFINED, default=_UNDEFINED,
               parser=None, filter=None):
         """Return one event value (for a specific key, if given).
 
@@ -531,7 +531,7 @@ class Event(object):
             raise KeyError(key)
         return default
 
-    def contains(self, key=_UNDEFINED, value=_UNDEFINED, 
+    def contains(self, key=_UNDEFINED, value=_UNDEFINED,
                  parser=None, filter=None):
         """Return whether the event contains a key-value pair (for
         specific key and/or value, if given).
@@ -665,7 +665,7 @@ class Event(object):
         value = self.__eq__(other)
         if value is NotImplemented:
             return NotImplemented
-        return not value    
+        return not value
 
     def __unicode__(self):
         """Return an unicode representation of the event.
@@ -680,7 +680,7 @@ class Event(object):
         The specific order of the key-value pairs is undefined.
         """
 
-        return u", ".join(_unicode_quote(key) + u"=" + _unicode_quote(value) 
+        return u", ".join(_unicode_quote(key) + u"=" + _unicode_quote(value)
                           for (key, value) in self.items())
 
     def __repr__(self):
@@ -689,29 +689,27 @@ class Event(object):
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
-@threado.stream_fast
+@threado.stream
 def stanzas_to_events(inner):
     while True:
-        yield inner
+        element = yield inner
 
-        for element in inner:
-            for child in element.children():
-                event = Event.from_element(child)
-                if event is not None:
-                    inner.send(event)
+        for child in element.children():
+            event = Event.from_element(child)
+            if event is not None:
+                inner.send(event)
 
-@threado.stream_fast
+@threado.stream
 def events_to_elements(inner, include_body=True):
     while True:
-        yield inner
+        event = yield inner
 
-        for event in inner:
-            if include_body:
-                body = Element("body")
-                body.text = _escape(unicode(event))
-                inner.send(body, event.to_element())
-            else:
-                inner.send(event.to_element())
+        if include_body:
+            body = Element("body")
+            body.text = _escape(unicode(event))
+            inner.send(body, event.to_element())
+        else:
+            inner.send(event.to_element())
 
 class EventCollector(object):
     def __init__(self, compresslevel=6):
@@ -732,7 +730,7 @@ class EventCollector(object):
         self.stringio.close()
         self.__setstate__(state)
         return state
-        
+
     def append(self, event):
         attrs = dict()
         for key, value in event.items():
@@ -777,7 +775,7 @@ class EventList(object):
 
             seek(0)
             gz = gzip.GzipFile(fileobj=self.stringio)
-        
+
             try:
                 for line in gz:
                     event = Event()
