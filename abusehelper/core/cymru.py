@@ -107,6 +107,28 @@ class CymruWhoisAugmenter(object):
                 yield inner.sub(global_main)
 
     @threado.stream
+    def _parse(inner, self, ips, pending):
+        line_buffer = util.LineBuffer()
+
+        while ips:
+            data = yield inner
+
+            for line in line_buffer.feed(data):
+                line = line.decode("utf-8", "replace")
+                bites = [x.strip() for x in line.split("|")]
+                bites = [x if x not in ("", "NA") else None for x in bites]
+                if len(bites) != 7:
+                    continue
+                ip = bites.pop(1)
+
+                ips.discard(ip)
+                self.cache.set(ip, bites)
+
+                channels = pending.pop(ip, ())
+                for channel in channels:
+                    channel.send(ip, bites)
+
+    @threado.stream
     def iteration(inner, self, pending):
         if not pending:
             return
@@ -125,26 +147,9 @@ class CymruWhoisAugmenter(object):
                 socket.send(ip + "\n")
             socket.send("end\n")
 
-            line_buffer = util.LineBuffer()
-            while ips:
-                source, data = yield threado.any(inner, socket)
-                if inner is source:
-                    continue
-
-                for line in line_buffer.feed(data):
-                    line = line.decode("utf-8", "replace")
-                    bites = [x.strip() for x in line.split("|")]
-                    bites = [x if x not in ("", "NA") else None for x in bites]
-                    if len(bites) != 7:
-                        continue
-                    ip = bites.pop(1)
-
-                    ips.discard(ip)
-                    self.cache.set(ip, bites)
-
-                    channels = pending.pop(ip, ())
-                    for channel in channels:
-                        channel.send(ip, bites)
+            yield inner.sub(threado.dev_null()
+                            | socket
+                            | self._parse(ips, pending))
         except sockets.error:
             pass
         finally:

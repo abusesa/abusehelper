@@ -7,10 +7,8 @@ from idiokit.jid import JID
 from idiokit import threado, timer
 from abusehelper.core import taskfarm, events, bot, services, rules
 
-class HistoryDB(threado.GeneratorStream):
+class HistoryDB(object):
     def __init__(self, path=None, keeptime=None):
-        threado.GeneratorStream.__init__(self)
-
         if path is None:
             path = ":memory:"
         self.conn = sqlite3.connect(path)
@@ -32,11 +30,11 @@ class HistoryDB(threado.GeneratorStream):
         self.keeptime = keeptime
         self.cursor = self.conn.cursor()
 
-        self.start()
+        self.main = self._main()
 
     def collect(self, room_name):
         collect = self._collect(room_name)
-        services.bind(self, collect)
+        services.bind(self.main, collect)
         return collect
 
     @threado.stream
@@ -55,11 +53,12 @@ class HistoryDB(threado.GeneratorStream):
                 self.cursor.executemany("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
                                         [(eventid, key, value) for value in values])
 
-    def run(self, interval=1.0):
+    @threado.stream
+    def _main(inner, self, interval=1.0):
         try:
             while True:
-                yield self.inner.sub(timer.sleep(interval))
-                yield self.inner.flush()
+                yield inner.sub(timer.sleep(interval))
+                yield inner.flush()
 
                 if self.keeptime is not None:
                     cutoff = int(time.time() - self.keeptime)
@@ -80,7 +79,7 @@ class HistoryDB(threado.GeneratorStream):
             self.conn.close()
 
     def close(self):
-        self.throw(threado.Finished())
+        self.main.throw(threado.Finished())
 
     def find(self, room_name=None, start=None, end=None):
         query = ("SELECT events.id, events.room, events.timestamp, attrs.key, attrs.value "+
