@@ -268,7 +268,7 @@ class Bot(object):
         pass
 
 import getpass
-from idiokit import threado
+import idiokit
 from idiokit.xmpp import connect
 from abusehelper.core import log
 
@@ -291,27 +291,26 @@ class XMPPBot(Bot):
             self.xmpp_password = getpass.getpass("XMPP password: ")
 
     def run(self):
-        return threado.run(self.main())
+        return idiokit.main_loop(self.main())
 
-    @threado.stream
-    def main(inner, self):
-        while True:
-            yield inner
+    @idiokit.stream
+    def main(self):
+        yield idiokit.consume()
 
-    @threado.stream
-    def xmpp_connect(inner, self):
+    @idiokit.stream
+    def xmpp_connect(self):
         verify_cert = not self.xmpp_ignore_cert
 
         self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
-        xmpp = yield inner.sub(connect(self.xmpp_jid,
-                                       self.xmpp_password,
-                                       host=self.xmpp_host,
-                                       port=self.xmpp_port,
-                                       ssl_verify_cert=verify_cert,
-                                       ssl_ca_certs=self.xmpp_extra_ca_certs))
+        xmpp = yield connect(self.xmpp_jid,
+                             self.xmpp_password,
+                             host=self.xmpp_host,
+                             port=self.xmpp_port,
+                             ssl_verify_cert=verify_cert,
+                             ssl_ca_certs=self.xmpp_extra_ca_certs)
         self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
-        xmpp.core.presence()
-        inner.finish(xmpp)
+        yield xmpp.core.presence()
+        idiokit.stop(xmpp)
 
 from abusehelper.core import services
 
@@ -336,11 +335,11 @@ class ServiceBot(XMPPBot):
                          "for bot control")
     service_mock_session = ListParam(default=None)
 
-    @threado.stream
-    def _run(inner, self):
+    @idiokit.stream
+    def _run(self):
         ver_str = version.version_str()
         self.log.info("Starting service %r version %s", self.bot_name, ver_str)
-        self.xmpp = yield inner.sub(self.xmpp_connect())
+        self.xmpp = yield self.xmpp_connect()
 
         service = _Service(self, self.bot_state_file)
         service.start()
@@ -349,39 +348,37 @@ class ServiceBot(XMPPBot):
             keys = dict(item.split("=", 1)
                         for item in self.service_mock_session)
             self.log.info("Running a mock ression with keys %r" % keys)
-            yield inner.sub(service.session(None, **keys) | service)
+            yield service.session(None, **keys) | service
             return
 
         self.log.info("Joining lobby %r", self.service_room)
-        self.lobby = yield inner.sub(services.join_lobby(self.xmpp,
-                                                         self.service_room,
-                                                         self.bot_name))
+        self.lobby = yield services.join_lobby(self.xmpp,
+                                               self.service_room,
+                                               self.bot_name)
         self.log.addHandler(log.RoomHandler(self.lobby.room))
 
         self.log.info("Offering service %r", self.bot_name)
         try:
-            yield inner.sub(self.lobby.offer(self.bot_name, service))
+            yield self.lobby.offer(self.bot_name, service)
         finally:
             self.log.info("Retired service %r", self.bot_name)
 
     def run(self):
-        return threado.run(self._run(), throw_on_signal=services.Stop())
+        return idiokit.main_loop(self._run())#, throw_on_signal=services.Stop())
 
-    @threado.stream
-    def main(inner, self, state):
+    @idiokit.stream
+    def main(self, state):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except services.Stop:
-            inner.finish()
+            pass
 
-    @threado.stream
-    def session(inner, self, state, **keys):
+    @idiokit.stream
+    def session(self, state, **keys):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except services.Stop:
-            inner.finish()
+            pass
 
 from abusehelper.core import events, taskfarm
 
@@ -396,13 +393,13 @@ class FeedBot(ServiceBot):
     def feed_keys(self, *args, **keys):
         yield ()
 
-    @threado.stream
-    def feed(inner, self, *args, **keys):
+    @idiokit.stream
+    def feed(self, *args, **keys):
         while True:
-            yield inner
+            yield idiokit.next()
 
-    @threado.stream
-    def session(inner, self, state, dst_room, **keys):
+    @idiokit.stream
+    def session(self, state, dst_room, **keys):
         feeds = [self._rooms.inc(dst_room)]
         feed_keys = set(self.feed_keys(dst_room=dst_room, **keys))
 
@@ -411,70 +408,80 @@ class FeedBot(ServiceBot):
             feeds.append(self._feeds.inc(key))
 
         try:
-            yield inner.sub(threado.pipe(*feeds))
+            yield idiokit.pipe(*feeds)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
         finally:
             for key in feed_keys:
                 self._dsts.dec(key, dst_room)
 
     def manage_feed(self, key):
-        return threado.pipe(self.feed(*key),
+        return idiokit.pipe(self.feed(*key),
                             self.augment(),
                             self._distribute(key))
 
-    @threado.stream
-    def manage_room(inner, self, name):
+    @idiokit.stream
+    def manage_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
 
         self.log.info("Joined room %r", name)
         try:
-            yield inner.sub(events.events_to_elements()
-                            | self._stats(name)
-                            | room
-                            | threado.dev_null())
+            yield (events.events_to_elements()
+                   | self._stats(name)
+                   | room
+                   | idiokit.consume())
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def _distribute(inner, self, key):
+    @idiokit.stream
+    def _distribute(self, key):
         while True:
-            event = yield inner
+            event = yield idiokit.next()
 
             rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
             rooms.discard(None)
 
             for room in rooms:
-                room.send(event)
+                yield room.send(event)
             if rooms:
-                inner.send(event)
+                yield idiokit.send(event)
 
-    @threado.stream
-    def _stats(inner, self, name, interval=60.0):
-        count = 0
-        sleeper = timer.sleep(interval / 2.0)
-
-        try:
+    def _stats(self, name, interval=60.0):
+        @idiokit.stream
+        def counter():
             while True:
-                source, event = yield threado.any(inner, sleeper)
-                if inner is source:
-                    count += 1
-                    inner.send(event)
-                else:
-                    if count > 0:
-                        self.log.info("Sent %d events to room %r", count, name)
-                    count = 0
-                    sleeper = timer.sleep(interval)
-        finally:
-            if count > 0:
-                self.log.info("Sent %d events to room %r", count, name)
+                event = yield idiokit.next()
+                yield idiokit.send(event)
+                counter.count += 1
+        counter.count = 0
 
-    @threado.stream
-    def augment(inner, self):
+        def log():
+            if counter.count > 0:
+                self.log.info("Sent %d events to room %r", counter.count, name)
+            counter.count = 0
+
+        @idiokit.stream
+        def logger():
+            try:
+                yield timer.sleep(interval / 2.0)
+                log()
+
+                while True:
+                    yield timer.sleep(interval)
+                    log()
+            finally:
+                log()
+
+        result = counter()
+        idiokit.pipe(logger(), result)
+        return result
+
+    @idiokit.stream
+    def augment(self):
         while True:
-            event = yield inner
-            inner.send(event)
+            event = yield idiokit.next()
+            yield idiokit.send(event)
 
 import time
 import codecs
@@ -503,16 +510,16 @@ class PollingBot(FeedBot):
         self._poll_dedup = dict()
         self._poll_cleanup = set()
 
-    @threado.stream
-    def poll(inner, self, *args, **keys):
-        yield
+    @idiokit.stream
+    def poll(self, *args, **keys):
+        yield timer.sleep(0.0)
 
     def feed_keys(self, *args, **keys):
         # Return (None,) instead of () for backwards compatibility.
         yield (None,)
 
-    @threado.stream
-    def manage_feed(inner, self, key):
+    @idiokit.stream
+    def manage_feed(self, key):
         if key not in self._poll_cleanup:
             self._poll_queue.appendleft((time.time(), key))
             self._poll_dedup.setdefault(key, dict())
@@ -520,18 +527,16 @@ class PollingBot(FeedBot):
             self._poll_cleanup.discard(key)
 
         try:
-            while True:
-                yield inner
-        except:
+            yield idiokit.consume()
+        finally:
             self._poll_cleanup.add(key)
 
-    @threado.stream
-    def main(inner, self, state):
+    @idiokit.stream
+    def main(self, state):
         try:
             while True:
-                while (not self._poll_queue or
-                       self._poll_queue[0][0] > time.time()):
-                    yield inner, timer.sleep(1.0)
+                while not self._poll_queue or self._poll_queue[0][0] > time.time():
+                    yield timer.sleep(1.0)
 
                 _, key = self._poll_queue.popleft()
                 if key in self._poll_cleanup:
@@ -539,33 +544,33 @@ class PollingBot(FeedBot):
                     self._poll_dedup.pop(key, None)
                     continue
 
-                yield inner.sub(self.poll(*key)
-                                | self.augment()
-                                | self._distribute(key))
+                yield self.poll(*key) | self.augment() | self._distribute(key)
+
                 expire_time = time.time() + self.poll_interval
                 self._poll_queue.append((expire_time, key))
         except services.Stop:
-            inner.finish()
+            pass
 
-    @threado.stream
-    def _distribute(inner, self, key):
-        old_dedup = self._poll_dedup[key]
-        new_dedup = self._poll_dedup[key] = dict()
+    @idiokit.stream
+    def _distribute(self, key):
+        if key not in self._poll_dedup:
+            self._poll_dedup[key] = dict()
+        old_dedups = self._poll_dedup[key]
+        new_dedups = self._poll_dedup[key] = dict()
 
         while True:
-            event = yield inner
-
-            rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
-            rooms.discard(None)
-            if not rooms:
-                continue
-
+            event = yield idiokit.next()
             event_key = event_hash(event)
-            for room in rooms:
-                if event_key in new_dedup.get(room, ()):
-                    continue
-                new_dedup.setdefault(room, set()).add(event_key)
 
-                if event_key in old_dedup.get(room, ()):
+            for name in self._dsts.get(key):
+                room = self._rooms.get(name)
+                if room is None:
                     continue
-                room.send(event)
+
+                if event_key in new_dedups.get(room, ()):
+                    continue
+                new_dedups.setdefault(room, set()).add(event_key)
+
+                if event_key in old_dedups.get(room, ()):
+                    continue
+                yield room.send(event)
