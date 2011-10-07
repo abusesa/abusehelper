@@ -1,5 +1,5 @@
 from idiokit import threado
-from idiokit import jid
+from idiokit.xmpp import jid
 from abusehelper.core import bot
 
 class ForwardBot(bot.XMPPBot):
@@ -27,7 +27,7 @@ class ForwardBot(bot.XMPPBot):
         while True:
             # Receive one XML element from the pipe input
             element = yield inner
-            
+
             # Prevent endless feedback loops
             sender = jid.JID(element.get_attr("from"))
             if sender == own_jid:

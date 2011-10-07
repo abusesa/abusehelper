@@ -3,7 +3,7 @@ import uuid
 import random
 from idiokit import threado
 from idiokit.core import XMPPError
-from idiokit.jid import JID
+from idiokit.xmpp.jid import JID
 from idiokit.xmlcore import Element
 from abusehelper.core import serialize
 

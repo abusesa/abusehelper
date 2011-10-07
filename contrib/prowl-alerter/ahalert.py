@@ -22,14 +22,15 @@ apikeys=<your prowl key>
 See also: http://prowl.weks.net/
 """
 
-from idiokit import threado, jid
+from idiokit import threado
+from idiokit.xmpp import jid
 from abusehelper.core import bot
 from prowl import ProwlConnection
 
 class AHAlert(bot.XMPPBot):
     rooms = bot.ListParam("comma separated list of XMPP rooms "+
                           "roomreader should watch "+
-                          "(e.g. room@conference.example.com, "+ 
+                          "(e.g. room@conference.example.com, "+
                           "room2@conference.example.com)")
     watch_room_jids = bot.ListParam("comma separated watchlist in a "+
                                     "format of <room>/<resource> (e.g. "+
@@ -69,8 +70,8 @@ class AHAlert(bot.XMPPBot):
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room 
-                            | self.watch(alerter) 
+            yield inner.sub(room
+                            | self.watch(alerter)
                             | threado.dev_null())
         finally:
             self.log.info("Left room %r", name)

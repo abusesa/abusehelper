@@ -1,13 +1,13 @@
 """
-Read '/resolve rr type' style messages from a 
-message body, resolve those through mresolve 
-and return resolved triplets in a similar 
+Read '/resolve rr type' style messages from a
+message body, resolve those through mresolve
+and return resolved triplets in a similar
 message which includes machine readable
 idiokit namespace.
 """
 from idiokit import threado
 from abusehelper.core import events
-from idiokit import jid
+from idiokit.xmpp import jid
 from abusehelper.core import bot
 import re, IPy, subprocess
 from subprocess import Popen

@@ -3,7 +3,7 @@ import os
 import re
 import sys
 import shutil
-from idiokit import jid
+from idiokit.xmpp import jid
 
 def dummy(_repr):
     class _dummy(object):
@@ -80,7 +80,7 @@ try:
         replaces.update(SMTP_AUTH_USER=smtp_auth_user,
                         SMTP_AUTH_PASSWORD=smtp_auth_password,
                         MAIL_SENDER=input("Mail sender"))
-        
+
         with open(os.path.join(dst, "startup.py"), "r+") as startup_file:
             startup = replace(startup_file.read(), replaces)
 

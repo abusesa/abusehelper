@@ -1,4 +1,5 @@
-from idiokit import threado, xmlcore, jid, xmpp
+from idiokit import threado, xmlcore, xmpp
+from idiokit.xmpp import jid
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts import combiner
 

@@ -3,7 +3,7 @@ import sys
 import re
 from opencollab.wiki import CLIWiki,WikiFault
 from opencollab.meta import Meta
-from idiokit.jid import JID
+from idiokit.xmpp.jid import JID
 import time
 from idiokit import timer
 import abusehelper.thirdparty.urlre as urlre

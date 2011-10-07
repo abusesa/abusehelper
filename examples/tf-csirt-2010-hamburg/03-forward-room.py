@@ -1,6 +1,6 @@
 from idiokit import threado
 from idiokit import xmpp
-from idiokit import jid
+from idiokit.xmpp import jid
 
 @threado.stream
 def main(inner, jid, password, src_roomname, dst_roomname):
@@ -21,7 +21,7 @@ def room_filter(inner, own_jid):
     while True:
         # Receive one XML element from the pipe input
         element = yield inner
-        
+
         # Prevent endless feedback loops
         sender = jid.JID(element.get_attr("from"))
         if sender == own_jid:

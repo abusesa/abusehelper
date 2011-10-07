@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 import sqlite3
 from idiokit.xmpp import Element
-from idiokit.jid import JID
+from idiokit.xmpp.jid import JID
 from idiokit import threado, timer
 from abusehelper.core import taskfarm, events, bot, services, rules
 

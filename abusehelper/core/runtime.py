@@ -1,5 +1,5 @@
 import os
-from idiokit import jid
+from idiokit.xmpp import jid
 from abusehelper.core import serialize, config
 
 def iter_runtimes(obj):

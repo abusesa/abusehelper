@@ -5,7 +5,8 @@ namespace.
 """
 
 from abusehelper.core import bot, events
-from idiokit import threado, jid
+from idiokit import threado
+from idiokit.xmpp import jid
 
 class ReprBot(bot.XMPPBot):
     room = bot.Param("repr room")
@@ -17,9 +18,9 @@ class ReprBot(bot.XMPPBot):
 
         self.log.info("Joined room %r.", self.room)
 
-        yield inner.sub(src 
-                        | self.repr(src.nick_jid) 
-                        | events.events_to_elements() 
+        yield inner.sub(src
+                        | self.repr(src.nick_jid)
+                        | events.events_to_elements()
                         | src)
 
     @threado.stream

@@ -1,5 +1,5 @@
 from idiokit import threado
-from idiokit import jid
+from idiokit.xmpp import jid
 from abusehelper.core import bot
 from abusehelper.core import utils
 from abusehelper.core import events
@@ -38,5 +38,5 @@ class CSVBot(bot.XMPPBot):
                                        columns=self.csv_columns)
         yield csv_feed | events.events_to_elements() | room | threado.dev_null()
 
-if __name__ == "__main__":        
+if __name__ == "__main__":
     CSVBot.from_command_line().run()
