@@ -4,26 +4,26 @@ import getpass
 import imaplib
 import email.parser
 
+import idiokit
+from idiokit import threadpool, timer
 from cStringIO import StringIO
 from abusehelper.core import events, bot, services
-from idiokit import threado, timer
 
-@threado.stream
-def thread(inner, call, *args, **keys):
-    thread = inner.thread(call, *args, **keys)
-    while not thread.has_result():
-        yield inner, thread
-    inner.finish(thread.result())
+def thread(call, *args, **keys):
+    value = threadpool.run(call, *args, **keys)
+    event = idiokit.Event()
+    value.listen(event.set)
+    return event
 
-@threado.stream
-def collect(inner):
+@idiokit.stream
+def collect():
     collection = list()
     try:
         while True:
-            item = yield inner
+            item = yield idiokit.next()
             collection.append(item)
-    except threado.Finished:
-        inner.finish(collection)
+    except StopIteration:
+        idiokit.stop(collection)
 
 class IMAPBot(bot.FeedBot):
     poll_interval = bot.IntParam(default=300)
@@ -40,58 +40,55 @@ class IMAPBot(bot.FeedBot):
 
         if self.mail_password is None:
             self.mail_password = getpass.getpass("Mail password: ")
-        self.queue = threado.Channel()
+        self.queue = self.run_mailbox()
 
-    @threado.stream
-    def feed(inner, self):
-        yield inner.sub(self.run_mailbox() | self.noop() | self.poll())
+    def feed(self):
+        return self.queue | self.noop() | self.poll()
 
     # Mailbox handling
 
-    @threado.stream
-    def run_mailbox(inner, self, min_delay=5.0, max_delay=60.0):
+    @idiokit.stream
+    def run_mailbox(self, min_delay=5.0, max_delay=60.0):
         mailbox = None
 
         try:
             while True:
-                source, item = yield threado.any(inner, self.queue)
-                if inner is source:
-                    continue
+                item = yield idiokit.next()
 
                 while True:
                     delay = min(min_delay, max_delay)
                     while mailbox is None:
                         try:
-                            mailbox = yield inner.sub(thread(self.connect))
+                            mailbox = yield thread(self.connect)
                         except (imaplib.IMAP4.abort, socket.error), error:
                             self.log.error("Failed IMAP connection: %r", error)
                         else:
                             break
 
                         self.log.info("Retrying connection in %.02f seconds", delay)
-                        yield inner, timer.sleep(delay)
+                        yield timer.sleep(delay)
                         delay = min(2 * delay, max_delay)
 
-                    channel, name, args, keys = item
-                    if channel.has_result():
+                    event, name, args, keys = item
+                    if event.result().is_set():
                         break
 
                     try:
                         method = getattr(mailbox, name)
-                        result = yield inner.sub(thread(method, *args, **keys))
+                        result = yield thread(method, *args, **keys)
                     except (imaplib.IMAP4.abort, socket.error), error:
-                        yield inner.sub(thread(self.disconnect, mailbox))
+                        yield thread(self.disconnect, mailbox)
                         self.log.error("Lost IMAP connection: %r", error)
                         mailbox = None
-                    except imaplib.IMAP4.error:
-                        channel.rethrow()
+                    except imaplib.IMAP4.error, error:
+                        event.fail(type(error), error, None)
                         break
                     else:
-                        channel.finish(result)
+                        event.succeed(result)
                         break
         finally:
             if mailbox is not None:
-                yield inner.sub(thread(self.disconnect, mailbox))
+                yield thread(self.disconnect, mailbox)
 
     def connect(self):
         self.log.info("Connecting to IMAP server %r port %d",
@@ -126,44 +123,34 @@ class IMAPBot(bot.FeedBot):
         except (imaplib.IMAP4.error, socket.error):
             pass
 
-    @threado.stream
-    def call(inner, self, name, *args, **keys):
-        channel = threado.Channel()
-        self.queue.send(channel, name, args, keys)
-
-        try:
-            while not channel.has_result():
-                yield inner, channel
-        except:
-            raise
-        else:
-            inner.finish(channel.result())
-        finally:
-            channel.finish()
+    def call(self, name, *args, **keys):
+        event = idiokit.Event()
+        self.queue.send(event, name, args, keys)
+        return event
 
     # Keep-alive
 
-    @threado.stream
-    def noop(inner, self, noop_interval=10.0):
+    @idiokit.stream
+    def noop(self, noop_interval=10.0):
         while True:
-            yield inner.sub(self.call("noop"))
-            yield inner, timer.sleep(noop_interval)
+            yield self.call("noop")
+            yield timer.sleep(noop_interval)
 
     # Main polling
 
-    @threado.stream
-    def poll(inner, self):
+    @idiokit.stream
+    def poll(self):
         while True:
-            yield inner.sub(self.fetch_mails(self.filter))
-            yield inner, timer.sleep(self.poll_interval)
+            yield self.fetch_mails(self.filter)
+            yield timer.sleep(self.poll_interval)
 
-    @threado.stream
-    def get_header(inner, self, uid, section):
+    @idiokit.stream
+    def get_header(self, uid, section):
         body_rex_str = r"\s*\d+\s+\(UID %s\s+BODY\[%s\]\s+" % (uid, section)
         body_rex = re.compile(body_rex_str, re.I)
 
         fetch = "(UID BODY.PEEK[%s])" % section
-        result, data = yield inner.sub(self.call("uid", "FETCH", uid, fetch))
+        result, data = yield self.call("uid", "FETCH", uid, fetch)
 
         # Filter away parts that don't closely enough resemble tuple
         # ("<MSGNUM> (UID <MSGUID> BODY[<SECTION>] {<SIZE>}", "<HEADERS>")
@@ -173,30 +160,30 @@ class IMAPBot(bot.FeedBot):
         # Accept only non-empty header data
         data = [x for x in data if x]
         if not data:
-            inner.finish()
-        inner.finish(email.parser.Parser().parsestr(data[0], headersonly=True))
+            idiokit.stop()
+        idiokit.stop(email.parser.Parser().parsestr(data[0], headersonly=True))
 
     def fetcher(self, uid, path):
-        @threado.stream
-        def fetch(inner):
+        @idiokit.stream
+        def fetch():
             fetch = "(BODY.PEEK[%s])" % path
-            result, data = yield inner.sub(self.call("uid", "FETCH", uid, fetch))
+            result, data = yield self.call("uid", "FETCH", uid, fetch)
 
             for parts in data:
                 if not isinstance(parts, tuple) or len(parts) != 2:
                     continue
                 reader = StringIO(parts[1])
-                inner.finish(StringIO(parts[1]))
+                idiokit.stop(StringIO(parts[1]))
         return fetch
 
-    @threado.stream
-    def walk_mail(inner, self, uid, path=(), headers=[]):
+    @idiokit.stream
+    def walk_mail(self, uid, path=(), headers=[]):
         if not path:
-            header = yield inner.sub(self.get_header(uid, "HEADER"))
+            header = yield self.get_header(uid, "HEADER")
             if header is None:
                 return
             if header.get_content_maintype() != "multipart":
-                inner.send("TEXT", tuple(headers + [header]))
+                yield idiokit.send("TEXT", tuple(headers + [header]))
                 return
             headers = headers + [header]
 
@@ -205,23 +192,23 @@ class IMAPBot(bot.FeedBot):
             path[-1] += 1
             path_str = ".".join(map(str, path))
 
-            header = yield inner.sub(self.get_header(uid, path_str + ".MIME"))
+            header = yield self.get_header(uid, path_str + ".MIME")
             if header is None:
                 return
 
             if header.get_content_maintype() == "multipart":
-                yield inner.sub(self.walk_mail(uid, path, headers + [header]))
+                yield self.walk_mail(uid, path, headers + [header])
             else:
-                inner.send(path_str, tuple(headers + [header]))
+                yield idiokit.send(path_str, tuple(headers + [header]))
 
-    @threado.stream
-    def fetch_mails(inner, self, filter):
-        result, data = yield inner.sub(self.call("uid", "SEARCH", None, filter))
+    @idiokit.stream
+    def fetch_mails(self, filter):
+        result, data = yield self.call("uid", "SEARCH", None, filter)
         if not data or not data[0]:
             return
 
         for uid in data[0].split():
-            collected = yield inner.sub(self.walk_mail(uid) | collect())
+            collected = yield self.walk_mail(uid) | collect()
 
             parts = list()
             for path, headers in collected:
@@ -232,15 +219,15 @@ class IMAPBot(bot.FeedBot):
                 subject = top_header["Subject"] or "<no subject>"
                 sender = top_header["From"] or "<unknown sender>"
                 self.log.info("Handling mail %r from %r", subject, sender)
-                yield inner.sub(self.handle(parts))
+                yield self.handle(parts)
                 self.log.info("Done with mail %r from %r", subject, sender)
 
             # UID STORE command flags have to be in parentheses, otherwise
             # imaplib quotes them, which is not allowed.
-            yield inner.sub(self.call("uid", "STORE", uid, "+FLAGS", "(\\Seen)"))
+            yield self.call("uid", "STORE", uid, "+FLAGS", "(\\Seen)")
 
-    @threado.stream
-    def handle(inner, self, parts):
+    @idiokit.stream
+    def handle(self, parts):
         handle_default = getattr(self, "handle_default", None)
 
         for headers, fetch in parts:
@@ -251,7 +238,7 @@ class IMAPBot(bot.FeedBot):
             if handler is None:
                 continue
 
-            fileobj = yield inner.sub(fetch())
-            skip_rest = yield inner.sub(handler(headers, fileobj))
+            fileobj = yield fetch()
+            skip_rest = yield handler(headers, fileobj)
             if skip_rest:
                 return
