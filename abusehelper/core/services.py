@@ -1,8 +1,9 @@
 import sys
 import uuid
 import random
+import functools
 from idiokit import threado
-from idiokit.core import XMPPError
+from idiokit.xmpp.core import XMPPError
 from idiokit.xmpp.jid import JID
 from idiokit.xmlcore import Element
 from abusehelper.core import serialize
@@ -10,18 +11,17 @@ from abusehelper.core import serialize
 SERVICE_NS = "abusehelper#service"
 
 def bind(parent, child):
-    def _bind(source):
-        try:
-            result = source.result()
+    def _bind(source, result):
+        throw, args = result
+        if not throw and source is parent:
+            child.throw(threado.Finished())
+        elif throw:
             if source is parent:
-                child.throw(threado.Finished())
-        except:
-            if source is parent:
-                child.rethrow()
+                child.throw(*args)
             else:
-                parent.rethrow()
-    parent.add_finish_callback(_bind)
-    child.add_finish_callback(_bind)
+                parent.throw(*args)
+    parent.result().listen(functools.partial(_bind, parent))
+    child.result().listen(functools.partial(_bind, child))
 
 @threado.stream
 def mask_errors(inner):
@@ -148,7 +148,7 @@ class Lobby(threado.GeneratorStream):
         if not iq.with_attrs("from", type="set"):
             return False
         jid = JID(iq.get_attr("from"))
-        if jid.bare() != self.room.room_jid:
+        if jid.bare() != self.room.jid.bare():
             return False
         if not payload.named("start").with_attrs("id"):
             return False
@@ -237,7 +237,7 @@ class Lobby(threado.GeneratorStream):
         for service_id, service in self.services.items():
             element = Element("service", id=service_id)
             services.add(element)
-        self.xmpp.core.presence(services, to=self.room.nick_jid)
+        self.xmpp.core.presence(services, to=self.room.jid)
 
     @threado.stream
     def offer(inner, self, service_id, service):
@@ -310,6 +310,7 @@ class Service(threado.GeneratorStream):
         self._put(self.root_key, None)
 
         state = yield inner.sub(self.main(state))
+
         self._put(self.root_key, state)
 
     def run(self):
