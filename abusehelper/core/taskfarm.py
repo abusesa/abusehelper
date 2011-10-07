@@ -1,4 +1,5 @@
-from idiokit import threado, callqueue
+import idiokit
+from idiokit import callqueue
 
 class Counter(object):
     def __init__(self):
@@ -40,8 +41,11 @@ class Counter(object):
         for key, values in self.keys.iteritems():
             yield key, set(values)
 
+class TaskStopped(Exception):
+    pass
+
 class TaskFarm(object):
-    def __init__(self, task, throw=threado.Finished()):
+    def __init__(self, task, throw=TaskStopped()):
         self.task = task
         self.throw = throw
 
@@ -56,25 +60,13 @@ class TaskFarm(object):
             return
         if key not in self.tasks:
             return
-        task, _ = self.tasks.pop(key)
+        task = self.tasks.pop(key)
         task.throw(self.throw)
 
-    @threado.stream
-    def _guard(inner, self, channels):
+    @idiokit.stream
+    def _inc(self, key, task):
         try:
-            while True:
-                item = yield inner
-                inner.send(item)
-        except:
-            for channel in channels:
-                channel.rethrow()
-
-    @threado.stream
-    def _inc(inner, self, key):
-        try:
-            while True:
-                item = yield inner
-                inner.send(item)
+            yield task.fork()
         finally:
             if self.counter.dec(key):
                 callqueue.add(self._check, key)
@@ -83,20 +75,13 @@ class TaskFarm(object):
         key = self._key(*args, **keys)
 
         if self.counter.inc(key):
-            channels = set()
-            task = self.task(*args, **keys) | self._guard(channels)
-            self.tasks[key] = task, channels
-        task, channels = self.tasks[key]
+            self.tasks[key] = self.task(*args, **keys)
+        task = self.tasks[key]
 
-        channel = self._inc(key)
-        if task.has_result():
-            return task | channel
-
-        channels.add(channel)
-        return channel
+        return self._inc(key, task)
 
     def get(self, *args, **keys):
         key = self._key(*args, **keys)
         if key not in self.tasks:
             return None
-        return self.tasks[key][0]
+        return self.tasks[key]
