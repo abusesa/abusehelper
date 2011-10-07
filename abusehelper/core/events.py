@@ -4,7 +4,8 @@ import gzip
 import codecs
 import inspect
 from cStringIO import StringIO
-from idiokit import threado
+
+import idiokit
 from idiokit.xmlcore import Element
 
 _ESCAPE = re.compile(u"&(?=#)|[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFF\uFFFE]",
@@ -689,27 +690,27 @@ class Event(object):
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
-@threado.stream
-def stanzas_to_events(inner):
+@idiokit.stream
+def stanzas_to_events():
     while True:
-        element = yield inner
+        element = yield idiokit.next()
 
         for child in element.children():
             event = Event.from_element(child)
             if event is not None:
-                inner.send(event)
+                yield idiokit.send(event)
 
-@threado.stream
-def events_to_elements(inner, include_body=True):
+@idiokit.stream
+def events_to_elements(include_body=True):
     while True:
-        event = yield inner
+        event = yield idiokit.next()
 
         if include_body:
             body = Element("body")
             body.text = _escape(unicode(event))
-            inner.send(body, event.to_element())
+            yield idiokit.send(body, event.to_element())
         else:
-            inner.send(event.to_element())
+            yield idiokit.send(event.to_element())
 
 class EventCollector(object):
     def __init__(self, compresslevel=6):
