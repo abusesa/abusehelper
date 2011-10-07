@@ -6,7 +6,8 @@ import httplib
 import collections
 import email.parser
 
-from idiokit import threado, util
+import idiokit
+from idiokit import util, threadpool
 from abusehelper.core import events
 from cStringIO import StringIO
 
@@ -25,35 +26,35 @@ class HTTPError(FetchUrlFailed):
     def __str__(self):
         return "HTTP Error %d: %s" % (self.code, self.msg)
 
-@threado.stream
-def fetch_url(inner, url, opener=None):
+def _thread(func, *args, **keys):
+    event = idiokit.Event()
+    value = threadpool.run(func, *args, **keys)
+    value.listen(event.set)
+    return event
+
+@idiokit.stream
+def fetch_url(url, opener=None):
     if opener is None:
         opener = urllib2.build_opener()
 
+    fileobj = yield _thread(opener.open, url)
     try:
-        reader = inner.thread(opener.open, url)
-        while not reader.has_result():
-            yield inner, reader
-
-        fileobj = reader.result()
-        reader = inner.thread(fileobj.read)
         try:
-            while not reader.has_result():
-                yield inner, reader
+            data = yield _thread(fileobj.read)
         finally:
             fileobj.close()
 
         info = fileobj.info()
         info = email.parser.Parser().parsestr(str(info), headersonly=True)
 
-        inner.finish(info, StringIO(reader.result()))
+        idiokit.stop(info, StringIO(data))
     except urllib2.HTTPError, he:
         raise HTTPError(he.code, he.msg, he.headers, he.fp)
     except (urllib2.URLError, httplib.HTTPException, socket.error), error:
         raise FetchUrlFailed(str(error))
 
-@threado.stream
-def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
+@idiokit.stream
+def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
     if columns is None:
         reader = csv.DictReader(fileobj, delimiter=delimiter)
     else:
@@ -65,8 +66,6 @@ def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
         decode = lambda x: x.decode(charset)
 
     for row in reader:
-        yield inner.flush()
-
         if columns is not None:
             row = dict(zip(columns, row))
 
@@ -80,7 +79,7 @@ def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
             value = decode(value.strip())
             event.add(key, value)
 
-        inner.send(event)
+        yield idiokit.send(event)
 
 class TimedCache(object):
     def __init__(self, cache_time):
