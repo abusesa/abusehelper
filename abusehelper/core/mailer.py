@@ -5,7 +5,7 @@ import smtplib
 import collections
 
 import idiokit
-from idiokit import threado, timer, threadpool
+from idiokit import timer, threadpool
 from abusehelper.core import events, taskfarm, services, templates, bot
 
 def next_time(time_string):
@@ -52,27 +52,27 @@ class ReportBot(bot.ServiceBot):
         self.collectors = dict()
         self.queue = collections.deque()
 
-    @threado.stream
-    def handle_room(inner, self, name):
+    @idiokit.stream
+    def handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room
-                            | events.stanzas_to_events()
-                            | self.distribute(name))
+            yield idiokit.pipe(room,
+                               events.stanzas_to_events(),
+                               self.distribute(name))
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def distribute(inner, self, name):
+    @idiokit.stream
+    def distribute(self, name):
         while True:
-            event = yield inner
+            event = yield idiokit.next()
 
             collectors = self.collectors.get(name)
             for collector in collectors:
-                collector.send(event)
+                yield collector.send(event)
 
     @idiokit.stream
     def main(self, queue):
@@ -91,60 +91,57 @@ class ReportBot(bot.ServiceBot):
         except services.Stop:
             idiokit.stop(self.queue)
 
-    @threado.stream
-    def session(inner, self, state, src_room, **keys):
-        @threado.stream
-        def _alert(inner):
-            alert = self.alert(**keys)
+    @idiokit.stream
+    def session(self, state, src_room, **keys):
+        @idiokit.stream
+        def _alert():
             while True:
-                source, item = yield threado.any(inner, alert)
-                if inner is source:
-                    inner.send(item)
-                else:
-                    inner.send(self.REPORT_NOW)
+                yield idiokit.next()
+                yield idiokit.send(self.REPORT_NOW)
 
-        @threado.stream
-        def _collect(inner):
+        @idiokit.stream
+        def _collect():
             while True:
-                item = yield inner
+                item = yield idiokit.next()
                 self.queue.append(item)
 
-        collector = _alert() | self.collect(state, **keys) | _collect()
+        collector = self.collect(state, **keys) | _collect()
+        idiokit.pipe(self.alert(src_room=src_room, **keys), _alert(), collector)
         self.collectors.setdefault(src_room, set()).add(collector)
 
         try:
-            result = yield inner.sub(collector | self.rooms.inc(src_room))
+            result = yield collector | self.rooms.inc(src_room)
         finally:
             collectors = self.collectors.get(src_room, set())
             collectors.discard(collector)
             if not collectors:
                 self.collectors.pop(src_room, None)
 
-        inner.finish(result)
+        idiokit.stop(result)
 
-    @threado.stream
-    def alert(inner, self, times, **keys):
-        yield inner.sub(alert(*times))
+    @idiokit.stream
+    def alert(self, times, **keys):
+        yield alert(*times)
 
-    @threado.stream
-    def collect(inner, self, state, **keys):
+    @idiokit.stream
+    def collect(self, state, **keys):
         if state is None:
             state = events.EventCollector()
 
         try:
             while True:
-                event = yield inner
+                event = yield idiokit.next()
                 if event is self.REPORT_NOW:
-                    inner.send(state.purge())
+                    yield idiokit.send(state.purge())
                 else:
                     state.append(event)
         except services.Stop:
-            inner.finish(state)
+            idiokit.stop(state)
 
-    @threado.stream
-    def report(inner, self, collected):
-        yield
-        inner.finish(True)
+    @idiokit.stream
+    def report(self, collected):
+        yield timer.sleep(0.0)
+        idiokit.stop(True)
 
 class MailTemplate(templates.Template):
     def format(self, events, encoding="utf-8"):
