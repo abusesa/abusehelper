@@ -3,7 +3,7 @@
 # resolved to 0-n IPv4/6 addresses. The bot also makes an effort to
 # find out the addresses' AS info etc.
 #
-# As an example the following mail could yield events 
+# As an example the following mail could yield events
 # "host=www.example.com, ip=198.51.100.2, AS=65536, ..." and
 # "host=badly-indented-url.example.com, ip=2001:db8::2, AS=65536, ...":
 #
@@ -19,7 +19,7 @@
 import socket
 import urlparse
 
-from idiokit import threado
+import idiokit
 from abusehelper.core import imapbot, events, bot, cymru
 
 def get_hosts(url_lines):
@@ -52,39 +52,37 @@ def get_hosts(url_lines):
             yield line, parsed.hostname
 
 class URLListMailBot(imapbot.IMAPBot):
-    @threado.stream
-    def get_resolved_hosts(inner, self, url_lines):
+    @idiokit.stream
+    def get_resolved_hosts(self, url_lines):
         r"""
         Send out events containing URLs (parsed from an iterable
         sequence of URL lines) and their respective hostname's IPv4
         and IPv6 addresses. 0-n events may be sent per each URL (one
         for each resolved hostname IPv4/6 address).
         """
-        
+
         for url, host in get_hosts(url_lines):
-            current = inner.thread(socket.getaddrinfo, host, None)
             try:
-                while not current.has_result():
-                    yield inner, current
+                addrinfo = yield imapbot.thread(socket.getaddrinfo, host, None)
             except socket.error, error:
                 self.log.info("Could not resolve host %r: %r", host, error)
                 continue
-            
-            for family, _, _, _, sockaddr in current.result():
+
+            for family, _, _, _, sockaddr in addrinfo:
                 if family not in (socket.AF_INET, socket.AF_INET6):
-                    continue                
+                    continue
                 event = events.Event()
                 event.add("url", url)
                 event.add("ip", sockaddr[0])
-                inner.send(event)
+                yield idiokit.send(event)
 
     def augment(self):
         return cymru.CymruWhois()
 
-    @threado.stream
-    def handle_text_plain(inner, self, headers, fileobj):
-        yield inner.sub(self.get_resolved_hosts(fileobj))
-        inner.finish(True)
+    @idiokit.stream
+    def handle_text_plain(self, headers, fileobj):
+        yield self.get_resolved_hosts(fileobj)
+        idiokit.stop(True)
 
 if __name__ == "__main__":
     URLListMailBot.from_command_line().execute()
