@@ -1,8 +1,10 @@
 import re
 
-from abusehelper.core import events, bot
-from idiokit import threado, util
+import idiokit
+from idiokit import util
 from idiokit.irc import IRC
+
+from abusehelper.core import events, bot
 
 class IRCFeedBot(bot.FeedBot):
     irc_host = bot.Param()
@@ -13,7 +15,7 @@ class IRCFeedBot(bot.FeedBot):
     irc_password = bot.Param(default=None)
     irc_use_ssl = bot.BoolParam()
     irc_extra_ca_certs = bot.Param("a PEM formatted file of CAs to be used "+
-                                   "in addition to the system CAs", 
+                                   "in addition to the system CAs",
                                    default=None)
     irc_ignore_cert = bot.BoolParam("do not perform any verification "+
                                     "for the IRC server's SSL certificate")
@@ -23,7 +25,7 @@ class IRCFeedBot(bot.FeedBot):
             return False
         if not params or params[0] != self.irc_channel:
             return False
-        
+
         sender = prefix.split("@", 1)[0].split("!", 1)[0]
         if self.irc_feed_nick is None or sender == self.irc_feed_nick:
             return True
@@ -38,39 +40,38 @@ class IRCFeedBot(bot.FeedBot):
 
         return event
 
-    @threado.stream
-    def _handle(inner, self):
+    @idiokit.stream
+    def _handle(self):
         while True:
-            prefix, command, params = yield inner
+            prefix, command, params = yield idiokit.next()
             if self.filter(prefix, command, params):
                 event = self.parse(prefix, command, params)
                 if event is not None:
-                    inner.send(event)
+                    yield idiokit.send(event)
 
-    @threado.stream
-    def feed(inner, self):
-        irc = IRC(self.irc_host, self.irc_port, 
+    @idiokit.stream
+    def feed(self):
+        irc = IRC(self.irc_host, self.irc_port,
                   ssl=self.irc_use_ssl,
                   ssl_verify_cert=not self.irc_ignore_cert,
                   ssl_ca_certs=self.irc_extra_ca_certs)
 
-        self.log.info("Connecting to IRC server %r port %d", 
+        self.log.info("Connecting to IRC server %r port %d",
                       self.irc_host, self.irc_port)
-        yield inner.sub(irc.connect(self.irc_own_nick, 
-                                    password=self.irc_password))
-        self.log.info("Connected to IRC server %r port %d", 
+        yield irc.connect(self.irc_own_nick, password=self.irc_password)
+        self.log.info("Connected to IRC server %r port %d",
                       self.irc_host, self.irc_port)
-        
+
         irc.join(self.irc_channel)
         self.log.info("Joined IRC channel %r", self.irc_channel)
-        
-        yield inner.sub(irc | self._handle())
+
+        yield irc | self._handle()
 
 class IRCFeedService(IRCFeedBot):
     def parse(self, prefix, command, params):
         field_rex = r"([^\s=]+)='([^']*)'"
         data_rex = r"^([^\s>]+)>\s*(("+ field_rex +"\s*,?\s*)*)\s*$"
-        
+
         match = re.match(data_rex, util.guess_encoding(params[-1]))
         if not match:
             return None
@@ -81,7 +82,7 @@ class IRCFeedService(IRCFeedBot):
         fields = re.findall(field_rex, match.group(2) or "")
         for key, value in fields:
             event.add(key, value)
-            
+
         return event
 
 if __name__ == "__main__":
