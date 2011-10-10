@@ -2,34 +2,14 @@ import sys
 import uuid
 import random
 import functools
-from idiokit import threado
+
+import idiokit
 from idiokit.xmpp.core import XMPPError
 from idiokit.xmpp.jid import JID
 from idiokit.xmlcore import Element
 from abusehelper.core import serialize
 
 SERVICE_NS = "abusehelper#service"
-
-def bind(parent, child):
-    def _bind(source, result):
-        throw, args = result
-        if not throw and source is parent:
-            child.throw(threado.Finished())
-        elif throw:
-            if source is parent:
-                child.throw(*args)
-            else:
-                parent.throw(*args)
-    parent.result().listen(functools.partial(_bind, parent))
-    child.result().listen(functools.partial(_bind, child))
-
-@threado.stream
-def mask_errors(inner):
-    try:
-        while True:
-            yield inner
-    except:
-        pass
 
 class SessionError(Exception):
     pass
@@ -40,10 +20,8 @@ class Stop(Exception):
 class Unavailable(Stop):
     pass
 
-class Lobby(threado.GeneratorStream):
+class Lobby(idiokit.Proxy):
     def __init__(self, xmpp, room):
-        threado.GeneratorStream.__init__(self)
-
         self.xmpp = xmpp
         self.room = room
 
@@ -57,10 +35,11 @@ class Lobby(threado.GeneratorStream):
             self._update_catalogue(participant.name, participant.payload)
 
         self.xmpp.core.add_iq_handler(self.handle_iq, "start", SERVICE_NS)
-        self.start()
 
-    @threado.stream
-    def session(inner, self, service_id, *path, **conf):
+        idiokit.Proxy.__init__(self, self.room | self._run())
+
+    @idiokit.stream
+    def session(self, service_id, *path, **conf):
         while True:
             matches = list()
             for jid, service_ids in self.catalogue.items():
@@ -68,28 +47,29 @@ class Lobby(threado.GeneratorStream):
                     matches.append(jid)
 
             if not matches:
-                if service_id not in self.waiters:
-                    channel = threado.Channel()
-                    self.waiters[service_id] = channel
-                channel = self.waiters[service_id]
-
-                while not channel.has_result():
-                    yield inner, channel
+                event = idiokit.Event()
+                self.waiters.setdefault(service_id, set()).add(event)
+                try:
+                    yield event
+                finally:
+                    self.waiters.get(service_id, set()).discard(event)
+                    if not self.waiters.get(service_id, None):
+                        self.waiters.pop(service_id, None)
                 continue
 
             jid = random.choice(matches)
             task = self._establish_session(jid, service_id, path, conf)
             self.guarded.setdefault((jid, service_id), set()).add(task)
             try:
-                session = yield inner.sub(task)
+                session = yield task
             finally:
                 self.guarded.get((jid, service_id), set()).discard(task)
 
             if session is not None:
-                inner.finish(session)
+                idiokit.stop(session)
 
-    @threado.stream
-    def _establish_session(inner, self, jid, service_id, path, conf):
+    @idiokit.stream
+    def _establish_session(self, jid, service_id, path, conf):
         start = Element("start", xmlns=SERVICE_NS, id=service_id)
         if path:
             path_element = Element("path")
@@ -100,30 +80,24 @@ class Lobby(threado.GeneratorStream):
         start.add(conf_element)
 
         try:
-            # Check that the service has not become unavailable.
-            yield inner.flush()
-
-            result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
-
-            # Check again that the service has not become unavailable.
-            yield inner.flush()
+            result = yield self.xmpp.core.iq_set(start, to=jid)
         except XMPPError, error:
             if error.type != "cancel":
                 raise
             if error.condition == "session-failure":
                 raise SessionError(error.text)
-            inner.finish()
+            idiokit.stop()
         except Unavailable:
-            inner.finish()
+            idiokit.stop()
 
         for start in result.children("start", SERVICE_NS).with_attrs("id"):
             session_id = start.get_attr("id")
             session = self._catch(jid, session_id)
-            bind(self, session | mask_errors())
+            idiokit.pipe(self.fork(), session)
 
             sessions = self.jids.setdefault(jid, dict())
             sessions[session_id] = session
-            inner.finish(session)
+            idiokit.stop(session)
         else:
             raise SessionError("No session ID received")
 
@@ -137,8 +111,8 @@ class Lobby(threado.GeneratorStream):
                     service_id = service.get_attr("id")
                     self.catalogue[jid].add(service_id)
 
-                    if service_id in self.waiters:
-                        self.waiters.pop(service_id).finish()
+                    for event in self.waiters.pop(service_id, ()):
+                        event.succeed()
 
         for service_id in previous - self.catalogue.get(jid, set()):
             for task in self.guarded.pop((jid, service_id), ()):
@@ -157,8 +131,8 @@ class Lobby(threado.GeneratorStream):
         self._start(iq, jid, service_id, payload)
         return True
 
-    @threado.stream
-    def _start(inner, self, iq, jid, service_id, element):
+    @idiokit.stream
+    def _start(self, iq, jid, service_id, element):
         try:
             service = self.services.get(service_id, None)
             if service is None:
@@ -175,7 +149,7 @@ class Lobby(threado.GeneratorStream):
             else:
                 raise SessionError("Did not get session configuration")
 
-            session = yield inner.sub(service.open_session(path, conf))
+            session = yield service.open_session(path, conf)
             session_id = uuid.uuid4().hex
 
             sessions = self.jids.setdefault(jid, dict())
@@ -194,13 +168,10 @@ class Lobby(threado.GeneratorStream):
             result = Element("start", xmlns=SERVICE_NS, id=session_id)
             self.xmpp.core.iq_result(iq, result)
 
-    def run(self):
-        yield self.inner.sub(self.room | self._run())
-
-    @threado.stream
-    def _run(inner, self):
+    @idiokit.stream
+    def _run(self):
         while True:
-            elements = yield inner
+            elements = yield idiokit.next()
 
             for message in elements.named("message").with_attrs("from"):
                 for end in message.children("end", SERVICE_NS).with_attrs("id"):
@@ -239,25 +210,22 @@ class Lobby(threado.GeneratorStream):
             services.add(element)
         self.xmpp.core.presence(services, to=self.room.jid)
 
-    @threado.stream
-    def offer(inner, self, service_id, service):
-        service.start()
+    @idiokit.stream
+    def offer(self, service_id, service):
         self.services[service_id] = service
-        bind(self, service)
 
         self._update_presence()
         try:
-            yield inner.sub(service)
+            yield self.fork() | service.run()
         finally:
             if self.services.get(service_id, None) is service:
                 self.services.pop(service_id, None)
             self._update_presence()
 
-    @threado.stream
-    def _catch(inner, self, jid, session_id):
+    @idiokit.stream
+    def _catch(self, jid, session_id):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         finally:
             end = Element("end", xmlns=SERVICE_NS, id=session_id)
             self.xmpp.core.message(jid, end)
@@ -267,10 +235,8 @@ import sqlite3
 from cPickle import loads, dumps, HIGHEST_PROTOCOL
 from idiokit import timer
 
-class Service(threado.GeneratorStream):
+class Service(object):
     def __init__(self, state_file=None):
-        threado.GeneratorStream.__init__(self)
-
         self.sessions = dict()
         self.shutting_down = False
 
@@ -304,31 +270,24 @@ class Service(threado.GeneratorStream):
             bites.append(bite.replace("/", r"\/"))
         return "/" + "/".join(bites)
 
-    @threado.stream
-    def _wrapped_main(inner, self):
+    @idiokit.stream
+    def run(self):
         state = self._get(self.root_key)
         self._put(self.root_key, None)
 
-        state = yield inner.sub(self.main(state))
-
-        self._put(self.root_key, state)
-
-    def run(self):
         try:
-            yield self.inner.sub(self.kill_sessions() | self._wrapped_main())
+            state = yield self.kill_sessions() | self.main(state)
         finally:
+            self._put(self.root_key, state)
+
             self.db.commit()
             self.db.close()
 
-    @threado.stream
-    def kill_sessions(inner, self):
+    @idiokit.stream
+    def kill_sessions(self):
         try:
-            try:
-                while True:
-                    item = yield inner
-                    inner.send(item)
-            except threado.Finished:
-                raise Stop()
+            yield idiokit.consume()
+            raise Stop()
         finally:
             self.shutting_down = True
 
@@ -337,18 +296,22 @@ class Service(threado.GeneratorStream):
 
             while self.sessions:
                 session = tuple(self.sessions.itervalues())[0]
-                while not session.has_result():
-                    yield inner, session
+                yield session
 
-    @threado.stream
-    def open_session(inner, self, path, conf):
+    @idiokit.stream
+    def open_session(self, path, conf):
         assert not self.shutting_down
 
-        @threado.stream
-        def _guarded(inner, path, key, session):
+        @idiokit.stream
+        def _guarded(path, key, session):
             try:
-                state = yield inner.sub(session)
-                if path is not None:
+                state = yield session
+            except:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                self.running.throw(exc_type, exc_value, exc_tb)
+                raise exc_type, exc_value, exc_tb
+            else:
+                if key is not None:
                     self._put(key, state)
             finally:
                 del self.sessions[path]
@@ -359,9 +322,8 @@ class Service(threado.GeneratorStream):
         else:
             while path in self.sessions:
                 old_session = self.sessions[path]
-                old_session.throw(Stop())
-                while not old_session.has_result():
-                    yield inner, old_session
+                yield old_session.throw(Stop())
+                yield old_session
 
             key = self.path_key(path)
             state = self._get(key)
@@ -369,27 +331,23 @@ class Service(threado.GeneratorStream):
             self._put(key, None)
 
         self.sessions[path] = session
-        bind(self, session)
-        inner.finish(session)
+        idiokit.stop(session)
 
-    @threado.stream
-    def main(inner, self, state):
+    @idiokit.stream
+    def main(self, state):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except Stop:
-            inner.finish()
+            idiokit.stop()
 
-    @threado.stream
-    def session(inner, self, state, **keys):
+    @idiokit.stream
+    def session(self, state, **keys):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except Stop:
-            inner.finish()
+            idiokit.stop()
 
-@threado.stream
-def join_lobby(inner, xmpp, name, nick=None):
-    room = yield inner.sub(xmpp.muc.join(name, nick))
-    lobby = Lobby(xmpp, room)
-    inner.finish(lobby)
+@idiokit.stream
+def join_lobby(xmpp, name, nick=None):
+    room = yield xmpp.muc.join(name, nick)
+    idiokit.stop(Lobby(xmpp, room))

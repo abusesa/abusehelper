@@ -342,13 +342,12 @@ class ServiceBot(XMPPBot):
         self.xmpp = yield self.xmpp_connect()
 
         service = _Service(self, self.bot_state_file)
-        service.start()
 
         if self.service_mock_session is not None:
             keys = dict(item.split("=", 1)
                         for item in self.service_mock_session)
             self.log.info("Running a mock ression with keys %r" % keys)
-            yield service.session(None, **keys) | service
+            yield service.session(None, **keys) | service.run()
             return
 
         self.log.info("Joining lobby %r", self.service_room)

@@ -32,10 +32,17 @@ class HistoryDB(object):
 
         self.main = self._main()
 
+    @idiokit.stream
     def collect(self, room_name):
         collect = self._collect(room_name)
-        services.bind(self.main, collect)
-        return collect
+        idiokit.pipe(self.main.fork(), collect)
+
+        try:
+            yield collect
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            self.main.throw(exc_type, exc_value, exc_tb)
+            raise exc_type, exc_value, exc_tb
 
     @threado.stream
     def _collect(inner, self, room_name):
