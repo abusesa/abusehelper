@@ -1,4 +1,4 @@
-from idiokit import threado
+import idiokit
 from abusehelper.core import events, rules, taskfarm, bot, services
 
 class RoomGraphBot(bot.ServiceBot):
@@ -7,11 +7,11 @@ class RoomGraphBot(bot.ServiceBot):
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.srcs = dict()
 
-    @threado.stream
-    def distribute(inner, self, name):
+    @idiokit.stream
+    def distribute(self, name):
         count = 0
         while True:
-            event = yield inner
+            event = yield idiokit.next()
 
             tests = list(self.srcs.get(name, ()))
             count += 1
@@ -25,31 +25,30 @@ class RoomGraphBot(bot.ServiceBot):
 
                 for rule in rules:
                     if rule(event):
-                        dst.send(event)
+                        yield dst.send(event)
                         break
 
-    @threado.stream
-    def handle_room(inner, self, name):
+    @idiokit.stream
+    def handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
         try:
-            yield inner.sub(events.events_to_elements()
-                            | room
-                            | events.stanzas_to_events()
-                            | self.distribute(name))
+            yield idiokit.pipe(events.events_to_elements(),
+                               room,
+                               events.stanzas_to_events(),
+                               self.distribute(name))
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def session(inner, self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
+    @idiokit.stream
+    def session(self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
         counter = self.srcs.setdefault(src_room, taskfarm.Counter())
         counter.inc(dst_room, rule)
         try:
-            yield inner.sub(self.rooms.inc(src_room)
-                            | self.rooms.inc(dst_room))
+            yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
         finally:
             counter.dec(dst_room, rule)
             if not counter:
