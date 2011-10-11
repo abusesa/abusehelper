@@ -11,8 +11,8 @@ import csv
 import time
 import errno
 
+import idiokit
 from abusehelper.core import bot, taskfarm, services, events
-from idiokit import threado
 
 def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
     """
@@ -50,35 +50,34 @@ class ArchiveBot(bot.ServiceBot):
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.archive_dir = ensure_dir(self.archive_dir)
 
-    @threado.stream
-    def handle_room(inner, self, name):
+    @idiokit.stream
+    def handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room
-                            | events.stanzas_to_events()
-                            | self.collect(room.room_jid)
-                            | threado.dev_null())
+            yield idiokit.pipe(room,
+                               events.stanzas_to_events(),
+                               self.collect(room.room_jid))
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def session(inner, self, state, src_room):
+    @idiokit.stream
+    def session(self, state, src_room):
         try:
-            yield inner.sub(self.rooms.inc(src_room))
+            yield self.rooms.inc(src_room)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
 
-    @threado.stream
-    def collect(inner, self, room_name):
+    @idiokit.stream
+    def collect(self, room_name):
         room_name = unicode(room_name).encode("utf-8")
         archive = open(os.path.join(self.archive_dir, room_name), "ab")
 
         try:
             while True:
-                event = yield inner
+                event = yield idiokit.next()
 
                 timestamp = time.time()
                 archive.write(self.format(timestamp, event))
