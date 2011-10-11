@@ -37,9 +37,11 @@ class CymruWhoisExpert(combiner.Expert):
         except Stop:
             pass
         except:
-            for channel in channels:
-                channel.rethrow()
             exc_type, exc_value, exc_tb = sys.exc_info()
+
+            for channel in channels:
+                channel.throw(exc_type, exc_value, exc_tb)
+
             raise exc_type, exc_value, exc_tb
 
         for channel in channels:
