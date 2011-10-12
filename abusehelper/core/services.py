@@ -249,6 +249,7 @@ class Service(object):
         self.db.commit()
 
         self.root_key = ""
+        self.errors = idiokit.consume()
 
     def _get(self, key):
         for state, in self.db.execute("SELECT state FROM states "+
@@ -276,7 +277,7 @@ class Service(object):
         self._put(self.root_key, None)
 
         try:
-            state = yield self.kill_sessions() | self.main(state)
+            state = yield self.errors | self.kill_sessions() | self.main(state)
         finally:
             self._put(self.root_key, state)
 
@@ -308,7 +309,7 @@ class Service(object):
                 state = yield session
             except:
                 exc_type, exc_value, exc_tb = sys.exc_info()
-                self.running.throw(exc_type, exc_value, exc_tb)
+                self.errors.throw(exc_type, exc_value, exc_tb)
                 raise exc_type, exc_value, exc_tb
             else:
                 if key is not None:
