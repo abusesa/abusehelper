@@ -7,22 +7,23 @@ import urlparse
 import cStringIO as StringIO
 import xml.etree.cElementTree as etree
 
-from idiokit import threado
+import idiokit
+from idiokit import threadpool
 from abusehelper.core import utils, bot, events, cymru
 
 TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I | re.S)
 
-@threado.stream
-def fetch_extras(inner, opener, url):
+@idiokit.stream
+def fetch_extras(opener, url):
     try:
-        _, fileobj = yield inner.sub(utils.fetch_url(url, opener))
+        _, fileobj = yield utils.fetch_url(url, opener)
     except utils.FetchUrlFailed:
-        inner.finish(list())
+        idiokit.stop(list())
 
-    data = yield inner.thread(fileobj.read)
+    data = yield threadpool.thread(fileobj.read)
     match = TABLE_REX.search(data)
     if match is None:
-        inner.finish(list())
+        idiokit.stop(list())
 
     table = etree.XML(match.group(1))
     keys = [th.text or "" for th in table.findall("thead/tr/th")]
@@ -58,10 +59,10 @@ def fetch_extras(inner, opener, url):
     values = map(str.strip, values)
     # Keys and values do not match in the table
     if (len(values) % len(keys)):
-        inner.finish(list())
+        idiokit.stop(list())
     items = [item for item in zip((len(values) / len(keys)) * keys, values)]
     items = zip(*[items[i::len(keys)] for i in range(len(keys))])
-    inner.finish(items)
+    idiokit.stop(items)
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
 DC_NS = "http://purl.org/dc/elements/1.1"
@@ -73,12 +74,12 @@ class AtlasSRFBot(bot.PollingBot):
     def augment(self):
         return cymru.CymruWhois()
 
-    @threado.stream
-    def poll(inner, self, _):
+    @idiokit.stream
+    def poll(self, _):
         self.log.info("Downloading the report")
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
         try:
-            _, fileobj = yield inner.sub(utils.fetch_url(self.feed_url, opener))
+            _, fileobj = yield utils.fetch_url(self.feed_url, opener)
         except utils.FetchUrlFailed, fuf:
             self.log.error("Failed to download the report: %r", fuf)
             return
@@ -115,7 +116,7 @@ class AtlasSRFBot(bot.PollingBot):
                     event.add(key, value)
 
                 if not self.no_extras:
-                    extras = yield inner.sub(fetch_extras(opener, url))
+                    extras = yield fetch_extras(opener, url)
                     if not extras:
                         all_events.append(event)
                     for line in extras:
@@ -128,8 +129,7 @@ class AtlasSRFBot(bot.PollingBot):
                     all_events.append(event)
 
             for cur in all_events:
-                inner.send(cur)
-            yield inner.flush()
+                yield idiokit.send(cur)
 
 if __name__ == "__main__":
     AtlasSRFBot.from_command_line().run()
