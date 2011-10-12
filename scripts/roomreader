@@ -3,8 +3,8 @@
 Roomreader can print messages to stdout (default) or to a log file.
 """
 
-from idiokit import threado
-from idiokit.jid import JID
+import idiokit
+from idiokit.xmpp.jid import JID
 from abusehelper.core import bot, events
 
 class Roomreader(bot.XMPPBot):
@@ -12,30 +12,28 @@ class Roomreader(bot.XMPPBot):
                                "rooms roomreader should watch. "+
                                "(e.g. room@conference.example.com, "+
                                "room2@conference.example.com)")
-                               
+
     show_events = bot.BoolParam("print out events from channels")
 
-    @threado.stream
-    def main(inner, self):
-        xmpp = yield inner.sub(self.xmpp_connect())
-        
+    @idiokit.stream
+    def main(self):
+        xmpp = yield self.xmpp_connect()
+
         rooms = list()
         for name in self.xmpp_rooms:
-            room = yield inner.sub(xmpp.muc.join(name, self.bot_name))
-            rooms.append(room 
-                         | self.xmpp_to_log(room.nick_jid, room.participants)
-                         | threado.dev_null())
+            room = yield xmpp.muc.join(name, self.bot_name)
+            rooms.append(room | self.xmpp_to_log(room.jid, room.participants))
 
-        yield inner.sub(threado.pipe(*rooms))
+        yield idiokit.pipe(*rooms)
 
-    @threado.stream
-    def xmpp_to_log(inner, self, own_jid, participants):
+    @idiokit.stream
+    def xmpp_to_log(self, own_jid, participants):
         in_room = set()
         for participant in  participants:
             in_room.add(participant.name.resource)
-    
+
         while True:
-            elements = yield inner
+            elements = yield idiokit.next()
 
             for message in elements.with_attrs("from"):
                 sender = JID(elements.get_attr("from"))
@@ -65,10 +63,10 @@ class Roomreader(bot.XMPPBot):
                         self.log.info("* %s entered the room %s.", resource, bare)
 
                 for body in message.children("body"):
-                    self.log.info("<%s> %s", 
-                                  unicode(sender).encode("unicode-escape"), 
+                    self.log.info("<%s> %s",
+                                  unicode(sender).encode("unicode-escape"),
                                   body.text.encode("unicode-escape"))
-                                  
+
                 if self.show_events:
                     for event in message.children("event"):
                         event = events.Event.from_element(event)
