@@ -1,11 +1,13 @@
-import time
 import re
-from datetime import datetime
+import time
 import sqlite3
-from idiokit.xmpp import Element
+from datetime import datetime
+
+import idiokit
+from idiokit import timer
+from idiokit.xmlcore import Element
 from idiokit.xmpp.jid import JID
-from idiokit import threado, timer
-from abusehelper.core import taskfarm, events, bot, services, rules
+from abusehelper.core import taskfarm, events, bot, services
 
 class HistoryDB(object):
     def __init__(self, path=None, keeptime=None):
@@ -44,10 +46,10 @@ class HistoryDB(object):
             self.main.throw(exc_type, exc_value, exc_tb)
             raise exc_type, exc_value, exc_tb
 
-    @threado.stream
-    def _collect(inner, self, room_name):
+    @idiokit.stream
+    def _collect(self, room_name):
         while True:
-            event = yield inner
+            event = yield idiokit.next()
             if event.contains("bot:action"):
                 continue
 
@@ -60,12 +62,11 @@ class HistoryDB(object):
                 self.cursor.executemany("INSERT INTO attrs(eventid, key, value) VALUES (?, ?, ?)",
                                         [(eventid, key, value) for value in values])
 
-    @threado.stream
-    def _main(inner, self, interval=1.0):
+    @idiokit.stream
+    def _main(self, interval=1.0):
         try:
             while True:
-                yield inner.sub(timer.sleep(interval))
-                yield inner.flush()
+                yield timer.sleep(interval)
 
                 if self.keeptime is not None:
                     cutoff = int(time.time() - self.keeptime)
@@ -86,7 +87,7 @@ class HistoryDB(object):
             self.conn.close()
 
     def close(self):
-        self.main.throw(threado.Finished())
+        self.main.throw(StopIteration, StopIteration(), None)
 
     def find(self, room_name=None, start=None, end=None):
         query = ("SELECT events.id, events.room, events.timestamp, attrs.key, attrs.value "+
@@ -232,89 +233,78 @@ def parse_command(message, name):
 
     return _match, start, end
 
-
 class HistorianService(bot.ServiceBot):
     def __init__(self, bot_state_file=None, **keys):
         bot.ServiceBot.__init__(self, bot_state_file=None, **keys)
         self.history = HistoryDB(bot_state_file)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
 
-    @threado.stream
-    def main(inner, self, state):
-        self.xmpp.add_listener(self.query_handler)
+    @idiokit.stream
+    def main(self, state):
         try:
-            while True:
-                yield inner
+            yield self.xmpp.fork() | self.query_handler()
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
 
-    @threado.stream
-    def handle_room(inner, self, name):
+    @idiokit.stream
+    def handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room
-                            | self.skip_own(room)
-                            | events.stanzas_to_events()
-                            | self.history.collect(unicode(room.room_jid))
-                            | threado.dev_null())
+            yield idiokit.pipe(room,
+                               self.skip_own(room),
+                               events.stanzas_to_events(),
+                               self.history.collect(unicode(room.jid.bare())))
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def session(inner, self, state, src_room):
+    @idiokit.stream
+    def session(self, state, src_room):
         try:
-            yield inner.sub(self.rooms.inc(src_room))
+            yield self.rooms.inc(src_room)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
 
-    @threado.stream
-    def skip_own(inner, self, room):
+    @idiokit.stream
+    def skip_own(self, room):
         while True:
-            element = yield inner
+            element = yield idiokit.next()
 
-            own = False
             for owned in element.with_attrs("from"):
                 sender = JID(owned.get_attr("from"))
-                if room.nick_jid == sender:
-                    own = True
-                    break
-            if not own:
-                inner.send(element)
+                if room.jid != sender:
+                    yield idiokit.send(owned)
 
-    def query_handler(self, success, element):
-        if not success:
-            return
+    @idiokit.stream
+    def query_handler(self):
+        while True:
+            element = yield idiokit.next()
 
-        for message in element.named("message").with_attrs("from"):
-            sender = JID(message.get_attr("from"))
-            room_jid = sender.bare()
-            chat_type = message.get_attr("type")
+            for message in element.named("message").with_attrs("from"):
+                sender = JID(message.get_attr("from"))
+                room_jid = sender.bare()
+                chat_type = message.get_attr("type")
 
-            if chat_type == "groupchat":
-                attrs = dict(type=chat_type)
-                to = room_jid
-            else:
-                attrs = dict()
-                to = sender
+                if chat_type == "groupchat":
+                    attrs = dict(type=chat_type)
+                    to = room_jid
+                else:
+                    attrs = dict()
+                    to = sender
 
-            if room_jid not in self.xmpp.muc.rooms:
-                return
+                if room_jid not in self.xmpp.muc.rooms:
+                    return
 
-            if room_jid == self.service_room:
-                room_jid = None
-            else:
-                room_jid = unicode(room_jid)
+                if room_jid == self.service_room:
+                    room_jid = None
+                else:
+                    room_jid = unicode(room_jid)
 
-            for jid in self.xmpp.muc.rooms:
-                for room in self.xmpp.muc.rooms[jid]:
-                    if room.nick_jid == sender:
-                        return
+                yield self.command_parser(element, to, room_jid, **attrs)
 
-            self.command_parser(element, to, room_jid, **attrs)
-
+    @idiokit.stream
     def command_parser(self, message, requester, room_jid, **attrs):
         for body in message.children("body"):
             matcher, start, end = parse_command(body, "historian")
@@ -335,7 +325,7 @@ class HistorianService(bot.ServiceBot):
                     body.text += "%s: %s\n" % (key, vals)
 
                 elements = [body]
-                self.xmpp.core.message(requester, *elements, **attrs)
+                yield self.xmpp.core.message(requester, *elements, **attrs)
                 counter += 1
 
             self.log.info("Returned %i events.", counter)
