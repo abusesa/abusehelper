@@ -1,4 +1,6 @@
 import os
+import idiokit
+from idiokit import timer
 from idiokit.xmpp import jid
 from abusehelper.core import serialize, config
 
@@ -122,38 +124,37 @@ class Room(Pipeable):
             jid.JID(name)
         self.name = name
 
-from idiokit import threado, timer
+import sys
+import idiokit
+from idiokit import timer
 from abusehelper.core import bot, services, log
 
 class Cancel(Exception):
     pass
 
-@threado.stream
-def forward_errors(inner):
-    while True:
-        try:
-            yield inner
-        except threado.Finished:
-            pass
-
 class RuntimeBot(bot.XMPPBot):
     service_room = bot.Param()
 
-    @threado.stream
-    def configs(inner, self):
-        while True:
-            yield inner
+    @idiokit.stream
+    def configs(self):
+        yield idiokit.consume()
 
-    @threado.stream
-    def _handle_updates(inner, self, lobby):
+    @idiokit.stream
+    def _catch(self, errors):
+        try:
+            yield idiokit.consume()
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            errors.throw(exc_type, exc_value, exc_tb)
+            raise exc_type, exc_value, exc_tb
+
+    @idiokit.stream
+    def _handle_updates(self, lobby, errors):
         sessions = dict()
-        forward = forward_errors()
 
         try:
             while True:
-                source, configs = yield threado.any(inner, forward)
-                if forward is source:
-                    continue
+                configs = yield idiokit.next()
 
                 added = set(iter_runtimes(config.flatten(configs)))
 
@@ -162,25 +163,25 @@ class RuntimeBot(bot.XMPPBot):
                     stream.throw(Cancel())
 
                 for session in added - set(sessions):
-                    sessions[session] = self.session(lobby, session) | forward
+                    sessions[session] = self.session(lobby, session) | self._catch(errors)
         finally:
             for stream in sessions.values():
                 stream.throw(Cancel())
-            forward.throw(Cancel())
 
-    @threado.stream
-    def main(inner, self):
-        xmpp = yield inner.sub(self.xmpp_connect())
+    @idiokit.stream
+    def main(self):
+        xmpp = yield self.xmpp_connect()
 
         self.log.info("Joining lobby %r", self.service_room)
-        lobby = yield inner.sub(services.join_lobby(xmpp,
-                                                    self.service_room,
-                                                    self.bot_name))
-        self.log.addHandler(log.RoomHandler(lobby.room))
-        yield inner.sub(self.configs() | self._handle_updates(lobby) | lobby)
+        lobby = yield services.join_lobby(xmpp, self.service_room, self.bot_name)
 
-    @threado.stream
-    def session(inner, self, lobby, session):
+        self.log.addHandler(log.RoomHandler(lobby.room))
+
+        errors = idiokit.consume()
+        yield errors | self.configs() | self._handle_updates(lobby, errors) | lobby
+
+    @idiokit.stream
+    def session(self, lobby, session):
         name = session.service
         if session.path:
             name += "(" + ".".join(session.path) + ")"
@@ -188,9 +189,9 @@ class RuntimeBot(bot.XMPPBot):
         while True:
             self.log.info("Waiting for %r", name)
             try:
-                stream = yield inner.sub(lobby.session(session.service,
-                                                       *session.path,
-                                                       **session.conf))
+                stream = yield lobby.session(session.service,
+                                             *session.path,
+                                             **session.conf)
             except Cancel:
                 self.log.info("Stopped waiting for %r", name)
                 break
@@ -200,7 +201,7 @@ class RuntimeBot(bot.XMPPBot):
             self.log.info("Sent %r conf:\n%s", name, conf_str)
 
             try:
-                yield inner.sub(stream)
+                yield stream
             except services.Stop:
                 self.log.info("Lost connection to %r", name)
             except Cancel:
@@ -214,8 +215,8 @@ class DefaultRuntimeBot(RuntimeBot):
                                  "for updates (default: %default)",
                                  default=1)
 
-    @threado.stream
-    def configs(inner, self):
+    @idiokit.stream
+    def configs(self):
         conf_path = os.path.abspath(self.config)
         last_mtime = None
         error_msg = None
@@ -226,7 +227,7 @@ class DefaultRuntimeBot(RuntimeBot):
                 if last_mtime != mtime:
                     last_mtime = mtime
 
-                    inner.send(config.load_configs(conf_path))
+                    yield idiokit.send(config.load_configs(conf_path))
 
                     error_msg = None
             except BaseException, exception:
@@ -235,7 +236,7 @@ class DefaultRuntimeBot(RuntimeBot):
                     self.log.error("Couldn't load module %r: %s",
                                    self.config, error_msg)
 
-            yield inner, timer.sleep(self.poll_interval)
+            yield timer.sleep(self.poll_interval)
 
 if __name__ == "__main__":
     DefaultRuntimeBot.from_command_line().execute()
