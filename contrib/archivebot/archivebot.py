@@ -59,7 +59,7 @@ class ArchiveBot(bot.ServiceBot):
         try:
             yield idiokit.pipe(room,
                                events.stanzas_to_events(),
-                               self.collect(room.room_jid))
+                               self.collect(room.jid.bare()))
         finally:
             self.log.info("Left room %r", name)
 
