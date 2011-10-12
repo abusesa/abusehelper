@@ -1,4 +1,3 @@
-import sys
 import uuid
 import random
 import functools
@@ -159,8 +158,7 @@ class Lobby(idiokit.Proxy):
             msg = se.args[0]
             error = self.xmpp.core.build_error("cancel", "session-failure", msg)
             self.xmpp.core.iq_error(iq, error)
-        except:
-            _, exc, _ = sys.exc_info()
+        except BaseException, exc:
             msg = "Session handling failed: %r" % exc
             error = self.xmpp.core.build_error("cancel", "session-failure", msg)
             self.xmpp.core.iq_error(iq, error)
@@ -308,9 +306,8 @@ class Service(object):
             try:
                 state = yield session
             except:
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                self.errors.throw(exc_type, exc_value, exc_tb)
-                raise exc_type, exc_value, exc_tb
+                self.errors.throw()
+                raise
             else:
                 if key is not None:
                     self._put(key, state)

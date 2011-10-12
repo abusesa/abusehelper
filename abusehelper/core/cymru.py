@@ -1,5 +1,3 @@
-import sys
-
 import idiokit
 from abusehelper.core import utils
 from idiokit import util, sockets, timer
@@ -42,10 +40,9 @@ class CymruWhoisAugmenter(object):
         except Stop:
             pass
         except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
             for channel in channels:
-                channel.throw(exc_type, exc_value, exc_tb)
-            raise exc_type, exc_value, exc_tb
+                channel.throw()
+            raise
 
         for channel in channels:
             channel.throw(Stop())

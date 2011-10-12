@@ -124,7 +124,6 @@ class Room(Pipeable):
             jid.JID(name)
         self.name = name
 
-import sys
 import idiokit
 from idiokit import timer
 from abusehelper.core import bot, services, log
@@ -144,9 +143,8 @@ class RuntimeBot(bot.XMPPBot):
         try:
             yield idiokit.consume()
         except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            errors.throw(exc_type, exc_value, exc_tb)
-            raise exc_type, exc_value, exc_tb
+            errors.throw()
+            raise
 
     @idiokit.stream
     def _handle_updates(self, lobby, errors):

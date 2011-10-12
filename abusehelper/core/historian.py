@@ -42,9 +42,8 @@ class HistoryDB(object):
         try:
             yield collect
         except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            self.main.throw(exc_type, exc_value, exc_tb)
-            raise exc_type, exc_value, exc_tb
+            self.main.throw()
+            raise
 
     @idiokit.stream
     def _collect(self, room_name):
