@@ -36,12 +36,6 @@ def alert(*times):
         yield timer.sleep(min(map(next_time, times)))
         yield idiokit.send()
 
-def thread(call, *args, **keys):
-    value = threadpool.run(call, *args, **keys)
-    event = idiokit.Event()
-    value.listen(event.set)
-    return event
-
 class ReportBot(bot.ServiceBot):
     REPORT_NOW = object()
 
@@ -269,7 +263,7 @@ class MailerService(ReportBot):
                 self.server = None
 
                 try:
-                    yield thread(server.quit)
+                    yield threadpool.thread(server.quit)
                 except self.TOLERATED_EXCEPTIONS, exc:
                     pass
         idiokit.stop(result)
@@ -280,7 +274,7 @@ class MailerService(ReportBot):
             host, port = self.smtp_host, self.smtp_port
             self.log.info("Connecting %r port %d", host, port)
             try:
-                server = yield thread(smtplib.SMTP, host, port)
+                server = yield threadpool.thread(smtplib.SMTP, host, port)
             except self.TOLERATED_EXCEPTIONS, exc:
                 self.log.error("Error connecting SMTP server: %r", exc)
             else:
@@ -312,16 +306,16 @@ class MailerService(ReportBot):
         self.log.info("Sending message %r to %r", subject, to_addr)
         try:
             if not ehlo_done:
-                yield thread(server.ehlo)
+                yield threadpool.thread(server.ehlo)
                 self.server = True, server
 
             try:
-                yield thread(server.sendmail, from_addr, to_addr, msg)
+                yield threadpool.thread(server.sendmail, from_addr, to_addr, msg)
             except smtplib.SMTPSenderRefused, refused:
                 if refused.smtp_code != 530:
                     raise
-                yield thread(self._try_to_authenticate, server)
-                yield thread(server.sendmail, from_addr, to_addr, msg)
+                yield threadpool.thread(self._try_to_authenticate, server)
+                yield threadpool.thread(server.sendmail, from_addr, to_addr, msg)
         except smtplib.SMTPDataError, data_error:
             self.log.error("Could not send message to %r: %r. "+
                            "Dropping message from queue.",
@@ -337,7 +331,7 @@ class MailerService(ReportBot):
             self.log.error("Could not send message to %r: %r", to_addr, exc)
             self.server = None
             try:
-                yield thread(server.quit)
+                yield threadpool.thread(server.quit)
             except self.TOLERATED_EXCEPTIONS:
                 pass
             idiokit.stop(False)

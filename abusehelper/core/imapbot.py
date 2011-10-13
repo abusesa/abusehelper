@@ -9,12 +9,6 @@ from idiokit import threadpool, timer
 from cStringIO import StringIO
 from abusehelper.core import events, bot, services
 
-def thread(call, *args, **keys):
-    value = threadpool.run(call, *args, **keys)
-    event = idiokit.Event()
-    value.listen(event.set)
-    return event
-
 @idiokit.stream
 def collect():
     collection = list()
@@ -59,7 +53,7 @@ class IMAPBot(bot.FeedBot):
                     delay = min(min_delay, max_delay)
                     while mailbox is None:
                         try:
-                            mailbox = yield thread(self.connect)
+                            mailbox = yield threadpool.thread(self.connect)
                         except (imaplib.IMAP4.abort, socket.error), error:
                             self.log.error("Failed IMAP connection: %r", error)
                         else:
@@ -75,9 +69,9 @@ class IMAPBot(bot.FeedBot):
 
                     try:
                         method = getattr(mailbox, name)
-                        result = yield thread(method, *args, **keys)
+                        result = yield threadpool.thread(method, *args, **keys)
                     except (imaplib.IMAP4.abort, socket.error), error:
-                        yield thread(self.disconnect, mailbox)
+                        yield threadpool.thread(self.disconnect, mailbox)
                         self.log.error("Lost IMAP connection: %r", error)
                         mailbox = None
                     except imaplib.IMAP4.error, error:
@@ -88,7 +82,7 @@ class IMAPBot(bot.FeedBot):
                         break
         finally:
             if mailbox is not None:
-                yield thread(self.disconnect, mailbox)
+                yield threadpool.thread(self.disconnect, mailbox)
 
     def connect(self):
         self.log.info("Connecting to IMAP server %r port %d",
