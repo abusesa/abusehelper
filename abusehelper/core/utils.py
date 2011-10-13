@@ -31,8 +31,8 @@ def fetch_url(url, opener=None):
     if opener is None:
         opener = urllib2.build_opener()
 
-    fileobj = yield threadpool.thread(opener.open, url)
     try:
+        fileobj = yield threadpool.thread(opener.open, url)
         try:
             data = yield threadpool.thread(fileobj.read)
         finally:
