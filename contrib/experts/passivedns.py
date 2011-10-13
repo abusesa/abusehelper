@@ -28,7 +28,7 @@ def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
         event = events.Event()
         for key, value in zip(keys, line.split("\t")):
             event.add(key, value)
-        yield inner.send(eid, event)
+        yield idiokit.send(eid, event)
 
 class PassiveDNSExpert(Expert):
     host = bot.Param()
@@ -36,12 +36,13 @@ class PassiveDNSExpert(Expert):
 
     @idiokit.stream
     def augment(self):
-        eid, event = yield idiokit.next()
+        while True:
+            eid, event = yield idiokit.next()
 
-        for name in set(event.values("domain") +
-                        event.values("ip") +
-                        event.values("soa")):
-            yield lookup(self.host, self.port, eid, name)
+            for name in set(event.values("domain") +
+                            event.values("ip") +
+                            event.values("soa")):
+                yield lookup(self.host, self.port, eid, name)
 
 if __name__ == "__main__":
     PassiveDNSExpert.from_command_line().execute()
