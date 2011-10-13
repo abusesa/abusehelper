@@ -45,7 +45,7 @@ class RoomBot(bot.ServiceBot):
     @threado.stream
     def _from_room(inner, self, channel):
         while True:
-            elements = yield threado.any(inner, channel)
+            source, elements = yield threado.any(inner, channel)
             if channel is source:
                 inner.send(elements)
 
