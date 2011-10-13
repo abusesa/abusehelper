@@ -26,21 +26,15 @@ class HTTPError(FetchUrlFailed):
     def __str__(self):
         return "HTTP Error %d: %s" % (self.code, self.msg)
 
-def _thread(func, *args, **keys):
-    event = idiokit.Event()
-    value = threadpool.run(func, *args, **keys)
-    value.listen(event.set)
-    return event
-
 @idiokit.stream
 def fetch_url(url, opener=None):
     if opener is None:
         opener = urllib2.build_opener()
 
-    fileobj = yield _thread(opener.open, url)
+    fileobj = yield threadpool.thread(opener.open, url)
     try:
         try:
-            data = yield _thread(fileobj.read)
+            data = yield threadpool.thread(fileobj.read)
         finally:
             fileobj.close()
 
