@@ -4,7 +4,7 @@ from idiokit import threado
 from abusehelper.core import events, bot, utils
 import time
 from idiokit import threado, util
-from idiokit.xmpp import Element
+from idiokit.xmlcore import Element
 
 
 class CSV2XMPP(bot.XMPPBot):

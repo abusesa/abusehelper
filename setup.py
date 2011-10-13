@@ -1,14 +1,6 @@
 import os
-import sys
 import imp
-import errno
-import platform
-from distutils.core import setup
-
-if sys.version_info < (2, 5):
-    print >> sys.stderr, "Error: AbuseHelper requires Python 2.5 or higher",
-    print >> sys.stderr, "(you are running %s)." % platform.python_version()
-    sys.exit(1)
+from setuphelpers import setup
 
 def generate_version():
     base_path, _ = os.path.split(__file__)
@@ -20,25 +12,6 @@ def generate_version():
     version_module.generate(base_path)
     return version_module.version_str()
 version = generate_version()
-
-def install_other(subdir):
-    cwd = os.getcwd()
-    path = os.path.join(cwd, subdir)
-
-    try:
-        os.chdir(path)
-    except OSError, error:
-        if error.errno not in (errno.ENOENT, errno.ENOTDIR):
-            raise
-        print >> sys.stderr, "Could not find directory %r" % path
-        return
-
-    try:
-        module_info = imp.find_module("setup", ["."])
-        imp.load_module("setup", *module_info)
-    finally:
-        os.chdir(cwd)
-install_other("idiokit")
 
 setup(name="abusehelper",
       version="2." + version,
