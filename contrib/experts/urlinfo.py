@@ -23,7 +23,7 @@ class URLInfoExpert(Expert):
         def _fetch(inner):
             while True:
                 eid, url = yield inner, channel
-                
+
                 self.log.info("Fetching URL %r", url)
                 try:
                     info, fileobj = yield inner.sub(utils.fetch_url(url))
