@@ -236,7 +236,6 @@ from idiokit import timer
 class Service(object):
     def __init__(self, state_file=None):
         self.sessions = dict()
-        self.shutting_down = False
 
         if state_file is None:
             self.db = sqlite3.connect(":memory:")
@@ -288,8 +287,6 @@ class Service(object):
             yield idiokit.consume()
             raise Stop()
         finally:
-            self.shutting_down = True
-
             for session in self.sessions.itervalues():
                 session.throw(Stop())
 
@@ -299,8 +296,6 @@ class Service(object):
 
     @idiokit.stream
     def open_session(self, path, conf):
-        assert not self.shutting_down
-
         @idiokit.stream
         def _guarded(path, key, session):
             try:
@@ -329,7 +324,7 @@ class Service(object):
             self._put(key, None)
 
         self.sessions[path] = session
-        idiokit.stop(session)
+        idiokit.stop(self.errors.fork() | session)
 
     @idiokit.stream
     def main(self, state):
