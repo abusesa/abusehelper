@@ -2,7 +2,8 @@ import re
 import socket
 import opencollab.wiki
 
-from idiokit import threado, timer
+import idiokit
+from idiokit import timer
 from abusehelper.core import bot, rules, events
 from abusehelper.core.runtime import RuntimeBot, Room, Session
 
@@ -201,8 +202,8 @@ class WikiRuntimeBot(RuntimeBot):
             self.template_cache[page] = self.wiki.getPage(page)
         return self.template_cache[page]
 
-    @threado.stream
-    def configs(inner, self):
+    @idiokit.stream
+    def configs(self):
         while True:
             confs = list()
 
@@ -221,8 +222,8 @@ class WikiRuntimeBot(RuntimeBot):
                 fallback.set_customer_rules(customer_rules)
                 confs.append(fallback)
 
-            inner.send(confs)
-            yield inner, timer.sleep(self.poll_interval)
+            yield idiokit.send(confs)
+            yield timer.sleep(self.poll_interval)
 
     def customers(self, pages, sources):
         templates = dict()

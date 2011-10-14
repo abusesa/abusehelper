@@ -3,7 +3,7 @@ import urllib2
 from datetime import datetime
 import xml.etree.cElementTree as etree
 
-from idiokit import threado, timer
+import idiokit
 from abusehelper.core import bot, events, utils
 
 class HeadRequest(urllib2.Request):
@@ -11,7 +11,7 @@ class HeadRequest(urllib2.Request):
         return "HEAD"
 
 class PhishtankBot(bot.PollingBot):
-    application_key = bot.Param("Registered application key for Phistank.")
+    application_key = bot.Param("registered application key for Phistank")
     feed_url = bot.Param(default="http://data.phishtank.com/data/%s/online-valid.xml.bz2")
 
     def __init__(self, *args, **keys):
@@ -39,16 +39,14 @@ class PhishtankBot(bot.PollingBot):
         self.log.info("Data modified since last fetch.")
         return True
 
-    @threado.stream
-    def poll(inner, self, _):
-        yield inner.flush()
-
+    @idiokit.stream
+    def poll(self, _):
         if not self.urlIsModified(self.full_feed):
             return
 
         try:
             self.log.info("Downloading data from: %s", self.full_feed)
-            _, fileobj = yield inner.sub(utils.fetch_url(self.full_feed))
+            _, fileobj = yield utils.fetch_url(self.full_feed)
         except utils.FetchUrlFailed, e:
             self.log.error("Failed to download the report %s: %r", self.full_feed, e)
             return
@@ -61,7 +59,6 @@ class PhishtankBot(bot.PollingBot):
                 continue
 
             for entry in entries:
-                yield inner.flush()
                 url = entry.find("url")
                 if url is None:
                     continue
@@ -107,7 +104,7 @@ class PhishtankBot(bot.PollingBot):
                         event.add("host", "/".join(url.split("/")[:3])+"/")
                         event.add("ip", ip)
                         event.add("asn", announcer)
-                        inner.send(event)
+                        yield idiokit.send(event)
 
 if __name__ == "__main__":
      PhishtankBot.from_command_line().execute()
