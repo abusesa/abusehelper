@@ -1,6 +1,6 @@
 import os
 import imp
-from setuphelpers import setup
+from setuphelpers import setup, install_other
 
 def generate_version():
     base_path, _ = os.path.split(__file__)
@@ -12,6 +12,8 @@ def generate_version():
     version_module.generate(base_path)
     return version_module.version_str()
 version = generate_version()
+
+install_other("idiokit")
 
 setup(name="abusehelper",
       version="2." + version,
