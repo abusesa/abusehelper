@@ -11,7 +11,7 @@ class HeadRequest(urllib2.Request):
         return "HEAD"
 
 class PhishtankBot(bot.PollingBot):
-    application_key = bot.Param("registered application key for Phistank")
+    application_key = bot.Param("Registered application key for Phistank.")
     feed_url = bot.Param(default="http://data.phishtank.com/data/%s/online-valid.xml.bz2")
 
     def __init__(self, *args, **keys):
@@ -52,8 +52,15 @@ class PhishtankBot(bot.PollingBot):
             return
 
         uncompressed = bz2.decompress(fileobj.read())
+        try:
+            elements = etree.fromstring(uncompressed)
+        except SyntaxError, e:
+            self.log.error('Syntax error in report "%s": %r ', 
+                           self.full_feed, e)
+            return
+
         sites = dict()
-        for elem in etree.fromstring(uncompressed):
+        for elem in elements:
             entries = elem.findall("entry")
             if not entries:
                 continue
