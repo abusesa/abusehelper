@@ -76,10 +76,10 @@ class ReportBot(bot.ServiceBot):
         try:
             while True:
                 while self.queue:
-                    item = self.queue.popleft()
-                    success = yield self.report(item)
+                    item, keys = self.queue.popleft()
+                    success = yield self.report(item, **keys)
                     if not success:
-                        self.queue.append(item)
+                        self.queue.append((item, keys))
 
                 yield timer.sleep(1.0)
         except services.Stop:
@@ -87,6 +87,9 @@ class ReportBot(bot.ServiceBot):
 
     @idiokit.stream
     def session(self, state, src_room, **keys):
+        keys = dict(keys)
+        keys["src_room"] = src_room
+
         @idiokit.stream
         def _alert():
             while True:
@@ -97,10 +100,10 @@ class ReportBot(bot.ServiceBot):
         def _collect():
             while True:
                 item = yield idiokit.next()
-                self.queue.append(item)
+                self.queue.append((item, keys))
 
         collector = self.collect(state, **keys) | _collect()
-        idiokit.pipe(self.alert(src_room=src_room, **keys), _alert(), collector)
+        idiokit.pipe(self.alert(**keys), _alert(), collector)
         self.collectors.setdefault(src_room, set()).add(collector)
 
         try:
@@ -216,43 +219,6 @@ class MailerService(ReportBot):
         yield timer.sleep(0.0)
         idiokit.stop(template.format(events))
 
-    def collect(self, state, **keys):
-        return ReportBot.collect(self, state, **keys) | self._collect(**keys)
-
-    @idiokit.stream
-    def _collect(self, to=[], cc=[], **keys):
-        from email.header import decode_header
-        from email.utils import formatdate, make_msgid, getaddresses, formataddr
-
-        # FIXME: Use encoding after getaddresses
-        from_addr = getaddresses([self.mail_sender])[0]
-
-        while True:
-            events = yield idiokit.next()
-            if not events:
-                continue
-
-            msg = yield self.build_mail(events, to=to, cc=cc, **keys)
-
-            if "To" not in msg:
-                msg["To"] = format_addresses(to)
-            if "Cc" not in msg:
-                msg["Cc"] = format_addresses(cc)
-
-            del msg["From"]
-            msg["From"] = formataddr(from_addr)
-            msg["Date"] = formatdate()
-            msg["Message-ID"] = make_msgid()
-            subject = msg.get("Subject", "")
-
-            msg_data = msg.as_string()
-
-            mail_to = msg.get_all("To", list()) + msg.get_all("Cc", list())
-            mail_to = [addr for (name, addr) in getaddresses(mail_to)]
-            mail_to = filter(None, map(str.strip, mail_to))
-            for address in mail_to:
-                yield idiokit.send(from_addr[1], address, subject, msg_data)
-
     @idiokit.stream
     def main(self, state):
         try:
@@ -296,9 +262,7 @@ class MailerService(ReportBot):
             server.login(self.smtp_auth_user, self.smtp_auth_password)
 
     @idiokit.stream
-    def _try_to_send(self, item):
-        from_addr, to_addr, subject, msg = item
-
+    def _try_to_send(self, from_addr, to_addr, subject, msg):
         yield self._ensure_connection()
 
         ehlo_done, server = self.server
@@ -340,14 +304,44 @@ class MailerService(ReportBot):
         idiokit.stop(True)
 
     @idiokit.stream
-    def report(self, item):
-        while True:
-            result = yield self._try_to_send(item)
-            if result:
-                idiokit.stop(True)
+    def report(self, events, to=[], cc=[], **keys):
+        from email.header import decode_header
+        from email.utils import formatdate, make_msgid, getaddresses, formataddr
 
-            self.log.info("Retrying sending in 10 seconds")
-            yield timer.sleep(10.0)
+        if not events:
+            idiokit.stop(True)
+
+        # FIXME: Use encoding after getaddresses
+        from_addr = getaddresses([self.mail_sender])[0]
+
+        msg = yield self.build_mail(events, to=to, cc=cc, **keys)
+
+        if "To" not in msg:
+            msg["To"] = format_addresses(to)
+        if "Cc" not in msg:
+            msg["Cc"] = format_addresses(cc)
+
+        del msg["From"]
+        msg["From"] = formataddr(from_addr)
+        msg["Date"] = formatdate()
+        msg["Message-ID"] = make_msgid()
+        subject = msg.get("Subject", "")
+
+        msg_data = msg.as_string()
+
+        mail_to = msg.get_all("To", list()) + msg.get_all("Cc", list())
+        mail_to = [addr for (name, addr) in getaddresses(mail_to)]
+        mail_to = filter(None, map(str.strip, mail_to))
+        for address in mail_to:
+            while True:
+                result = yield self._try_to_send(from_addr[1], address, subject, msg_data)
+                if result:
+                    break
+
+                self.log.info("Retrying sending in 10 seconds")
+                yield timer.sleep(10.0)
+
+        idiokit.stop(True)
 
 if __name__ == "__main__":
     MailerService.from_command_line().execute()
