@@ -8,12 +8,45 @@ import re
 class RuleError(Exception):
     pass
 
+class RuleClassifier(object):
+    def __init__(self):
+        self._rules = dict()
+
+    def inc(self, rule, class_id):
+        classes = self._rules.get(rule, None)
+        if classes is None:
+            classes = dict()
+            self._rules[rule] = classes
+        classes[class_id] = classes.get(class_id, 0) + 1
+
+    def dec(self, rule, class_id):
+        classes = self._rules.get(rule, None)
+        if classes is None:
+            return
+
+        count = classes.get(class_id, 0) - 1
+        if count <= 0:
+            classes.pop(class_id, None)
+
+    def classify(self, obj):
+        cache = dict()
+        result = set()
+
+        for rule, classes in self._rules.iteritems():
+            if rule.match(obj, cache):
+                result.update(classes)
+
+        return result
+
+    def is_empty(self):
+        return not not self._rules
+
 class _Rule(object):
     @classmethod
     def serialize_register(cls):
         name = "rule-" + cls.__name__.lower()
         serialize.register(cls.dump_rule, cls.load_rule, cls, name)
-    
+
     def __init__(self, identity):
         self._hash = None
         self._identity = identity
@@ -33,6 +66,18 @@ class _Rule(object):
         if self._hash is None:
             self._hash = hash(self.__class__) ^ hash(self._identity)
         return self._hash
+
+    def match(self, obj, cache=None):
+        if cache is None:
+            cache = dict()
+        elif self in cache:
+            return cache[self]
+        result = self.match_with_cache(obj, cache)
+        cache[self] = result
+        return result
+
+    def match_with_cache(self, obj, cache):
+        return False
 
 class MATCHError(RuleError):
     pass
@@ -86,7 +131,7 @@ class MATCH(_Rule):
     def __repr__(self):
         return self.__class__.__name__ + ("(%r, %r)" % (self.key, self.value))
 
-    def __call__(self, event):
+    def match_with_cache(self, event, cache):
         if self.key is None:
             return event.contains(filter=self.filter)
         return event.contains(self.key, filter=self.filter)
@@ -113,8 +158,8 @@ class NOT(_Rule):
     def __repr__(self):
         return self.__class__.__name__ + "(" + repr(self.child) + ")"
 
-    def __call__(self, *args, **keys):
-        return not self.child(*args, **keys)
+    def match_with_cache(self, obj, cache):
+        return not self.child.match(obj, cache)
 NOT.serialize_register()
 
 class OR(_Rule):
@@ -137,9 +182,9 @@ class OR(_Rule):
         children = ", ".join(map(repr, self.children))
         return self.__class__.__name__ + "(" + children + ")"
 
-    def __call__(self, *args, **keys):
+    def match_with_cache(self, obj, cache):
         for child in self.children:
-            if child(*args, **keys):
+            if child.match(obj, cache):
                 return True
         return False
 OR.serialize_register()
@@ -155,7 +200,7 @@ class AND(_Rule):
         if len(children) < 1:
             raise RuleError(element)
         return cls(*children)
-    
+
     def __init__(self, first, *rest):
         self.children = (first,) + rest
         _Rule.__init__(self, frozenset(self.children))
@@ -164,9 +209,9 @@ class AND(_Rule):
         children = ", ".join(map(repr, self.children))
         return self.__class__.__name__ + "(" + children + ")"
 
-    def __call__(self, *args, **keys):
+    def match_with_cache(self, obj, cache):
         for child in self.children:
-            if not child(*args, **keys):
+            if not child.match(obj, cache):
                 return False
         return True
 AND.serialize_register()
@@ -187,8 +232,9 @@ class ANYTHING(_Rule):
     def __repr__(self):
         return self.__class__.__name__ + "()"
 
-    def __call__(self, *args, **keys):
-        return self
+    def match(self, obj, cache):
+        return True
+    match_with_cache = match
 ANYTHING.serialize_register()
 
 import struct
@@ -234,7 +280,7 @@ class NETBLOCK(_Rule):
             bits = int(bits)
         except ValueError:
             raise RuleError(element)
-        
+
         keys = None
         for child in element.children():
             keys = serialize.load_list(load, child)
@@ -255,7 +301,7 @@ class NETBLOCK(_Rule):
                 self.ip_num = ip_num & self.mask
                 break
         else:
-            raise NETBLOCKError("could not parse IP %r" % ip)            
+            raise NETBLOCKError("could not parse IP %r" % ip)
 
         _Rule.__init__(self, (self.parser, self.ip_num, self.bits, self.keys))
 
@@ -269,7 +315,7 @@ class NETBLOCK(_Rule):
     def _filter(self, value):
         return value is not None and value & self.mask == self.ip_num
 
-    def __call__(self, event):
+    def match_with_cache(self, event, cache):
         if self.keys is None:
             keys = event.keys()
         else:
@@ -325,21 +371,21 @@ if __name__ == "__main__":
     class ContainsTests(unittest.TestCase):
         def test_match(self):
             rule = CONTAINS()
-            assert rule(MockEvent())
+            assert rule.match(MockEvent())
 
             rule = CONTAINS("a")
-            assert not rule(MockEvent())
-            assert not rule(MockEvent(x=["y"]))
-            assert rule(MockEvent(a=["b"]))
+            assert not rule.match(MockEvent())
+            assert not rule.match(MockEvent(x=["y"]))
+            assert rule.match(MockEvent(a=["b"]))
 
             rule = CONTAINS(a="b")
-            assert not rule(MockEvent(a=["a"]))
-            assert rule(MockEvent(a=["b"]))
+            assert not rule.match(MockEvent(a=["a"]))
+            assert rule.match(MockEvent(a=["b"]))
 
             rule = CONTAINS(a="b", x="y")
-            assert not rule(MockEvent(x=["y"]))
-            assert not rule(MockEvent(a=["b"]))
-            assert rule(MockEvent(a=["b"], x=["y"]))
+            assert not rule.match(MockEvent(x=["y"]))
+            assert not rule.match(MockEvent(a=["b"]))
+            assert rule.match(MockEvent(a=["b"], x=["y"]))
 
         def test_serialize(self):
             rule = CONTAINS()
@@ -361,24 +407,24 @@ if __name__ == "__main__":
 
         def test_match(self):
             rule = MATCH()
-            assert not rule(MockEvent())
-            assert rule(MockEvent(a=["b"]))
-            assert rule(MockEvent(x=["y"]))
+            assert not rule.match(MockEvent())
+            assert rule.match(MockEvent(a=["b"]))
+            assert rule.match(MockEvent(x=["y"]))
 
             rule = MATCH("a")
-            assert not rule(MockEvent())
-            assert rule(MockEvent(a=["b"]))
-            assert not rule(MockEvent(x=["y"]))
+            assert not rule.match(MockEvent())
+            assert rule.match(MockEvent(a=["b"]))
+            assert not rule.match(MockEvent(x=["y"]))
 
             rule = MATCH("a", "b")
-            assert not rule(MockEvent())
-            assert rule(MockEvent(a=["b"]))
-            assert not rule(MockEvent(a=["a"]))
+            assert not rule.match(MockEvent())
+            assert rule.match(MockEvent(a=["b"]))
+            assert not rule.match(MockEvent(a=["a"]))
 
             rule = MATCH("a", re.compile("b", re.U))
-            assert not rule(MockEvent())
-            assert rule(MockEvent(a=["abba"]))
-            assert not rule(MockEvent(a=["aaaa"]))
+            assert not rule.match(MockEvent())
+            assert rule.match(MockEvent(a=["abba"]))
+            assert not rule.match(MockEvent(a=["aaaa"]))
 
         def test_eq(self):
             assert MATCH() == MATCH()
@@ -417,14 +463,14 @@ if __name__ == "__main__":
             a = MATCH("a")
             b = MATCH("b")
             assert AND(a, b) == AND(a, b)
-            assert AND(a, b) == AND(b, a)            
+            assert AND(a, b) == AND(b, a)
             assert AND(a, a) != AND(b, b)
 
     class NetblockTests(unittest.TestCase):
         def test_bad_data(self):
             rule = NETBLOCK("0.0.0.0", 0)
-            assert not rule(MockEvent(ip=[u"not valid"]))
-            assert not rule(MockEvent(ip=[u"\xe4 not convertible to ascii"]))
+            assert not rule.match(MockEvent(ip=[u"not valid"]))
+            assert not rule.match(MockEvent(ip=[u"\xe4 not convertible to ascii"]))
 
         def test_eq(self):
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.0.0", 16)
@@ -434,30 +480,30 @@ if __name__ == "__main__":
 
         def test_match_ipv6(self):
             rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
-            assert rule(MockEvent(ip=["2001:0db8:aaaa:bbbb:cccc::"]))
+            assert rule.match(MockEvent(ip=["2001:0db8:aaaa:bbbb:cccc::"]))
 
         def test_non_match_ipv6(self):
             rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
-            assert not rule(MockEvent(ip=["::1"]))
+            assert not rule.match(MockEvent(ip=["::1"]))
 
         def test_match_arbitrary_key(self):
             rule = NETBLOCK("1.2.3.4", 24)
-            assert rule(MockEvent(somekey=["1.2.3.255"]))
+            assert rule.match(MockEvent(somekey=["1.2.3.255"]))
 
         def test_non_match_arbitrary_key(self):
             rule = NETBLOCK("1.2.3.4", 24)
-            assert not rule(MockEvent(somekey=["1.2.4.255"]))
+            assert not rule.match(MockEvent(somekey=["1.2.4.255"]))
 
         def test_match_ip_key(self):
             rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
-            assert rule(MockEvent(somekey=["4.5.6.255"], ip=["1.2.3.255"]))
+            assert rule.match(MockEvent(somekey=["4.5.6.255"], ip=["1.2.3.255"]))
 
         def test_nonmatch_ip_key(self):
             rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
-            assert not rule(MockEvent(somekey=["1.2.3.4"], ip=["1.2.4.255"]))
+            assert not rule.match(MockEvent(somekey=["1.2.3.4"], ip=["1.2.4.255"]))
 
         def test_non_match_non_ip_data(self):
             rule = NETBLOCK("1.2.3.4", 24)
-            assert not rule(MockEvent(ip=["this is just some data"]))
+            assert not rule.match(MockEvent(ip=["this is just some data"]))
 
     unittest.main()

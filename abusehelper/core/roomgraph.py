@@ -13,20 +13,18 @@ class RoomGraphBot(bot.ServiceBot):
         while True:
             event = yield idiokit.next()
 
-            tests = list(self.srcs.get(name, ()))
             count += 1
             if count % 100 == 0:
                 self.log.info("Seen %d events in room %r", count, name)
 
-            for dst_room, rules in tests:
-                dst = self.rooms.get(dst_room)
-                if dst is None:
-                    continue
+            classifier = self.srcs.get(name, None)
+            if classifier is None:
+                continue
 
-                for rule in rules:
-                    if rule(event):
-                        yield dst.send(event)
-                        break
+            for dst_room in classifier.classify(event):
+                dst = self.rooms.get(dst_room)
+                if dst is not None:
+                    yield dst.send(event)
 
     @idiokit.stream
     def handle_room(self, name):
@@ -43,15 +41,15 @@ class RoomGraphBot(bot.ServiceBot):
 
     @idiokit.stream
     def session(self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
-        counter = self.srcs.setdefault(src_room, taskfarm.Counter())
-        counter.inc(dst_room, rule)
+        classifier = self.srcs.setdefault(src_room, rules.RuleClassifier())
+        classifier.inc(rule, dst_room)
         try:
             yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
         except services.Stop:
             idiokit.stop()
         finally:
-            counter.dec(dst_room, rule)
-            if not counter:
+            classifier.dec(rule, dst_room)
+            if classifier.is_empty():
                 self.srcs.pop(src_room, None)
 
 if __name__ == "__main__":
