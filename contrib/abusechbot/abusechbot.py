@@ -4,7 +4,7 @@ import idiokit
 from abusehelper.core import bot, events, utils
 
 class RSSBot(bot.PollingBot):
-    feeds = bot.ListParam("Urls to the RSS feeds.")
+    feeds = bot.ListParam("URLs to the RSS feeds")
 
     @idiokit.stream
     def poll(self, _):
@@ -23,7 +23,6 @@ class RSSBot(bot.PollingBot):
                         continue
 
                     for item in items:
-                        yield
                         title = item.find("title")
                         if title is not None:
                             title = title.text
@@ -43,7 +42,7 @@ class RSSBot(bot.PollingBot):
                         event = self.create_event(title,link,
                                                   description,pubdate,url)
                         if event:
-                            idiokit.send(event)
+                            yield idiokit.send(event)
             except SyntaxError, e:
                 self.log.error('Syntax error in feed "%s": %r', url, e)
                 continue
@@ -62,7 +61,7 @@ class RSSBot(bot.PollingBot):
 
 class AbuseCHBot(RSSBot):
     feeds = bot.ListParam(default=[
-            "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker", 
+            "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker",
             "https://zeustracker.abuse.ch/rss.php",
             "http://amada.abuse.ch/palevotracker.php?rssfeed"])
 
