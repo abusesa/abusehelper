@@ -327,37 +327,6 @@ class NETBLOCK(_Rule):
         return False
 NETBLOCK.serialize_register()
 
-# CONTAINS rule type is deprecated. The following compatibility code
-# implements CONTAINS using the current supported rule types.
-
-import warnings
-
-def CONTAINS(*keys, **key_values):
-    warnings.warn("abusehelper.core.rules.CONTAINS is deprecated. "+
-                  "Use abusehelper.core.rules.MATCH instead.")
-    return _CONTAINS(keys, key_values)
-
-def _CONTAINS(keys, key_values):
-    keys = [MATCH(key) for key in keys]
-    key_values = [MATCH(key, value) for (key, value) in key_values.items()]
-
-    children = keys + key_values
-    if len(children) == 0:
-        return ANYTHING()
-    if len(children) == 1:
-        return children[0]
-    return AND(*children)
-
-def _CONTAINS_load(load, element):
-    children = list(element.children())
-    if len(children) != 2:
-        raise RuleError(element)
-
-    keys = set(serialize.load_list(load, children[0]))
-    key_values = serialize.load_dict(load, children[1])
-    return _CONTAINS(keys, key_values)
-serialize.register(None, _CONTAINS_load, [], "rule-contains")
-
 if __name__ == "__main__":
     import unittest
     from abusehelper.core import events
@@ -367,38 +336,6 @@ if __name__ == "__main__":
             events.Event.__init__(self)
             for key, values in keys.iteritems():
                 self.update(key, values)
-
-    class ContainsTests(unittest.TestCase):
-        def test_match(self):
-            rule = CONTAINS()
-            assert rule.match(MockEvent())
-
-            rule = CONTAINS("a")
-            assert not rule.match(MockEvent())
-            assert not rule.match(MockEvent(x=["y"]))
-            assert rule.match(MockEvent(a=["b"]))
-
-            rule = CONTAINS(a="b")
-            assert not rule.match(MockEvent(a=["a"]))
-            assert rule.match(MockEvent(a=["b"]))
-
-            rule = CONTAINS(a="b", x="y")
-            assert not rule.match(MockEvent(x=["y"]))
-            assert not rule.match(MockEvent(a=["b"]))
-            assert rule.match(MockEvent(a=["b"], x=["y"]))
-
-        def test_serialize(self):
-            rule = CONTAINS()
-            assert serialize.load(serialize.dump(rule)) == rule
-
-            rule = CONTAINS("a")
-            assert serialize.load(serialize.dump(rule)) == rule
-
-            rule = CONTAINS(a="a")
-            assert serialize.load(serialize.dump(rule)) == rule
-
-            rule = CONTAINS("key", a="a", x="y")
-            assert serialize.load(serialize.dump(rule)) == rule
 
     class MatchTests(unittest.TestCase):
         def test_init(self):
