@@ -263,7 +263,7 @@ class MailerService(ReportBot):
 
             mail_to = msg.get_all("To", list()) + msg.get_all("Cc", list())
             mail_to = [addr for (name, addr) in getaddresses(mail_to)]
-            mail_to = filter(None, map(str.strip, mail_to))
+            mail_to = filter(None, [x.strip() for x in mail_to])
             for address in mail_to:
                 inner.send(from_addr[1], address, subject, msg_data)
 
