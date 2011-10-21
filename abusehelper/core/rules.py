@@ -344,16 +344,25 @@ if __name__ == "__main__":
     class RuleClassifierTests(unittest.TestCase):
         def test_inc(self):
             c = RuleClassifier()
-            r = MATCH("a", "b")
-            c.inc(r, "c")
+            c.inc(MATCH("a", "b"), "c")
             assert list(c.classify(MockEvent(a=["b"]))) == ["c"]
+            assert not c.is_empty()
+
+            c.inc(MATCH("a"), "d")
+            assert list(c.classify(MockEvent(a=["b"]))) == ["c", "d"]
+            assert list(c.classify(MockEvent(a=["x"]))) == ["d"]
             assert not c.is_empty()
 
         def test_dec(self):
             c = RuleClassifier()
-            r = MATCH("a", "b")
-            c.inc(r, "c")
-            c.dec(r, "c")
+            c.inc(MATCH("a", "b"), "c")
+            c.inc(MATCH("a", "b"), "d")
+
+            c.dec(MATCH("a", "b"), "c")
+            assert list(c.classify(MockEvent(a=["b"]))) == ["d"]
+            assert not c.is_empty()
+
+            c.dec(MATCH("a", "b"), "d")
             assert list(c.classify(MockEvent(a=["b"]))) == []
             assert c.is_empty()
 
