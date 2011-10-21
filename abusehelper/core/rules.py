@@ -25,8 +25,12 @@ class RuleClassifier(object):
             return
 
         count = classes.get(class_id, 0) - 1
-        if count <= 0:
+        if count > 0:
+            classes[class_id] = count
+        else:
             classes.pop(class_id, None)
+            if not classes:
+                self._rules.pop(rule, None)
 
     def classify(self, obj):
         cache = dict()
@@ -39,7 +43,7 @@ class RuleClassifier(object):
         return result
 
     def is_empty(self):
-        return not not self._rules
+        return not self._rules
 
 class _Rule(object):
     @classmethod
@@ -336,6 +340,22 @@ if __name__ == "__main__":
             events.Event.__init__(self)
             for key, values in keys.iteritems():
                 self.update(key, values)
+
+    class RuleClassifierTests(unittest.TestCase):
+        def test_inc(self):
+            c = RuleClassifier()
+            r = MATCH("a", "b")
+            c.inc(r, "c")
+            assert list(c.classify(MockEvent(a=["b"]))) == ["c"]
+            assert not c.is_empty()
+
+        def test_dec(self):
+            c = RuleClassifier()
+            r = MATCH("a", "b")
+            c.inc(r, "c")
+            c.dec(r, "c")
+            assert list(c.classify(MockEvent(a=["b"]))) == []
+            assert c.is_empty()
 
     class MatchTests(unittest.TestCase):
         def test_init(self):
