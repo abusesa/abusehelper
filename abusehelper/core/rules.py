@@ -345,12 +345,12 @@ if __name__ == "__main__":
         def test_inc(self):
             c = RuleClassifier()
             c.inc(MATCH("a", "b"), "c")
-            assert list(c.classify(MockEvent(a=["b"]))) == ["c"]
+            assert set(c.classify(MockEvent(a=["b"]))) == set(["c"])
             assert not c.is_empty()
 
             c.inc(MATCH("a"), "d")
-            assert list(c.classify(MockEvent(a=["b"]))) == ["c", "d"]
-            assert list(c.classify(MockEvent(a=["x"]))) == ["d"]
+            assert set(c.classify(MockEvent(a=["b"]))) == set(["c", "d"])
+            assert set(c.classify(MockEvent(a=["x"]))) == set(["d"])
             assert not c.is_empty()
 
         def test_dec(self):
@@ -359,11 +359,11 @@ if __name__ == "__main__":
             c.inc(MATCH("a", "b"), "d")
 
             c.dec(MATCH("a", "b"), "c")
-            assert list(c.classify(MockEvent(a=["b"]))) == ["d"]
+            assert set(c.classify(MockEvent(a=["b"]))) == set(["d"])
             assert not c.is_empty()
 
             c.dec(MATCH("a", "b"), "d")
-            assert list(c.classify(MockEvent(a=["b"]))) == []
+            assert set(c.classify(MockEvent(a=["b"]))) == set([])
             assert c.is_empty()
 
     class MatchTests(unittest.TestCase):
