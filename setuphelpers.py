@@ -1,5 +1,6 @@
 import os
 import imp
+import sys
 import errno
 from distutils.core import setup as _setup
 from distutils.dir_util import remove_tree
