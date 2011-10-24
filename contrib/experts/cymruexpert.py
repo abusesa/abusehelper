@@ -1,6 +1,7 @@
+import idiokit
 import combiner
 from abusehelper.core import events, utils
-from idiokit import util, threado, sockets, timer
+from idiokit import util, sockets, timer
 
 class Stop(Exception):
     pass
@@ -21,18 +22,26 @@ class CymruWhoisExpert(combiner.Expert):
         self.global_channels = set()
         self.global_pending = dict()
 
-    @threado.stream
-    def main_loop(inner, self, channels, pending):
-        sleeper = timer.sleep(self.throttle_time / 2.0)
+    def main_loop(self, channels, pending):
+        main = self._main(channels, pending)
+        idiokit.pipe(self._alert(self.throttle_time), main)
+        return main
 
+    @idiokit.stream
+    def _alert(self, interval):
+        yield timer.sleep(interval / 2.0)
+        yield idiokit.send()
+
+        while True:
+            yield timer.sleep(interval)
+            yield idiokit.send()
+
+    @idiokit.stream
+    def _main(self, channels, pending):
         try:
             while True:
-                yield inner, sleeper
-
-                yield inner.sub(self.iteration(pending))
-
-                if sleeper.has_result():
-                    sleeper = timer.sleep(self.throttle_time)
+                yield idiokit.next()
+                yield self.iteration(pending)
         except Stop:
             pass
         except:
@@ -43,13 +52,13 @@ class CymruWhoisExpert(combiner.Expert):
         for channel in channels:
             channel.throw(Stop())
 
-    @threado.stream
-    def _forward(inner, self, global_main, local_pending):
+    @idiokit.stream
+    def _forward(self, global_main, local_pending):
         should_stop = False
 
         while not should_stop or local_pending:
             try:
-                ip, values = yield inner
+                ip, values = yield idiokit.next()
 
                 for eid in local_pending.pop(ip, ()):
                     augmentation = events.Event()
@@ -57,28 +66,27 @@ class CymruWhoisExpert(combiner.Expert):
                     for key, value in zip(self.LINE_KEYS, values):
                         if value is not None:
                             augmentation.add(key, value)
-
-                    inner.send(eid, augmentation)
-            except threado.Finished:
+                    yield idiokit.send(eid, augmentation)
+            except StopIteration:
                 should_stop = True
-                global_main.send()
+                yield global_main.send()
 
-    @threado.stream
-    def _collect(inner, self, key, channel, local_pending, global_pending):
+    @idiokit.stream
+    def _collect(self, key, channel, local_pending, global_pending):
         while True:
-            eid, event = yield inner
+            eid, event = yield idiokit.next()
 
             for ip in event.values(key):
-                local_pending.setdefault(ip, set()).add(eid)
+                local_pending.setdefault(ip, list()).append(eid)
 
                 values = self.cache.get(ip, None)
                 if values is not None:
-                    inner.send(ip, values)
+                    yield idiokit.send(ip, values)
                 else:
                     global_pending.setdefault(ip, set()).add(channel)
 
-    @threado.stream
-    def augment(inner, self, key="ip"):
+    @idiokit.stream
+    def augment(self, key="ip"):
         if self.global_main is None:
             self.global_main = self.main_loop(self.global_channels,
                                               self.global_pending)
@@ -94,7 +102,7 @@ class CymruWhoisExpert(combiner.Expert):
         global_channels.add(forward)
 
         try:
-            yield inner.sub(collect | forward)
+            yield idiokit.pipe(collect, forward)
         finally:
             for ip in local_pending:
                 forwards = global_pending.get(ip, set())
@@ -107,56 +115,47 @@ class CymruWhoisExpert(combiner.Expert):
                 global_main.throw(Stop())
                 if self.global_main is global_main:
                     self.global_main = None
-                yield inner.sub(global_main)
+                yield global_main
 
-    @threado.stream
-    def _parse(inner, self, ips, pending):
-        line_buffer = util.LineBuffer()
-
-        while ips:
-            data = yield inner
-
-            for line in line_buffer.feed(data):
-                line = line.decode("utf-8", "replace")
-                bites = [x.strip() for x in line.split("|")]
-                bites = [x if x not in ("", "NA") else None for x in bites]
-                if len(bites) != 7:
-                    continue
-                ip = bites.pop(1)
-
-                ips.discard(ip)
-                self.cache.set(ip, bites)
-
-                channels = pending.pop(ip, ())
-                for channel in channels:
-                    channel.send(ip, bites)
-
-    @threado.stream
-    def iteration(inner, self, pending):
+    @idiokit.stream
+    def iteration(self, pending):
         if not pending:
             return
 
         socket = sockets.Socket()
-        connect = socket.connect(("whois.cymru.com", 43))
         try:
-            while not connect.has_result():
-                yield inner, connect
+            yield socket.connect(("whois.cymru.com", 43))
 
             ips = set(pending)
 
-            socket.send("begin\n")
-            socket.send("verbose\n")
+            yield socket.writeall("begin\n")
+            yield socket.writeall("verbose\n")
             for ip in ips:
-                socket.send(ip + "\n")
-            socket.send("end\n")
+                yield socket.writeall(ip + "\n")
+            yield socket.writeall("end\n")
 
-            yield inner.sub(threado.dev_null()
-                            | socket
-                            | self._parse(ips, pending))
+            line_buffer = util.LineBuffer()
+            while ips:
+                data = yield socket.read(4096)
+
+                for line in line_buffer.feed(data):
+                    line = line.decode("utf-8", "replace")
+                    bites = [x.strip() for x in line.split("|")]
+                    bites = [x if x not in ("", "NA") else None for x in bites]
+                    if len(bites) != 7:
+                        continue
+                    ip = bites.pop(1)
+
+                    ips.discard(ip)
+                    self.cache.set(ip, bites)
+
+                    channels = pending.pop(ip, ())
+                    for channel in channels:
+                        channel.send(ip, bites)
         except sockets.error:
             pass
         finally:
-            yield inner.sub(socket.close())
+            yield socket.close()
 
 if __name__ == "__main__":
     CymruWhoisExpert.from_command_line().execute()
