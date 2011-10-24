@@ -386,12 +386,27 @@ class ServiceBot(XMPPBot):
 from abusehelper.core import events, taskfarm
 
 class FeedBot(ServiceBot):
+    add_values = ListParam("List of key/values to be added to every event." +
+                           'example: "key1=value1,key1=value2,key3=value3"', 
+                           default=dict())
+
     def __init__(self, *args, **keys):
         ServiceBot.__init__(self, *args, **keys)
 
         self._feeds = taskfarm.TaskFarm(self.manage_feed)
         self._rooms = taskfarm.TaskFarm(self.manage_room)
         self._dsts = taskfarm.Counter()
+
+        if self.add_values:
+            temp = dict()
+            for pair in self.add_values:
+                key_value = pair.split("=")
+                if len(key_value) < 2:
+                    continue
+                values = temp.setdefault(key_value[0], set())
+                values.add("=".join(key_value[1:]))
+            self.add_values = temp
+        print self.add_values
 
     def feed_keys(self, *args, **keys):
         yield ()
@@ -421,6 +436,7 @@ class FeedBot(ServiceBot):
     def manage_feed(self, key):
         return threado.pipe(self.feed(*key),
                             self.augment(),
+                            self._add_values(),
                             self._distribute(key))
 
     @threado.stream
@@ -469,6 +485,14 @@ class FeedBot(ServiceBot):
         finally:
             if count > 0:
                 self.log.info("Sent %d events to room %r", count, name)
+
+    @threado.stream
+    def _add_values(inner, self):
+        while True:
+            event = yield inner
+            for key in self.add_values:
+                event.add(key, *self.add_values[key])
+            inner.send(event)
 
     @threado.stream
     def augment(inner, self):
