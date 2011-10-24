@@ -406,7 +406,6 @@ class FeedBot(ServiceBot):
                 values = temp.setdefault(key_value[0], set())
                 values.add("=".join(key_value[1:]))
             self.add_values = temp
-        print self.add_values
 
     def feed_keys(self, *args, **keys):
         yield ()
