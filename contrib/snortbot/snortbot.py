@@ -11,6 +11,13 @@ class SnortBot(TailBot):
         if len(parts) < 4:
             return
 
+        type = parts[0].split()
+        if len(type) < 6:
+            return
+        type = type[-1].split(":")
+        if len(type) < 2:
+            return
+
         info = parts[1].split("[")
         if len(info) < 2:
             return
@@ -22,6 +29,7 @@ class SnortBot(TailBot):
         event = events.Event()
         event.add("source", "snort")
 
+        event.add("signature", type[1])
         event.add("description", info[0].strip())
         event.add("classification", info[1].split(": ")[-1])
         event.add("priority", parts[2].strip(" [").split(": ")[-1])
