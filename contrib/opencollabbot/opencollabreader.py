@@ -36,7 +36,7 @@ class OpenCollabReader(bot.FeedBot):
     def feed(inner, self, query):
         salt = str(random.randint(2**31, 2**32))
         def page_id(page):
-            return hashlib.md5(page + salt).hexdigest()
+            return hashlib.md5(page.encode("utf8") + salt).hexdigest()
 
         token = None
         current = dict()
