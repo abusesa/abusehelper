@@ -2,7 +2,7 @@ import re
 
 import idiokit
 from idiokit import util
-from idiokit.irc import IRC
+from idiokit.irc import connect
 
 from abusehelper.core import events, bot
 
@@ -51,18 +51,16 @@ class IRCFeedBot(bot.FeedBot):
 
     @idiokit.stream
     def feed(self):
-        irc = IRC(self.irc_host, self.irc_port,
-                  ssl=self.irc_use_ssl,
-                  ssl_verify_cert=not self.irc_ignore_cert,
-                  ssl_ca_certs=self.irc_extra_ca_certs)
-
         self.log.info("Connecting to IRC server %r port %d",
                       self.irc_host, self.irc_port)
-        yield irc.connect(self.irc_own_nick, password=self.irc_password)
+        irc = yield connect(self.irc_host, self.irc_port, self.irc_own_nick,
+                            ssl=self.irc_use_ssl,
+                            ssl_verify_cert=not self.irc_ignore_cert,
+                            ssl_ca_certs=self.irc_extra_ca_certs)
         self.log.info("Connected to IRC server %r port %d",
                       self.irc_host, self.irc_port)
 
-        irc.join(self.irc_channel)
+        yield irc.join(self.irc_channel)
         self.log.info("Joined IRC channel %r", self.irc_channel)
 
         yield irc | self._handle()
