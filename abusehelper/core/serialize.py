@@ -1,5 +1,4 @@
 from base64 import b64encode, b64decode
-from idiokit import threado
 from idiokit.xmlcore import Element
 
 class AlreadyRegistered(Exception): pass
@@ -16,7 +15,7 @@ class Marshal(object):
 
         if register_common:
             self.register(dump_dict, load_dict, dict, "dict")
-            self.register(dump_list, load_list, 
+            self.register(dump_list, load_list,
                           (list, tuple, set, frozenset), "list")
             self.register(dump_int, load_int, int, "int")
             self.register(dump_float, load_float, float, "float")
