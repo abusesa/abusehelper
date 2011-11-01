@@ -27,6 +27,7 @@ class CSVArchiveBot(archivebot.ArchiveBot):
                     value = event.value(column, u"").encode("utf-8")
                     row.append(value)
                 csvfile.writerow(row)
+                archive.flush()
         finally:
             archive.flush()
             archive.close()

@@ -101,7 +101,7 @@ class Customer(object):
             setattr(self, key, value)
 
     def __iter__(self):
-        template = "Subject: AbuseHelper report for " + self.name + "\n"
+        template = "Subject: AbuseHelper report for " + self.name + "\n\n"
         template += self.template
 
         yield (sources_room
