@@ -54,6 +54,7 @@ class IRCFeedBot(bot.FeedBot):
         self.log.info("Connecting to IRC server %r port %d",
                       self.irc_host, self.irc_port)
         irc = yield connect(self.irc_host, self.irc_port, self.irc_own_nick,
+                            password=self.irc_password,
                             ssl=self.irc_use_ssl,
                             ssl_verify_cert=not self.irc_ignore_cert,
                             ssl_ca_certs=self.irc_extra_ca_certs)
