@@ -12,6 +12,7 @@ import time
 import errno
 
 import idiokit
+from idiokit import timer
 from abusehelper.core import bot, taskfarm, services, events
 
 def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
@@ -70,19 +71,36 @@ class ArchiveBot(bot.ServiceBot):
         except services.Stop:
             idiokit.stop()
 
-    @idiokit.stream
     def collect(self, room_name):
+        collect = self._collect(room_name)
+        idiokit.pipe(self._alert(), collect)
+        return collect
+
+    @idiokit.stream
+    def _alert(self, flush_interval=2.0):
+        while True:
+            yield timer.sleep(flush_interval)
+            yield idiokit.send()
+
+    @idiokit.stream
+    def _collect(self, room_name):
         room_name = unicode(room_name).encode("utf-8")
         archive = open(os.path.join(self.archive_dir, room_name), "ab")
+        needs_flush = False
 
         try:
             while True:
                 event = yield idiokit.next()
 
+                if event is None:
+                    if needs_flush:
+                        archive.flush()
+                        needs_flush = False
+                    continue
+
                 timestamp = time.time()
                 archive.write(self.format(timestamp, event))
-
-                archive.flush()
+                needs_flush = True
         finally:
             archive.flush()
             archive.close()
