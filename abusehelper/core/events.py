@@ -1,7 +1,6 @@
 import re
 import os
 import gzip
-import codecs
 import inspect
 from cStringIO import StringIO
 
@@ -82,67 +81,7 @@ def _normalize(value):
     msg = "expected a string value, got the value %r of type %s" % (value, name)
     raise TypeError(msg)
 
-_ENCODING = "utf-8"
-_encoder = codecs.getencoder(_ENCODING)
-_decoder = codecs.getdecoder(_ENCODING)
-
-def _internal(string):
-    return _encoder(string)[0]
-
-def _external(string):
-    return _decoder(string)[0]
-
 EVENT_NS = "abusehelper#event"
-
-def _bisect(items, key, value):
-    """
-    >>> _bisect([], "a", "b")
-    0
-    >>> _bisect(["a", "b"], "a", "b")
-    0
-    >>> _bisect(["a", "a", "a", "c"], "a", "b")
-    2
-    """
-
-    lo = 0
-    hi = len(items) // 2
-
-    while lo < hi:
-        mid = (lo + hi) // 2
-        mid2 = 2 * mid
-        mid_key = items[mid2]
-
-        if mid_key < key:
-            lo = mid + 1
-        elif mid_key > key:
-            hi = mid
-        elif items[mid2 + 1] < value:
-            lo = mid + 1
-        else:
-            hi = mid
-
-    return 2 * lo
-
-def _zip(items, start=0):
-    """
-    >>> list(_zip([1, 2, 3, 4]))
-    [(1, 2), (3, 4)]
-    >>> list(_zip([1, 2, 3, 4], 2))
-    [(3, 4)]
-    """
-
-    for idx in xrange(start, len(items), 2):
-        yield items[idx], items[idx+1]
-
-def _unzip(items):
-    """
-    >>> list(_unzip([(1, 2), (3, 4)]))
-    [1, 2, 3, 4]
-    """
-
-    for left, right in items:
-        yield left
-        yield right
 
 _UNICODE_QUOTE_CHECK = re.compile(r'[\s"\\,=]', re.U)
 _UNICODE_QUOTE = re.compile(r'["\\]', re.U)
@@ -175,7 +114,7 @@ def _unicode_parse_part(string, start):
     return u"", end
 
 class Event(object):
-    __slots__ = ["_items"]
+    __slots__ = ["_attrs"]
 
     _UNDEFINED = object()
 
@@ -265,13 +204,11 @@ class Event(object):
         ((u'\\xe4', u'\\xe4'),)
         """
 
-        if events:
-            items = set()
-            for event in events:
-                items.update(_zip(event._items))
-            self._items = tuple(_unzip(sorted(items)))
-        else:
-            self._items = ()
+        self._attrs = dict()
+
+        for event in events:
+            for key, value in event.items():
+                self.add(key, value)
 
     def add(self, key, value, *values):
         """Add value(s) for a key.
@@ -317,19 +254,10 @@ class Event(object):
         False
         """
 
-        key = intern(_internal(_normalize(key)))
-        items = self._items
-        length = len(items)
-
-        for value in values:
-            value = _internal(_normalize(value))
-            idx = _bisect(items, key, value)
-
-            if idx >= length or items[idx] != key or items[idx+1] != value:
-                items = items[:idx] + (key, value) + items[idx:]
-                length += 2
-
-        self._items = items
+        key = _normalize(key)
+        if key not in self._attrs:
+            self._attrs[key] = set()
+        self._attrs[key].update(_normalize(value) for value in values)
 
     def discard(self, key, value, *values):
         """Discard some value(s) of a key.
@@ -349,19 +277,13 @@ class Event(object):
         ()
         """
 
-        key = _internal(_normalize(key))
-        items = self._items
-        length = len(items)
-
-        for value in (value,) + values:
-            value = _internal(_normalize(value))
-            idx = _bisect(items, key, value)
-
-            if idx < length and items[idx] == key and items[idx+1] == value:
-                items = items[:idx] + items[idx+2:]
-                length -= 2
-
-        self._items = items
+        key = _normalize(key)
+        if key not in self._attrs:
+            return
+        valueset = self._attrs[key]
+        valueset.difference_update(_normalize(value) for value in (value,) + values)
+        if not valueset:
+            del self._attrs[key]
 
     def clear(self, key):
         """Clear all values of a key.
@@ -378,60 +300,33 @@ class Event(object):
         >>> event.clear("key")
         """
 
-        key = _internal(_normalize(key))
-        items = self._items
-        length = len(items)
-
-        start = _bisect(items, key, "")
-        end = start
-        while end < length and items[end] == key:
-            end += 2
-
-        self._items = items[:start] + items[end:]
-
-    def _iteritems(self, key, parser, filter):
-        """Iterate through parsed and filtered values of either a
-        specific key or all keys.
-
-        Regression test, start iterating from the correct index when
-        iterating through values for a given key:
-
-        >>> event = Event()
-        >>> event.add("a", "1")
-        >>> event.add("b", "2")
-        >>> list(event._iteritems("b", None, None))
-        [(u'b', u'2')]
-        """
-
-        if key is self._UNDEFINED:
-            for key, value in _zip(self._items):
-                value = _external(value)
-                if parser is not None:
-                    value = parser(value)
-
-                if filter is None and value is None:
-                    continue
-                if filter is not None and not filter(value):
-                    continue
-                yield _external(key), value
-            return
-
         key = _normalize(key)
-        internal_key = _internal(key)
-        idx = _bisect(self._items, internal_key, "")
-        for other_key, value in _zip(self._items, idx):
-            if other_key != internal_key:
-                break
+        self._attrs.pop(key, None)
 
-            value = _external(value)
-            if parser is not None:
-                value = parser(value)
+    def _unkeyed(self):
+        for values in self._attrs.itervalues():
+            for value in values:
+                yield value
 
-            if filter is None and value is None:
-                continue
-            if filter is not None and not filter(value):
-                continue
-            yield key, value
+    def _iter(self, key, parser, filter):
+        if key is self._UNDEFINED:
+            values = set(self._unkeyed())
+        else:
+            key = _normalize(key)
+            values = self._attrs.get(key, ())
+
+        if parser is not None:
+            parsed = (parser(x) for x in values)
+
+            if filter is not None:
+                return (x for x in parsed if filter(x))
+            else:
+                return (x for x in parsed if x is not None)
+
+        if filter is not None:
+            return (x for x in values if filter(x))
+
+        return values
 
     def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return a tuple of event values (for a specific key, if
@@ -464,7 +359,7 @@ class Event(object):
         ['1.2.3.4', '10.10.10.10']
         """
 
-        return tuple(x[1] for x in self._iteritems(key, parser, filter))
+        return tuple(self._iter(key, parser, filter))
 
     def value(self, key=_UNDEFINED, default=_UNDEFINED,
               parser=None, filter=None):
@@ -523,7 +418,7 @@ class Event(object):
         KeyError: 'other'
         """
 
-        for _, value in self._iteritems(key, parser, filter):
+        for value in self._iter(key, parser, filter):
             return value
 
         if default is self._UNDEFINED:
@@ -569,12 +464,29 @@ class Event(object):
         False
         """
 
-        undef = self._UNDEFINED
+        if key is self._UNDEFINED:
+            values = set(self._unkeyed())
+        else:
+            key = _normalize(key)
+            values = self._attrs.get(key, ())
 
-        for _, parsed in self._iteritems(key, parser, filter):
-            if value is undef or parsed == value:
+        if parser is not None:
+            parsed = (parser(x) for x in values)
+
+            if filter is not None:
+                filtered = (x for x in parsed if filter(x))
+            else:
+                filtered = (x for x in parsed if x is not None)
+        elif filter is not None:
+            filtered = (x for x in values if filter(x))
+        else:
+            filtered = values
+
+        if value is self._UNDEFINED:
+            for _ in filtered:
                 return True
-        return False
+            return False
+        return value in set(values)
 
     def items(self, parser=None, filter=None):
         """Return a tuple of key-value pairs contained by the event.
@@ -600,7 +512,19 @@ class Event(object):
         The order of the key-value pairs is undefined.
         """
 
-        return tuple(self._iteritems(self._UNDEFINED, parser, filter))
+        result = list()
+
+        for key, values in self._attrs.iteritems():
+            for value in values:
+                if parser is not None:
+                    value = parser(value)
+                if filter is not None and not filter(value):
+                    continue
+                if filter is None and value is None:
+                    continue
+                result.append((key, value))
+
+        return tuple(result)
 
     def keys(self, parser=None, filter=None):
         """Return a tuple of keys with at least one value.
@@ -625,26 +549,8 @@ class Event(object):
         [u'key']
         """
 
-        keys = list()
-        prev_key = None
-
-        for key, value in _zip(self._items):
-            if key == prev_key:
-                continue
-            prev_key = None
-
-            value = _external(value)
-            if parser is not None:
-                value = parser(value)
-
-            if filter is None and value is None:
-                continue
-            if filter is not None and not filter(value):
-                continue
-            keys.append(_external(key))
-            prev_key = key
-
-        return tuple(keys)
+        return tuple(key for key in self._attrs
+                     if self.contains(key, parser=parser, filter=filter))
 
     def to_element(self):
         event = Element("event", xmlns=EVENT_NS)
@@ -660,7 +566,7 @@ class Event(object):
     def __eq__(self, other):
         if not isinstance(other, Event):
             return NotImplemented
-        return other._items == self._items
+        return other._attrs == self._attrs
 
     def __ne__(self, other):
         value = self.__eq__(other)
