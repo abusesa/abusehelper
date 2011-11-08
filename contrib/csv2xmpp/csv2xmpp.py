@@ -13,6 +13,30 @@ class CSV2XMPP(bot.XMPPBot):
     csv_columns = bot.ListParam(default=None)
     timestamp_column = bot.Param(default=None)
     xmpp_room = bot.Param()
+    add_values = bot.ListParam("List of key/values to be added to every event." +
+                           'example: "key1=value1,key1=value2,key3=value3"',
+                           default=dict())
+
+    def __init__(self, **keys):
+        bot.XMPPBot.__init__(self, **keys)
+
+        if self.add_values:
+            temp = dict()
+            for pair in self.add_values:
+                key_value = pair.split("=")
+                if len(key_value) < 2:
+                    continue
+                values = temp.setdefault(key_value[0], set())
+                values.add("=".join(key_value[1:]))
+            self.add_values = temp
+
+    @threado.stream
+    def _add_values(inner, self):
+        while True:
+            event = yield inner
+            for key in self.add_values:
+                event.add(key, *self.add_values[key])
+            inner.send(event)
 
     @threado.stream
     def main(inner, self):
@@ -27,11 +51,14 @@ class CSV2XMPP(bot.XMPPBot):
 
         if self.timestamp_column == None:
             yield inner.sub(utils.csv_to_events(fileobj, self.csv_delimiter, self.csv_columns)
+                            | self._add_values()
                             | events.events_to_elements()
                             | room)
         else:
             yield inner.sub(utils.csv_to_events(fileobj, self.csv_delimiter, self.csv_columns)
-                            | events_to_elements_with_delay_element(self.timestamp_column) |room)
+                            | self._add_values()
+                            | events_to_elements_with_delay_element(self.timestamp_column)
+                            | room)
 
 @threado.stream
 def events_to_elements_with_delay_element(inner,timestamp_column):
