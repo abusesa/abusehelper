@@ -1,5 +1,0 @@
-@newgroup _abusehe:901
-@newuser _abusehe:901:_abusehe:daemon:AbuseHelper account:/var/empty:/bin/sh
-@owner _abusehe
-@group _abusehe
-
