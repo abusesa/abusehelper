@@ -267,10 +267,36 @@ class Bot(object):
     def run(self):
         pass
 
+import time
 import getpass
+import collections
+
 import idiokit
+from idiokit import timer
 from idiokit.xmpp import connect
 from abusehelper.core import log
+
+@idiokit.stream
+def output_rate_limiter(rate):
+    queue = collections.deque()
+
+    while True:
+        msg = yield idiokit.next()
+
+        now = time.time()
+        queue.append(now + 1.0)
+
+        while True:
+            while queue and now > queue[0]:
+                queue.popleft()
+
+            if not queue or len(queue) <= rate:
+                break
+
+            yield timer.sleep(queue[0] - now)
+            now = time.time()
+
+        yield idiokit.send(msg)
 
 class XMPPBot(Bot):
     xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
@@ -283,6 +309,8 @@ class XMPPBot(Bot):
                                 "in addition to the system CAs", default=None)
     xmpp_ignore_cert = BoolParam("do not perform any verification "+
                                  "for the XMPP service's SSL certificate")
+    xmpp_rate_limit = IntParam("how many XMPP stanzas the bot can send per "+
+                               "second (default: no limit)", default=None)
 
     def __init__(self, **keys):
         Bot.__init__(self, **keys)
@@ -301,11 +329,17 @@ class XMPPBot(Bot):
     def xmpp_connect(self):
         verify_cert = not self.xmpp_ignore_cert
 
+        if self.xmpp_rate_limit is not None:
+            limiter = output_rate_limiter(self.xmpp_rate_limit)
+        else:
+            limiter = None
+
         self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
         xmpp = yield connect(self.xmpp_jid,
                              self.xmpp_password,
                              host=self.xmpp_host,
                              port=self.xmpp_port,
+                             rate_limiter=limiter,
                              ssl_verify_cert=verify_cert,
                              ssl_ca_certs=self.xmpp_extra_ca_certs)
         self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
@@ -480,11 +514,8 @@ class FeedBot(ServiceBot):
             event = yield idiokit.next()
             yield idiokit.send(event)
 
-import time
 import codecs
-import collections
 from hashlib import md5
-from idiokit import timer
 
 _utf8encoder = codecs.getencoder("utf-8")
 
