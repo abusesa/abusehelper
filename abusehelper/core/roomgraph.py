@@ -1,4 +1,5 @@
 import idiokit
+from idiokit import timer
 from abusehelper.core import events, rules, taskfarm, bot, services
 
 class RoomGraphBot(bot.ServiceBot):
@@ -8,14 +9,30 @@ class RoomGraphBot(bot.ServiceBot):
         self.srcs = dict()
 
     @idiokit.stream
+    def _alert(self, interval=15.0):
+        while True:
+            yield timer.sleep(interval)
+            yield idiokit.send(None)
+
+    @idiokit.stream
     def distribute(self, name):
         count = 0
+        waiters = dict()
+
         while True:
             event = yield idiokit.next()
 
+            if event is None:
+                for waiter in waiters.itervalues():
+                    yield waiter
+                waiters.clear()
+
+                if count > 0:
+                    self.log.info("Seen %d events in room %r", count, name)
+                    count = 0
+                continue
+
             count += 1
-            if count % 100 == 0:
-                self.log.info("Seen %d events in room %r", count, name)
 
             classifier = self.srcs.get(name, None)
             if classifier is None:
@@ -23,19 +40,27 @@ class RoomGraphBot(bot.ServiceBot):
 
             for dst_room in classifier.classify(event):
                 dst = self.rooms.get(dst_room)
+
+                if dst_room in waiters:
+                    yield waiters.pop(dst_room)
+
                 if dst is not None:
-                    yield dst.send(event)
+                    waiters[dst_room] = dst.send(event)
 
     @idiokit.stream
     def handle_room(self, name):
         self.log.info("Joining room %r", name)
         room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
+
+        distribute = self.distribute(name)
+        idiokit.pipe(self._alert() | distribute)
+
         try:
             yield idiokit.pipe(events.events_to_elements(),
                                room,
                                events.stanzas_to_events(),
-                               self.distribute(name))
+                               distribute)
         finally:
             self.log.info("Left room %r", name)
 
