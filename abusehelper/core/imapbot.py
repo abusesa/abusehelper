@@ -64,7 +64,7 @@ class IMAPBot(bot.FeedBot):
                         delay = min(2 * delay, max_delay)
 
                     event, name, args, keys = item
-                    if event.result().is_set():
+                    if event.result().unsafe_is_set():
                         break
 
                     try:
