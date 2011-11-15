@@ -6,6 +6,14 @@ import xml.etree.cElementTree as etree
 from idiokit import threado, timer
 from abusehelper.core import bot, events, utils
 
+def decode(s, encodings=('ascii', 'utf8', 'latin1')):
+    for encoding in encodings:
+        try:
+                return s.decode(encoding)
+        except UnicodeDecodeError:
+                pass
+    return s.decode('ascii', 'ignore')
+
 class HeadRequest(urllib2.Request):
     def get_method(self):
         return "HEAD"
@@ -55,10 +63,11 @@ class PhishtankBot(bot.PollingBot):
 
         uncompressed = bz2.decompress(fileobj.read())
         if not uncompressed:
-            return
+            return 
+        utf8_data = decode(uncompressed).encode("utf8")
 
         sites = dict()
-        for elem in etree.fromstring(uncompressed):
+        for elem in etree.fromstring(utf8_data):
             entries = elem.findall("entry")
             if not entries:
                 continue
