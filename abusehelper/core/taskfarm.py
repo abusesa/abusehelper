@@ -6,7 +6,7 @@ class Counter(object):
         self.keys = dict()
 
     def get(self, key):
-        return set(self.keys.get(key, ()))
+        return self.keys.get(key, ())
 
     def contains(self, key, value=None):
         self.inc(key, value)
@@ -39,7 +39,7 @@ class Counter(object):
 
     def __iter__(self):
         for key, values in self.keys.iteritems():
-            yield key, set(values)
+            yield key, values
 
 class TaskStopped(Exception):
     pass
