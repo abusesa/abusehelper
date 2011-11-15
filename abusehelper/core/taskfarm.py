@@ -45,9 +45,9 @@ class TaskStopped(Exception):
     pass
 
 class TaskFarm(object):
-    def __init__(self, task, throw=TaskStopped()):
+    def __init__(self, task, signal=TaskStopped()):
         self.task = task
-        self.throw = throw
+        self.signal = signal
 
         self.tasks = dict()
         self.counter = Counter()
@@ -61,7 +61,7 @@ class TaskFarm(object):
         if key not in self.tasks:
             return
         task = self.tasks.pop(key)
-        task.throw(self.throw)
+        task.signal(self.signal)
 
     @idiokit.stream
     def _inc(self, key, task):
