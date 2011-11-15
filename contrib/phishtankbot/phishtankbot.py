@@ -54,6 +54,9 @@ class PhishtankBot(bot.PollingBot):
             return
 
         uncompressed = bz2.decompress(fileobj.read())
+        if not uncompressed:
+            return
+
         sites = dict()
         for elem in etree.fromstring(uncompressed):
             entries = elem.findall("entry")
