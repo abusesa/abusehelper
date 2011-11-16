@@ -564,6 +564,7 @@ class PollingBot(FeedBot):
 
                 yield inner.sub(self.poll(*key)
                                 | self.augment()
+                                | self._add_values()
                                 | self._distribute(key))
                 expire_time = time.time() + self.poll_interval
                 self._poll_queue.append((expire_time, key))
