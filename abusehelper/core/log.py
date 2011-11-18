@@ -8,8 +8,8 @@ class RoomHandler(logging.Handler):
         logging.Handler.__init__(self)
 
         self.room = room
-        
-        formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s", 
+
+        formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
                                       "%Y-%m-%d %H:%M:%S")
         self.setFormatter(formatter)
 
@@ -21,7 +21,7 @@ class RoomHandler(logging.Handler):
             body.text = self.format(record)
 
             if event is not None:
-                self.room.send(event.to_element(), body)
+                self.room.send(event.to_elements(include_body=False), body)
             else:
                 self.room.send(body)
         except (KeyboardInterrupt, SystemExit):
@@ -79,7 +79,7 @@ class EventLogger(object):
 
         msg = _format(msg, self._formats, all_keys)
         event.add("logmsg", msg)
-        event.add("loglevel", unicode(logging.getLevelName(lvl)))        
+        event.add("loglevel", unicode(logging.getLevelName(lvl)))
         return self._logger.log(lvl, msg, **dict(extra=dict(event=event)))
 
     def derive(self, *formats, **keys):

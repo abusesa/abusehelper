@@ -36,11 +36,7 @@ class RoomGraphBot(bot.ServiceBot):
             if classifier is None:
                 continue
 
-            for element in elements.children():
-                event = events.Event.from_element(element)
-                if event is None:
-                    continue
-
+            for event in events.Event.from_elements(elements):
                 count += 1
 
                 for dst_room in classifier.classify(event):
@@ -61,9 +57,13 @@ class RoomGraphBot(bot.ServiceBot):
         distribute = self.distribute(name)
         idiokit.pipe(self._alert() | distribute)
 
+        def check(elements):
+            if name in self.srcs:
+                yield elements
+
         try:
             yield idiokit.pipe(events.events_to_elements(),
-                               room,
+                               room.map(check),
                                distribute)
         finally:
             self.log.info("Left room %r", name)

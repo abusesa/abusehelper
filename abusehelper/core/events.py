@@ -5,7 +5,7 @@ import inspect
 from cStringIO import StringIO
 
 import idiokit
-from idiokit.xmlcore import Element
+from idiokit.xmlcore import Element, Elements
 
 _ESCAPE = re.compile(u"&(?=#)|[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFF\uFFFE]",
                      re.U)
@@ -161,36 +161,32 @@ class Event(object):
             index += 1
 
     @classmethod
-    def from_element(self, element):
-        """Return an event parsed from an XML element (None if the
-        element was not suitable).
+    def from_elements(self, elements):
+        """Yield events parsed from XML element(s).
 
-        >>> element = Element("event", xmlns=EVENT_NS)
-        >>> Event.from_element(element) == Event()
+        >>> element = Element("message")
+        >>> list(Event.from_elements(element))
+        []
+        >>> element.add(Element("event", xmlns=EVENT_NS))
+        >>> list(Event.from_elements(element)) == [Event()]
         True
 
         >>> event = Event()
         >>> event.add("key", "value")
         >>> event.add("\uffff", "\x05") # include some forbidden XML chars
-        >>> Event.from_element(event.to_element()) == event
-        True
-
-        >>> element = Element("invalid")
-        >>> Event.from_element(element) is None
+        >>> element = Element("message")
+        >>> element.add(event.to_element())
+        >>> list(Event.from_elements(element)) == [event]
         True
         """
 
-        if len(element) != 1:
-            return None
-        if not element.named("event", EVENT_NS):
-            return None
-
-        event = Event()
-        for attr in element.children("attr").with_attrs("key", "value"):
-            key = _unescape(attr.get_attr("key"))
-            value = _unescape(attr.get_attr("value"))
-            event.add(key, value)
-        return event
+        for event_element in elements.children("event", EVENT_NS):
+            event = Event()
+            for attr in event_element.children("attr").with_attrs("key", "value"):
+                key = _unescape(attr.get_attr("key"))
+                value = _unescape(attr.get_attr("value"))
+                event.add(key, value)
+            yield event
 
     def __init__(self, *events):
         """
@@ -552,7 +548,7 @@ class Event(object):
         return tuple(key for key in self._attrs
                      if self.contains(key, parser=parser, filter=filter))
 
-    def to_element(self):
+    def to_elements(self, include_body=True):
         event = Element("event", xmlns=EVENT_NS)
 
         for key, value in self.items():
@@ -561,7 +557,12 @@ class Event(object):
             attr = Element("attr", key=key, value=value)
             event.add(attr)
 
-        return event
+        if not include_body:
+            return event
+
+        body = Element("body")
+        body.text = unicode(self)
+        return Elements(body, event)
 
     def __eq__(self, other):
         if not isinstance(other, Event):
@@ -596,27 +597,11 @@ class Event(object):
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
-@idiokit.stream
 def stanzas_to_events():
-    while True:
-        element = yield idiokit.next()
+    return idiokit.map(Event.from_elements)
 
-        for child in element.children():
-            event = Event.from_element(child)
-            if event is not None:
-                yield idiokit.send(event)
-
-@idiokit.stream
-def events_to_elements(include_body=True):
-    while True:
-        event = yield idiokit.next()
-
-        if include_body:
-            body = Element("body")
-            body.text = _escape(unicode(event))
-            yield idiokit.send(body, event.to_element())
-        else:
-            yield idiokit.send(event.to_element())
+def events_to_elements():
+    return idiokit.map(lambda x: (x.to_elements(),))
 
 class EventCollector(object):
     def __init__(self, compresslevel=6):
