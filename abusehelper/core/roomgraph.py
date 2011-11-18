@@ -63,7 +63,8 @@ class RoomGraphBot(bot.ServiceBot):
 
         try:
             yield idiokit.pipe(events.events_to_elements(),
-                               room.map(check),
+                               room,
+                               idiokit.map(check),
                                distribute)
         finally:
             self.log.info("Left room %r", name)
