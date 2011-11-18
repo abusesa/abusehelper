@@ -561,7 +561,7 @@ class Event(object):
             return event
 
         body = Element("body")
-        body.text = unicode(self)
+        body.text = _escape(unicode(self))
         return Elements(body, event)
 
     def __eq__(self, other):
