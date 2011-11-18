@@ -20,10 +20,10 @@ class RoomGraphBot(bot.ServiceBot):
         waiters = dict()
 
         while True:
-            event = yield idiokit.next()
+            elements = yield idiokit.next()
 
-            if event is None:
-                for waiter in waiters.itervalues():
+            if elements is None:
+                for waiter in waiters.values():
                     yield waiter
                 waiters.clear()
 
@@ -32,20 +32,25 @@ class RoomGraphBot(bot.ServiceBot):
                     count = 0
                 continue
 
-            count += 1
-
             classifier = self.srcs.get(name, None)
             if classifier is None:
                 continue
 
-            for dst_room in classifier.classify(event):
-                dst = self.rooms.get(dst_room)
+            for element in elements.children():
+                event = events.Event.from_element(element)
+                if event is None:
+                    continue
 
-                if dst_room in waiters:
-                    yield waiters.pop(dst_room)
+                count += 1
 
-                if dst is not None:
-                    waiters[dst_room] = dst.send(event)
+                for dst_room in classifier.classify(event):
+                    dst = self.rooms.get(dst_room)
+
+                    if dst_room in waiters:
+                        yield waiters.pop(dst_room)
+
+                    if dst is not None:
+                        waiters[dst_room] = dst.send(event)
 
     @idiokit.stream
     def handle_room(self, name):
@@ -59,7 +64,6 @@ class RoomGraphBot(bot.ServiceBot):
         try:
             yield idiokit.pipe(events.events_to_elements(),
                                room,
-                               events.stanzas_to_events(),
                                distribute)
         finally:
             self.log.info("Left room %r", name)
