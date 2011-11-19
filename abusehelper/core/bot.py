@@ -479,40 +479,31 @@ class FeedBot(ServiceBot):
                 yield room.send(event)
 
     def _stats(self, name, interval=60.0):
-        @idiokit.stream
-        def counter():
-            while True:
-                event = yield idiokit.next()
-                yield idiokit.send(event)
-                counter.count += 1
+        def counter(event):
+            counter.count += 1
+            return (event,)
         counter.count = 0
-
-        def log():
-            if counter.count > 0:
-                self.log.info("Sent %d events to room %r", counter.count, name)
-            counter.count = 0
 
         @idiokit.stream
         def logger():
-            try:
-                yield timer.sleep(interval / 2.0)
-                log()
+            sleep = interval / 2.0
 
-                while True:
-                    yield timer.sleep(interval)
-                    log()
-            finally:
-                log()
+            while True:
+                try:
+                    yield timer.sleep(sleep)
+                finally:
+                    if counter.count > 0:
+                        self.log.info("Sent %d events to room %r", counter.count, name)
+                        counter.count = 0
 
-        result = counter()
+                sleep = interval
+
+        result = idiokit.map(counter)
         idiokit.pipe(logger(), result)
         return result
 
-    @idiokit.stream
     def augment(self):
-        while True:
-            event = yield idiokit.next()
-            yield idiokit.send(event)
+        return idiokit.map(lambda x: (x,))
 
 import codecs
 from hashlib import md5
