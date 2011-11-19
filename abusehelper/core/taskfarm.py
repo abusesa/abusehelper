@@ -1,5 +1,5 @@
 import idiokit
-from idiokit import callqueue
+from idiokit import callqueue, timer
 
 class Counter(object):
     def __init__(self):
@@ -45,9 +45,10 @@ class TaskStopped(Exception):
     pass
 
 class TaskFarm(object):
-    def __init__(self, task, signal=TaskStopped()):
+    def __init__(self, task, signal=TaskStopped(), grace_period=1.0):
         self.task = task
         self.signal = signal
+        self.grace_period = grace_period
 
         self.tasks = dict()
         self.counter = Counter()
@@ -55,30 +56,28 @@ class TaskFarm(object):
     def _key(self, *args, **keys):
         return tuple(args), frozenset(keys.items())
 
-    def _check(self, key):
-        if self.counter.contains(key):
-            return
-        if key not in self.tasks:
-            return
-        task = self.tasks.pop(key)
-        task.signal(self.signal)
-
     @idiokit.stream
-    def _inc(self, key, task):
+    def _cleanup(self, key):
         try:
-            yield task.fork()
+            yield idiokit.consume()
         finally:
             if self.counter.dec(key):
-                callqueue.add(self._check, key)
+                yield timer.sleep(self.grace_period)
+
+                if not self.counter.contains(key) and key in self.tasks:
+                    task = self.tasks.pop(key)
+                    task.signal(self.signal)
 
     def inc(self, *args, **keys):
         key = self._key(*args, **keys)
 
-        if self.counter.inc(key):
+        if self.counter.inc(key) and key not in self.tasks:
             self.tasks[key] = self.task(*args, **keys)
         task = self.tasks[key]
 
-        return self._inc(key, task)
+        fork = task.fork()
+        idiokit.pipe(self._cleanup(key), fork)
+        return fork
 
     def get(self, *args, **keys):
         key = self._key(*args, **keys)
