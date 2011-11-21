@@ -68,26 +68,41 @@ def embed_eids():
         yield idiokit.send(event)
 
 class Expert(RoomBot):
+    def __init__(self, *args, **keys):
+        RoomBot.__init__(self, *args, **keys)
+        self._augments = taskfarm.TaskFarm(self._handle_augment)
+
+    def _handle_augment(self, src_room, dst_room, args):
+        return (self.from_room(src_room)
+                | events.stanzas_to_events()
+                | ignore_augmentations(src_room == dst_room)
+                | create_eids()
+                | self.augment(*args)
+                | embed_eids()
+                | events.events_to_elements()
+                | self.to_room(dst_room))
+
     @idiokit.stream
-    def augment(self):
+    def session(self, state, src_room, dst_room=None, **keys):
+        if dst_room is None:
+            dst_room = src_room
+
+        augments = list()
+        for args in self.augment_keys(src_room=src_room,
+                                      dst_room=dst_room,
+                                      **keys):
+            augments.append(self._augments.inc(src_room, dst_room, args))
+        yield idiokit.pipe(*augments)
+
+    def augment_keys(self, *args, **keys):
+        yield ()
+
+    @idiokit.stream
+    def augment(inner, self):
         while True:
             eid, event = yield idiokit.next()
             # Skip augmenting by default.
             # Implement yield idiokit.send(eid, augmentation).
-
-    @idiokit.stream
-    def session(self, state, src_room, dst_room=None):
-        if dst_room is None:
-            dst_room = src_room
-
-        yield (self.from_room(src_room)
-               | events.stanzas_to_events()
-               | ignore_augmentations(src_room == dst_room)
-               | create_eids()
-               | self.augment()
-               | embed_eids()
-               | events.events_to_elements()
-               | self.to_room(dst_room))
 
 class Combiner(RoomBot):
     @idiokit.stream

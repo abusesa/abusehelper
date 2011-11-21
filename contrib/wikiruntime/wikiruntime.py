@@ -158,12 +158,12 @@ class WikiRuntimeBot(RuntimeBot):
         try:
             self.wiki = opencollab.wiki.GraphingWiki(self.url)
         except socket.error, e:
-            self.log.error("Failed connecting to %s" % self.url)
+            self.log.error("Failed connecting to %s", self.url)
 
         try:
             success = self.wiki.authenticate(self.user, self.password)
         except opencollab.wiki.WikiFailure, e:
-            self.log.error("Invalid path to wiki: %s" % self.url)
+            self.log.error("Invalid path to wiki: %s", self.url)
             raise opencollab.wiki.WikiFailure, e
 
         if not success:
@@ -180,13 +180,13 @@ class WikiRuntimeBot(RuntimeBot):
             try:
                 self.connect()
             except Exception, e:
-                self.log.info("Could not reconnect to wiki: %r" % e)
+                self.log.info("Could not reconnect to wiki: %r", e)
                 return dict()
 
             try:
                 pages = self.wiki.getMeta(category)
             except Exception, e:
-                self.log.info("Failed to get category %s: %r" % category, e)
+                self.log.info("Failed to get category %s: %r", category, e)
                 return dict()
 
         result = dict()

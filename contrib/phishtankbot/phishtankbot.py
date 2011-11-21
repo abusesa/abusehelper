@@ -6,6 +6,14 @@ import xml.etree.cElementTree as etree
 import idiokit
 from abusehelper.core import bot, events, utils
 
+def decode(s, encodings=('ascii', 'utf8', 'latin1')):
+    for encoding in encodings:
+        try:
+            return s.decode(encoding)
+        except UnicodeDecodeError:
+             pass
+    return s.decode('ascii', 'ignore')
+
 class HeadRequest(urllib2.Request):
     def get_method(self):
         return "HEAD"
@@ -52,10 +60,11 @@ class PhishtankBot(bot.PollingBot):
             return
 
         uncompressed = bz2.decompress(fileobj.read())
+        utf8_data = decode(uncompressed).encode("utf8")
         try:
-            elements = etree.fromstring(uncompressed)
+            elements = etree.fromstring(utf8_data)
         except SyntaxError, e:
-            self.log.error('Syntax error in report "%s": %r ', 
+            self.log.error('Syntax error in report "%s": %r ',
                            self.full_feed, e)
             return
 
