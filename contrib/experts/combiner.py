@@ -108,26 +108,41 @@ def embed_eids(inner):
         inner.send(event)
 
 class Expert(RoomBot):
+    def __init__(self, *args, **keys):
+        RoomBot.__init__(self, *args, **keys)
+        self._augments = taskfarm.TaskFarm(self._handle_augment)
+
+    def _handle_augment(self, src_room, dst_room, args):
+        return (self.from_room(src_room)
+                | events.stanzas_to_events()
+                | ignore_augmentations(src_room == dst_room)
+                | create_eids()
+                | self.augment(*args)
+                | embed_eids()
+                | events.events_to_elements()
+                | self.to_room(dst_room))
+
+    @threado.stream
+    def session(inner, self, state, src_room, dst_room=None, **keys):
+        if dst_room is None:
+            dst_room = src_room
+
+        augments = list()
+        for args in self.augment_keys(src_room=src_room,
+                                      dst_room=dst_room,
+                                      **keys):
+            augments.append(self._augments.inc(src_room, dst_room, args))
+        yield inner.sub(threado.pipe(*augments))
+
+    def augment_keys(self, *args, **keys):
+        yield ()
+
     @threado.stream
     def augment(inner, self):
         while True:
             eid, event = yield inner
             # Skip augmenting by default.
             # Implement inner.send(eid, augmentation).
-
-    @threado.stream
-    def session(inner, self, state, src_room, dst_room=None):
-        if dst_room is None:
-            dst_room = src_room
-
-        yield inner.sub(self.from_room(src_room)
-                        | events.stanzas_to_events()
-                        | ignore_augmentations(src_room == dst_room)
-                        | create_eids()
-                        | self.augment()
-                        | embed_eids()
-                        | events.events_to_elements()
-                        | self.to_room(dst_room))
 
 class Combiner(RoomBot):
     @threado.stream

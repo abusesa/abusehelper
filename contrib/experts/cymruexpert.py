@@ -53,12 +53,12 @@ class CymruWhoisExpert(combiner.Expert):
             try:
                 ip, values = yield inner
 
-                for eid in local_pending.pop(ip, ()):
+                for eid, prefix in local_pending.pop(ip, ()):
                     augmentation = events.Event()
 
                     for key, value in zip(self.LINE_KEYS, values):
                         if value is not None:
-                            augmentation.add(key, value)
+                            augmentation.add(prefix + key, value)
 
                     inner.send(eid, augmentation)
             except threado.Finished:
@@ -66,12 +66,12 @@ class CymruWhoisExpert(combiner.Expert):
                 global_main.send()
 
     @threado.stream
-    def _collect(inner, self, key, channel, local_pending, global_pending):
+    def _collect(inner, self, key, prefix, channel, local_pending, global_pending):
         while True:
             eid, event = yield inner
 
             for ip in event.values(key):
-                local_pending.setdefault(ip, set()).add(eid)
+                local_pending.setdefault(ip, set()).add((eid, prefix))
 
                 values = self.cache.get(ip, None)
                 if values is not None:
@@ -79,8 +79,16 @@ class CymruWhoisExpert(combiner.Expert):
                 else:
                     global_pending.setdefault(ip, set()).add(channel)
 
+    def augment_keys(self, keys=["ip"], **_):
+        for key in keys:
+            if isinstance(key, basestring):
+                prefix = ""
+            else:
+                key, prefix = key
+            yield key, prefix
+
     @threado.stream
-    def augment(inner, self, key="ip"):
+    def augment(inner, self, key, prefix):
         if self.global_main is None:
             self.global_main = self.main_loop(self.global_channels,
                                               self.global_pending)
@@ -91,7 +99,7 @@ class CymruWhoisExpert(combiner.Expert):
 
         local_pending = dict()
         forward = self._forward(global_main, local_pending)
-        collect = self._collect(key, forward, local_pending, global_pending)
+        collect = self._collect(key, prefix, forward, local_pending, global_pending)
 
         global_channels.add(forward)
 
