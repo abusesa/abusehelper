@@ -229,57 +229,70 @@ class Lobby(idiokit.Proxy):
             self.xmpp.core.message(jid, end)
             self._discard_session(jid, session_id)
 
-import sqlite3
-from cPickle import loads, dumps, HIGHEST_PROTOCOL
-from idiokit import timer
+import os
+import fcntl
+import errno
+import cPickle as pickle
+
+def lock_file_nonblocking(fileobj):
+    # Use fcntl.flock instead of fcntl.lockf. lockf on pypy 1.7 seems
+    # to ignore existing locks.
+
+    try:
+        fcntl.flock(fileobj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError, ioe:
+        if ioe.errno not in (errno.EACCES, errno.EAGAIN):
+            raise
+        return False
+    return True
+
+def unlock_file(fileobj):
+    fcntl.flock(fileobj, fcntl.LOCK_UN)
 
 class Service(object):
     def __init__(self, state_file=None):
+        self.file = None
         self.sessions = dict()
 
-        if state_file is None:
-            self.db = sqlite3.connect(":memory:")
-        else:
-            self.db = sqlite3.connect(state_file)
-        self.db.execute("CREATE TABLE IF NOT EXISTS states "+
-                        "(key UNIQUE, state)")
-        self.db.commit()
+        if state_file is not None:
+            self.file = open(state_file, "w+b")
+            if not lock_file_nonblocking(self.file):
+                raise RuntimeError("state file %r already in use" % state_file)
 
-        self.root_key = ""
+            try:
+                self.sessions = pickle.load(self.file)
+            except EOFError:
+                pass
+
         self.errors = idiokit.consume()
 
     def _get(self, key):
-        for state, in self.db.execute("SELECT state FROM states "+
-                                      "WHERE key = ?", (key,)):
-            return loads(str(state))
-        return None
+        return self.sessions.get(key, None)
 
     def _put(self, key, state):
-        self.db.execute("DELETE FROM states WHERE key = ?", (key,))
-        if state is not None:
-            state = sqlite3.Binary(dumps(state, HIGHEST_PROTOCOL))
-            self.db.execute("INSERT INTO states(key, state) VALUES(?, ?)",
-                            (key, state))
-
-    def path_key(self, path):
-        bites = list()
-        for bite in path:
-            bite = bite.encode("unicode-escape")
-            bites.append(bite.replace("/", r"\/"))
-        return "/" + "/".join(bites)
+        if state is None:
+            self.sessions.pop(key, None)
+        else:
+            self.sessions[key] = state
 
     @idiokit.stream
     def run(self):
-        state = self._get(self.root_key)
-        self._put(self.root_key, None)
+        state = self._get(None)
+        self._put(None, None)
 
         try:
             state = yield self.errors | self.kill_sessions() | self.main(state)
         finally:
-            self._put(self.root_key, state)
+            self._put(None, state)
 
-            self.db.commit()
-            self.db.close()
+            if self.file is not None:
+                self.file.seek(0)
+                self.file.truncate(0)
+                pickle.dump(self.sessions, self.file, pickle.HIGHEST_PROTOCOL)
+
+                self.file.flush()
+                unlock_file(self.file)
+                self.file.close()
 
     @idiokit.stream
     def kill_sessions(self):
@@ -297,31 +310,30 @@ class Service(object):
     @idiokit.stream
     def open_session(self, path, conf):
         @idiokit.stream
-        def _guarded(path, key, session):
+        def _guarded(path, session):
             try:
                 state = yield session
             except:
                 self.errors.signal()
                 raise
             else:
-                if key is not None:
-                    self._put(key, state)
+                if path is not None:
+                    self._put(path, state)
             finally:
-                del self.sessions[path]
+                if path is not None:
+                    del self.sessions[path]
 
         if path is None:
-            path = object()
-            session = _guarded(path, None, self.session(None, **conf))
+            session = _guarded(None, self.session(None, **conf))
         else:
             while path in self.sessions:
                 old_session = self.sessions[path]
                 yield old_session.signal(Stop())
                 yield old_session
 
-            key = self.path_key(path)
-            state = self._get(key)
-            session = _guarded(path, key, self.session(state, **conf))
-            self._put(key, None)
+            state = self._get(path)
+            session = _guarded(path, self.session(state, **conf))
+            self._put(path, None)
 
         self.sessions[path] = session
         idiokit.stop(self.errors.fork() | session)
