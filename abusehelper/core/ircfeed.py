@@ -76,7 +76,7 @@ class IRCFeedService(IRCFeedBot):
             return None
 
         event = events.Event()
-        event.add("type", match.group(1))
+        event.add("type", match.group(1).lower())
 
         fields = re.findall(field_rex, match.group(2) or "")
         for key, value in fields:
