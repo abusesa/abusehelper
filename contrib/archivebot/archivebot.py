@@ -43,6 +43,9 @@ def ensure_dir(dir_name):
 
 class ArchiveBot(bot.ServiceBot):
     archive_dir = bot.Param("directory where archive files are written")
+    rollover = bot.Param("timestamp to do rollover, rollover happens when the " 
+                         "timestamp changes eg. %Y-%m-%d means rollover per day. "
+                         "Rollover is also used as the file name.", default=None)
     bot_state_file = None
 
     def __init__(self, *args, **keys):
@@ -85,8 +88,13 @@ class ArchiveBot(bot.ServiceBot):
     @idiokit.stream
     def _collect(self, room_name):
         room_name = unicode(room_name).encode("utf-8")
-        archive = open(os.path.join(self.archive_dir, room_name), "ab")
+        archivename = os.path.join(self.archive_dir, room_name)
+        archive = open(archivename, "ab")
         needs_flush = False
+
+        previous_rollover = None
+        if self.rollover:
+            previous_rollover = isoformat(time.time(), self.rollover)
 
         try:
             while True:
@@ -99,6 +107,15 @@ class ArchiveBot(bot.ServiceBot):
                     continue
 
                 timestamp = time.time()
+                if self.rollover:
+                    new = isoformat(timestamp, self.rollover)
+                    if new != previous_rollover:
+                        newname = "%s.%s" % (archivename, new)
+                        self.log.info("Rolling over %r to %r", archivename, new)
+                        archive.close()
+                        os.rename(archivename, newname)
+                        previous_rollover = new
+                        archive = open(archivename, "ab")
                 archive.write(self.format(timestamp, event))
                 needs_flush = True
         finally:
