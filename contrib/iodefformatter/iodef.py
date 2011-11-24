@@ -18,7 +18,7 @@ def node_id_and_text(parent, nodename, text=None, **kw):
 
     return node
 
-HEADER = u"""<?xml version=\"1.0\" ?>
+HEADER = """<?xml version=\"1.0\" ?>
 <!DOCTYPE IODEF-Message PUBLIC "-//IETF//DTD RFC 5070 IODEF v1.0//EN" "IODEF-Document.dtd">
 """
 
@@ -64,7 +64,7 @@ class XMLFormatter(templates.Formatter):
         top.set_attr('xsi:schemaLocation',
                      "https://www.cert.fi/autoreporter/IODEF-Document.xsd")
 
-        serialized = [HEADER, top.serialize_open().decode("utf-8")]
+        serialized = [HEADER, top.serialize_open()]
 
         def ts_to_xml(ts):
             return ts.replace(' ', 'T') + '+00:00'
@@ -137,7 +137,9 @@ class XMLFormatter(templates.Formatter):
                 node_id_and_text(node, 'Address', value,
                                  category='asn')
 
-            serialized.append(inc_tag.serialize().decode("utf-8"))
+            serialized.append(inc_tag.serialize())
 
-        serialized.append(inc_tag.serialize_close().decode("utf-8"))
-        return u"".join(serialized)
+        serialized.append(top.serialize_close())
+        serialized = "".join(serialized)
+        serialized = serialized.decode("utf-8")
+        return serialized
