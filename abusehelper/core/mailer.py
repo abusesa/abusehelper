@@ -64,9 +64,12 @@ class ReportBot(bot.ServiceBot):
         while True:
             event = yield idiokit.next()
 
-            collectors = self.collectors.get(name)
-            for collector in collectors:
-                yield collector.send(event)
+            collectors = self.collectors.get(name, ())
+            for collector in tuple(collectors):
+                try:
+                    yield collector.send(event)
+                except idiokit.BrokenPipe:
+                    pass
 
     @idiokit.stream
     def main(self, queue):
@@ -90,20 +93,14 @@ class ReportBot(bot.ServiceBot):
         keys = dict(keys)
         keys["src_room"] = src_room
 
-        @idiokit.stream
-        def _alert():
-            while True:
-                yield idiokit.next()
-                yield idiokit.send(self.REPORT_NOW)
+        def _alert(_):
+            yield self.REPORT_NOW
 
-        @idiokit.stream
-        def _collect():
-            while True:
-                item = yield idiokit.next()
-                self.queue.append((item, keys))
+        def _collect(item):
+            self.queue.append((item, keys))
 
-        collector = self.collect(state, **keys) | _collect()
-        idiokit.pipe(self.alert(**keys), _alert(), collector)
+        collector = self.collect(state, **keys) | idiokit.map(_collect)
+        idiokit.pipe(self.alert(**keys), idiokit.map(_alert), collector)
         self.collectors.setdefault(src_room, set()).add(collector)
 
         try:
@@ -125,13 +122,14 @@ class ReportBot(bot.ServiceBot):
         if state is None:
             state = events.EventCollector()
 
+        def _collect(event):
+            if event is self.REPORT_NOW:
+                yield state.purge()
+            else:
+                state.append(event)
+
         try:
-            while True:
-                event = yield idiokit.next()
-                if event is self.REPORT_NOW:
-                    yield idiokit.send(state.purge())
-                else:
-                    state.append(event)
+            yield idiokit.map(_collect)
         except services.Stop:
             idiokit.stop(state)
 
@@ -327,11 +325,14 @@ class MailerService(ReportBot):
         msg["Message-ID"] = make_msgid()
         subject = msg.get("Subject", "")
 
-        msg_data = msg.as_string()
-
         mail_to = msg.get_all("To", list()) + msg.get_all("Cc", list())
         mail_to = [addr for (name, addr) in getaddresses(mail_to)]
         mail_to = filter(None, [x.strip() for x in mail_to])
+
+        # No need to keep both the mail object and mail data in memory.
+        msg_data = msg.as_string()
+        del msg
+
         for address in mail_to:
             while True:
                 result = yield self._try_to_send(from_addr[1], address, subject, msg_data)
