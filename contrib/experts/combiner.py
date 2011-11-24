@@ -68,7 +68,7 @@ import time
 import codecs
 import collections
 from hashlib import sha1
-from abusehelper.core import events
+from abusehelper.core import events, services
 
 _encoder = codecs.getencoder("utf-8")
 
@@ -132,7 +132,11 @@ class Expert(RoomBot):
                                       dst_room=dst_room,
                                       **keys):
             augments.append(self._augments.inc(src_room, dst_room, args))
-        yield inner.sub(threado.pipe(*augments))
+
+        try:
+            yield inner.sub(threado.pipe(*augments))
+        except services.Stop:
+            inner.finish()
 
     def augment_keys(self, *args, **keys):
         yield ()
