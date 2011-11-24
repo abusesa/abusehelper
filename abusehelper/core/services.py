@@ -349,6 +349,8 @@ class Service(threado.GeneratorStream):
                 state = yield inner.sub(session)
                 if path is not None:
                     self._put(key, state)
+            except Stop:
+                pass
             finally:
                 del self.sessions[path]
 
