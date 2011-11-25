@@ -101,12 +101,16 @@ class ReportBot(bot.ServiceBot):
         @threado.stream
         def _alert(inner):
             alert = self.alert(**keys)
-            while True:
-                source, item = yield threado.any(inner, alert)
-                if inner is source:
-                    inner.send(item)
-                else:
-                    inner.send(self.REPORT_NOW)
+
+            try:
+                while True:
+                    source, item = yield threado.any(inner, alert)
+                    if inner is source:
+                        inner.send(item)
+                    else:
+                        inner.send(self.REPORT_NOW)
+            except:
+                alert.rethrow()
 
         @threado.stream
         def _collect(inner):
