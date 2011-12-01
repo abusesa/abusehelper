@@ -236,7 +236,7 @@ class ANYTHING(_Rule):
     def __repr__(self):
         return self.__class__.__name__ + "()"
 
-    def match(self, obj, cache):
+    def match(self, obj, cache=None):
         return True
     match_with_cache = match
 ANYTHING.serialize_register()
