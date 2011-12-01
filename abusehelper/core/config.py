@@ -1,13 +1,13 @@
 import os
 import sys
 import imp
-import hashlib
 import inspect
+import compiler
 
 def base_dir(depth=1):
     calling_frame = inspect.stack()[depth]
     calling_file = calling_frame[1]
-    return os.path.dirname(os.path.abspath(calling_file))    
+    return os.path.dirname(os.path.abspath(calling_file))
 
 def relative_path(*path):
     return os.path.abspath(os.path.join(base_dir(depth=2), *path))
@@ -24,16 +24,24 @@ def load_module(module_name, relative_to_caller=True):
         found = imp.find_module(name, paths)
         sys.modules.pop(name, None)
         return imp.load_module(name, *found)
-    
+
     if relative_to_caller:
         module_name = os.path.join(base, module_name)
+
     module_file = open(module_name, "r")
     try:
-        name = hashlib.md5(module_name).hexdigest()
-        sys.modules.pop(name, None)
-        return imp.load_source(name, module_name, module_file)
+        source = module_file.read()
     finally:
         module_file.close()
+
+    code = compiler.compile(source, module_name, "exec")
+    namespace = dict()
+    exec code in dict(), namespace
+
+    module = imp.new_module(module_name)
+    for key, value in namespace.iteritems():
+        setattr(module, key, value)
+    return module
 
 def flatten(obj):
     """
@@ -67,7 +75,8 @@ def flatten(obj):
 def load_configs(module_name, config_name="configs"):
     module = load_module(module_name, False)
     if not hasattr(module, config_name):
-        raise ImportError("no %r defined in module %r" % (module, config_name))
+        raise ImportError("no %r defined in module %r" %
+                          (config_name, module.__name__))
 
     config_attr = getattr(module, config_name)
     return flatten(config_attr)

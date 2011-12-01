@@ -313,6 +313,8 @@ class Service(object):
         def _guarded(path, session):
             try:
                 state = yield session
+            except Stop:
+                state = None
             except:
                 self.errors.signal()
                 raise
