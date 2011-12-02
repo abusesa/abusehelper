@@ -36,7 +36,6 @@ def configs():
               smtp_auth_user="@SMTP_AUTH_USER@",
               smtp_auth_password="@SMTP_AUTH_PASSWORD@",
               mail_sender="@MAIL_SENDER@")
-    yield Bot("wikibot")
     yield Bot("dshield")
     yield Bot("roomgraph")
     yield Bot("historian")
