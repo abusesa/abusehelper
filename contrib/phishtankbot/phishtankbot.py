@@ -6,13 +6,13 @@ import xml.etree.cElementTree as etree
 from idiokit import threado, timer
 from abusehelper.core import bot, events, utils
 
-def decode(s, encodings=('ascii', 'utf8', 'latin1')):
+def decode(s, encodings=['latin1']):
     for encoding in encodings:
         try:
-                return s.decode(encoding)
+            return s.decode(encoding)
         except UnicodeDecodeError:
-                pass
-    return s.decode('ascii', 'ignore')
+            pass
+    return s.decode('utf-8', 'ignore')
 
 class HeadRequest(urllib2.Request):
     def get_method(self):
