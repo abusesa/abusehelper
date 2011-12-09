@@ -2,7 +2,6 @@ import os
 import sys
 import imp
 import inspect
-import compiler
 import hashlib
 
 def base_dir(depth=1):
