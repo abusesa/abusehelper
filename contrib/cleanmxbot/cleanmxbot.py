@@ -11,7 +11,7 @@ from abusehelper.core import bot, events, utils
 import httplib, urllib
 import csv
 
-def decode(text, encodings=('latin1')):
+def decode(text, encodings=['latin1']):
     for encoding in encodings:
         try:
             return text.decode(encoding)

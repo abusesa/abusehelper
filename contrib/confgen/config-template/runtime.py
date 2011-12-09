@@ -122,15 +122,6 @@ def load_template(name):
             template_file.close()
     return template_cache[name]
 
-def wiki(customer):
-    return Session("wikibot", 
-                   customer.prefix, customer.name,
-                   wiki_url=customer.wiki_url, 
-                   wiki_user=customer.wiki_user, 
-                   wiki_password=customer.wiki_password,
-                   wiki_type=customer.wiki_type,
-                   parent=customer.wiki_parent)
-
 def mail(customer):
     template = load_template(customer.mail_template)
     return Session("mailer",
@@ -145,12 +136,6 @@ class Customer(Base):
     types = None # Default: all types
     reports = [] # Default: no reporting
 
-    wiki_url = "https://wiki.example.com"
-    wiki_user = "wikiuser"
-    wiki_password = "wikipassword"
-    wiki_type = "opencollab"
-    wiki_parent = None
-
     mail_to = []
     mail_cc = []
     mail_template = "default"
@@ -158,7 +143,6 @@ class Customer(Base):
 
     def __init__(self, name, **attrs):
         self.name = name
-        self.wiki_parent = name
 
         for key, value in attrs.items():
             setattr(self, key, value)
@@ -195,8 +179,7 @@ def configs():
     # Customer definitions
     yield Customer("unknown_to_mail",
                    asns=["3 +127.0.0.1/16"],
-                   reports=[mail, wiki], 
+                   reports=[mail], 
                    types=["unknown"])
-    yield Customer("all_to_wiki",
-                   asns=[1, 2, 3], 
-                   reports=[wiki])
+    yield Customer("all_to_room",
+                   asns=[1, 2, 3])

@@ -35,11 +35,14 @@ def load_module(module_name, relative_to_caller=True):
         module_file.close()
 
     code = compiler.compile(source, module_name, "exec")
-    namespace = dict()
-    exec code in dict(), namespace
+
+    local_namespace = dict()
+    global_namespace = dict()
+    exec code in global_namespace, local_namespace
+    global_namespace.update(local_namespace)
 
     module = imp.new_module(module_name)
-    for key, value in namespace.iteritems():
+    for key, value in local_namespace.iteritems():
         setattr(module, key, value)
     return module
 
