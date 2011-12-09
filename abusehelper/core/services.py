@@ -234,6 +234,14 @@ import fcntl
 import errno
 import cPickle as pickle
 
+O_BINARY = getattr(os, "O_BINARY", 0)
+
+def open_file(filename):
+    # Open file, create if necessary.
+
+    fd = os.open(filename, os.O_RDWR | os.O_CREAT | O_BINARY)
+    return os.fdopen(fd, "r+b")
+
 def lock_file_nonblocking(fileobj):
     # Use fcntl.flock instead of fcntl.lockf. lockf on pypy 1.7 seems
     # to ignore existing locks.
@@ -253,27 +261,32 @@ class Service(object):
     def __init__(self, state_file=None):
         self.file = None
         self.sessions = dict()
+        self.state = dict()
 
         if state_file is not None:
-            self.file = open(state_file, "w+b")
-            if not lock_file_nonblocking(self.file):
-                raise RuntimeError("state file %r already in use" % state_file)
+            self.file = open_file(state_file)
+            try:
+                if not lock_file_nonblocking(self.file):
+                    raise RuntimeError("state file %r already in use" % state_file)
+            except:
+                self.file.close()
+                raise
 
             try:
-                self.sessions = pickle.load(self.file)
+                self.state = pickle.load(self.file)
             except EOFError:
                 pass
 
         self.errors = idiokit.consume()
 
     def _get(self, key):
-        return self.sessions.get(key, None)
+        return self.state.get(key, None)
 
     def _put(self, key, state):
         if state is None:
-            self.sessions.pop(key, None)
+            self.state.pop(key, None)
         else:
-            self.sessions[key] = state
+            self.state[key] = state
 
     @idiokit.stream
     def run(self):
@@ -288,7 +301,7 @@ class Service(object):
             if self.file is not None:
                 self.file.seek(0)
                 self.file.truncate(0)
-                pickle.dump(self.sessions, self.file, pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.state, self.file, pickle.HIGHEST_PROTOCOL)
 
                 self.file.flush()
                 unlock_file(self.file)
