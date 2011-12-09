@@ -194,9 +194,9 @@ class RuntimeBot(bot.XMPPBot):
                 self.log.info("Stopped waiting for %r", name)
                 break
 
-            conf_str = "\n".join(" %r=%r" % item for item
-                                 in session.conf.items())
-            self.log.info("Sent %r conf:\n%s", name, conf_str)
+            conf_str = ", ".join("%s=%r" % (key.encode("unicode-escape"), value)
+                                 for (key, value) in session.conf.items())
+            self.log.info("Sent %r conf: %s", name, conf_str)
 
             try:
                 yield stream
@@ -205,6 +205,12 @@ class RuntimeBot(bot.XMPPBot):
             except Cancel:
                 self.log.info("Ended connection to %r", name)
                 break
+
+    def run(self):
+        try:
+            return bot.XMPPBot.run(self)
+        except idiokit.Signal:
+            pass
 
 class DefaultRuntimeBot(RuntimeBot):
     config = bot.Param("configuration module")

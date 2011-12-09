@@ -397,7 +397,13 @@ class ServiceBot(XMPPBot):
             self.log.info("Retired service %r", self.bot_name)
 
     def run(self):
-        return idiokit.main_loop(self._run())#, throw_on_signal=services.Stop())
+        @idiokit.stream
+        def throw_stop_on_signal():
+            try:
+                yield idiokit.consume()
+            except idiokit.Signal:
+                raise services.Stop()
+        return idiokit.main_loop(throw_stop_on_signal() | self._run())
 
     @idiokit.stream
     def main(self, state):
