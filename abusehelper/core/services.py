@@ -310,7 +310,7 @@ class Service(object):
     @idiokit.stream
     def open_session(self, path, conf):
         @idiokit.stream
-        def _guarded(path, session):
+        def _guarded(key, path, session):
             try:
                 state = yield session
             except Stop:
@@ -322,22 +322,23 @@ class Service(object):
                 if path is not None:
                     self._put(path, state)
             finally:
-                if path is not None:
-                    del self.sessions[path]
+                del self.sessions[key]
 
         if path is None:
-            session = _guarded(None, self.session(None, **conf))
+            key = object()
+            session = _guarded(key, None, self.session(None, **conf))
         else:
-            while path in self.sessions:
-                old_session = self.sessions[path]
+            key = path
+            while key in self.sessions:
+                old_session = self.sessions[key]
                 yield old_session.signal(Stop())
                 yield old_session
 
             state = self._get(path)
-            session = _guarded(path, self.session(state, **conf))
+            session = _guarded(key, path, self.session(state, **conf))
             self._put(path, None)
 
-        self.sessions[path] = session
+        self.sessions[key] = session
         idiokit.stop(self.errors.fork() | session)
 
     @idiokit.stream
