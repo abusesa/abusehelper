@@ -23,7 +23,7 @@ def generate(base_path, version=None):
         version = _parse_hg_archival(base_path)
 
     _generate_version_module(VERSION=version)
-    
+
     global VERSION
     VERSION = version
 
@@ -65,3 +65,6 @@ def _generate_version_module(**keys):
             print >> module_file, ("%s = %r" % (key, value))
     finally:
         module_file.close()
+
+if __name__ == "__main__":
+    print version_str()
