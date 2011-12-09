@@ -3,6 +3,7 @@ import sys
 import imp
 import inspect
 import compiler
+import hashlib
 
 def base_dir(depth=1):
     calling_frame = inspect.stack()[depth]
@@ -30,21 +31,11 @@ def load_module(module_name, relative_to_caller=True):
 
     module_file = open(module_name, "r")
     try:
-        source = module_file.read()
+        name = hashlib.md5(module_name).hexdigest()
+        sys.modules.pop(name, None)
+        return imp.load_source(name, module_name, module_file)
     finally:
         module_file.close()
-
-    code = compiler.compile(source, module_name, "exec")
-
-    local_namespace = dict()
-    global_namespace = dict()
-    exec code in global_namespace, local_namespace
-    global_namespace.update(local_namespace)
-
-    module = imp.new_module(module_name)
-    for key, value in local_namespace.iteritems():
-        setattr(module, key, value)
-    return module
 
 def flatten(obj):
     """
@@ -79,7 +70,7 @@ def load_configs(module_name, config_name="configs"):
     module = load_module(module_name, False)
     if not hasattr(module, config_name):
         raise ImportError("no %r defined in module %r" %
-                          (config_name, module.__name__))
+                          (config_name, module_name))
 
     config_attr = getattr(module, config_name)
     return flatten(config_attr)
