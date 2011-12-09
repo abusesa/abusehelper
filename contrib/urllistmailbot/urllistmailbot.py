@@ -69,12 +69,16 @@ class URLListMailBot(imapbot.IMAPBot):
                 self.log.info("Could not resolve host %r: %r", host, error)
                 continue
 
+            addresses = set()
             for family, _, _, _, sockaddr in addrinfo:
                 if family not in (socket.AF_INET, socket.AF_INET6):
                     continue
+                addresses.add(sockaddr[0])
+
+            for address in addresses:
                 event = events.Event()
                 event.add("url", url)
-                event.add("ip", sockaddr[0])
+                event.add("ip", address)
                 yield idiokit.send(event)
 
     def augment(self):
