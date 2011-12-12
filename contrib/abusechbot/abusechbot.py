@@ -38,6 +38,10 @@ class RSSBot(bot.PollingBot):
                         pubdate = item.find("pubdate")
                         if pubdate is not None:
                             pubdate = pubdate.text
+                        if not pubdate:
+                            pubdate = item.find("pubDate")
+                            if pubdate is not None:
+                                pubdate = pubdate.text
 
                         event = self.create_event(title,link,
                                                   description,pubdate,url)
