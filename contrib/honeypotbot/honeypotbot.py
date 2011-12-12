@@ -6,8 +6,6 @@ import idiokit
 from abusehelper.core import bot, events, utils, config
 from abusehelper.contrib.abusechbot.abusechbot import RSSBot
 
-sanitizer = config.load_module("sanitizer")
-
 class ProjectHoneyPotBot(RSSBot):
     feeds = bot.ListParam(default=[
             "http://www.projecthoneypot.org/list_of_ips.php?rss=1"])
@@ -55,7 +53,7 @@ class ProjectHoneyPotBot(RSSBot):
         if pubdate:
             try:
                 ts = strptime(pubdate, '%B %d %Y %I:%M:%S %p')
-                pubtime = strftime(sanitizer.REPORT_FORMAT, ts)
+                pubtime = strftime("%Y-%m-%d %H:%M:%S", ts)
                 
                 event.add('pubtime', pubtime)
             except ValueError:
