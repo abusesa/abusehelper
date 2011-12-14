@@ -13,6 +13,22 @@ def generate_version():
     return version_module.version_str()
 version = generate_version()
 
+def collect_package_data(src, dst):
+    paths = list()
+
+    cwd = os.getcwd()
+    try:
+        os.chdir(src)
+
+        for dirpath, dirnames, filenames in os.walk(dst):
+            for filename in filenames:
+                normalized = os.path.normpath(os.path.join(dirpath, filename))
+                paths.append(os.path.normpath(normalized))
+    finally:
+        os.chdir(cwd)
+
+    return paths
+
 install_other("idiokit")
 
 setup(
@@ -59,12 +75,8 @@ setup(
         "abusehelper.contrib.experts": "contrib/experts",
 	},
     package_data={
-        "abusehelper.contrib.confgen": [
-            "confgen/*.py",
-            "confgen/config-template/*.py",
-            "confgen/config-template/custom/*.py",
-            "confgen/config-template/template/default"
-        ]
+        "abusehelper.contrib.confgen":
+            collect_package_data("contrib/confgen", "config-template")
     },
     scripts=[
         "scripts/abusehelperctl",
