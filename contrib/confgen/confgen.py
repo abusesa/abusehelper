@@ -51,45 +51,48 @@ def parse_jid(string):
     except UnicodeDecodeError:
         return value
 
-dirname = os.path.dirname(__file__)
+def main():
+    if len(sys.argv) != 2:
+        print >> sys.stderr, "USAGE:", sys.executable, sys.argv[0], "CONFIGDIR"
+        sys.exit(1)
 
-if len(sys.argv) != 2:
-    print >> sys.stderr, "USAGE:", sys.argv[0], "CONFIGDIR"
-    sys.exit(1)
+    dirname = os.path.dirname(__file__)
+    src = os.path.join(dirname, "config-template")
+    dst = sys.argv[1]
 
-src = os.path.join(dirname, "config-template")
-dst = sys.argv[1]
-
-try:
-    shutil.copytree(src, dst)
     try:
-        replaces = dict(XMPP_JID=input("XMPP username", parser=parse_jid),
-                        XMPP_PASSWORD=input("XMPP password"),
-                        SERVICE_ROOM=input("Lobby"),
-                        SMTP_HOST=input("SMTP host"),
-                        SMTP_PORT=input("SMTP port", 25, int))
+        shutil.copytree(src, dst)
+        try:
+            replaces = dict(XMPP_JID=input("XMPP username", parser=parse_jid),
+                            XMPP_PASSWORD=input("XMPP password"),
+                            SERVICE_ROOM=input("Lobby"),
+                            SMTP_HOST=input("SMTP host"),
+                            SMTP_PORT=input("SMTP port", 25, int))
 
-        no_auth = dummy("no auth")
-        smtp_auth_user = input("SMTP auth user", no_auth)
-        if smtp_auth_user is no_auth:
-            smtp_auth_user = None
-            smtp_auth_password = None
-        else:
-            smtp_auth_password = input("SMTP auth password")
+            no_auth = dummy("no auth")
+            smtp_auth_user = input("SMTP auth user", no_auth)
+            if smtp_auth_user is no_auth:
+                smtp_auth_user = None
+                smtp_auth_password = None
+            else:
+                smtp_auth_password = input("SMTP auth password")
 
-        replaces.update(SMTP_AUTH_USER=smtp_auth_user,
-                        SMTP_AUTH_PASSWORD=smtp_auth_password,
-                        MAIL_SENDER=input("Mail sender"))
-        
-        with open(os.path.join(dst, "startup.py"), "r+") as startup_file:
-            startup = replace(startup_file.read(), replaces)
+            replaces.update(SMTP_AUTH_USER=smtp_auth_user,
+                            SMTP_AUTH_PASSWORD=smtp_auth_password,
+                            MAIL_SENDER=input("Mail sender"))
 
-            startup_file.seek(0)
-            startup_file.truncate(0)
-            startup_file.write(startup)
-    except:
-        shutil.rmtree(dst)
-        raise
-except Exception, error:
-    print >> sys.stderr, "ERROR:", error
-    sys.exit(1)
+            with open(os.path.join(dst, "startup.py"), "r+") as startup_file:
+                startup = replace(startup_file.read(), replaces)
+
+                startup_file.seek(0)
+                startup_file.truncate(0)
+                startup_file.write(startup)
+        except:
+            shutil.rmtree(dst)
+            raise
+    except Exception, error:
+        print >> sys.stderr, "ERROR:", error
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
