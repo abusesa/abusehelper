@@ -2,66 +2,7 @@ import urllib2
 import xml.etree.cElementTree as etree
 import idiokit
 from abusehelper.core import bot, events, utils
-
-class RSSBot(bot.PollingBot):
-    feeds = bot.ListParam("URLs to the RSS feeds")
-
-    @idiokit.stream
-    def poll(self, _):
-        for url in self.feeds:
-            try:
-                self.log.info('Downloading feed from: "%s"', url)
-                _, fileobj = yield utils.fetch_url(url)
-            except utils.FetchUrlFailed, e:
-                self.log.error('Failed to download feed "%s": %r', url, e)
-                return
-
-            try:
-                for _, elem in etree.iterparse(fileobj):
-                    items = elem.findall("item")
-                    if not items:
-                        continue
-
-                    for item in items:
-                        title = item.find("title")
-                        if title is not None:
-                            title = title.text
-
-                        link = item.find("link")
-                        if link is not None:
-                            link = link.text
-
-                        description = item.find("description")
-                        if description is not None:
-                            description = description.text
-
-                        pubdate = item.find("pubdate")
-                        if pubdate is not None:
-                            pubdate = pubdate.text
-                        if not pubdate:
-                            pubdate = item.find("pubDate")
-                            if pubdate is not None:
-                                pubdate = pubdate.text
-
-                        event = self.create_event(title,link,
-                                                  description,pubdate,url)
-                        if event:
-                            yield idiokit.send(event)
-            except SyntaxError, e:
-                self.log.error('Syntax error in feed "%s": %r', url, e)
-                continue
-
-    def create_event(self, title, link, description, pubdate, url=''):
-        event = events.Event()
-        if title:
-            event.add("title", title)
-        if link:
-            event.add("link", link)
-        if description:
-            event.add("description", description)
-        if pubdate:
-            event.add("pubdate", pubdate)
-        return event
+from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 class AbuseCHBot(RSSBot):
     feeds = bot.ListParam(default=[

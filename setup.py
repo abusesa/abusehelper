@@ -8,18 +8,35 @@ def generate_version():
 
     module_info = imp.find_module("version", [module_path])
     version_module = imp.load_module("version", *module_info)
-    
+
     version_module.generate(base_path)
     return version_module.version_str()
 version = generate_version()
 
+def collect_package_data(src, dst):
+    paths = list()
+
+    cwd = os.getcwd()
+    try:
+        os.chdir(src)
+
+        for dirpath, dirnames, filenames in os.walk(dst):
+            for filename in filenames:
+                normalized = os.path.normpath(os.path.join(dirpath, filename))
+                paths.append(os.path.normpath(normalized))
+    finally:
+        os.chdir(cwd)
+
+    return paths
+
 install_other("idiokit")
 
-setup(name="abusehelper",
-      version="2." + version,
-      packages=[
-        "abusehelper", 
-        "abusehelper.core", 
+setup(
+    name="abusehelper",
+    version="2." + version,
+    packages=[
+        "abusehelper",
+        "abusehelper.core",
         "abusehelper.contrib",
         "abusehelper.contrib.confgen",
         "abusehelper.contrib.archivebot",
@@ -31,6 +48,7 @@ setup(name="abusehelper",
         "abusehelper.contrib.wikiruntime",
         "abusehelper.contrib.arbor",
         "abusehelper.contrib.dragon",
+        "abusehelper.contrib.rssbot",
         "abusehelper.contrib.abusechbot",
         "abusehelper.contrib.honeypotbot",
         "abusehelper.contrib.cleanmxbot",
@@ -40,7 +58,7 @@ setup(name="abusehelper",
         "abusehelper.contrib.urllistmailbot",
         "abusehelper.contrib.experts"],
       package_dir={
-        "abusehelper.contrib": "contrib",	
+        "abusehelper.contrib": "contrib",
         "abusehelper.contrib.confgen": "contrib/confgen",
         "abusehelper.contrib.archivebot": "contrib/archivebot",
         "abusehelper.contrib.bridgebot": "contrib/bridgebot",
@@ -51,6 +69,7 @@ setup(name="abusehelper",
         "abusehelper.contrib.wikiruntime": "contrib/wikiruntime",
         "abusehelper.contrib.arbor": "contrib/arbor",
         "abusehelper.contrib.dragon": "contrib/dragon",
+        "abusehelper.contrib.rssbot": "contrib/rssbot",
         "abusehelper.contrib.abusechbot": "contrib/abusechbot",
         "abusehelper.contrib.honeypotbot": "contrib/honeypotbot",
         "abusehelper.contrib.cleanmxbot": "contrib/cleanmxbot",
@@ -60,35 +79,22 @@ setup(name="abusehelper",
         "abusehelper.contrib.mdlbot": "contrib/mdlbot/",
         "abusehelper.contrib.experts": "contrib/experts",
 	},
-      package_data={
+    package_data={
         "abusehelper.contrib.confgen":
-            [
-            "confgen/*.py",
-            "confgen/config-template/*.py",
-            "confgen/config-template/custom/*.py",
-            "confgen/config-template/template/default"
-            ]
-        },
-      description="A framework for receiving and redistributing abuse feeds",
-      long_description="AbuseHelper is a modular, scalable and robust " + \
-          "framework to help you in your abuse handling.",
-      author="Clarified Networks",
-      author_email="contact@clarifiednetworks.com",
-      url="https://bitbucket.org/clarifiednetworks/abusehelper",
-      download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
-      scripts=[
+            collect_package_data("contrib/confgen", "config-template")
+    },
+    scripts=[
         "scripts/abusehelperctl",
         "scripts/roomreader"
-        ],
-      license="MIT",
-      classifiers=[
-        "Development Status :: 4 - Beta",
-        "Environment :: Other Environment",
-        "Topic :: Internet",
-        "Topic :: Security",
-        "Intended Audience :: Information Technology",
-        "Intended Audience :: Telecommunications Industry",
-        "License :: Freely Distributable",
-        "Programming Language :: Python"
-        ],
-      )
+    ],
+    description="A framework for receiving and redistributing abuse feeds",
+    long_description=(
+        "AbuseHelper is a modular, scalable and robust " +
+        "framework to help you in your abuse handling."
+    ),
+    author="Clarified Networks",
+    author_email="contact@clarifiednetworks.com",
+    url="https://bitbucket.org/clarifiednetworks/abusehelper",
+    download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
+    license="MIT"
+)
