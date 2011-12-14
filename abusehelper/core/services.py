@@ -265,14 +265,13 @@ class Lobby(threado.GeneratorStream):
 
 import sqlite3
 from cPickle import loads, dumps, HIGHEST_PROTOCOL
-from idiokit import timer
 
 class Service(threado.GeneratorStream):
     def __init__(self, state_file=None):
         threado.GeneratorStream.__init__(self)
 
         self.sessions = dict()
-        self.shutting_down = False
+        self.errors = threado.dev_null()
 
         if state_file is None:
             self.db = sqlite3.connect(":memory:")
@@ -304,17 +303,14 @@ class Service(threado.GeneratorStream):
             bites.append(bite.replace("/", r"\/"))
         return "/" + "/".join(bites)
 
-    @threado.stream
-    def _wrapped_main(inner, self):
+    def run(self):
         state = self._get(self.root_key)
         self._put(self.root_key, None)
 
-        state = yield inner.sub(self.main(state))
-        self._put(self.root_key, state)
-
-    def run(self):
         try:
-            yield self.inner.sub(self.kill_sessions() | self._wrapped_main())
+            yield self.inner.sub(self.errors
+                                 | self.kill_sessions()
+                                 | self.main(state))
         finally:
             self.db.commit()
             self.db.close()
@@ -329,8 +325,6 @@ class Service(threado.GeneratorStream):
             except threado.Finished:
                 raise Stop()
         finally:
-            self.shutting_down = True
-
             for session in self.sessions.itervalues():
                 session.throw(Stop())
 
@@ -341,8 +335,6 @@ class Service(threado.GeneratorStream):
 
     @threado.stream
     def open_session(inner, self, path, conf):
-        assert not self.shutting_down
-
         @threado.stream
         def _guarded(inner, path, key, session):
             try:
@@ -371,7 +363,7 @@ class Service(threado.GeneratorStream):
             self._put(key, None)
 
         self.sessions[path] = session
-        bind(self, session)
+        bind(self.errors, session)
         inner.finish(session)
 
     @threado.stream
