@@ -8,18 +8,19 @@ def generate_version():
 
     module_info = imp.find_module("version", [module_path])
     version_module = imp.load_module("version", *module_info)
-    
+
     version_module.generate(base_path)
     return version_module.version_str()
 version = generate_version()
 
 install_other("idiokit")
 
-setup(name="abusehelper",
-      version="2." + version,
-      packages=[
-        "abusehelper", 
-        "abusehelper.core", 
+setup(
+    name="abusehelper",
+    version="2." + version,
+    packages=[
+        "abusehelper",
+        "abusehelper.core",
         "abusehelper.contrib",
         "abusehelper.contrib.confgen",
         "abusehelper.contrib.archivebot",
@@ -36,9 +37,10 @@ setup(name="abusehelper",
         "abusehelper.contrib.cleanmxbot",
         "abusehelper.contrib.phishtankbot",
         "abusehelper.contrib.runtime2dot",
-        "abusehelper.contrib.experts"],
-      package_dir={
-        "abusehelper.contrib": "contrib",	
+        "abusehelper.contrib.experts"
+    ],
+    package_dir={
+        "abusehelper.contrib": "contrib",
         "abusehelper.contrib.confgen": "contrib/confgen",
         "abusehelper.contrib.archivebot": "contrib/archivebot",
         "abusehelper.contrib.bridgebot": "contrib/bridgebot",
@@ -56,35 +58,26 @@ setup(name="abusehelper",
         "abusehelper.contrib.runtime2dot": "contrib/runtime2dot",
         "abusehelper.contrib.experts": "contrib/experts",
 	},
-      package_data={
-        "abusehelper.contrib.confgen":
-            [
+    package_data={
+        "abusehelper.contrib.confgen": [
             "confgen/*.py",
             "confgen/config-template/*.py",
             "confgen/config-template/custom/*.py",
             "confgen/config-template/template/default"
-            ]
-        },
-      description="A framework for receiving and redistributing abuse feeds",
-      long_description="AbuseHelper is a modular, scalable and robust " + \
-          "framework to help you in your abuse handling.",
-      author="Clarified Networks",
-      author_email="contact@clarifiednetworks.com",
-      url="https://bitbucket.org/clarifiednetworks/abusehelper",
-      download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
-      scripts=[
+        ]
+    },
+    scripts=[
         "scripts/abusehelperctl",
         "scripts/roomreader"
-        ],
-      license="MIT",
-      classifiers=[
-        "Development Status :: 4 - Beta",
-        "Environment :: Other Environment",
-        "Topic :: Internet",
-        "Topic :: Security",
-        "Intended Audience :: Information Technology",
-        "Intended Audience :: Telecommunications Industry",
-        "License :: Freely Distributable",
-        "Programming Language :: Python"
-        ],
-      )
+    ],
+    description="A framework for receiving and redistributing abuse feeds",
+    long_description=(
+        "AbuseHelper is a modular, scalable and robust " +
+        "framework to help you in your abuse handling."
+    ),
+    author="Clarified Networks",
+    author_email="contact@clarifiednetworks.com",
+    url="https://bitbucket.org/clarifiednetworks/abusehelper",
+    download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
+    license="MIT"
+)
