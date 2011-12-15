@@ -1,6 +1,3 @@
-import re
-import cStringIO
-
 import idiokit
 from idiokit import util
 from abusehelper.core import utils, cymru, bot, events
@@ -28,7 +25,7 @@ class BruteForceBlockerBot(bot.PollingBot):
             idiokit.stop(False)
         self.log.info("Downloaded")
 
-        for line in fileobj.xreadlines():
+        for line in fileobj.readlines():
             if line.startswith(';'):
                 continue
             data = line.split(';')
@@ -43,7 +40,7 @@ class BruteForceBlockerBot(bot.PollingBot):
             new.add('ip', ip)
             new.add('netblock', netblock)
             new.add('url', 
-                    "http://www.spamhaus.org/sbl/sbl.lasso?query=" % (url))
+                    "http://www.spamhaus.org/sbl/sbl.lasso?query=%s" % (sbl))
             new.add('source', 'Spamhaus DROP')
 
             yield idiokit.send(new)
