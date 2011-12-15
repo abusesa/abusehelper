@@ -3,7 +3,7 @@ import xml.etree.cElementTree as etree
 from time import strftime, strptime
 
 import idiokit
-from abusehelper.core import bot, events, utils, config
+from abusehelper.core import bot, events, utils, config, cymru
 from abusehelper.contrib.abusechbot.abusechbot import RSSBot
 
 class ProjectHoneyPotBot(RSSBot):
