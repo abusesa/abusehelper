@@ -4,7 +4,7 @@ from time import strftime, strptime
 
 import idiokit
 from abusehelper.core import bot, events, utils, config, cymru
-from abusehelper.contrib.abusechbot.abusechbot import RSSBot
+from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 class ProjectHoneyPotBot(RSSBot):
     feeds = bot.ListParam(default=[
@@ -13,7 +13,8 @@ class ProjectHoneyPotBot(RSSBot):
     def augment(self):
         return cymru.CymruWhois()
 
-    def create_event(self, title, link, description, pubdate, url=''):
+    def create_event(self, title, link, description, 
+                     pubdate, source, url='', **kw):
         if description is None:
             return None
         description = description.split(' | ')
@@ -25,6 +26,7 @@ class ProjectHoneyPotBot(RSSBot):
         ip, badness = title
 
         event = events.Event()
+        event.add('source', source)
         event.add('ip', ip)
         event.add('url', 'http://www.projecthoneypot.org/ip_%s' % (ip))
 
