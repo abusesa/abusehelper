@@ -13,20 +13,23 @@ class ProjectHoneyPotBot(RSSBot):
     def augment(self):
         return cymru.CymruWhois()
 
-    def create_event(self, title, link, description, 
-                     pubdate, source, url='', **kw):
-        if description is None:
+    def create_event(self, **kw):
+        self.log.info("Got %r", kw)
+        if not kw.get('description', ''):
             return None
-        description = description.split(' | ')
+        description = kw['description'].split(' | ')
         if len(description) < 2:
             return None
-        title = title.split(' | ')
+        if not kw.get('title', ''):
+            return None
+        title = kw.get('title').split(' | ')
         if not len(title) == 2:
             return None
         ip, badness = title
 
         event = events.Event()
-        event.add('source', source)
+        if kw.get('source', ''):
+            event.add('source', kw.get('source'))
         event.add('ip', ip)
         event.add('url', 'http://www.projecthoneypot.org/ip_%s' % (ip))
 
@@ -52,7 +55,8 @@ class ProjectHoneyPotBot(RSSBot):
                     val = val.replace(',', '')
                 event.add(descrtypes[key], val)
 
-        if pubdate:
+        if kw.get('pubDate', ''):
+            pubdate = kw.get('pubDate')
             try:
                 ts = strptime(pubdate, '%B %d %Y %I:%M:%S %p')
                 pubtime = strftime("%Y-%m-%d %H:%M:%S", ts)
