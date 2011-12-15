@@ -1,3 +1,4 @@
+import re
 import idiokit
 from idiokit import util
 from abusehelper.core import utils, cymru, bot, events
@@ -31,20 +32,8 @@ class IPListBot(bot.PollingBot):
             idiokit.stop(False)
         self.log.info("Downloaded")
 
-        for line in fileobj.readlines():
-            line = line.strip()
-            # Skip empty lines
-            if not line:
-                continue
-            # If the line does not start with a number, skip. Checking
-            # the validity of IP addresses is the job of sanitizers.
-            if not line[0].isdigit():
-                continue
-            # Assuming that the lines can contain arbitrary crap after
-            # a space, so only retain data before space and assume
-            # that it is the IP address
-            ip = line.split()[0]
-
+        data = fileobj.read()
+        for ip in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', data)
             new = events.Event()
             new.add('ip', ip)
             new.add('url', self.url)
