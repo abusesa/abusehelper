@@ -4,25 +4,28 @@ from abusehelper.core import utils, cymru, bot, events
 
 class IPListBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam(default=True)
+    url = bot.Param("IPlist URL")
+    source = bot.Param("Source name")
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
+        self.log.info("%r %r", args, keys)
         self.whois = cymru.CymruWhoisAugmenter()
 
-    def poll(self, _, url="", source=""):
+    def poll(self, _):
         if self.use_cymru_whois:
-            return self._poll(url, source) | self.whois.augment()
-        return self._poll(url)
+            return self._poll() | self.whois.augment()
+        return self._poll()
 
     @idiokit.stream
-    def _poll(self, url="", source=""):
-        if not url:
+    def _poll(self):
+        if not self.url:
             self.log.error("URL not specified!")
             idiokit.stop(False)
             
-        self.log.info("Downloading %s" % url)
+        self.log.info("Downloading %s" % self.url)
         try:
-            info, fileobj = yield utils.fetch_url(url)
+            info, fileobj = yield utils.fetch_url(self.url)
         except utils.FetchUrlFailed, fuf:
             self.log.error("Download failed: %r", fuf)
             idiokit.stop(False)
@@ -42,10 +45,11 @@ class IPListBot(bot.PollingBot):
             # that it is the IP address
             ip = line.split()[0]
 
+            new = events.Event()
             new.add('ip', ip)
-            new.add('url', url)
-            if source:
-                new.add('source', source)
+            new.add('url', self.url)
+            if self.source:
+                new.add('source', self.source)
 
             yield idiokit.send(new)
 
