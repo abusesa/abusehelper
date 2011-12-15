@@ -59,8 +59,9 @@ setup(
         "abusehelper.contrib.runtime2dot",
         "abusehelper.contrib.mdlbot",
         "abusehelper.contrib.urllistmailbot",
-        "abusehelper.contrib.experts"],
-      package_dir={
+        "abusehelper.contrib.experts"
+    ],
+    package_dir={
         "abusehelper.contrib": "contrib",
         "abusehelper.contrib.confgen": "contrib/confgen",
         "abusehelper.contrib.archivebot": "contrib/archivebot",
