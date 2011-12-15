@@ -2,8 +2,7 @@ import idiokit
 from idiokit import util
 from abusehelper.core import utils, cymru, bot, events
 
-class BruteForceBlockerBot(bot.PollingBot):
-    COLUMNS = ["ip", "lastseen", "count", "id", "url"]
+class SpamhausDropBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam(default=True)
 
     def __init__(self, *args, **keys):
@@ -21,7 +20,7 @@ class BruteForceBlockerBot(bot.PollingBot):
         try:
             info, fileobj = yield utils.fetch_url(url)
         except utils.FetchUrlFailed, fuf:
-            self.log.error("Download failed: %r", asn, fuf)
+            self.log.error("Download failed: %r", fuf)
             idiokit.stop(False)
         self.log.info("Downloaded")
 
@@ -46,4 +45,4 @@ class BruteForceBlockerBot(bot.PollingBot):
             yield idiokit.send(new)
 
 if __name__ == "__main__":
-    BruteForceBlockerBot.from_command_line().execute()
+    SpamhausDropBot.from_command_line().execute()
