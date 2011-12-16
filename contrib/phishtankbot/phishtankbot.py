@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+"""
+    Phishtank feed handler
+"""
+__authors__ = "Toni Huttunen, Joachim Viide and Jussi Eronen"
+__copyright__ = "Copyright 2011, The AbuseHelper Project"
+__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
+__maintainer__ = "Jussi Eronen"
+__email__ = "exec@iki.fi"
+
 import bz2
 import urllib2
 from datetime import datetime

@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+"""
+    Project Honeypot feed handler
+"""
+__authors__ = "Jussi Eronen"
+__copyright__ = "Copyright 2011, The AbuseHelper Project"
+__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
+__maintainer__ = "Jussi Eronen"
+__email__ = "exec@iki.fi"
+
 import urllib2
 import xml.etree.cElementTree as etree
 from time import strftime, strptime

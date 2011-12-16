@@ -1,5 +1,13 @@
-# By Jussi Eronen <exec@iki.fi> 2011
-# MIT License
+# -*- coding: utf-8 -*-
+"""
+    Mailer that does PGP signing and encryption. Needs pyme and
+    handling the PGP key store for the user that runs the bot.
+"""
+__authors__ = "Jussi Eronen and Joachim Viide"
+__copyright__ = "Copyright 2011, The AbuseHelper Project"
+__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
+__maintainer__ = "Jussi Eronen"
+__email__ = "exec@iki.fi"
 
 import pyme.core
 try:
