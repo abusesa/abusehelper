@@ -33,9 +33,20 @@ class IPListBot(bot.PollingBot):
         self.log.info("Downloaded")
 
         data = fileobj.read()
-        for ip in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', data):
+        for ip in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?!/)', data):
             new = events.Event()
             new.add('ip', ip)
+            new.add('url', self.url)
+            if self.source:
+                new.add('source', self.source)
+
+            yield idiokit.send(new)
+        for netblock in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+', 
+                                   data):
+            new = events.Event()
+            ip = netblock.split('/')[0]
+            new.add('ip', ip)
+            new.add('netblock', netblock)
             new.add('url', self.url)
             if self.source:
                 new.add('source', self.source)
