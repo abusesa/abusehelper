@@ -1,7 +1,7 @@
 import os
 import csv
 
-from idiokit import threado
+import idiokit
 from abusehelper.core import bot
 
 import archivebot
@@ -9,8 +9,8 @@ import archivebot
 class CSVArchiveBot(archivebot.ArchiveBot):
     csv_columns = bot.ListParam()
 
-    @threado.stream
-    def collect(inner, self, room_name):
+    @idiokit.stream
+    def collect(self, room_name):
         room_name = unicode(room_name).encode("utf-8")
         archive = open(os.path.join(self.archive_dir, room_name), "ab")
         csvfile = csv.writer(archive)
@@ -20,7 +20,7 @@ class CSVArchiveBot(archivebot.ArchiveBot):
                 csvfile.writerow([x.encode("utf-8") for x in self.csv_columns])
 
             while True:
-                event = yield inner
+                event = yield idiokit.next()
 
                 row = list()
                 for column in self.csv_columns:
