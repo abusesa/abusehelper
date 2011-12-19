@@ -20,7 +20,8 @@ class AbuseCHBot(RSSBot):
             "https://zeustracker.abuse.ch/rss.php",
             "http://amada.abuse.ch/palevotracker.php?rssfeed"])
 
-    def create_event(self, title, link, description, pubdate, url=''):
+    def create_event(self, title, link, description, pubdate, 
+                     url='', source=''):
         if description is None:
             return None
 
@@ -56,6 +57,8 @@ class AbuseCHBot(RSSBot):
 
         if not event.contains("asn") or not event.contains("ip"):
             return None
+
+        event.add('source', source)
 
         return event
 
