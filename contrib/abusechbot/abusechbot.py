@@ -60,7 +60,7 @@ class AbuseCHBot(RSSBot):
             return None
 
         if kw.get('source', ''):
-            event.add('source', source)
+            event.add('source', kw[source])
 
         return event
 
