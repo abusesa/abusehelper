@@ -21,7 +21,7 @@ class AbuseCHBot(RSSBot):
             "http://amada.abuse.ch/palevotracker.php?rssfeed"])
 
     def create_event(self, title, link, description, pubdate, 
-                     url='', source=''):
+                     url='', source='', **kw):
         if description is None:
             return None
 
