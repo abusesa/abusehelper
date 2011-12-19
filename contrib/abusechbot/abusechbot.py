@@ -20,10 +20,10 @@ class AbuseCHBot(RSSBot):
             "https://zeustracker.abuse.ch/rss.php",
             "http://amada.abuse.ch/palevotracker.php?rssfeed"])
 
-    def create_event(self, title, link, description, pubdate, 
-                     url='', source='', **kw):
-        if description is None:
+    def create_event(self, **kw):
+        if kw.get("description", None) == None:
             return None
+        description = kw["description"]
 
         event = events.Event()
 
@@ -48,6 +48,7 @@ class AbuseCHBot(RSSBot):
                 event.add("host", value)
             elif key == "Status":
                 event.add("status", value)
+            url = kw.get('url', '')
             if "zeus" in url:
                 event.add("malware", "zeus")
             elif "spyeye" in url:
@@ -58,7 +59,8 @@ class AbuseCHBot(RSSBot):
         if not event.contains("asn") or not event.contains("ip"):
             return None
 
-        event.add('source', source)
+        if kw.get('source', ''):
+            event.add('source', source)
 
         return event
 
