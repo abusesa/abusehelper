@@ -9,6 +9,8 @@ __maintainer__ = "Jussi Eronen"
 __email__ = "exec@iki.fi"
 
 import socket
+import idiokit
+from idiokit import threadpool
 
 from abusehelper.core import utils, cymru, bot, events
 from abusehelper.contrib.iplist.iplist import IPListBot
