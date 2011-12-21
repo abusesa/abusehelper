@@ -85,6 +85,14 @@ class PhishtankBot(bot.PollingBot):
                 if verified is None or verified.text != "yes":
                     continue
 
+                ts = verification.find("verification_time")
+                if ts != None and ts.text:
+                    try:
+                        ts=datetime.strptime(ts.text,"%Y-%m-%dT%H:%M:%S+00:00")
+                        ts=ts.strftime("%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        ts = None
+
                 status = entry.find("status")
                 if status is None:
                     continue
@@ -119,6 +127,8 @@ class PhishtankBot(bot.PollingBot):
                         event.add("host", "/".join(url.split("/")[:3])+"/")
                         event.add("ip", ip)
                         event.add("asn", announcer)
+                        if ts:
+                            event.add("time", ts)
                         inner.send(event)
 
 if __name__ == "__main__":
