@@ -20,6 +20,12 @@ class AbuseCHBot(RSSBot):
         if url:
             event.add("source", url)
 
+        title = keys.get("title", None)
+        if title:
+            parts = title.split("(")
+            if len(parts) > 1:
+                event.add("time", parts[1].rstrip(")"))
+
         for part in description.split(","):
             pair = part.split(":", 1)
             if len(pair) < 2:
