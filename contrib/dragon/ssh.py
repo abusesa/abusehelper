@@ -21,7 +21,7 @@ class DragonSshBot(bot.PollingBot):
         try:
             info, fileobj = yield inner.sub(utils.fetch_url(url))
         except utils.FetchUrlFailed, fuf:
-            self.log.error("Download failed: %r", asn, fuf)
+            self.log.error("Download failed: %r", fuf)
             return
         self.log.info("Downloaded")
 
