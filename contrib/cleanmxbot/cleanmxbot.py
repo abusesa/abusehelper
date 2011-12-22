@@ -9,7 +9,7 @@ from idiokit import threado
 from abusehelper.core import bot, events, utils
 
 import httplib, urllib
-import csv
+import csv, _csv
 
 def decode(text, encodings=['latin1']):
     for encoding in encodings:
@@ -32,7 +32,7 @@ class cleanmxbot(bot.PollingBot):
             self.log.error('Failed to download page "%s": %r', url, e)
             return
 
-        data = csv.reader(fileobj,delimiter=",",quotechar='"')
+        data = csv.reader(fileobj, delimiter=",", quotechar='"')
         fields = dict()
         for index, field in enumerate(data.next()):
             if field == "firsttime":
@@ -40,13 +40,20 @@ class cleanmxbot(bot.PollingBot):
             elif field in ["url", "ip", "domain"]:
                 fields[field] = index
     
-        for line in data:
+        while True:
+            try:
+                line = data.next()
+            except _csv.Error, e:
+                continue
+            except:
+                break
+
             if not line:
                 continue
 
             event = events.Event()
             event.add("feed", name)
-
+ 
             for field in fields:
                 try:
                     value = line[fields[field]]
