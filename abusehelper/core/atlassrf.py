@@ -74,12 +74,15 @@ class AtlasSRFBot(bot.PollingBot):
     def augment(self):
         return cymru.CymruWhois()
 
+    def feed_keys(self, *args, **keys):
+        yield (self.feed_url,)
+
     @idiokit.stream
-    def poll(self, _):
+    def poll(self, url):
         self.log.info("Downloading the report")
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
         try:
-            _, fileobj = yield utils.fetch_url(self.feed_url, opener)
+            _, fileobj = yield utils.fetch_url(url, opener)
         except utils.FetchUrlFailed, fuf:
             self.log.error("Failed to download the report: %r", fuf)
             return
