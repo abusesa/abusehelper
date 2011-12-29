@@ -143,7 +143,20 @@ def command_restart(module):
     command_start(module)
 
 def command_follow(module):
-    process = popen("tail", "-f", logpath(module),
+    height = 20
+    try:
+        process = popen("stty", "size", stdin=sys.stdin)
+    except OSError:
+        pass
+    else:
+        stdout, _ = process.communicate()
+        if process.returncode == 0:
+            try:
+                height = max(int(stdout.split()[0])-2, 0)
+            except ValueError:
+                pass
+
+    process = popen("tail", "-f", "-%d" % height, logpath(module),
                     stdout=sys.stdout,
                     stderr=sys.stderr)
     try:
