@@ -142,6 +142,16 @@ def command_restart(module):
     command_stop(module)
     command_start(module)
 
+def command_follow(module):
+    process = popen("tail", "-f", logpath(module),
+                    stdout=sys.stdout,
+                    stderr=sys.stderr)
+    try:
+        while is_running(module):
+            time.sleep(0.2)
+    finally:
+        send_signal(process.pid, signal.SIGKILL)
+
 if __name__ == "__main__":
     command = sys.argv[1]
     module = normalized_module(sys.argv[2])
