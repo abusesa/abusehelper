@@ -27,6 +27,12 @@ class AbuseCHBot(RSSBot):
 
         event = events.Event()
 
+        title = keys.get("title", None)
+        if title:
+            parts = title.split("(")
+            if len(parts) > 1:
+                event.add("time", parts[1].rstrip(")"))
+
         for part in description.split(","):
             pair = part.split(":")
             if len(pair) < 2:

@@ -69,6 +69,7 @@ setup(
     },
     scripts=[
         "scripts/abusehelperctl",
+        "scripts/botnet",
         "scripts/roomreader"
     ],
     description="A framework for receiving and redistributing abuse feeds",

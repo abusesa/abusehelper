@@ -1,0 +1,176 @@
+#!/usr/bin/env python
+
+from __future__ import with_statement, absolute_import
+
+import os
+import re
+import sys
+import time
+import errno
+import signal
+import hashlib
+import subprocess
+
+# Helpers
+
+def module_id(module):
+    return hashlib.sha1(module).hexdigest() + "-" + module
+
+def popen(*args, **keys):
+    defaults = dict(stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    stdin=subprocess.PIPE)
+    defaults.update(keys)
+    return subprocess.Popen(args, **defaults)
+
+def send_signal(pid, signum):
+    try:
+        os.kill(pid, signum)
+    except OSError, ose:
+        if ose.errno != errno.ESRCH:
+            raise
+
+def find(module):
+    process = popen("ps", "-wweo", "pid=,command=")
+    stdout, stderr = process.communicate()
+    if process.returncode != 0:
+        sys.stderr.write(stderr)
+        sys.stderr.flush()
+        sys.exit(process.returncode)
+
+    found = list()
+    rex = re.compile(r"\s" + re.escape(module_id(module)))
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        pid, command = line.split(" ", 1)
+        if rex.search(command):
+            found.append((int(pid), command))
+    return found
+
+def is_running(module):
+    return not not find(module)
+
+def _signal(module, signame, signum):
+    waiting = set()
+
+    try:
+        while True:
+            pids = find(module)
+            if not pids:
+                break
+
+            for item in pids:
+                if item in waiting:
+                    continue
+                pid, command = item
+
+                send_signal(pid, signum)
+                print "Sent %s to process %d." % (signame, pid)
+
+            waiting = set(pids)
+            time.sleep(0.2)
+    finally:
+        pids = find(module)
+        if pids:
+            print "Warning, some instances survived:"
+            print " pid=%d command=%r" % (pid, command)
+
+def normalized_module(module):
+    module = os.path.abspath(module)
+    if os.path.isdir(module):
+        module = os.path.join(module, "startup.py")
+    return module
+
+def logpath(module):
+    path, filename = os.path.split(module)
+    return os.path.join(path, "log", filename + ".log")
+
+# Commands
+
+def command_start(module):
+    if is_running(module):
+        print "Already running."
+        return
+
+    with open(logpath(module), "a") as logfile:
+        print "Starting."
+        process = popen(sys.executable,
+                        "-m", "abusehelper.core.startup", module,
+                        module_id(module),
+                        stdout=logfile,
+                        stderr=logfile,
+                        close_fds=True)
+
+    for _ in xrange(20):
+        retcode = process.poll()
+        if retcode is not None:
+            print "Warning, process died with return code %d" % retcode
+            return
+        time.sleep(0.1)
+
+def command_status(module):
+    pids = find(module)
+    if not pids:
+        print "Not running."
+        return
+
+    if len(pids) == 1:
+        print "1 instance running:"
+    else:
+        print "%d instances running:" % len(pids)
+
+    for pid, command in pids:
+        print " pid=%d command=%r" % (pid, command)
+
+def command_stop(module):
+    if not is_running(module):
+        print "Nothing running."
+    else:
+        print "Shutting down."
+        _signal(module, "SIGTERM", signal.SIGTERM)
+
+def command_kill(module):
+    if not is_running(module):
+        print "Nothing running."
+    else:
+        print "Forcefully shutting down."
+        _signal(module, "SIGKILL", signal.SIGKILL)
+
+def command_restart(module):
+    command_stop(module)
+    command_start(module)
+
+def command_follow(module):
+    height = 20
+    try:
+        process = popen("stty", "size", stdin=sys.stdin)
+    except OSError:
+        pass
+    else:
+        stdout, _ = process.communicate()
+        if process.returncode == 0:
+            try:
+                height = max(int(stdout.split()[0])-2, 0)
+            except ValueError:
+                pass
+
+    process = popen("tail", "-f", "-%d" % height, logpath(module),
+                    stdout=sys.stdout,
+                    stderr=sys.stderr)
+    try:
+        while is_running(module):
+            time.sleep(0.2)
+    finally:
+        send_signal(process.pid, signal.SIGKILL)
+
+if __name__ == "__main__":
+    command = sys.argv[1]
+    module = normalized_module(sys.argv[2])
+
+    command_func = globals().get("command_" + command.lower())
+    if not callable(command_func):
+        raise Exception("no command %r" % command)
+
+    command_func(module)

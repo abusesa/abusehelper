@@ -1,9 +1,12 @@
+from __future__ import with_statement
+
 import os
 import sys
 import time
 import errno
 import heapq
 import signal
+import contextlib
 import subprocess
 import cPickle as pickle
 from abusehelper.core import bot, config
@@ -59,7 +62,25 @@ class Bot(object):
     def __startup__(self):
         return self
 
+@contextlib.contextmanager
+def signal_handler(handler):
+    signums = [signal.SIGTERM, signal.SIGINT]
+    old_handlers = dict((x, signal.getsignal(x)) for x in signums)
+
+    try:
+        for signum in signums:
+            signal.signal(signum, handler)
+        yield
+    finally:
+        for signum, old_handler in old_handlers.items():
+            signal.signal(signum, old_handler)
+
+class Signal(Exception):
+    pass
+
 class StartupBot(bot.Bot):
+    grace_period = bot.IntParam(default=None)
+
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
 
@@ -72,7 +93,7 @@ class StartupBot(bot.Bot):
     def strategy(self, conf, delay=15):
         while True:
             yield conf
-            
+
             self.log.info("Relaunching %r in %d seconds", conf.name, delay)
             yield delay
 
@@ -100,7 +121,7 @@ class StartupBot(bot.Bot):
             pickle.dump(conf.params, process.stdin)
             process.stdin.flush()
         except IOError, ioe:
-            self.log.error("Failed sending configuration to bot %r: %r", 
+            self.log.error("Failed sending configuration to bot %r: %r",
                            conf.name, ioe)
 
         return process
@@ -111,7 +132,7 @@ class StartupBot(bot.Bot):
                 continue
 
             if process is not None and process.poll() is not None:
-                self.log.info("Bot %r exited with return value %d", 
+                self.log.info("Bot %r exited with return value %d",
                               conf.name, process.poll())
 
             self._processes.remove((process, strategy, conf))
@@ -146,43 +167,74 @@ class StartupBot(bot.Bot):
             strategy.close()
         self._strategies = list()
 
-    def run(self, poll_interval=0.1):
-        def signal_handler(sig, frame):
-            sys.exit()
-        signal.signal(signal.SIGTERM, signal_handler)
+    def _cleanup(self, signame, signum, poll_interval, wait_time=None):
+        self._poll()
+        self._close()
+        if not self._processes:
+            return
 
-        try:
-            for conf in iter_startups(config.flatten(self.configs())):
-                strategy = self.strategy(conf)
-                heapq.heappush(self._strategies, (time.time(), strategy))
+        self.log.info("Sending %s to alive bots" % (signame,))
+        self._signal(signum)
 
-            while self._strategies or self._processes:
-                self._poll()
-
-                for conf, strategy in self._purge():
-                    self.log.info("Launching bot %r from module %r", 
-                                  conf.name, conf.module)
-                    process = self._launch(conf)
-                    self._processes.add((process, strategy, conf))
-
-                time.sleep(poll_interval)
-        finally:
+        start = time.time()
+        while True:
             self._poll()
+            self._close()
+            if not self._processes:
+                return
 
-            if self._processes:
-                self.log.info("Sending SIGTERM to alive bots")
-                self._signal(signal.SIGTERM)
-
-            while self._processes or self._strategies:
-                self._poll()
-                self._close()
+            if wait_time is None:
                 time.sleep(poll_interval)
+                continue
+
+            now = time.time()
+            wait_time -= max(now - start, 0.0)
+            if wait_time <= 0.0:
+                return
+
+            start = now
+            time.sleep(min(wait_time, poll_interval))
+
+    def run(self, poll_interval=0.1):
+        for conf in iter_startups(config.flatten(self.configs())):
+            strategy = self.strategy(conf)
+            heapq.heappush(self._strategies, (time.time(), strategy))
+
+        def handler(signum, frame):
+            raise Signal(signum)
+
+        with signal_handler(handler):
+            try:
+                try:
+                    while self._strategies or self._processes:
+                        self._poll()
+
+                        for conf, strategy in self._purge():
+                            self.log.info("Launching bot %r from module %r",
+                                          conf.name, conf.module)
+                            process = self._launch(conf)
+                            self._processes.add((process, strategy, conf))
+
+                        time.sleep(poll_interval)
+                finally:
+                    self._cleanup("SIGTERM", signal.SIGTERM, poll_interval, self.grace_period)
+
+                    if self.grace_period is not None:
+                        self._cleanup("SIGKILL", signal.SIGKILL, poll_interval)
+            except Signal:
+                if self._processes:
+                    sys.exit(100)
+            finally:
+                if self._processes:
+                    info = ", ".join("%r[%d]" % (conf.name, process.pid)
+                                     for (process, _, conf) in self._processes)
+                    self.log.info("%d bot(s) left alive: %s" % (len(self._processes), info))
 
 class DefaultStartupBot(StartupBot):
     config = bot.Param("configuration module")
     enable = bot.ListParam("bots that are run (default: run all bots)",
                            default=None)
-    disable = bot.ListParam("bots that are not run (default: run all bots)", 
+    disable = bot.ListParam("bots that are not run (default: run all bots)",
                             default=None)
 
     def configs(self):
@@ -195,6 +247,6 @@ class DefaultStartupBot(StartupBot):
             if self.enable is not None and not (names & set(self.enable)):
                 continue
             yield conf
- 
+
 if __name__ == "__main__":
     DefaultStartupBot.from_command_line().execute()
