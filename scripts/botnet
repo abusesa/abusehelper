@@ -159,7 +159,7 @@ def command_follow(module):
             except ValueError:
                 pass
 
-    process = popen("tail", "-f", "-%d" % height, logpath(module),
+    process = popen("tail", "-n", str(height), "-f", logpath(module),
                     stdout=sys.stdout,
                     stderr=sys.stderr)
     try:
