@@ -1,22 +1,22 @@
 #!/usr/bin/env python
 
-from __future__ import with_statement, absolute_import
-
 import os
 import re
 import sys
 import time
 import errno
 import signal
-import hashlib
-import subprocess
 
 # Helpers
 
 def module_id(module):
+    import hashlib
+
     return hashlib.sha1(module).hexdigest() + "-" + module
 
 def popen(*args, **keys):
+    import subprocess
+
     defaults = dict(stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     stdin=subprocess.PIPE)
@@ -94,7 +94,8 @@ def command_start(module):
         print "Already running."
         return
 
-    with open(logpath(module), "a") as logfile:
+    logfile = open(logpath(module), "a")
+    try:
         print "Starting."
         process = popen(sys.executable,
                         "-m", "abusehelper.core.startup", module,
@@ -102,6 +103,8 @@ def command_start(module):
                         stdout=logfile,
                         stderr=logfile,
                         close_fds=True)
+    finally:
+        logfile.close()
 
     for _ in xrange(20):
         retcode = process.poll()
@@ -166,11 +169,28 @@ def command_follow(module):
         send_signal(process.pid, signal.SIGKILL)
 
 if __name__ == "__main__":
-    command = sys.argv[1]
-    module = normalized_module(sys.argv[2])
+    from optparse import OptionParser
+
+    parser = OptionParser(usage="usage: %prog [options] command module")
+    parser.add_option("-p",
+                      "--python",
+                      dest="python",
+                      default=None,
+                      help=("use the given python executable "+
+                            "instead of %r" % sys.executable))
+    options, args = parser.parse_args()
+
+    if options.python is not None:
+        os.execlp(options.python, options.python, sys.argv[0], *args)
+    if sys.version_info < (2, 5):
+        parser.error("python version < 2.5, use command line option -p/--python")
+
+    if len(args) < 2:
+        parser.error("expected command and module arguments")
+    command, module = args
 
     command_func = globals().get("command_" + command.lower())
     if not callable(command_func):
         raise Exception("no command %r" % command)
 
-    command_func(module)
+    command_func(normalized_module(module))
