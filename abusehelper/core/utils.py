@@ -7,7 +7,7 @@ import collections
 import email.parser
 
 import idiokit
-from idiokit import util, threadpool
+from idiokit import threadpool
 from abusehelper.core import events
 from cStringIO import StringIO
 
@@ -47,30 +47,39 @@ def fetch_url(url, opener=None):
     except (urllib2.URLError, httplib.HTTPException, socket.error), error:
         raise FetchUrlFailed(str(error))
 
-@idiokit.stream
-def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
-    if columns is None:
-        reader = csv.DictReader(fileobj, delimiter=delimiter)
-    else:
-        reader = csv.reader(fileobj, delimiter=delimiter)
+def _force_decode(string, encodings=["ascii", "utf-8"]):
+    if isinstance(string, unicode):
+        return string
 
+    for encoding in encodings:
+        try:
+            return string.decode(encoding)
+        except ValueError:
+            pass
+    return string.decode("latin-1", "replace")
+
+def _csv_reader(fileobj, charset=None, **keys):
     if charset is None:
-        decode = util.guess_encoding
+        decode = _force_decode
     else:
         decode = lambda x: x.decode(charset)
+    lines = (decode(line).encode("utf-8").replace("\x00", "\x80") for line in fileobj)
+    normalize = lambda x: x.replace("\x80", "\x00").decode("utf-8").strip()
 
-    for row in reader:
-        if columns is not None:
-            row = dict(zip(columns, row))
+    for row in csv.reader(lines, **keys):
+        yield map(normalize, row)
+
+@idiokit.stream
+def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
+    for row in _csv_reader(fileobj, charset=charset, delimiter=delimiter):
+        if columns is None:
+            columns = row
+            continue
 
         event = events.Event()
-        for key, value in row.items():
-            if None in (key, value):
-                continue
+        for key, value in zip(columns, row):
             if not value:
                 continue
-            key = decode(key.lower().strip())
-            value = decode(value.strip())
             event.add(key, value)
 
         yield idiokit.send(event)
