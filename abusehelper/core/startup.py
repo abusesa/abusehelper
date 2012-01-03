@@ -77,8 +77,6 @@ def signal_handler(handler):
             signal.signal(signum, old_handler)
 
 class StartupBot(bot.Bot):
-    grace_period = bot.IntParam(default=float("inf"))
-
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
 
@@ -198,10 +196,8 @@ class StartupBot(bot.Bot):
                 self._poll()
                 self._close()
 
-                expire_time = None
+                count = 0
                 while self._strategies or self._processes:
-                    now = time.time()
-
                     while received:
                         signum = received.popleft()
 
@@ -209,19 +205,13 @@ class StartupBot(bot.Bot):
                             self._clean("SIGTERM", signal.SIGTERM)
                         elif signum == signal.SIGUSR2:
                             self._clean("SIGKILL", signal.SIGKILL)
-                        elif expire_time is None:
-                            self._clean("SIGTERM", signal.SIGTERM)                            
-                            expire_time = now + self.grace_period
+                        elif count == 0:
+                            self._clean("SIGTERM", signal.SIGTERM)
+                            count += 1
                         else:
                             raise KeyboardInterrupt()
                         
-                    if expire_time is None:
-                        time.sleep(poll_interval)
-                    elif expire_time <= now:
-                        self._clean("SIGKILL", signal.SIGKILL)
-                        expire_time = float("inf")
-                    else:
-                        time.sleep(min(expire_time - now, poll_interval))
+                    time.sleep(poll_interval)
 
                     self._poll()
                     self._close()
