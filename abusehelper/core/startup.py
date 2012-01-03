@@ -8,6 +8,7 @@ import heapq
 import signal
 import contextlib
 import subprocess
+import collections
 import cPickle as pickle
 from abusehelper.core import bot, config
 
@@ -64,7 +65,7 @@ class Bot(object):
 
 @contextlib.contextmanager
 def signal_handler(handler):
-    signums = [signal.SIGTERM, signal.SIGINT]
+    signums = [signal.SIGTERM, signal.SIGINT, signal.SIGUSR1, signal.SIGUSR2]
     old_handlers = dict((x, signal.getsignal(x)) for x in signums)
 
     try:
@@ -75,11 +76,8 @@ def signal_handler(handler):
         for signum, old_handler in old_handlers.items():
             signal.signal(signum, old_handler)
 
-class Signal(Exception):
-    pass
-
 class StartupBot(bot.Bot):
-    grace_period = bot.IntParam(default=None)
+    grace_period = bot.IntParam(default=float("inf"))
 
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
@@ -167,63 +165,68 @@ class StartupBot(bot.Bot):
             strategy.close()
         self._strategies = list()
 
-    def _cleanup(self, signame, signum, poll_interval, wait_time=None):
+    def _clean(self, signame, signum):
         self._poll()
         self._close()
         if not self._processes:
             return
 
         self.log.info("Sending %s to alive bots" % (signame,))
-        self._signal(signum)
-
-        start = time.time()
-        while True:
-            self._poll()
-            self._close()
-            if not self._processes:
-                return
-
-            if wait_time is None:
-                time.sleep(poll_interval)
-                continue
-
-            now = time.time()
-            wait_time -= max(now - start, 0.0)
-            if wait_time <= 0.0:
-                return
-
-            start = now
-            time.sleep(min(wait_time, poll_interval))
+        self._signal(signum)       
 
     def run(self, poll_interval=0.1):
         for conf in iter_startups(config.flatten(self.configs())):
             strategy = self.strategy(conf)
             heapq.heappush(self._strategies, (time.time(), strategy))
 
+        received = collections.deque()
         def handler(signum, frame):
-            raise Signal(signum)
+            received.append(signum)
 
         with signal_handler(handler):
             try:
-                try:
-                    while self._strategies or self._processes:
-                        self._poll()
+                while not received and (self._strategies or self._processes):
+                    self._poll()
 
-                        for conf, strategy in self._purge():
-                            self.log.info("Launching bot %r from module %r",
-                                          conf.name, conf.module)
-                            process = self._launch(conf)
-                            self._processes.add((process, strategy, conf))
+                    for conf, strategy in self._purge():
+                        self.log.info("Launching bot %r from module %r", conf.name, conf.module)
+                        process = self._launch(conf)
+                        self._processes.add((process, strategy, conf))
 
+                    time.sleep(poll_interval)
+
+                self._poll()
+                self._close()
+
+                expire_time = None
+                while self._strategies or self._processes:
+                    now = time.time()
+
+                    while received:
+                        signum = received.popleft()
+
+                        if signum == signal.SIGUSR1:
+                            self._clean("SIGTERM", signal.SIGTERM)
+                        elif signum == signal.SIGUSR2:
+                            self._clean("SIGKILL", signal.SIGKILL)
+                        elif expire_time is None:
+                            self._clean("SIGTERM", signal.SIGTERM)                            
+                            expire_time = now + self.grace_period
+                        else:
+                            raise KeyboardInterrupt()
+                        
+                    if expire_time is None:
                         time.sleep(poll_interval)
-                finally:
-                    self._cleanup("SIGTERM", signal.SIGTERM, poll_interval, self.grace_period)
+                    elif expire_time <= now:
+                        self._clean("SIGKILL", signal.SIGKILL)
+                        expire_time = float("inf")
+                    else:
+                        time.sleep(min(expire_time - now, poll_interval))
 
-                    if self.grace_period is not None:
-                        self._cleanup("SIGKILL", signal.SIGKILL, poll_interval)
-            except Signal:
-                if self._processes:
-                    sys.exit(100)
+                    self._poll()
+                    self._close()
+            except KeyboardInterrupt:
+                pass
             finally:
                 if self._processes:
                     info = ", ".join("%r[%d]" % (conf.name, process.pid)
