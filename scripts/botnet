@@ -150,7 +150,14 @@ def command_stop(module):
         print "Nothing running."
     else:
         print "Shutting down."
-        _signal(module, "SIGTERM", signal.SIGTERM)
+        _signal(module, "SIGUSR1", signal.SIGUSR1)
+
+def command_kill(module):
+    if not is_running(module):
+        print "Nothing running."
+    else:
+        print "Shutting down."
+        _signal(module, "SIGUSR2", signal.SIGUSR2)
 
 def command_restart(module):
     command_stop(module)
