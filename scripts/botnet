@@ -30,8 +30,8 @@ def send_signal(pid, signum):
         if ose.errno != errno.ESRCH:
             raise
 
-def find(module):
-    process = popen("ps", "-wweo", "pid=,command=")
+def ps():
+    process = popen("ps", "-wweo", "pid=,ppid=,command=")
     stdout, stderr = process.communicate()
     if process.returncode != 0:
         sys.stderr.write(stderr)
@@ -39,12 +39,21 @@ def find(module):
         sys.exit(process.returncode)
 
     found = list()
-    rex = re.compile(r"\s" + re.escape(module_id(module)))
     for line in stdout.splitlines():
         line = line.strip()
         if not line:
             continue
-        pid, command = line.split(" ", 1)
+        pid, ppid, command = line.split(None, 2)
+        found.append((int(pid), int(ppid), command))
+    return found
+
+def find(module, processes=None):
+    rex = re.compile(r"\s" + re.escape(module_id(module)))
+    if processes is None:
+        processes = ps()
+
+    found = list()
+    for pid, ppid, command in processes:
         if rex.search(command):
             found.append((int(pid), command))
     return found
@@ -75,7 +84,7 @@ def _signal(module, signame, signum):
         pids = find(module)
         if pids:
             print "Warning, some instances survived:"
-            print " pid=%d command=%r" % (pid, command)
+            print "  pid=%d command=%r" % (pid, command)
 
 def normalized_module(module):
     module = os.path.abspath(module)
@@ -98,7 +107,8 @@ def command_start(module):
     try:
         print "Starting."
         process = popen(sys.executable,
-                        "-m", "abusehelper.core.startup", module,
+                        "-m", "runpy",
+                        "abusehelper.core.startup", module,
                         module_id(module),
                         stdout=logfile,
                         stderr=logfile,
@@ -114,7 +124,8 @@ def command_start(module):
         time.sleep(0.1)
 
 def command_status(module):
-    pids = find(module)
+    processes = ps()
+    pids = find(module, processes)
     if not pids:
         print "Not running."
         return
@@ -124,8 +135,15 @@ def command_status(module):
     else:
         print "%d instances running:" % len(pids)
 
-    for pid, command in pids:
-        print " pid=%d command=%r" % (pid, command)
+    parents = dict()
+    for pid, ppid, command in processes:
+        parents.setdefault(ppid, list()).append((pid, command))
+
+    for parent_pid, parent_command in pids:
+        print "  pid=%d command=%r" % (parent_pid, parent_command)
+
+        for pid, command in parents.get(parent_pid, ()):
+            print "    pid=%d command=%r" % (pid, command)
 
 def command_stop(module):
     if not is_running(module):
@@ -133,13 +151,6 @@ def command_stop(module):
     else:
         print "Shutting down."
         _signal(module, "SIGTERM", signal.SIGTERM)
-
-def command_kill(module):
-    if not is_running(module):
-        print "Nothing running."
-    else:
-        print "Forcefully shutting down."
-        _signal(module, "SIGKILL", signal.SIGKILL)
 
 def command_restart(module):
     command_stop(module)
