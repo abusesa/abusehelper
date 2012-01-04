@@ -391,7 +391,7 @@ from abusehelper.core import events, taskfarm
 
 class FeedBot(ServiceBot):
     add_values = ListParam("List of key/values to be added to every event." +
-                           'example: "key1=value1,key1=value2,key3=value3"', 
+                           'example: "key1=value1,key1=value2,key3=value3"',
                            default=dict())
 
     def __init__(self, *args, **keys):
@@ -516,7 +516,7 @@ def event_hash(event):
     for key, value in sorted(event.items()):
         result.append(_utf8encoder(key)[0])
         result.append(_utf8encoder(value)[0])
-    return md5("\x80".join(result)).digest()
+    return md5("\xc0".join(result)).digest()
 
 class PollingBot(FeedBot):
     poll_interval = IntParam("wait at least the given amount of seconds "+
