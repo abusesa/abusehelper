@@ -2,7 +2,7 @@
 """
     AbuseCH feed handler
 """
-__authors__ = "Toni Huttunen, Joachim Viide and Jussi Eronen"
+__authors__ = "Toni Huttunen, Sebastian Turpeinen and Jussi Eronen"
 __copyright__ = "Copyright 2011, The AbuseHelper Project"
 __license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
 __maintainer__ = "Jussi Eronen"
@@ -27,7 +27,7 @@ class AbuseCHBot(RSSBot):
 
         event = events.Event()
 
-        title = keys.get("title", None)
+        title = kw.get("title", None)
         if title:
             parts = title.split("(")
             if len(parts) > 1:
