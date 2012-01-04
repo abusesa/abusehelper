@@ -68,7 +68,11 @@ class IntParam(Param):
         except ValueError:
             raise ParamError("not a valid integer value: %r" % value)
 
-class _InternalParam(BoolParam):
+class _InternalParam(IntParam):
+    def __init__(self, *args, **keys):
+        keys.setdefault("default", None)
+        IntParam.__init__(self, *args, **keys)
+
     def is_visible(self):
         return False
 
@@ -107,10 +111,10 @@ class LineFormatter(logging.Formatter):
 class Bot(object):
     log_file = Param("write logs to the given path (default: log to stdout)",
                      default=None)
-    read_config_pickle_from_stdin = _InternalParam("internal use only, "+
-                                                   "bot should read its "+
-                                                   "configuration from stdin "+
-                                                   "as a Python pickle")
+    ppid = _InternalParam("internal use only, "+
+                          "bot should read its "+
+                          "configuration from stdin "+
+                          "as a Python pickle")
 
     class __metaclass__(type):
         def __new__(cls, name, parents, keys):
@@ -204,7 +208,7 @@ class Bot(object):
         default = cls.param_defaults()
         parser, cli = cls.params_from_command_line(argv)
 
-        if cli.get("read_config_pickle_from_stdin", False):
+        if cli.get("ppid", None):
             conf = dict(pickle.load(sys.stdin))
             for name, param in cls.params():
                 if name not in conf:

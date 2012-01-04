@@ -105,7 +105,7 @@ class StartupBot(bot.Bot):
             # out which modules are running. Workaround: Use
             # "-m runpy module" instead of "-m module".
             args.extend(["-m", "runpy", conf.module])
-        args.append("--read-config-pickle-from-stdin")
+        args.extend(["--ppid=%d" % os.getpid()])
 
         try:
             process = subprocess.Popen(args, stdin=subprocess.PIPE)
