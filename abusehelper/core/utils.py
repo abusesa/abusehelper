@@ -63,8 +63,8 @@ def _csv_reader(fileobj, charset=None, **keys):
         decode = _force_decode
     else:
         decode = lambda x: x.decode(charset)
-    lines = (decode(line).encode("utf-8").replace("\x00", "\x80") for line in fileobj)
-    normalize = lambda x: x.replace("\x80", "\x00").decode("utf-8").strip()
+    lines = (decode(line).encode("utf-8").replace("\x00", "\xc0") for line in fileobj)
+    normalize = lambda x: x.replace("\xc0", "\x00").decode("utf-8").strip()
 
     for row in csv.reader(lines, **keys):
         yield map(normalize, row)
