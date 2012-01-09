@@ -1,18 +1,20 @@
 import pygeoip
-from idiokit import threado
+
+import idiokit
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts.combiner import Expert
 
 class GeoIPExpert(Expert):
-    geoip_db = bot.Param("Path to the GeoIP database.")
-    ip_key = bot.Param("Key which has IP address as value.", default="ip")
+    geoip_db = bot.Param("path to the GeoIP database")
+    ip_key = bot.Param("key which has IP address as value " +
+                       "(default: %default)", default="ip")
 
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
 
         self.geoip = pygeoip.GeoIP(self.geoip_db)
         self.log.info('GeoIP initiated')
-        
+
     def set_geo(self, event, key):
         ip = event.value(key, None)
         if not ip:
@@ -44,13 +46,13 @@ class GeoIPExpert(Expert):
 
         return event
 
-    @threado.stream
-    def augment(inner, self):
+    @idiokit.stream
+    def augment(self):
         while True:
-            eid, event = yield inner
+            eid, event = yield idiokit.next()
 
             augmented = self.set_geo(event, self.ip_key)
-            inner.send(eid, augmented)
+            yield idiokit.send(eid, augmented)
 
 if __name__ == "__main__":
     GeoIPExpert.from_command_line().execute()
