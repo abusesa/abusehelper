@@ -1,4 +1,5 @@
-from idiokit import threado, timer
+import idiokit
+from idiokit import timer, threadpool
 from abusehelper.core import bot, events, taskfarm
 from abusehelper.contrib.experts.combiner import Expert
 from opencollab import wiki
@@ -17,10 +18,10 @@ class OpenCollabExpert(Expert):
 
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
-        self.cache_handler = taskfarm.TaskFarm(self._manage_cache)
         self.cache = dict()
 
         self.keys = dict()
+
         for pair in self.page_keys:
             parts = pair.split("=")
             if len(parts) < 2:
@@ -33,10 +34,12 @@ class OpenCollabExpert(Expert):
                                         ssl_verify_cert=not self.collab_ignore_cert,
                                         ssl_ca_certs=self.collab_extra_ca_certs)
         self.collab.authenticate(self.collab_user, self.collab_password)
-        self.cache_handler.inc(self.cache_query)
 
-    @threado.stream
-    def _manage_cache(inner, self, query):
+    def main(self, *args, **keys):
+        return self._manage_cache(self.cache_query) | Expert.main(self, *args, **keys)
+
+    @idiokit.stream
+    def _manage_cache(self, query):
         token = None
         wikikeys = set()
         for valueset in self.keys.values():
@@ -44,12 +47,10 @@ class OpenCollabExpert(Expert):
 
         while True:
             try:
-                result = yield inner.thread(self.collab.request, 
-                                            "IncGetMeta", query, token)
+                result = yield threadpool.thread(self.collab.request, "IncGetMeta", query, token)
             except Exception, exc:
                 self.log.error("IncGetMeta failed: %s" % exc)
             else:
-
                 incremental, token, (removed, updates) = result
                 removed = set(removed)
                 if not incremental:
@@ -73,17 +74,12 @@ class OpenCollabExpert(Expert):
                     self.cache.pop(page, None)
 
             self.log.info("%i pages in cache", len(self.cache))
+            yield timer.sleep(self.poll_interval)
 
-            sleep = timer.sleep(self.poll_interval)
-            while not sleep.has_result():
-                yield inner, sleep
-
-    @threado.stream
-    def augment(inner, self):
-        counter = 0
-
+    @idiokit.stream
+    def augment(self):
         while True:
-            eid, event = yield inner
+            eid, event = yield idiokit.next()
 
             for pagekey in self.keys:
                 for pagename in event.values(pagekey):
@@ -96,7 +92,7 @@ class OpenCollabExpert(Expert):
                         for value in page.values(wikikey):
                             event.add(newkey, value.strip("[[]]"))
 
-            inner.send(eid, event)
+            yield idiokit.send(eid, event)
 
 if __name__ == "__main__":
     OpenCollabExpert.from_command_line().execute()
