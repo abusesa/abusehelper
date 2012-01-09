@@ -10,7 +10,6 @@ __email__ = "exec@iki.fi"
 
 import re
 import idiokit
-from idiokit import util
 from abusehelper.core import utils, cymru, bot, events
 
 class IPListBot(bot.PollingBot):
@@ -33,7 +32,7 @@ class IPListBot(bot.PollingBot):
         if not self.url:
             self.log.error("URL not specified!")
             idiokit.stop(False)
-            
+
         self.log.info("Downloading %s" % self.url)
         try:
             info, fileobj = yield utils.fetch_url(self.url)
@@ -51,7 +50,7 @@ class IPListBot(bot.PollingBot):
                 new.add('source', self.source)
 
             yield idiokit.send(new)
-        for netblock in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+', 
+        for netblock in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+',
                                    data):
             new = events.Event()
             ip = netblock.split('/')[0]
