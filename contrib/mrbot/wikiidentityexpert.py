@@ -1,7 +1,7 @@
 import getpass, opencollab.wiki
 from idiokit import threado, timer
 from abusehelper.core import events, taskfarm, bot, services
-from combiner import Expert
+from abusehelper.contrib.experts.combiner import Expert
 from opencollab.wiki import WikiFailure
 from opencollab.meta import Metas
 

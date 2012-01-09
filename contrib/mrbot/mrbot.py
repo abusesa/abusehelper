@@ -1,10 +1,11 @@
 """
-Read '/resolve rr type' style messages from a
-message body, resolve those through mresolve
-and return resolved triplets in a similar
-message which includes machine readable
-idiokit namespace.
+Read '/resolve rr type' style messages from a message body, resolve those
+through mresolve and return resolved triplets in a similar message which
+includes machine readable idiokit namespace.
 """
+
+__maintainer__ = "Lari Huttunen"
+
 from idiokit import threado
 from abusehelper.core import events
 from idiokit.xmpp import jid
@@ -12,13 +13,13 @@ from abusehelper.core import bot
 import re, IPy, subprocess
 from subprocess import Popen
 
-
 class MrBot(bot.XMPPBot):
     """
     MrBot implementation
     """
     room = bot.Param("mr room")
-    mresolve = bot.Param(default='/usr/bin/mresolve', help='mresolve path (default: %default)')
+    mresolve = bot.Param(default='/usr/bin/mresolve',
+                         help='mresolve path (default: %default)')
 
     @threado.stream
     def main(inner, self):
