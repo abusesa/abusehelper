@@ -1,6 +1,4 @@
-import xml.etree.cElementTree as etree
-from idiokit import threado
-from abusehelper.core import bot, events, utils
+from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 class AbuseCHBot(RSSBot):
