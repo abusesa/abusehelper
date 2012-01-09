@@ -68,7 +68,6 @@ setup(
             collect_package_data("contrib/confgen", "config-template")
     },
     scripts=[
-        "scripts/abusehelperctl",
         "scripts/botnet",
         "scripts/roomreader"
     ],
