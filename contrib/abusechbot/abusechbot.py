@@ -49,7 +49,7 @@ class AbuseCHBot(RSSBot):
             elif key == "Host":
                 event.add("host", value)
 
-        if not event.contains("asn") or not event.contains("ip"):
+        if not event.contains("ip"):
             return None
         return event
 
