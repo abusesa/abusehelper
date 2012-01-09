@@ -385,7 +385,8 @@ class ServiceBot(XMPPBot):
             keys = dict(item.split("=", 1)
                         for item in self.service_mock_session)
             self.log.info("Running a mock ression with keys %r" % keys)
-            yield service.session(None, **keys) | service.run()
+            session = yield service.open_session(None, keys)
+            yield session | service.run()
             return
 
         self.log.info("Joining lobby %r", self.service_room)

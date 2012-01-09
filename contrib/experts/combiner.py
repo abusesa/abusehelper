@@ -96,13 +96,13 @@ class Expert(RoomBot):
         try:
             yield idiokit.pipe(*augments)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
 
     def augment_keys(self, *args, **keys):
         yield ()
 
     @idiokit.stream
-    def augment(inner, self):
+    def augment(self):
         while True:
             eid, event = yield idiokit.next()
             # Skip augmenting by default.
