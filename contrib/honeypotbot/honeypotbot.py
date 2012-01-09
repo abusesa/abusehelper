@@ -8,20 +8,15 @@ __license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
 __maintainer__ = "Jussi Eronen"
 __email__ = "exec@iki.fi"
 
-import urllib2
-import xml.etree.cElementTree as etree
 from time import strftime, strptime
 
-import idiokit
-from abusehelper.core import bot, events, utils, config, cymru
+from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 class ProjectHoneyPotBot(RSSBot):
     feeds = bot.ListParam(default=[
             "http://www.projecthoneypot.org/list_of_ips.php?rss=1"])
-
-    def augment(self):
-        return cymru.CymruWhois()
+    use_cymru_whois = bot.BoolParam(default=True)
 
     def create_event(self, **kw):
         self.log.info("Got %r", kw)
