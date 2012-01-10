@@ -1,72 +1,67 @@
 # -*- coding: utf-8 -*-
 
-# runtime.py:
-#    yield Source("cleanmxbot",csv_url="http://support.clean-mx.de/clean-mx/xmlphishing?response=alive&format=csv&domain=", csv_name="xmlphishing")
-#    yield Source("cleanmxbot",csv_url="http://support.clean-mx.de/clean-mx/xmlviruses?response=alive&format=csv&domain=", csv_name="xmlviruses")
+# In the runtime config:
+# yield Source("cleanmxbot", csv_url="http://support.clean-mx.de/clean-mx/xmlphishing?response=alive&format=csv&domain=")
+# yield Source("cleanmxbot", csv_url="http://support.clean-mx.de/clean-mx/xmlviruses?response=alive&format=csv&domain=", csv_name="xmlvirii")
 
-
-from idiokit import threado
+import re
+import idiokit
+import urlparse
+from xml.sax.saxutils import unescape as _unescape
 from abusehelper.core import bot, events, utils
 
-import httplib, urllib
-import csv, _csv
+cdata = re.compile("(.*?)\<\!\[CDATA\[(.*?)\]\]\>");
 
-def decode(text, encodings=['latin1']):
-    for encoding in encodings:
-        try:
-            return text.decode(encoding)
-        except UnicodeDecodeError:
-            pass
-    return text.decode('utf-8', 'ignore')
+def unescape_data(string, unescape_func):
+    result = list()
 
-class cleanmxbot(bot.PollingBot):
+    for index, data in enumerate(cdata.split(string)):
+        if index % 3 != 2:
+            data = unescape_func(data)
+        result.append(data)
 
-    @threado.stream
-    def poll(inner,self, url, name):
-        yield
+    return "".join(result)
 
+def unescape(string):
+    return _unescape(string.replace("&nbsp;", " "))
+
+class CleanMXBot(bot.PollingBot):
+    def feed_keys(self, csv_url, csv_name=None, **keys):
+        if csv_name is None:
+            csv_name = urlparse.urlparse(csv_url)[2].split("/")[-1]
+        yield (csv_url, csv_name)
+
+    @idiokit.stream
+    def poll(self, url, name):
         try:
             self.log.info('Downloading page from: "%s"', url)
-            _, fileobj = yield inner.sub(utils.fetch_url(url))
+            info, fileobj = yield utils.fetch_url(url)
         except utils.FetchUrlFailed, e:
             self.log.error('Failed to download page "%s": %r', url, e)
             return
 
-        data = csv.reader(fileobj, delimiter=",", quotechar='"')
-        fields = dict()
-        for index, field in enumerate(data.next()):
-            if field == "firsttime":
-                fields["time"] = index
-            elif field in ["url", "ip", "domain"]:
-                fields[field] = index
-    
+        charset = info.get_param("charset", None)
+        lines = (line.strip() for line in fileobj if line.strip())
+        yield utils.csv_to_events(lines, charset=charset) | self.normalize(name)
+
+    @idiokit.stream
+    def normalize(self, name):
         while True:
-            try:
-                line = data.next()
-            except _csv.Error, e:
-                continue
-            except:
-                break
+            event = yield idiokit.next()
 
-            if not line:
-                continue
+            new = events.Event()
+            for key, value in event.items():
+                value = unescape_data(value, unescape).strip()
+                if not value:
+                    continue
+                if key == "firsttime":
+                    key = "time"
+                new.add(key, value)
 
-            event = events.Event()
-            event.add("feed", name)
- 
-            for field in fields:
-                try:
-                    value = line[fields[field]]
-                    if field == "time":
-                        value = value.replace("&nbsp;", " ")
-                    event.add(field, decode(value))
-                except IndexError:
-                    pass
-            inner.send(event)
+            if name:
+                new.add("feed", name)
 
-    def feed_keys(self, csv_url=(), csv_name=(), **keys):
-        yield (str(csv_url),str(csv_name),)
+            yield idiokit.send(new)
 
 if __name__ == "__main__":
-    cleanmxbot.from_command_line().run()
-
+    CleanMXBot.from_command_line().run()
