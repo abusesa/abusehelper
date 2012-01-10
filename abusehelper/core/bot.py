@@ -592,7 +592,7 @@ class PollingBot(FeedBot):
             event = yield idiokit.next()
             event_key = event_hash(event)
 
-            for name in self._dsts.get(key):
+            for name in tuple(self._dsts.get(key)):
                 room = self._rooms.get(name)
                 if room is None:
                     continue
