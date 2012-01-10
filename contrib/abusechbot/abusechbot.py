@@ -8,17 +8,15 @@ __license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
 __maintainer__ = "Jussi Eronen"
 __email__ = "exec@iki.fi"
 
-import urllib2
-import xml.etree.cElementTree as etree
-import idiokit
-from abusehelper.core import bot, events, utils
+from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
+
 
 class AbuseCHBot(RSSBot):
     feeds = bot.ListParam(default=[
-            "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker",
-            "https://zeustracker.abuse.ch/rss.php",
-            "http://amada.abuse.ch/palevotracker.php?rssfeed"])
+        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker",
+        "https://zeustracker.abuse.ch/rss.php",
+        "http://amada.abuse.ch/palevotracker.php?rssfeed"])
 
     def create_event(self, **kw):
         if kw.get("description", None) == None:
@@ -72,4 +70,3 @@ class AbuseCHBot(RSSBot):
 
 if __name__ == "__main__":
     AbuseCHBot.from_command_line().run()
-
