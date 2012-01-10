@@ -44,86 +44,12 @@ def parse(string, base_time):
 
     return result
 
-def follow_file(filename):
-    prev_inode = None
-    prev_size = None
-    prev_mtime = None
-    opened = None
+from abusehelper.contrib.tailbot.tailbot import TailBot
 
-    while True:
-        try:
-            stat = os.stat(filename)
-        except OSError:
-            if opened is not None:
-                opened.close()
-                opened = None
-            yield None
-            prev_inode = prev_size = prev_mtime = None
-            continue
+class SSHLogBot(TailBot):
 
-        inode, size, mtime = stat[1], stat[6], stat[8]
-
-        if inode != prev_inode:
-            prev_inode = prev_size = prev_mtime = None
-            if opened is not None:
-                opened.close()
-                opened = None
-
-            try:
-                opened = open(filename, "rb")
-            except IOError:
-                yield None
-                prev_inode = prev_size = prev_mtime = None
-                continue
-            yield mtime, opened
-        elif prev_size != size and prev_mtime != mtime:
-            opened.seek(opened.tell())
-            yield mtime, opened
-        else:
-            yield None
-
-        prev_size = size
-        prev_mtime = mtime
-        prev_inode = inode
-
-from idiokit import threado, timer
-from abusehelper.core import bot, events
-
-@threado.stream
-def sleep(inner, delay):
-    sleeper = timer.sleep(delay)
-
-    while not sleeper.has_result():
-        yield inner, sleeper
-
-class SSHLogBot(bot.FeedBot):
-    file = bot.Param()
-
-    @threado.stream
-    def feed(inner, self):
-        first = True
-
-        for result in follow_file(self.file):
-            yield inner.sub(sleep(2.0))
-
-            if result is not None:
-                mtime, opened = result
-                if first:
-                    opened.seek(0, os.SEEK_END)
-
-                for line in opened:
-                    keys = parse(line, time.gmtime(mtime))
-                    if keys is None:
-                        continue
-
-                    event = events.Event()
-                    for key, value in keys.iteritems():
-                        event.add(key, value)
-                    inner.send(event)
-
-                    yield inner.flush()
-
-            first = False
+    def parse(self, line, mtime):
+        return parse(line, time.gmtime(mtime))
 
 if __name__ == "__main__":
     SSHLogBot.from_command_line().execute()
