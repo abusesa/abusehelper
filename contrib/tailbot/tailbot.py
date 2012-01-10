@@ -1,73 +1,82 @@
 import os
 from abusehelper.core import events, bot
-from idiokit import threado, timer
+import idiokit
+
+def follow_file(filename):
+    prev_inode = None
+    prev_size = None
+    prev_mtime = None
+    opened = None
+
+    while True:
+        try:
+            stat = os.stat(filename)
+        except OSError:
+            if opened is not None:
+                opened.close()
+                opened = None
+            yield None
+            prev_inode = prev_size = prev_mtime = None
+            continue
+
+        inode, size, mtime = stat[1], stat[6], stat[8]
+
+        if inode != prev_inode:
+            prev_inode = prev_size = prev_mtime = None
+            if opened is not None:
+                opened.close()
+                opened = None
+
+            try:
+                opened = open(filename, "rb")
+            except IOError:
+                yield None
+                prev_inode = prev_size = prev_mtime = None
+                continue
+            yield mtime, opened
+        elif prev_size != size and prev_mtime != mtime:
+            opened.seek(opened.tell())
+            yield mtime, opened
+        else:
+            yield None
+
+        prev_size = size
+        prev_mtime = mtime
+        prev_inode = inode
 
 class TailBot(bot.FeedBot):
-    path=bot.Param("Path to file.")
+    path=bot.Param("Path to the followed file.")
 
-    def open(self, path):
-        try:
-            return os.open(path, os.O_RDONLY)
-        except IOError, e:
-            self.log.info("Failed to open file %s. %s", path, e)
-            raise IOError, e
-        except OSError, e:
-            self.log.info("Failed to open file %s. %s", path, e)
-            return None
+    @idiokit.stream
+    def feed(self):
+        first = True
 
-    @threado.stream
-    def feed(inner, self):
-        fileobj = self.open(self.path)
-        stats = os.fstat(fileobj)
-        old_inode = stats[1]
-        old_size = stats[6]
-        old_mtime = stats[8]
+        for result in follow_file(self.path):
+            yield idiokit.timer.sleep(2.0)
 
-        count = 0
-        while True:
-            yield inner, timer.sleep(1)
+            if result is not None:
+                mtime, opened = result
+                if first:
+                    opened.seek(0, os.SEEK_END)
 
-            if not fileobj:
-                continue
-            stats = os.fstat(fileobj)
-            inode = stats[1]
-            size = stats[6]
-            mtime = stats[8]
+                for line in opened:
+                    keys = self.parse(line, mtime)
+                    if keys is None:
+                        continue
 
-            if old_inode != inode:
-                old_inode = inode
-                old_size = 0
-            elif old_mtime == mtime:
-                #If file doesn't change, reopen it to see if inode is changed.
-                count += 1
-                if count >= 5:
-                    count = 0
-                    os.close(fileobj)
-                    fileobj = self.open(self.path)
-                continue
-            elif size < old_size:
-                old_size = 0
+                    event = events.Event()
+                    for key, value in keys.iteritems():
+                        event.add(key, value.decode("utf-8", "ignore"))
+                    yield idiokit.send(event)
 
-            os.lseek(fileobj, old_size, 0)
-            data = os.read(fileobj, size-old_size)
-            for line in data.split("\n"):
-                event = self.parse(unicode(line.decode("utf-8")))
-                if event:
-                    yield inner.send(event)
+            first = False
 
-            count = 0
-            old_size = size
-            old_mtime = mtime
-
-        os.close(fileobj)
-
-    def parse(self, line):
+    def parse(self, line, mtime):
+        line = line.rstrip()
         if not line:
             return 
 
-        event = events.Event()
-        event.add("line", line)
-        return event
+        return {"line": line}
 
 if __name__ == "__main__":
     TailBot.from_command_line().execute()
