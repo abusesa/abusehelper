@@ -9,30 +9,34 @@ __maintainer__ = "Jussi Eronen"
 __email__ = "exec@iki.fi"
 
 import re
+import socket
 import idiokit
 from abusehelper.core import utils, cymru, bot, events
 
-class IPListBot(bot.PollingBot):
-    use_cymru_whois = bot.BoolParam(default=True)
-    url = bot.Param("IPlist URL")
-    source = bot.Param("Source name")
+rex = re.compile(r"((?:[\d\.]|[a-z\d\:])+)(?:/(\d+))?", re.I)
 
-    def __init__(self, *args, **keys):
-        bot.PollingBot.__init__(self, *args, **keys)
-        self.log.info("%r %r", args, keys)
-        self.whois = cymru.CymruWhoisAugmenter()
+def as_ip(string):
+    for addr_type in (socket.AF_INET, socket.AF_INET6):
+        try:
+            value = socket.inet_pton(addr_type, string)
+        except (ValueError, socket.error):
+            pass
+        else:
+            return socket.inet_ntop(addr_type, value)
+    return None
+
+class IPListBot(bot.PollingBot):
+    url = bot.Param("IP list URL")
+    source = bot.Param("source name", default=None)
+    use_cymru_whois = bot.BoolParam()
 
     def poll(self, _):
         if self.use_cymru_whois:
-            return self._poll() | self.whois.augment()
+            return self._poll() | cymru.CymruWhois()
         return self._poll()
 
     @idiokit.stream
     def _poll(self):
-        if not self.url:
-            self.log.error("URL not specified!")
-            idiokit.stop(False)
-
         self.log.info("Downloading %s" % self.url)
         try:
             info, fileobj = yield utils.fetch_url(self.url)
@@ -41,26 +45,20 @@ class IPListBot(bot.PollingBot):
             idiokit.stop(False)
         self.log.info("Downloaded")
 
-        data = fileobj.read()
-        for ip in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?!/)', data):
-            new = events.Event()
-            new.add('ip', ip)
-            new.add('url', self.url)
-            if self.source:
-                new.add('source', self.source)
+        for line in fileobj:
+            for candidate in rex.finditer(line):
+                ip, netblock = candidate.groups()
+                ip = as_ip(ip)
+                if ip is None:
+                    continue
 
-            yield idiokit.send(new)
-        for netblock in re.findall('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d+',
-                                   data):
-            new = events.Event()
-            ip = netblock.split('/')[0]
-            new.add('ip', ip)
-            new.add('netblock', netblock)
-            new.add('url', self.url)
-            if self.source:
-                new.add('source', self.source)
-
-            yield idiokit.send(new)
+                new = events.Event()
+                new.add("ip", ip)
+                new.add("netblock", netblock)
+                new.add("url", self.url)
+                if self.source:
+                    new.add("source", self.source)
+                yield idiokit.send(new)
 
 if __name__ == "__main__":
     IPListBot.from_command_line().execute()
