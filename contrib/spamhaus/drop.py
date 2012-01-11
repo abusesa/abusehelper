@@ -40,7 +40,12 @@ class SpamhausDropBot(bot.PollingBot):
             data = line.split(';')
             if not data:
                 continue
-            netblock, sbl = [x.strip() for x in data]
+
+            netblock_sbl = [x.strip() for x in data]
+            if len(netblock_sbl) != 2:
+                continue
+
+            netblock, sbl = netblock_sbl
             if not len(netblock.split('/')) == 2:
                 continue
             ip = netblock.split('/')[0]
