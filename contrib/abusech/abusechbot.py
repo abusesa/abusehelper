@@ -1,3 +1,4 @@
+<<<<<<< local
 # -*- coding: utf-8 -*-
 """
     AbuseCH feed handler
@@ -8,6 +9,8 @@ __license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
 __maintainer__ = "Jussi Eronen"
 __email__ = "exec@iki.fi"
 
+=======
+>>>>>>> other
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
@@ -60,7 +63,7 @@ class AbuseCHBot(RSSBot):
             elif "palevo" in url:
                 event.add("malware", "palevo")
 
-        if not event.contains("asn") or not event.contains("ip"):
+        if not event.contains("ip"):
             return None
 
         if kw.get('source', ''):
