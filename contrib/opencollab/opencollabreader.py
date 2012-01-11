@@ -2,8 +2,9 @@ import random
 import getpass
 import hashlib
 
+import idiokit
+from idiokit import timer, threadpool
 from abusehelper.core import bot, events
-from idiokit import threado, timer
 from opencollab import wiki
 
 class OpenCollabReader(bot.FeedBot):
@@ -32,8 +33,8 @@ class OpenCollabReader(bot.FeedBot):
     def feed_keys(self, query, **keys):
         yield (query,)
 
-    @threado.stream
-    def feed(inner, self, query):
+    @idiokit.stream
+    def feed(self, query):
         salt = str(random.randint(2**31, 2**32))
         def page_id(page):
             return hashlib.md5(page.encode("utf8") + salt).hexdigest()
@@ -43,8 +44,8 @@ class OpenCollabReader(bot.FeedBot):
         yield timer.sleep(5)
         while True:
             try:
-                result = yield inner.thread(self.collab.request, 
-                                            "IncGetMeta", query, token)
+                result = yield threadpool.thread(self.collab.request,
+                                                 "IncGetMeta", query, token)
             except Exception, exc:
                 self.log.error("IncGetMeta failed: %s" % exc)
             else:
@@ -67,19 +68,17 @@ class OpenCollabReader(bot.FeedBot):
 
                         for value in added:
                             event.add(key, value.lstrip("[[").rstrip("]]"))
-                    inner.send(event)
+                    yield idiokit.send(event)
 
                 for page in removed:
                     current.pop(page, None)
 
                     event = events.Event()
                     event.add("id", page_id(page))
-                    
-                    inner.send(event)
-           
-            sleep = timer.sleep(self.poll_interval)
-            while not sleep.has_result():
-                yield inner, sleep
+
+                    yield idiokit.send(event)
+
+            yield timer.sleep(self.poll_interval)
 
 if __name__ == "__main__":
     OpenCollabReader.from_command_line().execute()
