@@ -1,4 +1,3 @@
-<<<<<<< local
 # -*- coding: utf-8 -*-
 """
     AbuseCH feed handler
@@ -9,11 +8,8 @@ __license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
 __maintainer__ = "Jussi Eronen"
 __email__ = "exec@iki.fi"
 
-=======
->>>>>>> other
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
-
 
 class AbuseCHBot(RSSBot):
     feeds = bot.ListParam(default=[
@@ -49,12 +45,9 @@ class AbuseCHBot(RSSBot):
                 event.add("asn", value)
             elif key == "IP address":
                 event.add("ip", value)
-            elif key == "Country":
-                event.add("country", value)
-            elif key == "Host":
-                event.add("host", value)
-            elif key == "Status":
-                event.add("status", value)
+            elif key in ["Country", "Host", "Status"]:
+                event.add(key.lower(), value)
+
             url = kw.get('url', '')
             if "zeus" in url:
                 event.add("malware", "zeus")
