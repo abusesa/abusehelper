@@ -19,7 +19,7 @@ def is_ip(string):
 class CymruWhoisAugmenter(object):
     KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
 
-    def __init__(self, wait_time=0.5, cache_time=60*60.0):
+    def __init__(self, wait_time=0.5, cache_time=3600.0):
         self.wait_time = wait_time
 
         self.cache = utils.TimedCache(cache_time)
@@ -33,7 +33,7 @@ class CymruWhoisAugmenter(object):
         while True:
             event = yield idiokit.next()
 
-            for ip in event.values(ip_key, filter=is_ip):
+            for ip in event.values(ip_key):
                 items = yield self.resolve(ip)
                 for key, value in items:
                     event.add(key, value)
@@ -42,19 +42,23 @@ class CymruWhoisAugmenter(object):
 
     @idiokit.stream
     def resolve(self, ip):
-        self.count += 1
-        try:
-            if self.main is None:
-                self.main = self._main()
-                idiokit.pipe(self._alert(self.wait_time / 2), self.main)
-            main = self.main
+        if not is_ip(ip):
+            idiokit.stop(())
 
-            event = idiokit.Event()
-            yield main.send(ip, event)
-            values = yield event | main.fork() | event
-        finally:
-            self.count -= 1
+        values = self.cache.get(ip, None)
+        if values is None:
+            self.count += 1
+            try:
+                if self.main is None:
+                    self.main = self._main()
+                    idiokit.pipe(self._alert(self.wait_time / 2), self.main)
+                main = self.main
 
+                event = idiokit.Event()
+                yield main.send(ip, event)
+                values = yield event | main.fork() | event
+            finally:
+                self.count -= 1
         idiokit.stop([x for x in zip(self.KEYS, values) if x[1] is not None])
 
     @idiokit.stream
