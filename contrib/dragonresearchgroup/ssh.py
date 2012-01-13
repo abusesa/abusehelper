@@ -1,12 +1,15 @@
 import idiokit
 from idiokit import util
-from abusehelper.core import utils, bot, events
+from abusehelper.core import utils, cymru, bot, events
 
 class DragonSshBot(bot.PollingBot):
     COLUMNS = ["asn", "as name", "ip", "time", "category"]
 
+    def poll(self, _):
+        return self._poll() | cymru.CymruWhois()
+
     @idiokit.stream
-    def poll(self, _, url="http://dragonresearchgroup.org/insight/sshpwauth.txt"):
+    def _poll(self,url="http://dragonresearchgroup.org/insight/sshpwauth.txt"):
         self.log.info("Downloading %s" % url)
         try:
             info, fileobj = yield utils.fetch_url(url)
