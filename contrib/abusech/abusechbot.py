@@ -15,7 +15,10 @@ class AbuseCHBot(RSSBot):
     feeds = bot.ListParam(default=[
         "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker",
         "https://zeustracker.abuse.ch/rss.php",
-        "http://amada.abuse.ch/palevotracker.php?rssfeed"])
+        "http://amada.abuse.ch/palevotracker.php?rssfeed",
+        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=configurls",
+        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=binaryurls",
+        "https://spyeyetracker.abuse.ch/monitor.php?browse=dropzones"])
 
     def create_event(self, **kw):
         if kw.get("description", None) == None:
@@ -37,18 +40,35 @@ class AbuseCHBot(RSSBot):
             key = pair[0].strip()
             value = pair[1].strip()
 
+            levels = {'1': 'Bulletproof hosted',
+                      '2': 'Hacked webserver',
+                      '3': 'Free hosting service',
+                      '4': 'Unknown',
+                      '5': 'Hosted on a FastFlux botnet'}
+
             if not value:
                 continue
             elif key == "AS":
                 if value.startswith("AS"):
                     value = value[2:]
                 event.add("asn", value)
+            elif key == "Status":
+                event.add("status", value)
             elif key == "IP address":
                 event.add("ip", value)
             elif key in ["Country", "Host", "Status"]:
                 event.add(key.lower(), value)
-
+            elif key == "SBL":
+                event.add("sbl", 
+                          "http://www.spamhaus.org/sbl/sbl.lasso?query=%s" % 
+                          (value))
+            elif key == "Level":
+                if value in levels:
+                    event.add("level", levels[value])
+                else:
+                    event.add("level", value)
             url = kw.get('url', '')
+
             if "zeus" in url:
                 event.add("malware", "zeus")
             elif "spyeye" in url:
