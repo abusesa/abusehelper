@@ -54,7 +54,8 @@ class IPListBot(bot.PollingBot):
 
                 new = events.Event()
                 new.add("ip", ip)
-                new.add("netblock", netblock)
+                if netblock:
+                    new.add("netblock", netblock)
                 new.add("url", self.url)
                 if self.source:
                     new.add("source", self.source)
