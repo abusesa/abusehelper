@@ -9,11 +9,11 @@ __license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
 __maintainer__ = "Jussi Eronen"
 __email__ = "exec@iki.fi"
 
+import time
 import hashlib
 from cStringIO import StringIO
 from abusehelper.core import templates
 from abusehelper.core import config
-sanitizer = config.load_module("sanitizer")
 
 from idiokit.xmlcore import Element
 
@@ -29,6 +29,11 @@ def node_id_and_text(parent, nodename, text=None, **kw):
 HEADER = """<?xml version=\"1.0\" ?>
 <!DOCTYPE IODEF-Message PUBLIC "-//IETF//DTD RFC 5070 IODEF v1.0//EN" "IODEF-Document.dtd">
 """
+
+def format_time(time_tuple=None):
+    if time_tuple is None:
+        time_tuple = time.gmtime()
+    return time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
 
 class XMLFormatter(templates.Formatter):
     def __init__(self, **kw):
@@ -94,7 +99,7 @@ class XMLFormatter(templates.Formatter):
 
             if not inc.contains('time'):
                 node_id_and_text(inc_tag, 'ReportTime',
-                                 ts_to_xml(sanitizer.format_time()))
+                                 ts_to_xml(format_time()))
             else:
                 for ts in inc.values('time'):
                     node_id_and_text(inc_tag, 'ReportTime',

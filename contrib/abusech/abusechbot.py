@@ -18,7 +18,7 @@ class AbuseCHBot(RSSBot):
         "http://amada.abuse.ch/palevotracker.php?rssfeed",
         "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=configurls",
         "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=binaryurls",
-        "https://spyeyetracker.abuse.ch/monitor.php?browse=dropzones"])
+        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=dropurls"])
 
     def create_event(self, **kw):
         if kw.get("description", None) == None:
