@@ -1,4 +1,3 @@
-import os
 import csv
 import sys
 import inspect
@@ -42,7 +41,7 @@ class ListParam(Param):
             for row in csv.reader([value]):
                 split = filter(None, map(str.strip, row))
                 return map(self.type.parse, split)
-        except csv.Error, error:
+        except csv.Error:
             raise ParamError("not a valid comma separated list: %r" % value)
 
 class BoolParam(Param):
@@ -197,7 +196,7 @@ class Bot(object):
 
             try:
                 parsed[name] = param.parse(value)
-            except ParamError:
+            except ParamError, error:
                 message = "parameter " + name + ": " + error.args[0]
                 parser.error(message)
 
