@@ -5,9 +5,7 @@
 # 2010-12-09 15:11:34 a=1,b=2,b=3
 # 2010-12-09 17:12:32 a=4,a=5,b=6
 
-import re
 import os
-import csv
 import time
 import errno
 
@@ -112,7 +110,7 @@ class ArchiveBot(bot.ServiceBot):
         if self.rollover:
             rollover = calculate_rollover(time.time(), self.rollover)
             if not rollover:
-                self.log.warning("Invalid period (%s), disabling rollover", 
+                self.log.warning("Invalid period (%s), disabling rollover",
                                  self.rollover)
                 self.rollover = None
 
@@ -130,7 +128,7 @@ class ArchiveBot(bot.ServiceBot):
                     if timestamp > rollover:
                         curtime = time.strftime('%Y%m%d', time.gmtime())
                         newname = "%s.%s" % (archivename, curtime)
-                        self.log.info("Rolling over %r to %r", 
+                        self.log.info("Rolling over %r to %r",
                                       archivename, newname)
                         archive.close()
                         os.rename(archivename, newname)
