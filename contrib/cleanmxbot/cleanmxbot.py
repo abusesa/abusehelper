@@ -53,7 +53,12 @@ class cleanmxbot(bot.PollingBot):
 
             event = events.Event()
             event.add("feed", name)
- 
+            try:
+                self.csv_url
+                event.add("source url", self.csv_url)
+            except AttributeError:
+                self.log.warning("self.url was not set when event was being sent.")
+
             for field in fields:
                 try:
                     value = line[fields[field]]
@@ -65,6 +70,7 @@ class cleanmxbot(bot.PollingBot):
             inner.send(event)
 
     def feed_keys(self, csv_url=(), csv_name=(), **keys):
+        self.csv_url = csv_url
         yield (str(csv_url),str(csv_name),)
 
 if __name__ == "__main__":
