@@ -5,9 +5,7 @@
 # 2010-12-09 15:11:34 a=1,b=2,b=3
 # 2010-12-09 17:12:32 a=4,a=5,b=6
 
-import re
 import os
-import csv
 import time
 import errno
 
@@ -84,9 +82,10 @@ class ArchiveBot(bot.ServiceBot):
 
     @idiokit.stream
     def _collect(self, room_name):
-        room_name = unicode(room_name).encode("utf-8")
-        archive = open(os.path.join(self.archive_dir, room_name), "ab")
+        path = None
+        archive = None
         needs_flush = False
+        init_done = False
 
         try:
             while True:
@@ -94,20 +93,50 @@ class ArchiveBot(bot.ServiceBot):
 
                 if event is None:
                     if needs_flush:
-                        archive.flush()
-                        needs_flush = False
+                        self.archive_flush(archive)
+                    needs_flush = False
                     continue
 
                 timestamp = time.time()
-                archive.write(self.format(timestamp, event))
+                new_path = self.archive_path(timestamp, room_name, event)
+                if new_path != path:
+                    if init_done:
+                        self.archive_flush(archive)
+                        self.archive_close(archive)
+                        init_done = False
+                        needs_flush = False
+                        self.log.info("Closed archive %r" % path)
+
+                    archive = self.archive_open(os.path.join(self.archive_dir, new_path))
+                    path = new_path
+                    init_done = True
+                    self.log.info("Opened archive %r" % path)
+
+                self.archive_write(archive, timestamp, room_name, event)
                 needs_flush = True
         finally:
-            archive.flush()
-            archive.close()
+            if init_done:
+                self.archive_flush(archive)
+                self.archive_close(archive)
+                self.log.info("Closed archive file %r" % path)
 
-    def format(self, timestamp, event):
+    # Override these for custom behavior
+
+    def archive_path(self, timestamp, room_name, event):
+        return unicode(room_name).encode("utf-8")
+
+    def archive_open(self, full_path):
+        return open(full_path, "ab")
+
+    def archive_write(self, archive, timestamp, room_name, event):
         data = unicode(event).encode("utf-8")
-        return isoformat(timestamp) + " " + data + os.linesep
+        archive.write(isoformat(timestamp) + " " + data + os.linesep)
+
+    def archive_flush(self, archive):
+        archive.flush()
+
+    def archive_close(self, archive):
+        archive.close()
 
 if __name__ == "__main__":
     ArchiveBot.from_command_line().execute()
