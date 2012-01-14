@@ -1,8 +1,7 @@
 import time
 import calendar
 
-import archivebot
-from abusehelper.core import bot
+from abusehelper.core import bot, archivebot
 
 def current_timestamp(timestamp, period):
     time_list = list(time.gmtime())

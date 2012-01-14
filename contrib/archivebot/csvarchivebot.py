@@ -2,8 +2,7 @@ import os
 import csv
 
 import idiokit
-import archivebot
-from abusehelper.core import bot
+from abusehelper.core import bot, archivebot
 
 class CSVArchiveBot(archivebot.ArchiveBot):
     csv_columns = bot.ListParam()
