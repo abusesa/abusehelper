@@ -5,12 +5,11 @@
 # 2010-12-09 15:11:34 a=1,b=2,b=3
 # 2010-12-09 17:12:32 a=4,a=5,b=6
 
+import re
 import os
+import csv
 import time
 import errno
-
-from calendar import monthrange, timegm
-from datetime import date, timedelta
 
 import idiokit
 from idiokit import timer
@@ -28,21 +27,6 @@ def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
 
     return time.strftime(format, time.gmtime(seconds))
 
-def calculate_rollover(timestamp, period):
-    cur = date.fromtimestamp(timestamp)
-    if period == 'day':
-        next = cur + timedelta(days=1)
-    elif period == 'month':
-        next = cur + timedelta(days=monthrange(cur.year, cur.month)[1])
-    elif period == 'week':
-        next = cur + timedelta(weeks=1)
-    elif period == 'year':
-        next = cur.replace(year=cur.year+1)
-    else:
-        return None
-
-    return timegm(next.timetuple())
-
 def ensure_dir(dir_name):
     """
     Ensure that the directory exists (create if necessary) and return
@@ -59,7 +43,6 @@ def ensure_dir(dir_name):
 
 class ArchiveBot(bot.ServiceBot):
     archive_dir = bot.Param("directory where archive files are written")
-    rollover = bot.Param("period for doing archive filerollover (day, week, month or year)", default=None)
     bot_state_file = None
 
     def __init__(self, *args, **keys):
@@ -102,21 +85,13 @@ class ArchiveBot(bot.ServiceBot):
     @idiokit.stream
     def _collect(self, room_name):
         room_name = unicode(room_name).encode("utf-8")
-        archivename = os.path.join(self.archive_dir, room_name)
-        archive = open(archivename, "ab")
+        archive = open(os.path.join(self.archive_dir, room_name), "ab")
         needs_flush = False
-
-        rollover = None
-        if self.rollover:
-            rollover = calculate_rollover(time.time(), self.rollover)
-            if not rollover:
-                self.log.warning("Invalid period (%s), disabling rollover",
-                                 self.rollover)
-                self.rollover = None
 
         try:
             while True:
                 event = yield idiokit.next()
+
                 if event is None:
                     if needs_flush:
                         archive.flush()
@@ -124,16 +99,6 @@ class ArchiveBot(bot.ServiceBot):
                     continue
 
                 timestamp = time.time()
-                if self.rollover:
-                    if timestamp > rollover:
-                        curtime = time.strftime('%Y%m%d', time.gmtime())
-                        newname = "%s.%s" % (archivename, curtime)
-                        self.log.info("Rolling over %r to %r",
-                                      archivename, newname)
-                        archive.close()
-                        os.rename(archivename, newname)
-                        rollover = calculate_rollover(timestamp, period)
-                        archive = open(archivename, "ab")
                 archive.write(self.format(timestamp, event))
                 needs_flush = True
         finally:
