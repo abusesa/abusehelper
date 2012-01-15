@@ -19,7 +19,7 @@ class Dot(object):
             services.update(dot.services())
 
         for conf in startup.iter_startups(self.configs):
-            service = dict(startup.params).get("bot_name", None)
+            service = dict(conf.params).get("bot_name", None)
             services.add(service)
 
         services.discard(None)
