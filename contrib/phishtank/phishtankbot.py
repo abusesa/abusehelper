@@ -117,7 +117,7 @@ class PhishTankBot(bot.PollingBot):
             yield idiokit.send(event)
 
     @idiokit.stream
-    def poll(self, _):
+    def poll(self):
         url = self.feed_url % self.application_key
         try:
             self.log.info("Checking if %r has new data" % url)

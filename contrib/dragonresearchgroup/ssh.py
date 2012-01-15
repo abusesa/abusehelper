@@ -1,15 +1,14 @@
 import idiokit
-from idiokit import util
-from abusehelper.core import utils, cymru, bot, events
+from abusehelper.core import utils, cymru, bot
 
 class DragonSshBot(bot.PollingBot):
     COLUMNS = ["asn", "as name", "ip", "time", "category"]
 
-    def poll(self, _):
+    def poll(self):
         return self._poll() | cymru.CymruWhois()
 
     @idiokit.stream
-    def _poll(self,url="http://dragonresearchgroup.org/insight/sshpwauth.txt"):
+    def _poll(self, url="http://dragonresearchgroup.org/insight/sshpwauth.txt"):
         self.log.info("Downloading %s" % url)
         try:
             info, fileobj = yield utils.fetch_url(url)
@@ -19,11 +18,6 @@ class DragonSshBot(bot.PollingBot):
         self.log.info("Downloaded")
 
         charset = info.get_param("charset")
-        if charset is None:
-            decode = util.guess_encoding
-        else:
-            decode = lambda x: x.decode(charset)
-
         filtered = (x for x in fileobj if x.strip() and not x.startswith("#"))
         yield utils.csv_to_events(filtered,
                                   delimiter="|",

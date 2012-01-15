@@ -5,7 +5,7 @@ from abusehelper.core import utils, cymru, bot, events
 class ArborSSHBot(bot.PollingBot):
     COLUMNS = ["ip", "count"]
 
-    def poll(self, _):
+    def poll(self):
         return self._poll() | cymru.CymruWhois()
 
     @idiokit.stream
@@ -14,7 +14,7 @@ class ArborSSHBot(bot.PollingBot):
         try:
             info, fileobj = yield utils.fetch_url(url)
         except utils.FetchUrlFailed, fuf:
-            self.log.error("Download failed: %r", asn, fuf)
+            self.log.error("Download failed: %r", fuf)
             return
         self.log.info("Downloaded")
 

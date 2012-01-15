@@ -13,7 +13,6 @@ import idiokit
 from idiokit import threadpool
 from abusehelper.core import bot, cymru, utils, events
 
-
 class AmadaBot(bot.PollingBot):
     url = bot.Param()
     use_cymru_whois = bot.BoolParam(default=True)
@@ -22,7 +21,7 @@ class AmadaBot(bot.PollingBot):
         bot.PollingBot.__init__(self, *args, **keys)
         self.whois = cymru.CymruWhoisAugmenter()
 
-    def poll(self, _):
+    def poll(self):
         if self.use_cymru_whois:
             return self._poll() | self.whois.augment()
         return self._poll()

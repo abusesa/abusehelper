@@ -30,7 +30,7 @@ class IPListBot(bot.PollingBot):
     source = bot.Param("source name", default=None)
     use_cymru_whois = bot.BoolParam()
 
-    def poll(self, _):
+    def poll(self):
         if self.use_cymru_whois:
             return self._poll() | cymru.CymruWhois()
         return self._poll()

@@ -544,8 +544,7 @@ class PollingBot(FeedBot):
         yield timer.sleep(0.0)
 
     def feed_keys(self, *args, **keys):
-        # Return (None,) instead of () for backwards compatibility.
-        yield (None,)
+        yield ()
 
     @idiokit.stream
     def manage_feed(self, key):
