@@ -82,7 +82,7 @@ def event_id(event):
             result.append(key)
             result.append(value)
 
-    return sha1("\x80".join(result)).hexdigest()
+    return sha1("\xc0".join(result)).hexdigest()
 
 AUGMENT_KEY = "augment sha-1"
 

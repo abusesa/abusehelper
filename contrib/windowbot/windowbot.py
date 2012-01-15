@@ -79,7 +79,7 @@ def event_id(event):
             result.append(key)
             result.append(value)
 
-    return hashlib.md5("\x80".join(result)).hexdigest()
+    return hashlib.md5("\xc0".join(result)).hexdigest()
 
 class WindowBot(RoomBot):
     @threado.stream
