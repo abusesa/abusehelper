@@ -1,86 +1,162 @@
-# -*- coding: utf-8 -*-
 """
-    AbuseCH feed handler
+Base AbuseCH feed handler. The specific AbuseCH RSS feeds bots
+(ZeuS Tracker etc.) are built on this.
+
+Maintainer: Jussi Eronen <exec@iki.fi>
 """
-__authors__ = "Toni Huttunen, Sebastian Turpeinen and Jussi Eronen"
-__copyright__ = "Copyright 2011, The AbuseHelper Project"
-__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
-__maintainer__ = "Jussi Eronen"
-__email__ = "exec@iki.fi"
+
+import re
+import cgi
+import time
+import socket
+import urlparse
 
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
+def is_ip(string):
+    for addr_type in (socket.AF_INET, socket.AF_INET6):
+        try:
+            socket.inet_pton(addr_type, string)
+        except (ValueError, socket.error):
+            pass
+        else:
+            return True
+    return False
+
+def parse_title(title):
+    """
+    ZeuS Tracker and SpyEye Tracker styles:
+
+    >>> list(parse_title("1.2.3.4/badness.php (2012-01-01)"))
+    [('time', '2012-01-01 00:00:00 UTC')]
+
+    >>> list(parse_title("1.2.3.4/badness.php (2012-01-01 01:02:03)"))
+    [('time', '2012-01-01 01:02:03 UTC')]
+
+    Palevo tracker style:
+
+    >>> list(parse_title("1.2.3.4/badness.php 2012-01-01"))
+    [('time', '2012-01-01 00:00:00 UTC')]
+
+    Ignore if can't be parsed:
+
+    >>> list(parse_title("1.2.3.4/badness.php"))
+    []
+    """
+
+    match = re.search(r"(\d{4}-\d\d-\d\d(?: \d\d\:\d\d:\d\d)?)\)?\s*$", title)
+    if not match:
+        return
+
+    timestamp = match.group(1)
+    for format in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            timestamp = time.strptime(timestamp, format)
+        except ValueError:
+            continue
+        yield "time", time.strftime("%Y-%m-%d %H:%M:%S UTC", timestamp)
+        break
+
+def parse_link(link):
+    """
+    >>> list(parse_link("https://spyeyetracker.abuse.ch/monitor.php?host=www.example.com"))
+    [('host', 'www.example.com')]
+
+    >>> sorted(parse_link("https://spyeyetracker.abuse.ch/monitor.php?host=1.2.3.4"))
+    [('host', '1.2.3.4'), ('ip', '1.2.3.4')]
+    """
+
+    parsed = urlparse.urlparse(link)
+    query = cgi.parse_qs(parsed[4])
+    for host in query.get("host", []):
+        yield "host", host
+
+        if is_ip(host):
+            yield "ip", host
+
+_levels = {
+    "1": "Bulletproof hosted",
+    "2": "Hacked webserver",
+    "3": "Free hosting service",
+    "4": "Unknown",
+    "5": "Hosted on a FastFlux botnet"
+}
+
+_sbl_prefix = "http://www.spamhaus.org/sbl/sbl.lasso?query="
+
+def parse_description(description):
+    for part in description.split(","):
+        pair = part.split(":", 1)
+        if len(pair) < 2:
+            continue
+        key, value = pair
+
+        value = value.strip()
+        if not value:
+            continue
+
+        key = key.strip().lower()
+        if key == "as":
+            if value.lower().startswith("as"):
+                value = value[2:]
+            yield "asn", value
+        elif key == "ip address":
+            yield "ip", value
+        elif key == "sbl":
+            if value.lower() != "not listed":
+                yield "sbl", _sbl_prefix + value
+        elif key == "level":
+            yield "level", _levels.get(value, value)
+        else:
+            yield key, value
+
 class AbuseCHBot(RSSBot):
-    feeds = bot.ListParam(default=[
-        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker",
-        "https://zeustracker.abuse.ch/rss.php",
-        "http://amada.abuse.ch/palevotracker.php?rssfeed",
-        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=configurls",
-        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=binaryurls",
-        "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=dropurls"])
+    feeds = None
 
-    def create_event(self, **kw):
-        if kw.get("description", None) == None:
-            return None
-        description = kw["description"]
+    types = dict()
+    malware = None
 
+    def feed_keys(self, types=None, **_):
+        if types is None:
+            types = self.types
+
+        for feed_type in types:
+            if feed_type not in self.types:
+                self.log.error("no support for feed type %r" % feed_type)
+            else:
+                yield (self.types[feed_type],)
+
+    def parse_title(self, string):
+        return parse_title(string)
+
+    def parse_link(self, string):
+        return parse_link(string)
+
+    def parse_description(self, string):
+        return parse_description(string)
+
+    def create_event(self, source=None, **keys):
         event = events.Event()
 
-        title = kw.get("title", None)
-        if title:
-            parts = title.split("(")
-            if len(parts) > 1:
-                event.add("time", parts[1].rstrip(")"))
-
-        for part in description.split(","):
-            pair = part.split(":")
-            if len(pair) < 2:
+        for name, string in keys.iteritems():
+            parse = getattr(self, "parse_" + name, None)
+            if parse is None:
                 continue
-            key = pair[0].strip()
-            value = pair[1].strip()
 
-            levels = {'1': 'Bulletproof hosted',
-                      '2': 'Hacked webserver',
-                      '3': 'Free hosting service',
-                      '4': 'Unknown',
-                      '5': 'Hosted on a FastFlux botnet'}
+            for key, value in parse(string):
+                event.add(key, value)
 
-            if not value:
-                continue
-            elif key == "AS":
-                if value.startswith("AS"):
-                    value = value[2:]
-                event.add("asn", value)
-            elif key == "Status":
-                event.add("status", value)
-            elif key == "IP address":
-                event.add("ip", value)
-            elif key in ["Country", "Host", "Status"]:
-                event.add(key.lower(), value)
-            elif key == "SBL":
-                event.add("sbl", 
-                          "http://www.spamhaus.org/sbl/sbl.lasso?query=%s" % 
-                          (value))
-            elif key == "Level":
-                if value in levels:
-                    event.add("level", levels[value])
-                else:
-                    event.add("level", value)
-            url = kw.get('url', '')
-
-            if "zeus" in url:
-                event.add("malware", "zeus")
-            elif "spyeye" in url:
-                event.add("malware", "spyeye")
-            elif "palevo" in url:
-                event.add("malware", "palevo")
-
-        if not event.contains("ip"):
+        if not event.contains():
             return None
 
-        if kw.get('source', ''):
-            event.add('source', kw['source'])
+        if self.malware is not None:
+            event.add("malware", self.malware)
+
+        event.add("source url", source)
+        for feed_type, feed_url in self.types.iteritems():
+            if source == feed_url:
+                event.add("type", feed_type)
 
         return event
 
