@@ -64,4 +64,4 @@ class CleanMXBot(bot.PollingBot):
             yield idiokit.send(new)
 
 if __name__ == "__main__":
-    CleanMXBot.from_command_line().run()
+    CleanMXBot.from_command_line().execute()
