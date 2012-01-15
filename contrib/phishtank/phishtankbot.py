@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    Phishtank feed handler
+    PhishTank feed handler
 """
 __authors__ = "Toni Huttunen, Joachim Viide and Jussi Eronen"
 __copyright__ = "Copyright 2011, The AbuseHelper Project"
@@ -16,131 +16,141 @@ import xml.etree.cElementTree as etree
 import idiokit
 from abusehelper.core import bot, events, utils
 
-def decode(s, encodings=['latin1']):
-    for encoding in encodings:
-        try:
-            return s.decode(encoding)
-        except UnicodeDecodeError:
-            pass
-    return s.decode('utf-8', 'ignore')
+class BZ2Reader(object):
+    def __init__(self, fileobj):
+        self.fileobj = fileobj
+
+        self.bz2 = bz2.BZ2Decompressor()
+        self.pending = ""
+        self.index = 0
+
+    def read(self, amount):
+        result = list()
+
+        while amount > 0:
+            if self.index >= len(self.pending):
+                data = self.fileobj.read(2**16)
+                if not data:
+                    break
+                self.pending = self.bz2.decompress(data)
+                self.index = 0
+            else:
+                piece = self.pending[self.index:self.index+amount]
+                self.index += len(piece)
+                amount -= len(piece)
+                result.append(piece)
+
+        return "".join(result)
 
 class HeadRequest(urllib2.Request):
     def get_method(self):
         return "HEAD"
 
-class PhishtankBot(bot.PollingBot):
-    application_key = bot.Param("Registered application key for Phistank.")
+class PhishTankBot(bot.PollingBot):
+    application_key = bot.Param("registered application key for PhishTank")
     feed_url = bot.Param(default="http://data.phishtank.com/data/%s/online-valid.xml.bz2")
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
-        self.full_feed = self.feed_url % self.application_key
-        self.last_modified = None
+        self.fileobj = None
+        self.etag = None
 
-    def urlIsModified(self, url):
-        self.log.info("Checking if %s has new data." % url)
-        info = urllib2.urlopen(HeadRequest(url)).info()
+    @idiokit.stream
+    def _handle_entry(self, entry, sites):
+        url = entry.find("url")
+        if url is None:
+            return
+        if not isinstance(url, basestring):
+            url = url.text
 
-        etag = info.get("etag", '"Thu, 01 Jan 1970 00:00:00"')
-        etag = datetime.strptime(etag, '"%a, %d %b %Y %H:%M:%S"')
-        new = info.get("last-modified", 'Thu, 01 Jan 1970 00:00:00 GMT')
-        new = datetime.strptime(new, "%a, %d %b %Y %H:%M:%S GMT")
+        verification = entry.find("verification")
+        if verification is None:
+            return
 
-        if etag > new:
-            new = etag
+        verified = verification.find("verified")
+        if verified is None or verified.text != "yes":
+            return
 
-        if self.last_modified and self.last_modified >= new:
-            self.log.info("No new data since %s", self.last_modified)
-            return False
+        ts = verification.find("verification_time")
+        if ts != None and ts.text:
+            try:
+                ts = datetime.strptime(ts.text, "%Y-%m-%dT%H:%M:%S+00:00")
+                ts = ts.strftime("%Y-%m-%d %H:%M:%S UTC")
+            except ValueError:
+                ts = None
 
-        self.last_modified = new
-        self.log.info("Data modified since last fetch.")
-        return True
+        status = entry.find("status")
+        if status is None:
+            return
+        online = status.find("online")
+        if online is None or online.text != "yes":
+            return
+
+        details = entry.find("details")
+        if details is None:
+            return
+        for detail in details.findall("detail"):
+            ip = detail.find("ip_address")
+            if ip is None:
+                continue
+
+            announcer = detail.find("announcing_network")
+            if announcer is None or announcer.text == None:
+                continue
+
+            ip = ip.text
+            announcer = announcer.text
+
+            url_data = sites.setdefault(url, set())
+            if (ip, announcer) in url_data:
+                continue
+            url_data.add((ip, announcer))
+
+            event = events.Event()
+            event.add("feed", "phishtank")
+            event.add("url", url)
+            event.add("host", "/".join(url.split("/")[:3])+"/")
+            event.add("ip", ip)
+            event.add("asn", announcer)
+            if ts:
+                event.add("time", ts)
+            yield idiokit.send(event)
 
     @idiokit.stream
     def poll(self, _):
-        if not self.urlIsModified(self.full_feed):
-            return
-
+        url = self.feed_url % self.application_key
         try:
-            self.log.info("Downloading data from: %s", self.full_feed)
-            _, fileobj = yield utils.fetch_url(self.full_feed)
-        except utils.FetchUrlFailed, e:
-            self.log.error("Failed to download the report %s: %r", self.full_feed, e)
+            self.log.info("Checking if %r has new data" % url)
+            info, _ = yield utils.fetch_url(HeadRequest(url))
+
+            etag = info.get("etag", None)
+            if etag is None or self.etag != etag:
+                self.log.info("Downloading new data from %r", url)
+                _, self.fileobj = yield utils.fetch_url(url)
+            self.etag = etag
+        except utils.FetchUrlFailed, error:
+            self.log.error("Failed to download %r: %r", url, error)
             return
 
-        uncompressed = bz2.decompress(fileobj.read())
-        utf8_data = decode(uncompressed).encode("utf8")
+        self.fileobj.seek(0)
+        reader = BZ2Reader(self.fileobj)
         try:
-            elements = etree.fromstring(utf8_data)
-        except SyntaxError, e:
-            self.log.error('Syntax error in report "%s": %r ',
-                           self.full_feed, e)
-            return
+            depth = 0
+            sites = dict()
 
-        sites = dict()
-        for elem in elements:
-            entries = elem.findall("entry")
-            if not entries:
-                continue
+            for event, element in etree.iterparse(reader, events=("start", "end")):
+                if event == "start" and element.tag == "entry":
+                    depth += 1
 
-            for entry in entries:
-                url = entry.find("url")
-                if url is None:
-                    continue
+                if event == "end" and element.tag == "entry":
+                    yield self._handle_entry(element, sites)
+                    depth -= 1
 
-                verification = entry.find("verification")
-                if verification is None:
-                    continue
-                verified = verification.find("verified")
-                if verified is None or verified.text != "yes":
-                    continue
-
-                ts = verification.find("verification_time")
-                if ts != None and ts.text:
-                    try:
-                        ts=datetime.strptime(ts.text,"%Y-%m-%dT%H:%M:%S+00:00")
-                        ts=ts.strftime("%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        ts = None
-
-                status = entry.find("status")
-                if status is None:
-                    continue
-                online = status.find("online")
-                if online is None or online.text != "yes":
-                    continue
-
-                details = entry.find("details")
-                if details is None:
-                    continue
-                for detail in details.findall("detail"):
-                    ip = detail.find("ip_address")
-                    if ip is None:
-                        continue
-
-                    announcer = detail.find("announcing_network")
-                    if announcer is None or announcer.text == None:
-                        continue
-
-                    if type(url) not in [str, unicode]:
-                        url = url.text
-                    ip = ip.text
-                    announcer = announcer.text
-
-                    url_data = sites.setdefault(url, list())
-                    if (ip, announcer) not in url_data:
-                        url_data.append((ip, announcer))
-
-                        event = events.Event()
-                        event.add("feed", "phishtank")
-                        event.add("url", url)
-                        event.add("host", "/".join(url.split("/")[:3])+"/")
-                        event.add("ip", ip)
-                        event.add("asn", announcer)
-                        if ts:
-                            event.add("time", ts)
-                        yield idiokit.send(event)
+                if event == "end" and depth == 0:
+                    element.clear()
+        except SyntaxError, error:
+            self.log.error("Syntax error in report %r: %r", url, error)
+            pass
 
 if __name__ == "__main__":
-     PhishtankBot.from_command_line().execute()
+    PhishTankBot.from_command_line().execute()
