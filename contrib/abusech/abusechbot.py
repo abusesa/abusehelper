@@ -11,7 +11,7 @@ import time
 import socket
 import urlparse
 
-from abusehelper.core import bot, events
+from abusehelper.core import events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 def is_ip(string):
@@ -114,18 +114,55 @@ def parse_description(description):
 class AbuseCHBot(RSSBot):
     feeds = None
 
-    types = dict()
-    malware = None
+    malwares = {
+        "zeus": {
+            "c&c": "https://zeustracker.abuse.ch/rss.php",
+            "config": "https://zeustracker.abuse.ch/monitor.php?urlfeed=configs",
+            "binary": "https://zeustracker.abuse.ch/monitor.php?urlfeed=binaries",
+            "dropzone": "https://zeustracker.abuse.ch/monitor.php?urlfeed=dropzones"
+        },
+        "spyeye": {
+            "c&c": "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker",
+            "config": "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=configurls",
+            "binary": "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=binaryurls",
+            "dropzone": "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=dropurls"
+        },
+        "palevo": {
+            "c&c": "http://amada.abuse.ch/palevotracker.php?rssfeed"
+        }
+    }
 
-    def feed_keys(self, types=None, **_):
-        if types is None:
-            types = self.types
+    @property
+    def urls(self):
+        if self._urls is not None:
+            return self._urls
 
-        for feed_type in types:
-            if feed_type not in self.types:
-                self.log.error("no support for feed type %r" % feed_type)
-            else:
-                yield (self.types[feed_type],)
+        self._urls = dict()
+        for malware, feed_types in self.malwares.iteritems():
+            for feed_type, url in feed_types.iteritems():
+                self._urls[url] = malware, feed_type
+        return self._urls
+    _urls = None
+
+    def feed_keys(self, malwares=None, types=None, **_):
+        if malwares is None:
+            malwares = self.malwares
+
+        for malware in malwares:
+            if not malware in self.malwares:
+                self.log.error("no support for malware %r" % malware)
+                continue
+
+            feed_types = self.malwares[malware]
+            if types is None:
+                types = feed_types
+
+            for feed_type in types:
+                if feed_type not in feed_types:
+                    self.log.error("no support for %r type %r" % (malware, feed_type))
+                    continue
+
+                yield (feed_types[feed_type],)
 
     def parse_title(self, string):
         return parse_title(string)
@@ -150,13 +187,11 @@ class AbuseCHBot(RSSBot):
         if not event.contains():
             return None
 
-        if self.malware is not None:
-            event.add("malware", self.malware)
-
+        if source in self.urls:
+            malware, feed_type = self.urls[source]
+            event.add("malware", malware)
+            event.add("type", feed_type)
         event.add("source url", source)
-        for feed_type, feed_url in self.types.iteritems():
-            if source == feed_url:
-                event.add("type", feed_type)
 
         return event
 
