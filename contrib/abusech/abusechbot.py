@@ -78,11 +78,11 @@ def parse_link(link):
             yield "ip", host
 
 _levels = {
-    "1": "Bulletproof hosted",
-    "2": "Hacked webserver",
-    "3": "Free hosting service",
-    "4": "Unknown",
-    "5": "Hosted on a FastFlux botnet"
+    "1": "bulletproof hosted",
+    "2": "hacked webserver",
+    "3": "free hosting service",
+    "4": "unknown",
+    "5": "hosted on a fastflux botnet"
 }
 
 _sbl_prefix = "http://www.spamhaus.org/sbl/sbl.lasso?query="
