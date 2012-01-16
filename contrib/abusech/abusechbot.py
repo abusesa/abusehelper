@@ -60,12 +60,14 @@ def parse_title(title):
 
 def parse_link(link):
     """
-    >>> list(parse_link("https://spyeyetracker.abuse.ch/monitor.php?host=www.example.com"))
-    [('host', 'www.example.com')]
+    >>> sorted(parse_link("https://spyeyetracker.abuse.ch/monitor.php?host=www.example.com"))
+    [('host', 'www.example.com'), ('more info', 'https://spyeyetracker.abuse.ch/monitor.php?host=www.example.com')]
 
     >>> sorted(parse_link("https://spyeyetracker.abuse.ch/monitor.php?host=1.2.3.4"))
-    [('host', '1.2.3.4'), ('ip', '1.2.3.4')]
+    [('host', '1.2.3.4'), ('ip', '1.2.3.4'), ('more info', 'https://spyeyetracker.abuse.ch/monitor.php?host=1.2.3.4')]
     """
+
+    yield "more info", link
 
     parsed = urlparse.urlparse(link)
     query = cgi.parse_qs(parsed[4])
