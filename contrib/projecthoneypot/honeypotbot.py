@@ -1,7 +1,7 @@
 """
-    Project Honeypot feed handler.
+Project Honeypot feed handler.
 
-    Maintainer: Jussi Eronen <exec@iki.fi>
+Maintainer: Jussi Eronen <exec@iki.fi>
 """
 
 from time import strftime, strptime
