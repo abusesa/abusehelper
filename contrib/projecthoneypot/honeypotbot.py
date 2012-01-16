@@ -1,12 +1,8 @@
-# -*- coding: utf-8 -*-
 """
-    Project Honeypot feed handler
+    Project Honeypot feed handler.
+
+    Maintainer: Jussi Eronen <exec@iki.fi>
 """
-__authors__ = "Jussi Eronen"
-__copyright__ = "Copyright 2011, The AbuseHelper Project"
-__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
-__maintainer__ = "Jussi Eronen"
-__email__ = "exec@iki.fi"
 
 from time import strftime, strptime
 
@@ -33,14 +29,14 @@ class ProjectHoneyPotBot(RSSBot):
         ip, badness = title
 
         event = events.Event()
-        if kw.get('source', ''):
-            event.add('source', kw.get('source'))
+        if 'source' in kw:
+            event.add('source url', kw.get('source'))
         event.add('ip', ip)
-        event.add('url', 'http://www.projecthoneypot.org/ip_%s' % (ip))
+        event.add('more info', 'http://www.projecthoneypot.org/ip_' + ip)
 
-        badtypes = {'H': 'spam harvester', 
-                    'S': 'mail server', 
-                    'D': 'dictionary attacker', 
+        badtypes = {'H': 'spam harvester',
+                    'S': 'mail server',
+                    'D': 'dictionary attacker',
                     'W': 'bad web host',
                     'C': 'comment spammer'}
 
@@ -48,7 +44,7 @@ class ProjectHoneyPotBot(RSSBot):
             if item in badness:
                 event.add('type', badtypes[item])
 
-        descritems = [x.strip().split(': ') for x in 
+        descritems = [x.strip().split(': ') for x in
                       description[1:]]
 
         descrtypes = {'Total': 'count',
@@ -64,8 +60,8 @@ class ProjectHoneyPotBot(RSSBot):
             pubdate = kw.get('pubDate')
             try:
                 ts = strptime(pubdate, '%B %d %Y %I:%M:%S %p')
-                pubtime = strftime("%Y-%m-%d %H:%M:%S", ts)
-                
+                pubtime = strftime("%Y-%m-%d %H:%M:%S UTC", ts)
+
                 event.add('pubtime', pubtime)
             except ValueError:
                 pass
