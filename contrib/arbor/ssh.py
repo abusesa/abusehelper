@@ -1,5 +1,4 @@
 import idiokit
-from idiokit import util
 from abusehelper.core import utils, cymruwhois, bot, events
 
 class ArborSSHBot(bot.PollingBot):
@@ -20,7 +19,7 @@ class ArborSSHBot(bot.PollingBot):
 
         charset = info.get_param("charset")
         if charset is None:
-            decode = util.force_decode
+            decode = utils.force_decode
         else:
             decode = lambda x: x.decode(charset)
 
