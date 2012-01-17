@@ -1,7 +1,7 @@
 import re
-import os
 import gzip
 import inspect
+import cPickle as pickle
 from cStringIO import StringIO
 
 import idiokit
@@ -175,7 +175,7 @@ class Event(object):
         >>> event.add("key", "value")
         >>> event.add("\uffff", "\x05") # include some forbidden XML chars
         >>> element = Element("message")
-        >>> element.add(event.to_element())
+        >>> element.add(event.to_elements())
         >>> list(Event.from_elements(element)) == [event]
         True
         """
@@ -604,93 +604,100 @@ def events_to_elements():
     return idiokit.map(lambda x: (x.to_elements(),))
 
 class EventCollector(object):
-    def __init__(self, compresslevel=6):
-        self.stringio = StringIO()
-        self.compresslevel = compresslevel
-        self.gz = gzip.GzipFile(None, "w", compresslevel, self.stringio)
+    def __init__(self, compresslevel=6, data=""):
+        self._level = compresslevel
 
-    def __setstate__(self, (compresslevel, data)):
-        self.stringio = StringIO()
-        self.stringio.write(data)
-        self.compresslevel = compresslevel
-        self.gz = gzip.GzipFile(None, "a", compresslevel, self.stringio)
+        self._stringio = StringIO()
+        self._stringio.write(data)
 
-    def __getstate__(self):
-        self.gz.flush()
-        self.gz.close()
-        state = self.compresslevel, self.stringio.getvalue()
-        self.stringio.close()
-        self.__setstate__(state)
-        return state
+        self._gz = gzip.GzipFile(None, "a", compresslevel, self._stringio)
+
+    def __reduce__(self):
+        """
+        >>> import pickle
+
+        >>> event = Event()
+        >>> event.add("1", "2")
+
+        >>> event2 = Event()
+        >>> event2.add("x", "y")
+
+        >>> original = EventCollector()
+        >>> original.append(event)
+        >>> original.append(event2)
+        >>> original.append(event)
+
+        >>> unpickled = pickle.loads(pickle.dumps(original))
+        >>> list(unpickled.purge()) == list(original.purge())
+        True
+        """
+
+        self._gz.flush()
+        self._gz.close()
+
+        data = self._stringio.getvalue()
+        self._stringio.close()
+
+        self.__init__(self._level, data)
+        return self.__class__, (self._level, data)
 
     def append(self, event):
         attrs = dict()
         for key, value in event.items():
             attrs.setdefault(key, list()).append(value)
-        self.gz.write(repr(attrs) + os.linesep)
+        pickle.dump(attrs, self._gz, pickle.HIGHEST_PROTOCOL)
 
     def purge(self):
         """
-        >>> collector = EventCollector()
-
         >>> event = Event()
         >>> event.add("1", "2")
-        >>> collector.append(event)
 
         >>> event2 = Event()
         >>> event2.add("x", "y")
-        >>> collector.append(event2)
 
+        >>> collector = EventCollector()
         >>> collector.append(event)
+        >>> collector.append(event2)
+        >>> collector.append(event)
+
         >>> list(collector.purge()) == [event, event2, event]
         True
         """
 
-        stringio = self.stringio
-        self.stringio = StringIO()
+        self._gz.flush()
+        self._gz.close()
 
-        self.gz.flush()
-        self.gz.close()
-        self.gz = gzip.GzipFile(None, "w", 6, self.stringio)
+        event_list = _EventList(self._stringio)
 
-        return EventList(stringio)
+        self.__init__(self._level)
+        return event_list
 
-class EventList(object):
-    def __init__(self, stringio=None):
-        self.stringio = stringio
-        self.extensions = list()
+class _EventList(object):
+    def __init__(self, stringio):
+        self._stringio = stringio
 
     def __iter__(self):
-        if self.stringio is not None:
-            seek = self.stringio.seek
-            tell = self.stringio.tell
-
-            seek(0)
-            gz = gzip.GzipFile(fileobj=self.stringio)
-
+        if self._stringio is not None:
+            self._stringio.seek(0)
+            gz = gzip.GzipFile(fileobj=self._stringio)
             try:
-                for line in gz:
+                while True:
+                    try:
+                        attrs = pickle.load(gz)
+                    except EOFError:
+                        break
+
                     event = Event()
-                    for key, values in eval(line).items():
+                    for key, values in attrs.iteritems():
                         event.update(key, values)
-                    pos = tell()
+
+                    pos = self._stringio.tell()
                     yield event
-                    seek(pos)
+                    self._stringio.seek(pos)
             finally:
                 gz.close()
-
-        for other in self.extensions:
-            for event in other:
-                yield event
-
-    def extend(self, other):
-        self.extensions.append(other)
 
     def __nonzero__(self):
         for _ in self:
             return True
         return False
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
