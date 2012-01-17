@@ -5,11 +5,9 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 """
 
 import re
-import cStringIO
 
 import idiokit
 from abusehelper.core import utils, cymru, bot
-
 
 class BruteForceBlockerBot(bot.PollingBot):
     COLUMNS = ["ip", "time", "count", "id"]
