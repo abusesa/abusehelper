@@ -10,8 +10,10 @@ import cStringIO
 import idiokit
 from abusehelper.core import utils, cymru, bot
 
+
 class BruteForceBlockerBot(bot.PollingBot):
-    COLUMNS = ["ip", "lastseen", "count", "id", "url"]
+    COLUMNS = ["ip", "time", "count", "id"]
+
     use_cymru_whois = bot.BoolParam(default=True)
 
     def poll(self):
@@ -29,20 +31,22 @@ class BruteForceBlockerBot(bot.PollingBot):
             idiokit.stop(False)
         self.log.info("Downloaded")
 
-        # Crappy human-readable output does not lend itself well for
-        # csv parsing without modification
-        data = fileobj.read()
-        data = re.sub('\t+', '\t', data)
-        data = re.sub('\n', '\t%s\n' % (url), data)
-        data = data.replace('# ', '')
-        fileobj = cStringIO.StringIO(data)
-
-        charset = info.get_param("charset")
         filtered = (x for x in fileobj if x.strip() and not x.startswith("#"))
-        yield utils.csv_to_events(filtered,
-                                  delimiter="\t",
-                                  columns=self.COLUMNS,
-                                  charset=charset)
+        lines = (re.sub("\t+", "\t", x) for x in filtered)
+
+        yield (utils.csv_to_events(lines,
+                            delimiter="\t",
+                            columns=self.COLUMNS,
+                            charset=info.get_param("charset"))
+                | idiokit.map(self._normalize, url))
+
+    def _normalize(self, event, url):
+        for timestamp in event.values("time"):
+            event.add("last seen", timestamp.replace("# ", "") + " UTC")
+        event.clear("time")
+
+        event.add("source url", url)
+        yield event
 
 if __name__ == "__main__":
     BruteForceBlockerBot.from_command_line().execute()
