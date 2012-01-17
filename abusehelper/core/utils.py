@@ -47,7 +47,7 @@ def fetch_url(url, opener=None):
     except (urllib2.URLError, httplib.HTTPException, socket.error), error:
         raise FetchUrlFailed(str(error))
 
-def _force_decode(string, encodings=["ascii", "utf-8"]):
+def force_decode(string, encodings=["ascii", "utf-8"]):
     if isinstance(string, unicode):
         return string
 
@@ -60,7 +60,7 @@ def _force_decode(string, encodings=["ascii", "utf-8"]):
 
 def _csv_reader(fileobj, charset=None, **keys):
     if charset is None:
-        decode = _force_decode
+        decode = force_decode
     else:
         decode = lambda x: x.decode(charset)
     lines = (decode(line).encode("utf-8").replace("\x00", "\xc0") for line in fileobj)

@@ -20,7 +20,7 @@ class ArborSSHBot(bot.PollingBot):
 
         charset = info.get_param("charset")
         if charset is None:
-            decode = util.guess_encoding
+            decode = util.force_decode
         else:
             decode = lambda x: x.decode(charset)
 

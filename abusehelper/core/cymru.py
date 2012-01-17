@@ -1,7 +1,7 @@
 import socket
 import idiokit
 from abusehelper.core import utils
-from idiokit import util, sockets, timer
+from idiokit import sockets, timer
 
 class Stop(Exception):
     pass
@@ -23,8 +23,8 @@ class CymruWhoisAugmenter(object):
         self.wait_time = wait_time
 
         self.cache = utils.TimedCache(cache_time)
-        self.socket = None
         self.buffer = None
+        self.socket = None
         self.main = None
         self.count = 0
 
@@ -96,13 +96,15 @@ class CymruWhoisAugmenter(object):
             yield self.socket.connect(("whois.cymru.com", 43))
             yield self.socket.writeall("begin\nverbose\n")
 
-            self.buffer = util.LineBuffer()
+            self.buffer = ""
 
         yield self.socket.writeall(ip + "\n")
         while True:
             data = yield self.socket.read(4096)
+            lines = (self.buffer + data).split("\n")
+            self.buffer = lines.pop()
 
-            for line in self.buffer.feed(data):
+            for line in lines:
                 values = self._parse(line)
                 if values is not None:
                     idiokit.stop(values)

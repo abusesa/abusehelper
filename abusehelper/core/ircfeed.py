@@ -1,10 +1,9 @@
 import re
 
 import idiokit
-from idiokit import util
 from idiokit.irc import connect
 
-from abusehelper.core import events, bot
+from abusehelper.core import events, utils, bot
 
 class IRCFeedBot(bot.FeedBot):
     irc_host = bot.Param()
@@ -71,7 +70,7 @@ class IRCFeedService(IRCFeedBot):
         field_rex = r"([^\s=]+)='([^']*)'"
         data_rex = r"^([^\s>]+)>\s*(("+ field_rex +"\s*,?\s*)*)\s*$"
 
-        match = re.match(data_rex, util.guess_encoding(params[-1]))
+        match = re.match(data_rex, utils.force_decode(params[-1]))
         if not match:
             return None
 

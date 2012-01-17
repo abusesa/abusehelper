@@ -1,7 +1,7 @@
 import csv
 from cStringIO import StringIO
-from idiokit.util import guess_encoding
 from email.mime.text import MIMEText
+from abusehelper.core.utils import force_decode
 
 class Formatter(object):
     def format(self, result, events, *args):
@@ -23,8 +23,8 @@ class AttachAndEmbedUnicode(object):
         data = self.formatter.format(parts, events, *args)
 
         part = MIMEText(data.encode("utf-8"), self.subtype, "utf-8")
-        part.add_header("Content-Disposition", 
-                        "attachment", 
+        part.add_header("Content-Disposition",
+                        "attachment",
                         filename=filename)
 
         parts.append(part)
@@ -82,7 +82,7 @@ class Template(object):
             self.obj = obj
             self.events = events
             self.formatters = formatters
-            
+
         def __getitem__(self, key):
             for row in csv.reader([key], skipinitialspace=True):
                 if not row:
@@ -93,7 +93,7 @@ class Template(object):
             return u""
 
     def __init__(self, data, **formatters):
-        self.data = guess_encoding(data)
+        self.data = force_decode(data)
         self.formatters = formatters
 
     def format(self, obj, events):
