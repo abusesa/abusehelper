@@ -16,7 +16,12 @@ def is_ip(string):
             return True
     return False
 
-class CymruWhoisAugmenter(object):
+def ip_values(event, keys):
+    for key in keys:
+        for value in event.values(key, filter=is_ip):
+            yield value
+
+class CymruWhois(object):
     KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
 
     def __init__(self, wait_time=0.5, cache_time=3600.0):
@@ -29,11 +34,16 @@ class CymruWhoisAugmenter(object):
         self.count = 0
 
     @idiokit.stream
-    def augment(self, ip_key="ip"):
+    def augment(self, *ip_keys):
         while True:
             event = yield idiokit.next()
 
-            for ip in event.values(ip_key):
+            if not ip_keys:
+                values = event.values(filter=is_ip)
+            else:
+                values = ip_values(event, ip_keys)
+
+            for ip in values:
                 items = yield self.resolve(ip)
                 for key, value in items:
                     event.add(key, value)
@@ -127,7 +137,7 @@ class CymruWhoisAugmenter(object):
         bites.pop(1)
         return bites
 
-global_whois = CymruWhoisAugmenter()
+global_whois = CymruWhois()
 
-def CymruWhois(key="ip"):
-    return global_whois.augment(key)
+augment = global_whois.augment
+resolve = global_whois.resolve
