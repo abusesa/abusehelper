@@ -15,7 +15,6 @@ class ProjectHoneyPotBot(RSSBot):
     use_cymru_whois = bot.BoolParam(default=True)
 
     def create_event(self, **kw):
-        self.log.info("Got %r", kw)
         if not kw.get('description', ''):
             return None
         description = kw['description'].split(' | ')
