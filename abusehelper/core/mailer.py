@@ -144,7 +144,6 @@ class MailTemplate(templates.Template):
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
         from email.charset import Charset, QP
-        from email.utils import formatdate, make_msgid
 
         parts = list()
         data = templates.Template.format(self, parts, events)
@@ -228,7 +227,7 @@ class MailerService(ReportBot):
 
                 try:
                     yield threadpool.thread(server.quit)
-                except self.TOLERATED_EXCEPTIONS, exc:
+                except self.TOLERATED_EXCEPTIONS:
                     pass
         idiokit.stop(result)
 
@@ -303,7 +302,6 @@ class MailerService(ReportBot):
 
     @idiokit.stream
     def report(self, events, to=[], cc=[], **keys):
-        from email.header import decode_header
         from email.utils import formatdate, make_msgid, getaddresses, formataddr
 
         if not events:
