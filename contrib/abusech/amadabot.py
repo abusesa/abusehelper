@@ -1,29 +1,21 @@
-# -*- coding: utf-8 -*-
 """
-    Handles the abuse.ch AMaDa service
+Handles the abuse.ch AMaDa service
+
+Maintainer: Jussi Eronen <exec@iki.fi>
 """
-__authors__ = "Jussi Eronen"
-__copyright__ = "Copyright 2011, The AbuseHelper Project"
-__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
-__maintainer__ = "Jussi Eronen"
-__email__ = "exec@iki.fi"
 
 import socket
 import idiokit
 from idiokit import threadpool
-from abusehelper.core import bot, cymru, utils, events
+from abusehelper.core import bot, cymruwhois, utils, events
 
 class AmadaBot(bot.PollingBot):
     url = bot.Param()
     use_cymru_whois = bot.BoolParam(default=True)
 
-    def __init__(self, *args, **keys):
-        bot.PollingBot.__init__(self, *args, **keys)
-        self.whois = cymru.CymruWhoisAugmenter()
-
     def poll(self):
         if self.use_cymru_whois:
-            return self._poll() | self.whois.augment()
+            return self._poll() | cymruwhois.augment("ip")
         return self._poll()
 
     @idiokit.stream
@@ -61,7 +53,7 @@ class AmadaBot(bot.PollingBot):
                 if host not in ips:
                     new.add("domain", host)
                 new.add("url", self.url)
-                new.add("Cc type", malware)
+                new.add("cc type", malware)
 
                 yield idiokit.send(new)
 

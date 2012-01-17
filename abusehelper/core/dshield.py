@@ -1,14 +1,10 @@
 import idiokit
-from abusehelper.core import utils, cymru, bot, events
+from abusehelper.core import utils, cymruwhois, bot
 
 class DShieldBot(bot.PollingBot):
     COLUMNS = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
 
     use_cymru_whois = bot.BoolParam(default=False)
-
-    def __init__(self, *args, **keys):
-        bot.PollingBot.__init__(self, *args, **keys)
-        self.whois = cymru.CymruWhoisAugmenter()
 
     def feed_keys(self, asns=(), **keys):
         for asn in asns:
@@ -17,7 +13,7 @@ class DShieldBot(bot.PollingBot):
     def poll(self, asn):
         tail = self.normalize(asn)
         if self.use_cymru_whois:
-            tail = tail | self.whois.augment() | self.filter(asn)
+            tail = tail | cymruwhois.augment("ip") | self.filter(asn)
         return self._poll(asn) | tail
 
     @idiokit.stream

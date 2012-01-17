@@ -1,15 +1,12 @@
 import re
 import cgi
-import sys
-import time
 import urllib2
 import urlparse
-import cStringIO as StringIO
 import xml.etree.cElementTree as etree
 
 import idiokit
 from idiokit import threadpool
-from abusehelper.core import utils, bot, events, cymru
+from abusehelper.core import utils, bot, events, cymruwhois
 
 TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I | re.S)
 
@@ -72,7 +69,7 @@ class AtlasSRFBot(bot.PollingBot):
     no_extras = bot.BoolParam()
 
     def augment(self):
-        return cymru.CymruWhois()
+        return cymruwhois.augment("ip")
 
     def feed_keys(self, *args, **keys):
         yield (self.feed_url,)

@@ -1,12 +1,8 @@
 import idiokit
 import combiner
-from abusehelper.core import events, cymru
+from abusehelper.core import events, cymruwhois
 
 class CymruWhoisExpert(combiner.Expert):
-    def __init__(self, *args, **keys):
-        combiner.Expert.__init__(self, *args, **keys)
-        self.cymru = cymru.CymruWhoisAugmenter()
-
     def augment_keys(self, keys=["ip"], **_):
         for key in keys:
             if isinstance(key, basestring):
@@ -22,7 +18,7 @@ class CymruWhoisExpert(combiner.Expert):
 
             augmentation = events.Event()
             for ip in event.values(ip_key):
-                items = yield self.cymru.resolve(ip)
+                items = yield cymruwhois.resolve(ip)
                 for key, value in items:
                     augmentation.add(prefix + key, value)
 

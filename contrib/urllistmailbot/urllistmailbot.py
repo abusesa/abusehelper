@@ -21,7 +21,7 @@ import urlparse
 
 import idiokit
 from idiokit import threadpool
-from abusehelper.core import imapbot, events, bot, cymru
+from abusehelper.core import imapbot, events, cymruwhois
 
 def get_hosts(url_lines):
     r"""
@@ -81,12 +81,9 @@ class URLListMailBot(imapbot.IMAPBot):
                 event.add("ip", address)
                 yield idiokit.send(event)
 
-    def augment(self):
-        return cymru.CymruWhois()
-
     @idiokit.stream
     def handle_text_plain(self, headers, fileobj):
-        yield self.get_resolved_hosts(fileobj)
+        yield self.get_resolved_hosts(fileobj) | cymruwhois.augment("ip")
         idiokit.stop(True)
 
 if __name__ == "__main__":

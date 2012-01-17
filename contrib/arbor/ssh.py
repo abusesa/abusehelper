@@ -1,12 +1,12 @@
 import idiokit
 from idiokit import util
-from abusehelper.core import utils, cymru, bot, events
+from abusehelper.core import utils, cymruwhois, bot, events
 
 class ArborSSHBot(bot.PollingBot):
     COLUMNS = ["ip", "count"]
 
     def poll(self):
-        return self._poll() | cymru.CymruWhois()
+        return self._poll() | cymruwhois.augment("ip")
 
     @idiokit.stream
     def _poll(self, url="http://atlas-public.ec2.arbor.net/public/ssh_attackers"):

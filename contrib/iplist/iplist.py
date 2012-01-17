@@ -1,17 +1,13 @@
-# -*- coding: utf-8 -*-
 """
-    Generic feed handler for lists of IPv4 addresses and netblocks. TODO: IPv6!
+Generic feed handler for lists of IPv4/6 addresses and netblocks.
+
+Maintainer: Jussi Eronen <exec@iki.fi>
 """
-__authors__ = "Jussi Eronen"
-__copyright__ = "Copyright 2011, The AbuseHelper Project"
-__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
-__maintainer__ = "Jussi Eronen"
-__email__ = "exec@iki.fi"
 
 import re
 import socket
 import idiokit
-from abusehelper.core import utils, cymru, bot, events
+from abusehelper.core import utils, cymruwhois, bot, events
 
 rex = re.compile(r"((?:[\d\.]|[a-z\d\:])+)(?:/(\d+))?", re.I)
 
@@ -32,7 +28,7 @@ class IPListBot(bot.PollingBot):
 
     def poll(self):
         if self.use_cymru_whois:
-            return self._poll() | cymru.CymruWhois()
+            return self._poll() | cymruwhois.augment("ip")
         return self._poll()
 
     @idiokit.stream
@@ -42,7 +38,7 @@ class IPListBot(bot.PollingBot):
             info, fileobj = yield utils.fetch_url(self.url)
         except utils.FetchUrlFailed, fuf:
             self.log.error("Download failed: %r", fuf)
-            idiokit.stop(False)
+            return
         self.log.info("Downloaded")
 
         for line in fileobj:

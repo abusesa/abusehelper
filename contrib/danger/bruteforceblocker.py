@@ -7,7 +7,7 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 import re
 
 import idiokit
-from abusehelper.core import utils, cymru, bot
+from abusehelper.core import utils, cymruwhois, bot
 
 class BruteForceBlockerBot(bot.PollingBot):
     COLUMNS = ["ip", "time", "count", "id"]
@@ -16,7 +16,7 @@ class BruteForceBlockerBot(bot.PollingBot):
 
     def poll(self):
         if self.use_cymru_whois:
-            return self._poll() | cymru.CymruWhois()
+            return self._poll() | cymruwhois.augment("ip")
         return self._poll()
 
     @idiokit.stream

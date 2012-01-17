@@ -5,18 +5,13 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 """
 
 import idiokit
-from abusehelper.core import utils, cymru, bot, events
+from abusehelper.core import utils, cymruwhois, bot, events
 
 class SpamhausDropBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam(default=True)
 
-    def poll(self):
-        if self.use_cymru_whois:
-            return self._poll() | cymru.CymruWhois()
-        return self._poll()
-
     @idiokit.stream
-    def _poll(self, url="http://www.spamhaus.org/drop/drop.lasso"):
+    def poll(self, url="http://www.spamhaus.org/drop/drop.lasso"):
         self.log.info("Downloading %s" % url)
         try:
             info, fileobj = yield utils.fetch_url(url)
@@ -39,13 +34,17 @@ class SpamhausDropBot(bot.PollingBot):
             netblock, sbl = netblock_sbl
             if not len(netblock.split('/')) == 2:
                 continue
-            ip = netblock.split('/')[0]
+
             new = events.Event()
-            # Adding the bogus IP so that Cymru whois can do its magic
-            new.add('ip', ip)
+
             new.add('netblock', netblock)
             new.add('url', url + "?query=" + sbl)
             new.add('source', 'Spamhaus DROP')
+
+            if self.use_cymru_whois:
+                values = yield cymruwhois.resolve(netblock.split('/')[0])
+                for key, value in values:
+                    new.add(key, value)
 
             yield idiokit.send(new)
 

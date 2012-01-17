@@ -1,6 +1,6 @@
 import xml.etree.cElementTree as etree
 import idiokit
-from abusehelper.core import bot, cymru, events, utils
+from abusehelper.core import bot, cymruwhois, events, utils
 
 class RSSBot(bot.PollingBot):
     feeds = bot.ListParam("a list of RSS feed URLs")
@@ -8,7 +8,6 @@ class RSSBot(bot.PollingBot):
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
-        self.whois = cymru.CymruWhoisAugmenter()
         self.past_events = set()
 
     def feed_keys(self, **_):
@@ -17,7 +16,7 @@ class RSSBot(bot.PollingBot):
 
     def poll(self, url):
         if self.use_cymru_whois:
-            return self._poll(url) | self.whois.augment()
+            return self._poll(url) | cymruwhois.augment()
         return self._poll(url)
 
     @idiokit.stream
@@ -37,7 +36,7 @@ class RSSBot(bot.PollingBot):
                 continue
 
             for item in items:
-                args = {"source":url}
+                args = {"source": url}
                 for element in list(item):
                     if element.text and element.tag:
                         args[element.tag] = element.text

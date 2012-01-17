@@ -1,11 +1,12 @@
 import idiokit
-from abusehelper.core import utils, cymru, bot
+from abusehelper.core import utils, cymruwhois, bot
 
 class DragonSshBot(bot.PollingBot):
-    COLUMNS = ["asn", "as name", "ip", "time", "category"]
+    # The first column values (ASN and AS name) are ignored.
+    COLUMNS = [None, None, "ip", "time", "category"]
 
     def poll(self):
-        return self._poll() | cymru.CymruWhois()
+        return self._poll() | cymruwhois.augment("ip")
 
     @idiokit.stream
     def _poll(self, url="http://dragonresearchgroup.org/insight/sshpwauth.txt"):
