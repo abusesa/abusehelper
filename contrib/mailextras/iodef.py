@@ -1,20 +1,12 @@
-# -*- coding: utf-8 -*-
 """
-    IODEF formatter for event data. Assumes some specific keys in the
-    events.
+IODEF formatter for event data. Assumes some specific keys in the events.
+
+Maintainer: Jussi Eronen <exec@iki.fi>
 """
-__authors__ = "Jussi Eronen and Joachim Viide"
-__copyright__ = "Copyright 2011, The AbuseHelper Project"
-__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
-__maintainer__ = "Jussi Eronen"
-__email__ = "exec@iki.fi"
 
 import time
 import hashlib
-from cStringIO import StringIO
 from abusehelper.core import templates
-from abusehelper.core import config
-
 from idiokit.xmlcore import Element
 
 # Some XML output helpers
@@ -114,11 +106,11 @@ class XMLFormatter(templates.Formatter):
             # Provide contact details as described in config
             contact = node_id_and_text(inc_tag, 'Contact',
                                        role="creator", type="organization")
-            if kw.has_key("irt_name"):
+            if "irt_name" in kw:
                 node_id_and_text(contact, 'ContactName', kw["irt_name"])
-            if kw.has_key("irt_email"):
+            if "irt_email" in kw:
                 node_id_and_text(contact, 'Email', kw["irt_email"])
-            if kw.has_key("irt_phone"):
+            if "irt_phone" in kw:
                 node_id_and_text(contact, 'Telephone', kw["irt_phone"])
 
             event = node_id_and_text(inc_tag, 'EventData')
