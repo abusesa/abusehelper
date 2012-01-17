@@ -78,7 +78,7 @@ def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
 
         event = events.Event()
         for key, value in zip(columns, row):
-            if not value:
+            if key is None or not value:
                 continue
             event.add(key, value)
 
