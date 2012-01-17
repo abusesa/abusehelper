@@ -1,12 +1,8 @@
-# -*- coding: utf-8 -*-
 """
-    PhishTank feed handler
+PhishTank feed handler. Requires a PhishTank application key.
+
+Maintainer: Jussi Eronen <exec@iki.fi>
 """
-__authors__ = "Toni Huttunen, Joachim Viide and Jussi Eronen"
-__copyright__ = "Copyright 2011, The AbuseHelper Project"
-__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
-__maintainer__ = "Jussi Eronen"
-__email__ = "exec@iki.fi"
 
 import bz2
 import urllib2
@@ -150,7 +146,6 @@ class PhishTankBot(bot.PollingBot):
                     element.clear()
         except SyntaxError, error:
             self.log.error("Syntax error in report %r: %r", url, error)
-            pass
 
 if __name__ == "__main__":
     PhishTankBot.from_command_line().execute()
