@@ -1,27 +1,18 @@
-# -*- coding: utf-8 -*-
 """
-    Spamhaus DROP list handler
+Spamhaus DROP list handler.
+
+Maintainer: Jussi Eronen <exec@iki.fi>
 """
-__authors__ = "Jussi Eronen"
-__copyright__ = "Copyright 2011, The AbuseHelper Project"
-__license__ = "MIT <http://www.opensource.org/licenses/mit-license.php>"
-__maintainer__ = "Jussi Eronen"
-__email__ = "exec@iki.fi"
 
 import idiokit
-from idiokit import util
 from abusehelper.core import utils, cymru, bot, events
 
 class SpamhausDropBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam(default=True)
 
-    def __init__(self, *args, **keys):
-        bot.PollingBot.__init__(self, *args, **keys)
-        self.whois = cymru.CymruWhoisAugmenter()
-
-    def poll(self,_):
+    def poll(self):
         if self.use_cymru_whois:
-            return self._poll() | self.whois.augment()
+            return self._poll() | cymru.CymruWhois()
         return self._poll()
 
     @idiokit.stream
@@ -53,8 +44,7 @@ class SpamhausDropBot(bot.PollingBot):
             # Adding the bogus IP so that Cymru whois can do its magic
             new.add('ip', ip)
             new.add('netblock', netblock)
-            new.add('url', 
-                    "http://www.spamhaus.org/sbl/sbl.lasso?query=%s" % (sbl))
+            new.add('url', url + "?query=" + sbl)
             new.add('source', 'Spamhaus DROP')
 
             yield idiokit.send(new)
