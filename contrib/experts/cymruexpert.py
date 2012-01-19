@@ -18,7 +18,7 @@ class CymruWhoisExpert(combiner.Expert):
 
             augmentation = events.Event()
             for ip in event.values(ip_key):
-                items = yield cymruwhois.resolve(ip)
+                items = yield cymruwhois.lookup(ip)
                 for key, value in items:
                     augmentation.add(prefix + key, value)
 

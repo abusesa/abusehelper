@@ -42,7 +42,7 @@ class SpamhausDropBot(bot.PollingBot):
             new.add('source', 'Spamhaus DROP')
 
             if self.use_cymru_whois:
-                values = yield cymruwhois.resolve(netblock.split('/')[0])
+                values = yield cymruwhois.lookup(netblock.split('/')[0])
                 for key, value in values:
                     new.add(key, value)
 

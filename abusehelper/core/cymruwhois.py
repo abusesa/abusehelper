@@ -44,14 +44,14 @@ class CymruWhois(object):
                 values = ip_values(event, ip_keys)
 
             for ip in values:
-                items = yield self.resolve(ip)
+                items = yield self.lookup(ip)
                 for key, value in items:
                     event.add(key, value)
 
             yield idiokit.send(event)
 
     @idiokit.stream
-    def resolve(self, ip):
+    def lookup(self, ip):
         if not is_ip(ip):
             idiokit.stop(())
 
@@ -92,7 +92,7 @@ class CymruWhois(object):
                 ip, event = item
                 values = self.cache.get(ip, None)
                 if values is None:
-                    values = yield self._resolve(ip)
+                    values = yield self._lookup(ip)
                     self.cache.set(ip, tuple(values))
                     timeouts = 0
                 event.succeed(values)
@@ -100,7 +100,7 @@ class CymruWhois(object):
             self.main = None
 
     @idiokit.stream
-    def _resolve(self, ip):
+    def _lookup(self, ip):
         if self.socket is None:
             self.socket = sockets.Socket()
             yield self.socket.connect(("whois.cymru.com", 43))
@@ -140,4 +140,4 @@ class CymruWhois(object):
 global_whois = CymruWhois()
 
 augment = global_whois.augment
-resolve = global_whois.resolve
+lookup = global_whois.lookup
