@@ -16,13 +16,14 @@ class CymruWhoisExpert(combiner.Expert):
         while True:
             eid, event = yield idiokit.next()
 
-            augmentation = events.Event()
             for ip in event.values(ip_key):
                 items = yield cymruwhois.lookup(ip)
+                if not items:
+                    continue
+
+                augmentation = events.Event()
                 for key, value in items:
                     augmentation.add(prefix + key, value)
-
-            if augmentation.contains():
                 yield idiokit.send(eid, augmentation)
 
 if __name__ == "__main__":
