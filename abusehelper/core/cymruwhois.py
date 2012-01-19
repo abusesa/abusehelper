@@ -3,9 +3,6 @@ import idiokit
 from abusehelper.core import utils
 from idiokit import sockets, timer
 
-class Stop(Exception):
-    pass
-
 def is_ip(string):
     for addr_type in (socket.AF_INET, socket.AF_INET6):
         try:
