@@ -1,7 +1,7 @@
 import socket
 import idiokit
 from abusehelper.core import utils
-from idiokit import sockets, timer
+from idiokit import socket as idiokit_socket, timer
 
 def is_ip(string):
     for addr_type in (socket.AF_INET, socket.AF_INET6):
@@ -78,13 +78,16 @@ class CymruWhois(object):
     def _main(self):
         timeouts = 0
         try:
-            while not (timeouts >= 2 and self.count <= 0):
+            while True:
                 item = yield idiokit.next()
                 if item is None:
                     timeouts += 1
-                    if timeouts >= 2:
-                        yield self._close()
-                    continue
+                    if timeouts < 2:
+                        continue
+                    yield self._close()
+                    if self.count > 0:
+                        continue
+                    break
 
                 ip, event = item
                 values = self.cache.get(ip, None)
@@ -98,28 +101,34 @@ class CymruWhois(object):
 
     @idiokit.stream
     def _lookup(self, ip):
-        if self.socket is None:
-            self.socket = sockets.Socket()
-            yield self.socket.connect(("whois.cymru.com", 43))
-            yield self.socket.writeall("begin\nverbose\n")
-
-            self.buffer = ""
-
-        yield self.socket.writeall(ip + "\n")
         while True:
-            data = yield self.socket.read(4096)
-            lines = (self.buffer + data).split("\n")
-            self.buffer = lines.pop()
+            if self.socket is None:
+                self.socket = idiokit_socket.Socket()
+                yield self.socket.connect(("whois.cymru.com", 43))
+                yield self.socket.sendall("begin\nverbose\n")
 
-            for line in lines:
-                values = self._parse(line)
-                if values is not None:
-                    idiokit.stop(values)
+                self.buffer = ""
+
+            yield self.socket.sendall(ip + "\n")
+            while True:
+                data = yield self.socket.recv(4096)
+                if not data:
+                    self.socket = None
+                    self.buffer = None
+                    break
+
+                lines = (self.buffer + data).split("\n")
+                self.buffer = lines.pop()
+
+                for line in lines:
+                    values = self._parse(line)
+                    if values is not None:
+                        idiokit.stop(values)
 
     @idiokit.stream
     def _close(self):
         if self.socket is not None:
-            yield self.socket.writeall("end\n")
+            yield self.socket.sendall("end\n")
             yield self.socket.close()
         self.socket = None
         self.buffer = None

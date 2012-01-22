@@ -1,7 +1,5 @@
-import errno
-
 import idiokit
-from idiokit import sockets
+from idiokit import socket
 from abusehelper.core import bot, events
 from combiner import Expert
 
@@ -9,22 +7,21 @@ DEFAULT_KEYS = ("domain", "ip", "first seen", "last seen")
 
 @idiokit.stream
 def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
-    sock = sockets.Socket()
+    sock = socket.Socket()
     try:
         yield sock.connect((host, port))
-        yield sock.writeall(name + "\r\n")
+        yield sock.sendall(name + "\r\n")
 
-        data = list()
-        try:
-            while True:
-                data.append((yield sock.read(4096)))
-        except sockets.error, error:
-            if error.errno != errno.ECONNRESET:
-                raise
-    except sockets.error, error:
+        all_data = list()
+        while True:
+            data = sock.recv(4096)
+            if not data:
+                break
+            all_data.append(data)
+    except socket.SocketError:
         return
 
-    for line in "".join(data).splitlines():
+    for line in "".join(all_data).splitlines():
         event = events.Event()
         for key, value in zip(keys, line.split("\t")):
             event.add(key, value)
