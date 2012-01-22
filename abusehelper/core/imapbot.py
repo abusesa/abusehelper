@@ -7,7 +7,7 @@ import email.parser
 import idiokit
 from idiokit import threadpool, timer
 from cStringIO import StringIO
-from abusehelper.core import events, bot, services
+from abusehelper.core import bot
 
 @idiokit.stream
 def collect():
@@ -166,7 +166,6 @@ class IMAPBot(bot.FeedBot):
             for parts in data:
                 if not isinstance(parts, tuple) or len(parts) != 2:
                     continue
-                reader = StringIO(parts[1])
                 idiokit.stop(StringIO(parts[1]))
         return fetch
 
