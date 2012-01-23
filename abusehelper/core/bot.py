@@ -67,6 +67,13 @@ class IntParam(Param):
         except ValueError:
             raise ParamError("not a valid integer value: %r" % value)
 
+class FloatParam(Param):
+    def parse(self, value):
+        try:
+            return float(value)
+        except ValueError:
+            raise ParamError("not a valid floating point value: %r" % value)
+
 class _InternalParam(IntParam):
     def __init__(self, *args, **keys):
         keys.setdefault("default", None)
@@ -279,28 +286,6 @@ from idiokit import timer
 from idiokit.xmpp import connect
 from abusehelper.core import log
 
-@idiokit.stream
-def output_rate_limiter(rate):
-    queue = collections.deque()
-
-    while True:
-        msg = yield idiokit.next()
-
-        now = time.time()
-        queue.append(now + 1.0)
-
-        while True:
-            while queue and now > queue[0]:
-                queue.popleft()
-
-            if not queue or len(queue) <= rate:
-                break
-
-            yield timer.sleep(queue[0] - now)
-            now = time.time()
-
-        yield idiokit.send(msg)
-
 class XMPPBot(Bot):
     xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
     xmpp_password = Param("the XMPP password", default=None)
@@ -312,8 +297,6 @@ class XMPPBot(Bot):
                                 "in addition to the system CAs", default=None)
     xmpp_ignore_cert = BoolParam("do not perform any verification "+
                                  "for the XMPP service's SSL certificate")
-    xmpp_rate_limit = IntParam("how many XMPP stanzas the bot can send per "+
-                               "second (default: no limit)", default=None)
 
     def __init__(self, **keys):
         Bot.__init__(self, **keys)
@@ -332,17 +315,11 @@ class XMPPBot(Bot):
     def xmpp_connect(self):
         verify_cert = not self.xmpp_ignore_cert
 
-        if self.xmpp_rate_limit is not None:
-            limiter = output_rate_limiter(self.xmpp_rate_limit)
-        else:
-            limiter = None
-
         self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
         xmpp = yield connect(self.xmpp_jid,
                              self.xmpp_password,
                              host=self.xmpp_host,
                              port=self.xmpp_port,
-                             rate_limiter=limiter,
                              ssl_verify_cert=verify_cert,
                              ssl_ca_certs=self.xmpp_extra_ca_certs)
         self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
@@ -426,12 +403,32 @@ class ServiceBot(XMPPBot):
 from abusehelper.core import events, taskfarm
 
 class FeedBot(ServiceBot):
+    xmpp_rate_limit = FloatParam("how many XMPP stanzas the bot can send per "+
+                                 "second (default: no limiting)", default=None)
+
     def __init__(self, *args, **keys):
         ServiceBot.__init__(self, *args, **keys)
 
         self._feeds = taskfarm.TaskFarm(self.manage_feed)
         self._rooms = taskfarm.TaskFarm(self.manage_room)
         self._dsts = taskfarm.Counter()
+
+        self._last_output = float("-inf")
+
+    @idiokit.stream
+    def _output_rate_limiter(self):
+        while self.xmpp_rate_limit <= 0.0:
+            yield timer.sleep(1.0)
+
+        while True:
+            delta = max(time.time() - self._last_output, 0)
+            delay = 1.0 / self.xmpp_rate_limit - delta
+            if delay > 0.0:
+                yield timer.sleep(delay)
+            self._last_output = time.time()
+
+            msg = yield idiokit.next()
+            yield idiokit.send(msg)
 
     def feed_keys(self, *args, **keys):
         yield ()
@@ -471,6 +468,7 @@ class FeedBot(ServiceBot):
         self.log.info("Joined room %r", name)
         try:
             yield (events.events_to_elements()
+                   | self._output_rate_limiter()
                    | self._stats(name)
                    | room
                    | idiokit.consume())
