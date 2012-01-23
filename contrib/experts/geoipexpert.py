@@ -15,44 +15,46 @@ class GeoIPExpert(Expert):
         self.geoip = pygeoip.GeoIP(self.geoip_db)
         self.log.info('GeoIP initiated')
 
-    def set_geo(self, event, key):
+    def geomap(self, event, key):
         ip = event.value(key, None)
         if not ip:
-            return event
+            return
 
         try:
             record = self.geoip.record_by_addr(ip)
         except pygeoip.GeoIPError, e:
             self.log.error("GeoIP fetch failed: %s", repr(e))
-            return event
+            return
 
         if not record:
-            return event
+            return
+
+        augmentation = events.Event()
 
         if not event.contains('cc'):
             cc = record.get('country_code', None)
             if cc:
-                event.add('geoip_cc', cc)
+                augmentation.add('geoip_cc', cc)
 
         if not event.contains('latitude'):
             latitude = record.get('latitude', None)
             if latitude:
-                event.add('latitude', unicode(latitude))
+                augmentation.add('latitude', unicode(latitude))
 
         if not event.contains('longitude'):
             longitude = self.geoip.record_by_addr(ip)['longitude']
             if longitude:
-                event.add('longitude', unicode(longitude))
+                augmentation.add('longitude', unicode(longitude))
 
-        return event
+        yield augmentation
 
     @idiokit.stream
     def augment(self):
         while True:
             eid, event = yield idiokit.next()
 
-            augmented = self.set_geo(event, self.ip_key)
-            yield idiokit.send(eid, augmented)
+            for augmentation in self.geomap(event, self.ip_key):
+                yield idiokit.send(eid, augmentation)
 
 if __name__ == "__main__":
     GeoIPExpert.from_command_line().execute()
