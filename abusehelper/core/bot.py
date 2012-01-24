@@ -465,13 +465,13 @@ class FeedBot(ServiceBot):
         self.log.info("Joining room %r", name)
         room = yield self.xmpp.muc.join(name, self.bot_name)
 
+        tail = self._stats(name) | room | idiokit.consume()
+        if self.xmpp_rate_limit is not None:
+            tail = self._output_rate_limiter() | tail
+
         self.log.info("Joined room %r", name)
         try:
-            yield (events.events_to_elements()
-                   | self._output_rate_limiter()
-                   | self._stats(name)
-                   | room
-                   | idiokit.consume())
+            yield events.events_to_elements() | tail
         finally:
             self.log.info("Left room %r", name)
 
