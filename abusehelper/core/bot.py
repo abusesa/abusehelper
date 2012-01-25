@@ -1,3 +1,4 @@
+import os
 import csv
 import sys
 import inspect
@@ -21,9 +22,6 @@ class Param(object):
 
         self.order = Param.param_order
         Param.param_order += 1
-
-    def is_visible(self):
-        return True
 
     def has_default(self):
         return self.default is not self.NO_VALUE
@@ -74,14 +72,6 @@ class FloatParam(Param):
         except ValueError:
             raise ParamError("not a valid floating point value: %r" % value)
 
-class _InternalParam(IntParam):
-    def __init__(self, *args, **keys):
-        keys.setdefault("default", None)
-        IntParam.__init__(self, *args, **keys)
-
-    def is_visible(self):
-        return False
-
 def optparse_name(name):
     return name.replace("_", "-")
 
@@ -115,20 +105,9 @@ class LineFormatter(logging.Formatter):
         return "".join(lines)
 
 class Bot(object):
+    bot_name = Param("name for the bot (default=%default)")
     log_file = Param("write logs to the given path (default: log to stdout)",
                      default=None)
-    ppid = _InternalParam("internal use only, "+
-                          "bot should read its "+
-                          "configuration from stdin "+
-                          "as a Python pickle")
-
-    class __metaclass__(type):
-        def __new__(cls, name, parents, keys):
-            bot_name = Param("name for the bot (default=%default)",
-                             default=name)
-            bot_name.order = -1
-            keys.setdefault("bot_name", bot_name)
-            return type.__new__(cls, name, parents, keys)
 
     @classmethod
     def params(cls):
@@ -156,37 +135,41 @@ class Bot(object):
         return sorted(params, key=lambda x: tuple(map(orders.get, keys[x[0]])))
 
     @classmethod
-    def param_defaults(cls):
-        return dict((name, param.default)
-                    for (name, param) in cls.params()
-                    if param.has_default())
+    def param_defaults(cls, **defaults):
+        result = dict()
+        for name, param in cls.params():
+            if param.has_default():
+                result[name] = param.default
+            elif name == "bot_name":
+                modulename = inspect.getmodulename(inspect.getfile(cls))
+                result["bot_name"] = modulename
+        result.update(defaults)
+        return result
 
     @classmethod
-    def params_from_command_line(cls, argv=None):
-        import optparse
+    def _from_sys_argv(cls, params, **defaults):
+        defaults = cls.param_defaults(**defaults)
 
         parser = optparse.OptionParser()
         parsed = dict()
 
-        usage = ["Usage: %prog [options]"]
-        positional = list()
-        for name, param in cls.params():
-            if not param.has_default() and param.is_visible():
-                usage.append(name)
+        positional = []
+        for name, param in params:
+            if name not in defaults:
                 positional.append((name, param))
+
+        usage = ["Usage: %prog [options]"]
+        for name, param in positional:
+            usage.append(name)
         parser.set_usage(" ".join(usage))
 
-        for name, param in cls.params():
+        for name, param in params:
             args = ["--" + optparse_name(name)]
             if param.short is not None:
                 args = ["-" + optparse_name(param.short)]
 
-            help = param.help
-            if not param.is_visible():
-                help = optparse.SUPPRESS_HELP
-
-            kwargs = dict(default=param.default,
-                          help=help,
+            kwargs = dict(default=defaults.get(name, None),
+                          help=param.help,
                           metavar=name,
                           dest=name,
                           action="callback",
@@ -196,7 +179,7 @@ class Bot(object):
                           callback_args=(param.parse, parsed))
             parser.add_option(*args, **kwargs)
 
-        _, args = parser.parse_args(argv)
+        _, args = parser.parse_args()
         for (name, param), value in zip(positional, args):
             if name in parsed:
                 continue
@@ -207,35 +190,59 @@ class Bot(object):
                 message = "parameter " + name + ": " + error.args[0]
                 parser.error(message)
 
-        return parser, parsed
+        for name, param in positional[len(args):]:
+            parser.error("no value for parameter " + name)
+
+        defaults.update(parsed)
+        return dict((name, defaults[name]) for (name, _) in params)
 
     @classmethod
-    def from_command_line(cls, argv=None):
-        default = cls.param_defaults()
-        parser, cli = cls.params_from_command_line(argv)
+    def _from_dict(cls, params, **defaults):
+        defaults = cls.param_defaults(**defaults)
+        results = dict()
 
-        if cli.get("ppid", None):
-            conf = dict(pickle.load(sys.stdin))
-            for name, param in cls.params():
-                if name not in conf:
-                    continue
-                value = conf[name]
-                if isinstance(value, basestring):
-                    try:
-                        value = param.parse(value)
-                    except ParamError, error:
-                        message = "startup parameter " + name + ": " + error.args[0]
-                        parser.error(message)
-                default[name] = value
+        for name, param in params:
+            if name not in defaults:
+                continue
 
-        default.update(cli)
+            value = defaults[name]
+            if not isinstance(value, basestring):
+                continue
+
+            try:
+                value = param.parse(value)
+            except ParamError, error:
+                raise ParamError("startup parameter " + name + ": " + error.args[0])
+            results[name] = value
+
+        return results
+
+    @classmethod
+    def from_command_line(cls, *args, **keys):
+        params = list()
         for name, param in cls.params():
-            if name not in default:
-                parser.error("no value for parameter " + name)
+            if name not in keys:
+                params.append((name, param))
 
-        return cls(**default)
+        bot_name = inspect.getmodulename(inspect.stack()[1][1])
 
-    def __init__(self, **keys):
+        if "ABUSEHELPER_CONF_FROM_STDIN" in os.environ:
+            defaults = dict(pickle.load(sys.stdin))
+            defaults.setdefault("bot_name", bot_name)
+            added = cls._from_dict(params, **defaults)
+        else:
+            added = cls._from_sys_argv(params, bot_name=bot_name)
+
+        print added
+        added.update(keys)
+        return cls(*args, **added)
+
+    def __init__(self, *args, **keys):
+        if len(args) == 1:
+            raise TypeError("got an unexpected positional argument")
+        elif len(args) > 1:
+            raise TypeError("got unexpected positional arguments")
+
         for name, param in self.params():
             if name in keys:
                 value = keys.pop(name)
@@ -298,8 +305,8 @@ class XMPPBot(Bot):
     xmpp_ignore_cert = BoolParam("do not perform any verification "+
                                  "for the XMPP service's SSL certificate")
 
-    def __init__(self, **keys):
-        Bot.__init__(self, **keys)
+    def __init__(self, *args, **keys):
+        Bot.__init__(self, *args, **keys)
 
         if self.xmpp_password is None:
             self.xmpp_password = getpass.getpass("XMPP password: ")
