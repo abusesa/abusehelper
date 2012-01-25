@@ -206,13 +206,11 @@ class Bot(object):
                 continue
 
             value = defaults[name]
-            if not isinstance(value, basestring):
-                continue
-
-            try:
-                value = param.parse(value)
-            except ParamError, error:
-                raise ParamError("startup parameter " + name + ": " + error.args[0])
+            if isinstance(value, basestring):
+                try:
+                    value = param.parse(value)
+                except ParamError, error:
+                    raise ParamError("startup parameter " + name + ": " + error.args[0])
             results[name] = value
 
         return results
