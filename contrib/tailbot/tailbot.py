@@ -45,7 +45,7 @@ def follow_file(filename):
         prev_inode = inode
 
 class TailBot(bot.FeedBot):
-    path=bot.Param("Path to the followed file.")
+    path = bot.Param("path to the followed file")
 
     @idiokit.stream
     def feed(self):
@@ -65,8 +65,8 @@ class TailBot(bot.FeedBot):
                         continue
 
                     event = events.Event()
-                    for key, value in keys.iteritems():
-                        event.add(key, value.decode("utf-8", "ignore"))
+                    for key, value in keys.items():
+                        event.add(key, value)
                     yield idiokit.send(event)
 
             first = False
@@ -74,7 +74,7 @@ class TailBot(bot.FeedBot):
     def parse(self, line, mtime):
         line = line.rstrip()
         if not line:
-            return 
+            return
 
         return {"line": line}
 
