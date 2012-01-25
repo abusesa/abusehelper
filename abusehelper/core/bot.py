@@ -233,7 +233,6 @@ class Bot(object):
         else:
             added = cls._from_sys_argv(params, bot_name=bot_name)
 
-        print added
         added.update(keys)
         return cls(*args, **added)
 
