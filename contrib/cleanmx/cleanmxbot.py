@@ -10,7 +10,7 @@ import urlparse
 from xml.sax.saxutils import unescape as _unescape
 from abusehelper.core import bot, events, utils
 
-cdata = re.compile("(.*?)\<\!\[CDATA\[(.*?)\]\]\>");
+cdata = re.compile("(.*?)\<\!\[CDATA\[(.*?)\]\]\>")
 
 def unescape_data(string, unescape_func):
     result = list()
