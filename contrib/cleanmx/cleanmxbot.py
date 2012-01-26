@@ -12,18 +12,20 @@ from abusehelper.core import bot, events, utils
 
 cdata = re.compile("(.*?)\<\!\[CDATA\[(.*?)\]\]\>")
 
-def unescape_data(string, unescape_func):
+def unescape(string):
+    """
+    >>> unescape("one&nbsp;<![CDATA[two&nbsp;]]>three")
+    'one two&nbsp;three'
+    """
+
     result = list()
 
     for index, data in enumerate(cdata.split(string)):
         if index % 3 != 2:
-            data = unescape_func(data)
+            data = _unescape(data, {"&nbsp;": " "})
         result.append(data)
 
     return "".join(result)
-
-def unescape(string):
-    return _unescape(string.replace("&nbsp;", " "))
 
 class CleanMXBot(bot.PollingBot):
     def feed_keys(self, csv_url, csv_name=None, **keys):
@@ -51,7 +53,7 @@ class CleanMXBot(bot.PollingBot):
 
             new = events.Event()
             for key, value in event.items():
-                value = unescape_data(value, unescape).strip()
+                value = unescape(value).strip()
                 if not value:
                     continue
                 if key == "firsttime":
