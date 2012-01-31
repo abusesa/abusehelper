@@ -15,14 +15,21 @@ def fetch_extras(opener, url):
     try:
         _, fileobj = yield utils.fetch_url(url, opener)
     except utils.FetchUrlFailed:
+        self.log.error("Fetching failed for report %r", url)
         idiokit.stop(list())
 
     data = yield threadpool.thread(fileobj.read)
     match = TABLE_REX.search(data)
     if match is None:
+        self.log.error("Data table not found in report %r", url)
         idiokit.stop(list())
 
-    table = etree.XML(match.group(1))
+    try:
+        table = etree.XML(match.group(1))
+    except SyntaxError, error:
+        self.log.error("Syntax error in report %r: %r", url, error)
+        idiokit.stop(list())
+
     keys = [th.text or "" for th in table.findall("thead/tr/th")]
     keys = map(str.strip, keys)
 
@@ -56,6 +63,7 @@ def fetch_extras(opener, url):
     values = map(str.strip, values)
     # Keys and values do not match in the table
     if (len(values) % len(keys)):
+        self.log.error("Data keys do not match in report %r", url)
         idiokit.stop(list())
     items = [item for item in zip((len(values) / len(keys)) * keys, values)]
     items = zip(*[items[i::len(keys)] for i in range(len(keys))])
