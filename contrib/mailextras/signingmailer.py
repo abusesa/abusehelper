@@ -95,7 +95,8 @@ class Mailer(mailer.MailerService):
     rt_close_delay = bot.IntParam("Delay after which generated tickets are closed", 
                                default=300)
     sent_dir = bot.Param("Directory for logs on sent data", default='')
-    ticket_preamble = bot.Param("A possible preamble to ticket subject", default='')
+    ticket_preamble = bot.Param("A possible ticketing header, eg. CERT in [CERT #1]", 
+                                default='')
 
     def get_random_ticket_no(self, **kw):
         from random import randint as randrange
@@ -227,9 +228,15 @@ class Mailer(mailer.MailerService):
         number = number.encode(encoding)
         subject = subject.encode(encoding)
 
+        postscript = kws.get("subject_postscript", u"")
+        if postscript:
+            postscript = u" %s" % (postscript)
+        postscript = postscript.encode(encoding)
+
         charset = Charset(encoding)
         charset.header_encoding = QP
-        msg["Subject"] = charset.header_encode("%s%s" % (number, subject))
+        msg["Subject"] = charset.header_encode("%s%s%s" % 
+                                               (number, subject, postscript))
 
         if not self.sign_keys or not self.passphrase:
             return msg
