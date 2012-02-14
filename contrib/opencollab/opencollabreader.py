@@ -19,12 +19,9 @@ class OpenCollabReader(bot.FeedBot):
     def __init__(self, *args, **keys):
         bot.FeedBot.__init__(self, *args, **keys)
 
-        verify_cert = self.collab_ignore_cert
-        ca_certs = self.collab_extra_ca_certs
-
         self.collab = wiki.GraphingWiki(self.collab_url,
-                                        ssl_verify_cert=verify_cert,
-                                        ssl_ca_certs=ca_certs)
+            ssl_verify_cert=not self.collab_ignore_cert,
+            ssl_ca_certs=self.collab_extra_ca_certs)
 
         if self.collab_password is None:
             self.collab_password = getpass.getpass("Collab password: ")
@@ -36,6 +33,7 @@ class OpenCollabReader(bot.FeedBot):
     @idiokit.stream
     def feed(self, query):
         salt = str(random.randint(2**31, 2**32))
+
         def page_id(page):
             return hashlib.md5(page.encode("utf8") + salt).hexdigest()
 
