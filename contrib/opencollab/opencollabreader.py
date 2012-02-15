@@ -7,6 +7,11 @@ from idiokit import timer, threadpool
 from abusehelper.core import bot, events
 from opencollab import wiki
 
+def normalize(value):
+    if value.startswith("[[") and value.endswith("]]"):
+        return value[2:-2]
+    return value
+
 class OpenCollabReader(bot.FeedBot):
     poll_interval = bot.IntParam(default=60)
 
@@ -61,11 +66,11 @@ class OpenCollabReader(bot.FeedBot):
                     removed.discard(page)
 
                     for key, (discarded, added) in keys.iteritems():
-                        for value in discarded:
+                        for value in map(normalize, discarded):
                             event.discard(key, value)
 
-                        for value in added:
-                            event.add(key, value.lstrip("[[").rstrip("]]"))
+                        for value in map(normalize, added):
+                            event.add(key, value)
                     yield idiokit.send(event)
 
                 for page in removed:
