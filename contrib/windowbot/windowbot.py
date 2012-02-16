@@ -1,68 +1,28 @@
-from idiokit import threado, timer
+import idiokit
+from idiokit import timer
 from abusehelper.core import bot, taskfarm
 
 class RoomBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
-
         self.room_handlers = taskfarm.TaskFarm(self._handle_room)
-        self.room_channels = dict()
 
-    @threado.stream
-    def _distribute_room(inner, self, name):
-        while True:
-            elements = yield inner
-
-            channels = self.room_channels.get(name, ())
-            for channel in channels:
-                channel.send(elements)
-
-    @threado.stream
-    def _handle_room(inner, self, name):
+    @idiokit.stream
+    def _handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room | self._distribute_room(name))
+            yield room
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def _to_room(inner, self, room):
-        while True:
-            source, elements = yield threado.any(inner, room)
-            if inner is source:
-                room.send(elements)
+    def to_room(self, name):
+        return self.room_handlers.inc(name) | idiokit.consume()
 
-    @threado.stream
-    def to_room(inner, self, name):
-        inc = self.room_handlers.inc(name)
-        room = self.room_handlers.get(name)
-
-        yield inner.sub(self._to_room(room) | inc)
-
-    @threado.stream
-    def _from_room(inner, self, channel):
-        while True:
-            source, elements = yield threado.any(inner, channel)
-            if channel is source:
-                inner.send(elements)
-
-    @threado.stream
-    def from_room(inner, self, name):
-        channel = threado.Channel()
-        self.room_channels.setdefault(name, set()).add(channel)
-
-        try:
-            yield inner.sub(threado.dev_null()
-                            | self.room_handlers.inc(name)
-                            | self._from_room(channel))
-        finally:
-            channels = self.room_channels.get(name, set())
-            channels.discard(channel)
-            if not channels:
-                self.room_channels.pop(name, None)
+    def from_room(self, name):
+        return idiokit.consume() | self.room_handlers.inc(name)
 
 import time
 import hashlib
@@ -82,28 +42,28 @@ def event_id(event):
     return hashlib.md5("\xc0".join(result)).hexdigest()
 
 class WindowBot(RoomBot):
-    @threado.stream
-    def process(inner, self, window_time):
-        ids = dict()
-        queue = collections.deque()
-        sleeper = timer.sleep(1.0)
-
+    @idiokit.stream
+    def process(self, ids, queue, window_time):
         while True:
-            if sleeper.has_result():
-                sleeper = timer.sleep(1.0)
-            source, event = yield threado.any(inner, sleeper)
+            event = yield idiokit.next()
 
             current_time = time.time()
             expire_time = current_time + window_time
 
-            if inner is source:
-                eid = event_id(event)
+            eid = event_id(event)
 
-                event.add("id", eid)
-                inner.send(event)
+            event.add("id", eid)
+            yield idiokit.send(event)
 
-                ids[eid] = expire_time
-                queue.append((expire_time, eid))
+            ids[eid] = expire_time
+            queue.append((expire_time, eid))
+
+    @idiokit.stream
+    def purge(self, ids, queue):
+        while True:
+            yield timer.sleep(1.0)
+
+            current_time = time.time()
 
             while queue and queue[0][0] <= current_time:
                 expire_time, eid = queue.popleft()
@@ -114,15 +74,23 @@ class WindowBot(RoomBot):
 
                 event = events.Event()
                 event.add("id", eid)
-                inner.send(event)
+                yield idiokit.send(event)
 
-    @threado.stream
-    def session(inner, self, state, src_room, dst_room, window_time=60.0):
-        yield inner.sub(self.from_room(src_room)
-                        | events.stanzas_to_events()
-                        | self.process(window_time)
-                        | events.events_to_elements()
-                        | self.to_room(dst_room))
+    @idiokit.stream
+    def session(self, state, src_room, dst_room, window_time=60.0):
+        queue = collections.deque()
+        ids = dict()
+
+        to = self.to_room(dst_room)
+        idiokit.pipe(self.purge(ids, queue),
+                     events.events_to_elements(),
+                     to)
+
+        yield (self.from_room(src_room)
+               | events.stanzas_to_events()
+               | self.process(ids, queue, window_time)
+               | events.events_to_elements()
+               | to)
 
 if __name__ == "__main__":
     WindowBot.from_command_line().execute()

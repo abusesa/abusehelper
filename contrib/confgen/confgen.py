@@ -3,7 +3,7 @@ import os
 import re
 import sys
 import shutil
-from idiokit import jid
+from idiokit.xmpp import jid
 
 def dummy(_repr):
     class _dummy(object):
@@ -83,7 +83,6 @@ def main():
 
             with open(os.path.join(dst, "startup.py"), "r+") as startup_file:
                 startup = replace(startup_file.read(), replaces)
-
                 startup_file.seek(0)
                 startup_file.truncate(0)
                 startup_file.write(startup)

@@ -1,4 +1,5 @@
-from idiokit import threado
+import idiokit
+from idiokit import timer
 from abusehelper.core import events, rules, taskfarm, bot, services
 
 class RoomGraphBot(bot.ServiceBot):
@@ -7,52 +8,78 @@ class RoomGraphBot(bot.ServiceBot):
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.srcs = dict()
 
-    @threado.stream
-    def distribute(inner, self, name):
-        count = 0
+    @idiokit.stream
+    def _alert(self, interval=15.0):
         while True:
-            event = yield inner
+            yield timer.sleep(interval)
+            yield idiokit.send(None)
 
-            tests = list(self.srcs.get(name, ()))
-            count += 1
-            if count % 100 == 0:
-                self.log.info("Seen %d events in room %r", count, name)
+    @idiokit.stream
+    def distribute(self, name):
+        count = 0
+        waiters = dict()
 
-            for dst_room, rules in tests:
-                dst = self.rooms.get(dst_room)
-                if dst is None:
-                    continue
+        while True:
+            elements = yield idiokit.next()
 
-                for rule in rules:
-                    if rule(event):
-                        dst.send(event)
-                        break
+            if elements is None:
+                for waiter in waiters.values():
+                    yield waiter
+                waiters.clear()
 
-    @threado.stream
-    def handle_room(inner, self, name):
+                if count > 0:
+                    self.log.info("Seen %d events in room %r", count, name)
+                    count = 0
+                continue
+
+            classifier = self.srcs.get(name, None)
+            if classifier is None:
+                continue
+
+            for event in events.Event.from_elements(elements):
+                count += 1
+
+                for dst_room in classifier.classify(event):
+                    dst = self.rooms.get(dst_room)
+
+                    if dst_room in waiters:
+                        yield waiters.pop(dst_room)
+
+                    if dst is not None:
+                        waiters[dst_room] = dst.send(event)
+
+    @idiokit.stream
+    def handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
+
+        distribute = self.distribute(name)
+        idiokit.pipe(self._alert() | distribute)
+
+        def check(elements):
+            if name in self.srcs:
+                yield elements
+
         try:
-            yield inner.sub(events.events_to_elements()
-                            | room
-                            | events.stanzas_to_events()
-                            | self.distribute(name))
+            yield idiokit.pipe(events.events_to_elements(),
+                               room,
+                               idiokit.map(check),
+                               distribute)
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def session(inner, self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
-        counter = self.srcs.setdefault(src_room, taskfarm.Counter())
-        counter.inc(dst_room, rule)
+    @idiokit.stream
+    def session(self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
+        classifier = self.srcs.setdefault(src_room, rules.RuleClassifier())
+        classifier.inc(rule, dst_room)
         try:
-            yield inner.sub(self.rooms.inc(src_room)
-                            | self.rooms.inc(dst_room))
+            yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
         finally:
-            counter.dec(dst_room, rule)
-            if not counter:
+            classifier.dec(rule, dst_room)
+            if classifier.is_empty():
                 self.srcs.pop(src_room, None)
 
 if __name__ == "__main__":

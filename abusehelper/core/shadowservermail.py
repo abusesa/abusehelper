@@ -3,7 +3,8 @@ import base64
 import quopri
 import zipfile
 from cStringIO import StringIO
-from idiokit import threado
+
+import idiokit
 from abusehelper.core import utils, bot, imapbot
 
 class ShadowServerMail(imapbot.IMAPBot):
@@ -23,7 +24,7 @@ class ShadowServerMail(imapbot.IMAPBot):
                 data = base64.b64decode(fileobj.read())
             except TypeError, error:
                 self.log.error("Base64 decoding failed: %s", error)
-                raise threado.Finished(False)
+                idiokit.stop(False)
             return StringIO(data)
 
         if encoding == "quoted-printable":
@@ -34,10 +35,10 @@ class ShadowServerMail(imapbot.IMAPBot):
 
         return fileobj
 
-    @threado.stream
-    def normalize(inner, self, groupdict):
+    @idiokit.stream
+    def normalize(self, groupdict):
         while True:
-            event = yield inner
+            event = yield idiokit.next()
 
             for key in event.keys():
                 event.discard(key, "")
@@ -48,19 +49,19 @@ class ShadowServerMail(imapbot.IMAPBot):
                     continue
                 event.add(key, value)
 
-            inner.send(event)
+            yield idiokit.send(event)
 
-    @threado.stream
-    def parse_csv(inner, self, filename, fileobj):
+    @idiokit.stream
+    def parse_csv(self, filename, fileobj):
         match = re.match(self.filename_rex, filename)
         if match is None:
             self.log.error("Filename %r did not match", filename)
-            inner.finish(False)
+            idiokit.stop(False)
 
-        yield inner.sub(utils.csv_to_events(fileobj)
-                        | self.normalize(match.groupdict()))
-        inner.finish(True)
-        
+        yield idiokit.pipe(utils.csv_to_events(fileobj),
+                           self.normalize(match.groupdict()))
+        idiokit.stop(True)
+
     def handle(self, parts):
         attachments = list()
         texts = list()
@@ -76,19 +77,19 @@ class ShadowServerMail(imapbot.IMAPBot):
 
         return imapbot.IMAPBot.handle(self, attachments + texts)
 
-    @threado.stream
-    def handle_text_plain(inner, self, headers, fileobj):
+    @idiokit.stream
+    def handle_text_plain(self, headers, fileobj):
         filename = headers[-1].get_filename(None)
         if filename is not None:
             self.log.info("Parsing CSV data from an attachment")
             fileobj = self._decode(headers, fileobj)
-            result = yield inner.sub(self.parse_csv(filename, fileobj))
-            inner.finish(result)
+            result = yield self.parse_csv(filename, fileobj)
+            idiokit.stop(result)
 
         for match in re.findall(self.url_rex, fileobj.read()):
             self.log.info("Fetching URL %r", match)
             try:
-                info, fileobj = yield inner.sub(utils.fetch_url(match))
+                info, fileobj = yield utils.fetch_url(match)
             except utils.FetchUrlFailed, fail:
                 self.log.error("Fetching URL %r failed: %r", match, fail)
                 return
@@ -97,40 +98,40 @@ class ShadowServerMail(imapbot.IMAPBot):
             if filename is None:
                 self.log.error("No filename given for the data")
                 continue
-            
+
             self.log.info("Parsing CSV data from the URL")
             fileobj = self._decode(headers, fileobj)
-            result = yield inner.sub(self.parse_csv(filename, fileobj))
-            inner.finish(result)
+            result = yield self.parse_csv(filename, fileobj)
+            idiokit.stop(result)
 
-    @threado.stream
-    def handle_text_csv(inner, self, headers, fileobj):
+    @idiokit.stream
+    def handle_text_csv(self, headers, fileobj):
         filename = headers[-1].get_filename(None)
         if filename is None:
             self.log.error("No filename given for the data")
-            inner.finish(False)
+            idiokit.stop(False)
 
         self.log.info("Parsing CSV data from an attachment")
         fileobj = self._decode(headers, fileobj)
-        result = yield inner.sub(self.parse_csv(filename, fileobj))
-        inner.finish(result)
+        result = yield self.parse_csv(filename, fileobj)
+        idiokit.stop(result)
 
-    @threado.stream
-    def handle_application_zip(inner, self, headers, fileobj):
+    @idiokit.stream
+    def handle_application_zip(self, headers, fileobj):
         self.log.info("Opening a ZIP attachment")
         fileobj = self._decode(headers, fileobj)
         try:
             zip = zipfile.ZipFile(fileobj)
         except zipfile.BadZipfile, error:
             self.log.error("ZIP handling failed: %s", error)
-            inner.finish(False)
+            idiokit.stop(False)
 
         for filename in zip.namelist():
             csv_data = StringIO(zip.read(filename))
-            
+
             self.log.info("Parsing CSV data from the ZIP attachment")
-            result = yield inner.sub(self.parse_csv(filename, csv_data))
-            inner.finish(result)
+            result = yield self.parse_csv(filename, csv_data)
+            idiokit.stop(result)
 
     def handle_application_octet__stream(self, headers, fileobj):
         filename = headers[-1].get_filename(None)

@@ -6,7 +6,6 @@ from distutils.core import setup as _setup
 from distutils.dir_util import remove_tree
 from distutils.util import convert_path
 from distutils.command.install import install as _install
-from distutils.command.build import build as _build
 
 def rmtree(path):
     try:

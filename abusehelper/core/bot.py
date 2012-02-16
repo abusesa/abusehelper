@@ -23,9 +23,6 @@ class Param(object):
         self.order = Param.param_order
         Param.param_order += 1
 
-    def is_visible(self):
-        return True
-
     def has_default(self):
         return self.default is not self.NO_VALUE
 
@@ -42,7 +39,7 @@ class ListParam(Param):
             for row in csv.reader([value]):
                 split = filter(None, map(str.strip, row))
                 return map(self.type.parse, split)
-        except csv.Error, error:
+        except csv.Error:
             raise ParamError("not a valid comma separated list: %r" % value)
 
 class BoolParam(Param):
@@ -68,13 +65,12 @@ class IntParam(Param):
         except ValueError:
             raise ParamError("not a valid integer value: %r" % value)
 
-class _InternalParam(IntParam):
-    def __init__(self, *args, **keys):
-        keys.setdefault("default", None)
-        IntParam.__init__(self, *args, **keys)
-
-    def is_visible(self):
-        return False
+class FloatParam(Param):
+    def parse(self, value):
+        try:
+            return float(value)
+        except ValueError:
+            raise ParamError("not a valid floating point value: %r" % value)
 
 def optparse_name(name):
     return name.replace("_", "-")
@@ -109,20 +105,9 @@ class LineFormatter(logging.Formatter):
         return "".join(lines)
 
 class Bot(object):
+    bot_name = Param("name for the bot (default=%default)")
     log_file = Param("write logs to the given path (default: log to stdout)",
                      default=None)
-    ppid = _InternalParam("internal use only, "+
-                          "bot should read its "+
-                          "configuration from stdin "+
-                          "as a Python pickle")
-
-    class __metaclass__(type):
-        def __new__(cls, name, parents, keys):
-            bot_name = Param("name for the bot (default=%default)",
-                             default=name)
-            bot_name.order = -1
-            keys.setdefault("bot_name", bot_name)
-            return type.__new__(cls, name, parents, keys)
 
     @classmethod
     def params(cls):
@@ -150,37 +135,41 @@ class Bot(object):
         return sorted(params, key=lambda x: tuple(map(orders.get, keys[x[0]])))
 
     @classmethod
-    def param_defaults(cls):
-        return dict((name, param.default)
-                    for (name, param) in cls.params()
-                    if param.has_default())
+    def param_defaults(cls, **defaults):
+        result = dict()
+        for name, param in cls.params():
+            if param.has_default():
+                result[name] = param.default
+            elif name == "bot_name":
+                modulename = inspect.getmodulename(inspect.getfile(cls))
+                result["bot_name"] = modulename
+        result.update(defaults)
+        return result
 
     @classmethod
-    def params_from_command_line(cls, argv=None):
-        import optparse
+    def _from_sys_argv(cls, params, **defaults):
+        defaults = cls.param_defaults(**defaults)
 
         parser = optparse.OptionParser()
         parsed = dict()
 
-        usage = ["Usage: %prog [options]"]
-        positional = list()
-        for name, param in cls.params():
-            if not param.has_default() and param.is_visible():
-                usage.append(name)
+        positional = []
+        for name, param in params:
+            if name not in defaults:
                 positional.append((name, param))
+
+        usage = ["Usage: %prog [options]"]
+        for name, param in positional:
+            usage.append(name)
         parser.set_usage(" ".join(usage))
 
-        for name, param in cls.params():
+        for name, param in params:
             args = ["--" + optparse_name(name)]
             if param.short is not None:
                 args = ["-" + optparse_name(param.short)]
 
-            help = param.help
-            if not param.is_visible():
-                help = optparse.SUPPRESS_HELP
-
-            kwargs = dict(default=param.default,
-                          help=help,
+            kwargs = dict(default=defaults.get(name, None),
+                          help=param.help,
                           metavar=name,
                           dest=name,
                           action="callback",
@@ -190,46 +179,67 @@ class Bot(object):
                           callback_args=(param.parse, parsed))
             parser.add_option(*args, **kwargs)
 
-        _, args = parser.parse_args(argv)
+        _, args = parser.parse_args()
         for (name, param), value in zip(positional, args):
             if name in parsed:
                 continue
 
             try:
                 parsed[name] = param.parse(value)
-            except ParamError:
+            except ParamError, error:
                 message = "parameter " + name + ": " + error.args[0]
                 parser.error(message)
 
-        return parser, parsed
+        for name, param in positional[len(args):]:
+            parser.error("no value for parameter " + name)
+
+        defaults.update(parsed)
+        return dict((name, defaults[name]) for (name, _) in params)
 
     @classmethod
-    def from_command_line(cls, argv=None):
-        default = cls.param_defaults()
-        parser, cli = cls.params_from_command_line(argv)
+    def _from_dict(cls, params, **defaults):
+        defaults = cls.param_defaults(**defaults)
+        results = dict()
 
-        if cli.get("ppid", None):
-            conf = dict(pickle.load(sys.stdin))
-            for name, param in cls.params():
-                if name not in conf:
-                    continue
-                value = conf[name]
-                if isinstance(value, basestring):
-                    try:
-                        value = param.parse(value)
-                    except ParamError, error:
-                        message = "startup parameter " + name + ": " + error.args[0]
-                        parser.error(message)
-                default[name] = value
+        for name, param in params:
+            if name not in defaults:
+                continue
 
-        default.update(cli)
+            value = defaults[name]
+            if isinstance(value, basestring):
+                try:
+                    value = param.parse(value)
+                except ParamError, error:
+                    raise ParamError("startup parameter " + name + ": " + error.args[0])
+            results[name] = value
+
+        return results
+
+    @classmethod
+    def from_command_line(cls, *args, **keys):
+        params = list()
         for name, param in cls.params():
-            if name not in default:
-                parser.error("no value for parameter " + name)
+            if name not in keys:
+                params.append((name, param))
 
-        return cls(**default)
+        bot_name = inspect.getmodulename(inspect.stack()[1][1])
 
-    def __init__(self, **keys):
+        if "ABUSEHELPER_CONF_FROM_STDIN" in os.environ:
+            defaults = dict(pickle.load(sys.stdin))
+            defaults.setdefault("bot_name", bot_name)
+            added = cls._from_dict(params, **defaults)
+        else:
+            added = cls._from_sys_argv(params, bot_name=bot_name)
+
+        added.update(keys)
+        return cls(*args, **added)
+
+    def __init__(self, *args, **keys):
+        if len(args) == 1:
+            raise TypeError("got an unexpected positional argument")
+        elif len(args) > 1:
+            raise TypeError("got unexpected positional arguments")
+
         for name, param in self.params():
             if name in keys:
                 value = keys.pop(name)
@@ -271,8 +281,12 @@ class Bot(object):
     def run(self):
         pass
 
+import time
 import getpass
-from idiokit import threado
+import collections
+
+import idiokit
+from idiokit import timer
 from idiokit.xmpp import connect
 from abusehelper.core import log
 
@@ -288,34 +302,33 @@ class XMPPBot(Bot):
     xmpp_ignore_cert = BoolParam("do not perform any verification "+
                                  "for the XMPP service's SSL certificate")
 
-    def __init__(self, **keys):
-        Bot.__init__(self, **keys)
+    def __init__(self, *args, **keys):
+        Bot.__init__(self, *args, **keys)
 
         if self.xmpp_password is None:
             self.xmpp_password = getpass.getpass("XMPP password: ")
 
     def run(self):
-        return threado.run(self.main())
+        return idiokit.main_loop(self.main())
 
-    @threado.stream
-    def main(inner, self):
-        while True:
-            yield inner
+    @idiokit.stream
+    def main(self):
+        yield idiokit.consume()
 
-    @threado.stream
-    def xmpp_connect(inner, self):
+    @idiokit.stream
+    def xmpp_connect(self):
         verify_cert = not self.xmpp_ignore_cert
 
         self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
-        xmpp = yield inner.sub(connect(self.xmpp_jid,
-                                       self.xmpp_password,
-                                       host=self.xmpp_host,
-                                       port=self.xmpp_port,
-                                       ssl_verify_cert=verify_cert,
-                                       ssl_ca_certs=self.xmpp_extra_ca_certs))
+        xmpp = yield connect(self.xmpp_jid,
+                             self.xmpp_password,
+                             host=self.xmpp_host,
+                             port=self.xmpp_port,
+                             ssl_verify_cert=verify_cert,
+                             ssl_ca_certs=self.xmpp_extra_ca_certs)
         self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
-        xmpp.core.presence()
-        inner.finish(xmpp)
+        yield xmpp.core.presence()
+        idiokit.stop(xmpp)
 
 from abusehelper.core import services
 
@@ -340,59 +353,62 @@ class ServiceBot(XMPPBot):
                          "for bot control")
     service_mock_session = ListParam(default=None)
 
-    @threado.stream
-    def _run(inner, self):
+    @idiokit.stream
+    def _run(self):
         ver_str = version.version_str()
         self.log.info("Starting service %r version %s", self.bot_name, ver_str)
-        self.xmpp = yield inner.sub(self.xmpp_connect())
+        self.xmpp = yield self.xmpp_connect()
 
         service = _Service(self, self.bot_state_file)
-        service.start()
 
         if self.service_mock_session is not None:
             keys = dict(item.split("=", 1)
                         for item in self.service_mock_session)
             self.log.info("Running a mock ression with keys %r" % keys)
-            yield inner.sub(service.session(None, **keys) | service)
+            session = yield service.open_session(None, keys)
+            yield session | service.run()
             return
 
         self.log.info("Joining lobby %r", self.service_room)
-        self.lobby = yield inner.sub(services.join_lobby(self.xmpp,
-                                                         self.service_room,
-                                                         self.bot_name))
+        self.lobby = yield services.join_lobby(self.xmpp,
+                                               self.service_room,
+                                               self.bot_name)
         self.log.addHandler(log.RoomHandler(self.lobby.room))
 
         self.log.info("Offering service %r", self.bot_name)
         try:
-            yield inner.sub(self.lobby.offer(self.bot_name, service))
+            yield self.lobby.offer(self.bot_name, service)
         finally:
             self.log.info("Retired service %r", self.bot_name)
 
     def run(self):
-        return threado.run(self._run(), throw_on_signal=services.Stop())
+        @idiokit.stream
+        def throw_stop_on_signal():
+            try:
+                yield idiokit.consume()
+            except idiokit.Signal:
+                raise services.Stop()
+        return idiokit.main_loop(throw_stop_on_signal() | self._run())
 
-    @threado.stream
-    def main(inner, self, state):
+    @idiokit.stream
+    def main(self, state):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except services.Stop:
-            inner.finish()
+            pass
 
-    @threado.stream
-    def session(inner, self, state, **keys):
+    @idiokit.stream
+    def session(self, state, **keys):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except services.Stop:
-            inner.finish()
+            pass
 
 from abusehelper.core import events, taskfarm
 
 class FeedBot(ServiceBot):
-    add_values = ListParam("List of key/values to be added to every event." +
-                           'example: "key1=value1,key1=value2,key3=value3"',
-                           default=dict())
+    xmpp_rate_limit = FloatParam("how many XMPP stanzas the bot can send per "+
+                                 "second (default: no limiting)", default=None)
 
     def __init__(self, *args, **keys):
         ServiceBot.__init__(self, *args, **keys)
@@ -401,26 +417,33 @@ class FeedBot(ServiceBot):
         self._rooms = taskfarm.TaskFarm(self.manage_room)
         self._dsts = taskfarm.Counter()
 
-        if self.add_values:
-            temp = dict()
-            for pair in self.add_values:
-                key_value = pair.split("=")
-                if len(key_value) < 2:
-                    continue
-                values = temp.setdefault(key_value[0], set())
-                values.add("=".join(key_value[1:]))
-            self.add_values = temp
+        self._last_output = float("-inf")
+
+    @idiokit.stream
+    def _output_rate_limiter(self):
+        while self.xmpp_rate_limit <= 0.0:
+            yield timer.sleep(1.0)
+
+        while True:
+            delta = max(time.time() - self._last_output, 0)
+            delay = 1.0 / self.xmpp_rate_limit - delta
+            if delay > 0.0:
+                yield timer.sleep(delay)
+            self._last_output = time.time()
+
+            msg = yield idiokit.next()
+            yield idiokit.send(msg)
 
     def feed_keys(self, *args, **keys):
         yield ()
 
-    @threado.stream
-    def feed(inner, self, *args, **keys):
+    @idiokit.stream
+    def feed(self, *args, **keys):
         while True:
-            yield inner
+            yield idiokit.next()
 
-    @threado.stream
-    def session(inner, self, state, dst_room, **keys):
+    @idiokit.stream
+    def session(self, state, dst_room, **keys):
         feeds = [self._rooms.inc(dst_room)]
         feed_keys = set(self.feed_keys(dst_room=dst_room, **keys))
 
@@ -429,85 +452,73 @@ class FeedBot(ServiceBot):
             feeds.append(self._feeds.inc(key))
 
         try:
-            yield inner.sub(threado.pipe(*feeds))
+            yield idiokit.pipe(*feeds)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
         finally:
             for key in feed_keys:
                 self._dsts.dec(key, dst_room)
 
     def manage_feed(self, key):
-        return threado.pipe(self.feed(*key),
+        return idiokit.pipe(self.feed(*key),
                             self.augment(),
-                            self._add_values(),
                             self._distribute(key))
 
-    @threado.stream
-    def manage_room(inner, self, name):
+    @idiokit.stream
+    def manage_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
+
+        tail = self._stats(name) | room | idiokit.consume()
+        if self.xmpp_rate_limit is not None:
+            tail = self._output_rate_limiter() | tail
 
         self.log.info("Joined room %r", name)
         try:
-            yield inner.sub(events.events_to_elements()
-                            | self._stats(name)
-                            | room
-                            | threado.dev_null())
+            yield events.events_to_elements() | tail
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def _distribute(inner, self, key):
+    @idiokit.stream
+    def _distribute(self, key):
         while True:
-            event = yield inner
+            event = yield idiokit.next()
 
-            rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
-            rooms.discard(None)
+            for name in self._dsts.get(key):
+                room = self._rooms.get(name)
+                if room is None:
+                    continue
+                yield room.send(event)
 
-            for room in rooms:
-                room.send(event)
-            if rooms:
-                inner.send(event)
+    def _stats(self, name, interval=60.0):
+        def counter(event):
+            counter.count += 1
+            return (event,)
+        counter.count = 0
 
-    @threado.stream
-    def _stats(inner, self, name, interval=60.0):
-        count = 0
-        sleeper = timer.sleep(interval / 2.0)
+        @idiokit.stream
+        def logger():
+            sleep = interval / 2.0
 
-        try:
             while True:
-                source, event = yield threado.any(inner, sleeper)
-                if inner is source:
-                    count += 1
-                    inner.send(event)
-                else:
-                    if count > 0:
-                        self.log.info("Sent %d events to room %r", count, name)
-                    count = 0
-                    sleeper = timer.sleep(interval)
-        finally:
-            if count > 0:
-                self.log.info("Sent %d events to room %r", count, name)
+                try:
+                    yield timer.sleep(sleep)
+                finally:
+                    if counter.count > 0:
+                        self.log.info("Sent %d events to room %r", counter.count, name)
+                        counter.count = 0
 
-    @threado.stream
-    def _add_values(inner, self):
-        while True:
-            event = yield inner
-            for key in self.add_values:
-                event.add(key, *self.add_values[key])
-            inner.send(event)
+                sleep = interval
 
-    @threado.stream
-    def augment(inner, self):
-        while True:
-            event = yield inner
-            inner.send(event)
+        result = idiokit.map(counter)
+        idiokit.pipe(logger(), result)
+        return result
 
-import time
+    def augment(self):
+        return idiokit.map(lambda x: (x,))
+
 import codecs
-import collections
 from hashlib import md5
-from idiokit import timer
 
 _utf8encoder = codecs.getencoder("utf-8")
 
@@ -530,16 +541,15 @@ class PollingBot(FeedBot):
         self._poll_dedup = dict()
         self._poll_cleanup = set()
 
-    @threado.stream
-    def poll(inner, self, *args, **keys):
-        yield
+    @idiokit.stream
+    def poll(self, *args, **keys):
+        yield timer.sleep(0.0)
 
     def feed_keys(self, *args, **keys):
-        # Return (None,) instead of () for backwards compatibility.
-        yield (None,)
+        yield ()
 
-    @threado.stream
-    def manage_feed(inner, self, key):
+    @idiokit.stream
+    def manage_feed(self, key):
         if key not in self._poll_cleanup:
             self._poll_queue.appendleft((time.time(), key))
             self._poll_dedup.setdefault(key, dict())
@@ -547,18 +557,16 @@ class PollingBot(FeedBot):
             self._poll_cleanup.discard(key)
 
         try:
-            while True:
-                yield inner
-        except:
+            yield idiokit.consume()
+        finally:
             self._poll_cleanup.add(key)
 
-    @threado.stream
-    def main(inner, self, state):
+    @idiokit.stream
+    def main(self, state):
         try:
             while True:
-                while (not self._poll_queue or
-                       self._poll_queue[0][0] > time.time()):
-                    yield inner, timer.sleep(1.0)
+                while not self._poll_queue or self._poll_queue[0][0] > time.time():
+                    yield timer.sleep(1.0)
 
                 _, key = self._poll_queue.popleft()
                 if key in self._poll_cleanup:
@@ -566,34 +574,33 @@ class PollingBot(FeedBot):
                     self._poll_dedup.pop(key, None)
                     continue
 
-                yield inner.sub(self.poll(*key)
-                                | self.augment()
-                                | self._add_values()
-                                | self._distribute(key))
+                yield self.poll(*key) | self.augment() | self._distribute(key)
+
                 expire_time = time.time() + self.poll_interval
                 self._poll_queue.append((expire_time, key))
         except services.Stop:
-            inner.finish()
+            pass
 
-    @threado.stream
-    def _distribute(inner, self, key):
-        old_dedup = self._poll_dedup[key]
-        new_dedup = self._poll_dedup[key] = dict()
+    @idiokit.stream
+    def _distribute(self, key):
+        if key not in self._poll_dedup:
+            self._poll_dedup[key] = dict()
+        old_dedups = self._poll_dedup[key]
+        new_dedups = self._poll_dedup[key] = dict()
 
         while True:
-            event = yield inner
-
-            rooms = set(self._rooms.get(name) for name in self._dsts.get(key))
-            rooms.discard(None)
-            if not rooms:
-                continue
-
+            event = yield idiokit.next()
             event_key = event_hash(event)
-            for room in rooms:
-                if event_key in new_dedup.get(room, ()):
-                    continue
-                new_dedup.setdefault(room, set()).add(event_key)
 
-                if event_key in old_dedup.get(room, ()):
+            for name in tuple(self._dsts.get(key)):
+                room = self._rooms.get(name)
+                if room is None:
                     continue
-                room.send(event)
+
+                if event_key in new_dedups.get(room, ()):
+                    continue
+                new_dedups.setdefault(room, set()).add(event_key)
+
+                if event_key in old_dedups.get(room, ()):
+                    continue
+                yield room.send(event)

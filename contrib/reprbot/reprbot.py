@@ -4,28 +4,27 @@ back similar message which includes machine readable idiokit
 namespace.
 """
 
+import idiokit
+from idiokit.xmpp import jid
 from abusehelper.core import bot, events
-from idiokit import threado, jid
 
 class ReprBot(bot.XMPPBot):
     room = bot.Param("repr room")
 
-    @threado.stream
-    def main(inner, self):
+    @idiokit.stream
+    def main(self):
         conn = yield self.xmpp_connect()
         src = yield conn.muc.join(self.room, self.bot_name)
 
         self.log.info("Joined room %r.", self.room)
 
-        yield inner.sub(src 
-                        | self.repr(src.nick_jid) 
-                        | events.events_to_elements() 
-                        | src)
+        repr = self.repr(src.jid) | events.events_to_elements()
+        yield repr | src | repr
 
-    @threado.stream
-    def repr(inner, self, own_jid):
+    @idiokit.stream
+    def repr(self, own_jid):
         while True:
-            element = yield inner
+            element = yield idiokit.next()
 
             sender = jid.JID(element.get_attr("from"))
             if sender == own_jid:
@@ -40,7 +39,9 @@ class ReprBot(bot.XMPPBot):
                     event = events.Event.from_unicode(text[5:])
                 except ValueError:
                     continue
-                inner.send(event)
+
+                yield idiokit.send(event)
+                break
 
 if __name__ == "__main__":
     ReprBot.from_command_line().run()

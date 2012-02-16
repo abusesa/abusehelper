@@ -6,7 +6,8 @@ import httplib
 import collections
 import email.parser
 
-from idiokit import threado, util
+import idiokit
+from idiokit import threadpool
 from abusehelper.core import events
 from cStringIO import StringIO
 
@@ -25,62 +26,63 @@ class HTTPError(FetchUrlFailed):
     def __str__(self):
         return "HTTP Error %d: %s" % (self.code, self.msg)
 
-@threado.stream
-def fetch_url(inner, url, opener=None):
+@idiokit.stream
+def fetch_url(url, opener=None):
     if opener is None:
         opener = urllib2.build_opener()
 
     try:
-        reader = inner.thread(opener.open, url)
-        while not reader.has_result():
-            yield inner, reader
-
-        fileobj = reader.result()
-        reader = inner.thread(fileobj.read)
+        fileobj = yield threadpool.thread(opener.open, url)
         try:
-            while not reader.has_result():
-                yield inner, reader
+            data = yield threadpool.thread(fileobj.read)
         finally:
             fileobj.close()
 
         info = fileobj.info()
         info = email.parser.Parser().parsestr(str(info), headersonly=True)
 
-        inner.finish(info, StringIO(reader.result()))
+        idiokit.stop(info, StringIO(data))
     except urllib2.HTTPError, he:
         raise HTTPError(he.code, he.msg, he.headers, he.fp)
     except (urllib2.URLError, httplib.HTTPException, socket.error), error:
         raise FetchUrlFailed(str(error))
 
-@threado.stream
-def csv_to_events(inner, fileobj, delimiter=",", columns=None, charset=None):
-    if columns is None:
-        reader = csv.DictReader(fileobj, delimiter=delimiter)
-    else:
-        reader = csv.reader(fileobj, delimiter=delimiter)
+def force_decode(string, encodings=["ascii", "utf-8"]):
+    if isinstance(string, unicode):
+        return string
 
+    for encoding in encodings:
+        try:
+            return string.decode(encoding)
+        except ValueError:
+            pass
+    return string.decode("latin-1", "replace")
+
+def _csv_reader(fileobj, charset=None, **keys):
     if charset is None:
-        decode = util.guess_encoding
+        decode = force_decode
     else:
         decode = lambda x: x.decode(charset)
+    lines = (decode(line).encode("utf-8").replace("\x00", "\xc0") for line in fileobj)
+    normalize = lambda x: x.replace("\xc0", "\x00").decode("utf-8").strip()
 
-    for row in reader:
-        yield inner.flush()
+    for row in csv.reader(lines, **keys):
+        yield map(normalize, row)
 
-        if columns is not None:
-            row = dict(zip(columns, row))
+@idiokit.stream
+def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
+    for row in _csv_reader(fileobj, charset=charset, delimiter=delimiter):
+        if columns is None:
+            columns = row
+            continue
 
         event = events.Event()
-        for key, value in row.items():
-            if None in (key, value):
+        for key, value in zip(columns, row):
+            if key is None or not value:
                 continue
-            if not value:
-                continue
-            key = decode(key.lower().strip())
-            value = decode(value.strip())
             event.add(key, value)
 
-        inner.send(event)
+        yield idiokit.send(event)
 
 class TimedCache(object):
     def __init__(self, cache_time):

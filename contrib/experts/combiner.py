@@ -1,68 +1,28 @@
-from idiokit import threado, timer
+import idiokit
+from idiokit import timer
 from abusehelper.core import bot, taskfarm
 
 class RoomBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
-
         self.room_handlers = taskfarm.TaskFarm(self._handle_room)
-        self.room_channels = dict()
 
-    @threado.stream
-    def _distribute_room(inner, self, name):
-        while True:
-            elements = yield inner
-
-            channels = self.room_channels.get(name, ())
-            for channel in channels:
-                channel.send(elements)
-
-    @threado.stream
-    def _handle_room(inner, self, name):
+    @idiokit.stream
+    def _handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room | self._distribute_room(name))
+            yield room
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def _to_room(inner, self, room):
-        while True:
-            source, elements = yield threado.any(inner, room)
-            if inner is source:
-                room.send(elements)
+    def to_room(self, name):
+        return self.room_handlers.inc(name) | idiokit.consume()
 
-    @threado.stream
-    def to_room(inner, self, name):
-        inc = self.room_handlers.inc(name)
-        room = self.room_handlers.get(name)
-
-        yield inner.sub(self._to_room(room) | inc)
-
-    @threado.stream
-    def _from_room(inner, self, channel):
-        while True:
-            source, elements = yield threado.any(inner, channel)
-            if channel is source:
-                inner.send(elements)
-
-    @threado.stream
-    def from_room(inner, self, name):
-        channel = threado.Channel()
-        self.room_channels.setdefault(name, set()).add(channel)
-
-        try:
-            yield inner.sub(threado.dev_null()
-                            | self.room_handlers.inc(name)
-                            | self._from_room(channel))
-        finally:
-            channels = self.room_channels.get(name, set())
-            channels.discard(channel)
-            if not channels:
-                self.room_channels.pop(name, None)
+    def from_room(self, name):
+        return idiokit.consume() | self.room_handlers.inc(name)
 
 import time
 import codecs
@@ -86,26 +46,26 @@ def event_id(event):
 
 AUGMENT_KEY = "augment sha-1"
 
-@threado.stream
-def ignore_augmentations(inner, ignore):
+@idiokit.stream
+def ignore_augmentations(ignore):
     while True:
-        event = yield inner
+        event = yield idiokit.next()
         if ignore and event.contains(AUGMENT_KEY):
             continue
-        inner.send(event)
+        yield idiokit.send(event)
 
-@threado.stream
-def create_eids(inner):
+@idiokit.stream
+def create_eids():
     while True:
-        event = yield inner
-        inner.send(event_id(event), event)
+        event = yield idiokit.next()
+        yield idiokit.send(event_id(event), event)
 
-@threado.stream
-def embed_eids(inner):
+@idiokit.stream
+def embed_eids():
     while True:
-        eid, event = yield inner
+        eid, event = yield idiokit.next()
         event.add(AUGMENT_KEY, eid)
-        inner.send(event)
+        yield idiokit.send(event)
 
 class Expert(RoomBot):
     def __init__(self, *args, **keys):
@@ -122,8 +82,8 @@ class Expert(RoomBot):
                 | events.events_to_elements()
                 | self.to_room(dst_room))
 
-    @threado.stream
-    def session(inner, self, state, src_room, dst_room=None, **keys):
+    @idiokit.stream
+    def session(self, state, src_room, dst_room=None, **keys):
         if dst_room is None:
             dst_room = src_room
 
@@ -134,52 +94,41 @@ class Expert(RoomBot):
             augments.append(self._augments.inc(src_room, dst_room, args))
 
         try:
-            yield inner.sub(threado.pipe(*augments))
+            yield idiokit.pipe(*augments)
         except services.Stop:
-            inner.finish()
+            idiokit.stop()
 
     def augment_keys(self, *args, **keys):
         yield ()
 
-    @threado.stream
-    def augment(inner, self):
+    @idiokit.stream
+    def augment(self):
         while True:
-            eid, event = yield inner
+            eid, event = yield idiokit.next()
             # Skip augmenting by default.
-            # Implement inner.send(eid, augmentation).
+            # Implement yield idiokit.send(eid, augmentation).
 
 class Combiner(RoomBot):
-    @threado.stream
-    def collect(inner, self, ids, queue, time_window):
-        sleeper = timer.sleep(1.0)
-
+    @idiokit.stream
+    def collect(self, ids, queue, time_window):
         while True:
-            if sleeper.has_result():
-                sleeper = timer.sleep(1.0)
-            source, event = yield threado.any(inner, sleeper)
+            event = yield idiokit.next()
 
             current_time = time.time()
             expire_time = current_time + time_window
 
-            if inner is source:
-                eid = event_id(event)
-                if eid not in ids:
-                    queue.append((expire_time, eid))
-                    ids[eid] = event, list()
-                else:
-                    _, augmentations = ids[eid]
-                    ids[eid] = event, augmentations
+            eid = event_id(event)
+            if eid not in ids:
+                queue.append((expire_time, eid))
+                ids[eid] = event, list()
+            else:
+                _, augmentations = ids[eid]
+                ids[eid] = event, augmentations
 
-            while queue and queue[0][0] <= current_time:
-                expire_time, eid = queue.popleft()
-                event, augmentations = ids.pop(eid)
-                if event is not None:
-                    inner.send(events.Event(event, *augmentations))
-
-    @threado.stream
-    def combine(inner, self, ids, queue, time_window):
+    @idiokit.stream
+    def combine(self, ids, queue, time_window):
         while True:
-            augmentation = yield inner
+            augmentation = yield idiokit.next()
 
             augmentation = events.Event(augmentation)
             eids = augmentation.values(AUGMENT_KEY)
@@ -193,23 +142,37 @@ class Combiner(RoomBot):
                 event, augmentations = ids[eid]
                 augmentations.append(augmentation)
 
-    @threado.stream
-    def session(inner, self, state, src_room, dst_room,
+    @idiokit.stream
+    def cleanup(self, ids, queue):
+        while True:
+            yield timer.sleep(1.0)
+
+            current_time = time.time()
+
+            while queue and queue[0][0] <= current_time:
+                expire_time, eid = queue.popleft()
+                event, augmentations = ids.pop(eid)
+                if event is not None:
+                    yield idiokit.send(events.Event(event, *augmentations))
+
+    @idiokit.stream
+    def session(self, state, src_room, dst_room,
                 augment_room=None, time_window=10.0):
         if augment_room is None:
             augment_room = src_room
 
         ids = dict()
         queue = collections.deque()
-        yield inner.sub(self.from_room(src_room)
-                        | events.stanzas_to_events()
-                        | ignore_augmentations(augment_room == src_room)
-                        | self.collect(ids, queue, time_window)
-                        | events.events_to_elements()
-                        | self.to_room(dst_room)
-                        | self.from_room(augment_room)
-                        | events.stanzas_to_events()
-                        | self.combine(ids, queue, time_window))
+        yield (self.from_room(src_room)
+               | events.stanzas_to_events()
+               | ignore_augmentations(augment_room == src_room)
+               | self.collect(ids, queue, time_window)
+               | self.cleanup(ids, queue)
+               | events.events_to_elements()
+               | self.to_room(dst_room)
+               | self.from_room(augment_room)
+               | events.stanzas_to_events()
+               | self.combine(ids, queue, time_window))
 
 if __name__ == "__main__":
     Combiner.from_command_line().execute()

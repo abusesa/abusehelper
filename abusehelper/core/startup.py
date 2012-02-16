@@ -105,10 +105,11 @@ class StartupBot(bot.Bot):
             # out which modules are running. Workaround: Use
             # "-m runpy module" instead of "-m module".
             args.extend(["-m", "runpy", conf.module])
-        args.extend(["--ppid=%d" % os.getpid()])
 
+        env = dict(os.environ)
+        env["ABUSEHELPER_CONF_FROM_STDIN"] = "1"
         try:
-            process = subprocess.Popen(args, stdin=subprocess.PIPE)
+            process = subprocess.Popen(args, env=env, stdin=subprocess.PIPE)
         except OSError, ose:
             self.log.error("Failed launching bot %r: %r", conf.name, ose)
             return None
@@ -170,7 +171,7 @@ class StartupBot(bot.Bot):
             return
 
         self.log.info("Sending %s to alive bots" % (signame,))
-        self._signal(signum)       
+        self._signal(signum)
 
     def run(self, poll_interval=0.1):
         for conf in iter_startups(config.flatten(self.configs())):
@@ -210,7 +211,7 @@ class StartupBot(bot.Bot):
                             count += 1
                         else:
                             raise KeyboardInterrupt()
-                        
+
                     time.sleep(poll_interval)
 
                     self._poll()

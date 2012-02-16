@@ -1,12 +1,12 @@
 import re
 
-from idiokit import threado, util
-from abusehelper.core import events
+from idiokit import threado
+from abusehelper.core import events, utils
 
 @threado.stream
 def arf_to_events(inner, fileobj, charset=None):
     if charset is None:
-        decode = util.guess_encoding
+        decode = utils.force_decode
     else:
         decode = lambda x: x.decode(charset)
 

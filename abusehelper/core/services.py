@@ -1,35 +1,14 @@
-import sys
 import uuid
 import random
-from idiokit import threado
-from idiokit.core import XMPPError
-from idiokit.jid import JID
+import functools
+
+import idiokit
+from idiokit.xmpp.core import XMPPError
+from idiokit.xmpp.jid import JID
 from idiokit.xmlcore import Element
 from abusehelper.core import serialize
 
 SERVICE_NS = "abusehelper#service"
-
-def bind(parent, child):
-    def _bind(source):
-        try:
-            result = source.result()
-            if source is parent:
-                child.throw(threado.Finished())
-        except:
-            if source is parent:
-                child.rethrow()
-            else:
-                parent.rethrow()
-    parent.add_finish_callback(_bind)
-    child.add_finish_callback(_bind)
-
-@threado.stream
-def mask_errors(inner):
-    try:
-        while True:
-            yield inner
-    except:
-        pass
 
 class SessionError(Exception):
     pass
@@ -40,10 +19,8 @@ class Stop(Exception):
 class Unavailable(Stop):
     pass
 
-class Lobby(threado.GeneratorStream):
+class Lobby(idiokit.Proxy):
     def __init__(self, xmpp, room):
-        threado.GeneratorStream.__init__(self)
-
         self.xmpp = xmpp
         self.room = room
 
@@ -57,10 +34,11 @@ class Lobby(threado.GeneratorStream):
             self._update_catalogue(participant.name, participant.payload)
 
         self.xmpp.core.add_iq_handler(self.handle_iq, "start", SERVICE_NS)
-        self.start()
 
-    @threado.stream
-    def session(inner, self, service_id, *path, **conf):
+        idiokit.Proxy.__init__(self, self.room | self._run())
+
+    @idiokit.stream
+    def session(self, service_id, *path, **conf):
         while True:
             matches = list()
             for jid, service_ids in self.catalogue.items():
@@ -68,28 +46,29 @@ class Lobby(threado.GeneratorStream):
                     matches.append(jid)
 
             if not matches:
-                if service_id not in self.waiters:
-                    channel = threado.Channel()
-                    self.waiters[service_id] = channel
-                channel = self.waiters[service_id]
-
-                while not channel.has_result():
-                    yield inner, channel
+                event = idiokit.Event()
+                self.waiters.setdefault(service_id, set()).add(event)
+                try:
+                    yield event
+                finally:
+                    self.waiters.get(service_id, set()).discard(event)
+                    if not self.waiters.get(service_id, None):
+                        self.waiters.pop(service_id, None)
                 continue
 
             jid = random.choice(matches)
             task = self._establish_session(jid, service_id, path, conf)
             self.guarded.setdefault((jid, service_id), set()).add(task)
             try:
-                session = yield inner.sub(task)
+                session = yield task
             finally:
                 self.guarded.get((jid, service_id), set()).discard(task)
 
             if session is not None:
-                inner.finish(session)
+                idiokit.stop(session)
 
-    @threado.stream
-    def _establish_session(inner, self, jid, service_id, path, conf):
+    @idiokit.stream
+    def _establish_session(self, jid, service_id, path, conf):
         start = Element("start", xmlns=SERVICE_NS, id=service_id)
         if path:
             path_element = Element("path")
@@ -100,30 +79,24 @@ class Lobby(threado.GeneratorStream):
         start.add(conf_element)
 
         try:
-            # Check that the service has not become unavailable.
-            yield inner.flush()
-
-            result = yield inner.sub(self.xmpp.core.iq_set(start, to=jid))
-
-            # Check again that the service has not become unavailable.
-            yield inner.flush()
+            result = yield self.xmpp.core.iq_set(start, to=jid)
         except XMPPError, error:
             if error.type != "cancel":
                 raise
             if error.condition == "session-failure":
                 raise SessionError(error.text)
-            inner.finish()
+            idiokit.stop()
         except Unavailable:
-            inner.finish()
+            idiokit.stop()
 
         for start in result.children("start", SERVICE_NS).with_attrs("id"):
             session_id = start.get_attr("id")
             session = self._catch(jid, session_id)
-            bind(self, session | mask_errors())
+            idiokit.pipe(self.fork(), session)
 
             sessions = self.jids.setdefault(jid, dict())
             sessions[session_id] = session
-            inner.finish(session)
+            idiokit.stop(session)
         else:
             raise SessionError("No session ID received")
 
@@ -137,18 +110,18 @@ class Lobby(threado.GeneratorStream):
                     service_id = service.get_attr("id")
                     self.catalogue[jid].add(service_id)
 
-                    if service_id in self.waiters:
-                        self.waiters.pop(service_id).finish()
+                    for event in self.waiters.pop(service_id, ()):
+                        event.succeed()
 
         for service_id in previous - self.catalogue.get(jid, set()):
             for task in self.guarded.pop((jid, service_id), ()):
-                task.throw(Unavailable())
+                task.signal(Unavailable())
 
     def handle_iq(self, iq, payload):
         if not iq.with_attrs("from", type="set"):
             return False
         jid = JID(iq.get_attr("from"))
-        if jid.bare() != self.room.room_jid:
+        if jid.bare() != self.room.jid.bare():
             return False
         if not payload.named("start").with_attrs("id"):
             return False
@@ -157,8 +130,8 @@ class Lobby(threado.GeneratorStream):
         self._start(iq, jid, service_id, payload)
         return True
 
-    @threado.stream
-    def _start(inner, self, iq, jid, service_id, element):
+    @idiokit.stream
+    def _start(self, iq, jid, service_id, element):
         try:
             service = self.services.get(service_id, None)
             if service is None:
@@ -175,7 +148,7 @@ class Lobby(threado.GeneratorStream):
             else:
                 raise SessionError("Did not get session configuration")
 
-            session = yield inner.sub(service.open_session(path, conf))
+            session = yield service.open_session(path, conf)
             session_id = uuid.uuid4().hex
 
             sessions = self.jids.setdefault(jid, dict())
@@ -185,8 +158,7 @@ class Lobby(threado.GeneratorStream):
             msg = se.args[0]
             error = self.xmpp.core.build_error("cancel", "session-failure", msg)
             self.xmpp.core.iq_error(iq, error)
-        except:
-            _, exc, _ = sys.exc_info()
+        except BaseException, exc:
             msg = "Session handling failed: %r" % exc
             error = self.xmpp.core.build_error("cancel", "session-failure", msg)
             self.xmpp.core.iq_error(iq, error)
@@ -194,13 +166,10 @@ class Lobby(threado.GeneratorStream):
             result = Element("start", xmlns=SERVICE_NS, id=session_id)
             self.xmpp.core.iq_result(iq, result)
 
-    def run(self):
-        yield self.inner.sub(self.room | self._run())
-
-    @threado.stream
-    def _run(inner, self):
+    @idiokit.stream
+    def _run(self):
         while True:
-            elements = yield inner
+            elements = yield idiokit.next()
 
             for message in elements.named("message").with_attrs("from"):
                 for end in message.children("end", SERVICE_NS).with_attrs("id"):
@@ -221,7 +190,7 @@ class Lobby(threado.GeneratorStream):
             sessions = self.jids[jid]
             if session_id in sessions:
                 session = sessions.pop(session_id)
-                session.throw(reason)
+                session.signal(reason)
             if not sessions:
                 del self.jids[jid]
 
@@ -237,153 +206,169 @@ class Lobby(threado.GeneratorStream):
         for service_id, service in self.services.items():
             element = Element("service", id=service_id)
             services.add(element)
-        self.xmpp.core.presence(services, to=self.room.nick_jid)
+        self.xmpp.core.presence(services, to=self.room.jid)
 
-    @threado.stream
-    def offer(inner, self, service_id, service):
-        service.start()
+    @idiokit.stream
+    def offer(self, service_id, service):
         self.services[service_id] = service
-        bind(self, service)
 
         self._update_presence()
         try:
-            yield inner.sub(service)
+            yield self.fork() | service.run()
         finally:
             if self.services.get(service_id, None) is service:
                 self.services.pop(service_id, None)
             self._update_presence()
 
-    @threado.stream
-    def _catch(inner, self, jid, session_id):
+    @idiokit.stream
+    def _catch(self, jid, session_id):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         finally:
             end = Element("end", xmlns=SERVICE_NS, id=session_id)
             self.xmpp.core.message(jid, end)
             self._discard_session(jid, session_id)
 
-import sqlite3
-from cPickle import loads, dumps, HIGHEST_PROTOCOL
+import os
+import fcntl
+import errno
+import cPickle as pickle
 
-class Service(threado.GeneratorStream):
+O_BINARY = getattr(os, "O_BINARY", 0)
+
+def open_file(filename):
+    # Open file, create if necessary.
+
+    fd = os.open(filename, os.O_RDWR | os.O_CREAT | O_BINARY)
+    return os.fdopen(fd, "r+b")
+
+def lock_file_nonblocking(fileobj):
+    # Use fcntl.flock instead of fcntl.lockf. lockf on pypy 1.7 seems
+    # to ignore existing locks.
+
+    try:
+        fcntl.flock(fileobj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError, ioe:
+        if ioe.errno not in (errno.EACCES, errno.EAGAIN):
+            raise
+        return False
+    return True
+
+def unlock_file(fileobj):
+    fcntl.flock(fileobj, fcntl.LOCK_UN)
+
+class Service(object):
     def __init__(self, state_file=None):
-        threado.GeneratorStream.__init__(self)
-
+        self.file = None
         self.sessions = dict()
-        self.errors = threado.dev_null()
+        self.state = dict()
 
-        if state_file is None:
-            self.db = sqlite3.connect(":memory:")
-        else:
-            self.db = sqlite3.connect(state_file)
-        self.db.execute("CREATE TABLE IF NOT EXISTS states "+
-                        "(key UNIQUE, state)")
-        self.db.commit()
+        if state_file is not None:
+            self.file = open_file(state_file)
+            try:
+                if not lock_file_nonblocking(self.file):
+                    raise RuntimeError("state file %r already in use" % state_file)
+            except:
+                self.file.close()
+                raise
 
-        self.root_key = ""
+            try:
+                self.state = pickle.load(self.file)
+            except EOFError:
+                pass
+
+        self.errors = idiokit.consume()
 
     def _get(self, key):
-        for state, in self.db.execute("SELECT state FROM states "+
-                                      "WHERE key = ?", (key,)):
-            return loads(str(state))
-        return None
+        return self.state.get(key, None)
 
     def _put(self, key, state):
-        self.db.execute("DELETE FROM states WHERE key = ?", (key,))
-        if state is not None:
-            state = sqlite3.Binary(dumps(state, HIGHEST_PROTOCOL))
-            self.db.execute("INSERT INTO states(key, state) VALUES(?, ?)",
-                            (key, state))
+        if state is None:
+            self.state.pop(key, None)
+        else:
+            self.state[key] = state
 
-    def path_key(self, path):
-        bites = list()
-        for bite in path:
-            bite = bite.encode("unicode-escape")
-            bites.append(bite.replace("/", r"\/"))
-        return "/" + "/".join(bites)
-
+    @idiokit.stream
     def run(self):
-        state = self._get(self.root_key)
-        self._put(self.root_key, None)
+        state = self._get(None)
+        self._put(None, None)
 
         try:
-            yield self.inner.sub(self.errors
-                                 | self.kill_sessions()
-                                 | self.main(state))
+            state = yield self.errors | self.kill_sessions() | self.main(state)
         finally:
-            self.db.commit()
-            self.db.close()
+            self._put(None, state)
 
-    @threado.stream
-    def kill_sessions(inner, self):
+            if self.file is not None:
+                self.file.seek(0)
+                self.file.truncate(0)
+                pickle.dump(self.state, self.file, pickle.HIGHEST_PROTOCOL)
+
+                self.file.flush()
+                unlock_file(self.file)
+                self.file.close()
+
+    @idiokit.stream
+    def kill_sessions(self):
         try:
-            try:
-                while True:
-                    item = yield inner
-                    inner.send(item)
-            except threado.Finished:
-                raise Stop()
+            yield idiokit.consume()
+            raise Stop()
         finally:
             for session in self.sessions.itervalues():
-                session.throw(Stop())
+                session.signal(Stop())
 
             while self.sessions:
                 session = tuple(self.sessions.itervalues())[0]
-                while not session.has_result():
-                    yield inner, session
+                yield session
 
-    @threado.stream
-    def open_session(inner, self, path, conf):
-        @threado.stream
-        def _guarded(inner, path, key, session):
+    @idiokit.stream
+    def open_session(self, path, conf):
+        @idiokit.stream
+        def _guarded(key, path, session):
             try:
-                state = yield inner.sub(session)
+                state = yield session
             except Stop:
                 state = None
+            except:
+                self.errors.signal()
+                raise
+            else:
+                if path is not None:
+                    self._put(path, state)
             finally:
-                del self.sessions[path]
-
-            if path is not None:
-                self._put(key, state)
+                del self.sessions[key]
 
         if path is None:
-            path = object()
-            session = _guarded(path, None, self.session(None, **conf))
+            key = object()
+            session = _guarded(key, None, self.session(None, **conf))
         else:
-            while path in self.sessions:
-                old_session = self.sessions[path]
-                old_session.throw(Stop())
-                while not old_session.has_result():
-                    yield inner, old_session
+            key = path
+            while key in self.sessions:
+                old_session = self.sessions[key]
+                yield old_session.signal(Stop())
+                yield old_session
 
-            key = self.path_key(path)
-            state = self._get(key)
-            session = _guarded(path, key, self.session(state, **conf))
-            self._put(key, None)
+            state = self._get(path)
+            session = _guarded(key, path, self.session(state, **conf))
+            self._put(path, None)
 
-        self.sessions[path] = session
-        bind(self.errors, session)
-        inner.finish(session)
+        self.sessions[key] = session
+        idiokit.stop(self.errors.fork() | session)
 
-    @threado.stream
-    def main(inner, self, state):
+    @idiokit.stream
+    def main(self, state):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except Stop:
-            inner.finish()
+            idiokit.stop()
 
-    @threado.stream
-    def session(inner, self, state, **keys):
+    @idiokit.stream
+    def session(self, state, **keys):
         try:
-            while True:
-                yield inner
+            yield idiokit.consume()
         except Stop:
-            inner.finish()
+            idiokit.stop()
 
-@threado.stream
-def join_lobby(inner, xmpp, name, nick=None):
-    room = yield inner.sub(xmpp.muc.join(name, nick))
-    lobby = Lobby(xmpp, room)
-    inner.finish(lobby)
+@idiokit.stream
+def join_lobby(xmpp, name, nick=None):
+    room = yield xmpp.muc.join(name, nick)
+    idiokit.stop(Lobby(xmpp, room))

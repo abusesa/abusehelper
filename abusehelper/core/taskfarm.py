@@ -1,11 +1,12 @@
-from idiokit import threado, callqueue
+import idiokit
+from idiokit import callqueue, timer
 
 class Counter(object):
     def __init__(self):
         self.keys = dict()
 
     def get(self, key):
-        return set(self.keys.get(key, ()))
+        return self.keys.get(key, ())
 
     def contains(self, key, value=None):
         self.inc(key, value)
@@ -38,12 +39,16 @@ class Counter(object):
 
     def __iter__(self):
         for key, values in self.keys.iteritems():
-            yield key, set(values)
+            yield key, values
+
+class TaskStopped(Exception):
+    pass
 
 class TaskFarm(object):
-    def __init__(self, task, throw=threado.Finished()):
+    def __init__(self, task, signal=TaskStopped(), grace_period=1.0):
         self.task = task
-        self.throw = throw
+        self.signal = signal
+        self.grace_period = grace_period
 
         self.tasks = dict()
         self.counter = Counter()
@@ -51,52 +56,31 @@ class TaskFarm(object):
     def _key(self, *args, **keys):
         return tuple(args), frozenset(keys.items())
 
-    def _check(self, key):
-        if self.counter.contains(key):
-            return
-        if key not in self.tasks:
-            return
-        task, _ = self.tasks.pop(key)
-        task.throw(self.throw)
-
-    @threado.stream
-    def _guard(inner, self, channels):
+    @idiokit.stream
+    def _cleanup(self, key):
         try:
-            while True:
-                item = yield inner
-                inner.send(item)
-        except:
-            for channel in channels:
-                channel.rethrow()
-
-    @threado.stream
-    def _inc(inner, self, key):
-        try:
-            while True:
-                item = yield inner
-                inner.send(item)
+            yield idiokit.consume()
         finally:
             if self.counter.dec(key):
-                callqueue.add(self._check, key)
+                yield timer.sleep(self.grace_period)
+
+                if not self.counter.contains(key) and key in self.tasks:
+                    task = self.tasks.pop(key)
+                    task.signal(self.signal)
 
     def inc(self, *args, **keys):
         key = self._key(*args, **keys)
 
-        if self.counter.inc(key):
-            channels = set()
-            task = self.task(*args, **keys) | self._guard(channels)
-            self.tasks[key] = task, channels
-        task, channels = self.tasks[key]
+        if self.counter.inc(key) and key not in self.tasks:
+            self.tasks[key] = self.task(*args, **keys)
+        task = self.tasks[key]
 
-        channel = self._inc(key)
-        if task.has_result():
-            return task | channel
-
-        channels.add(channel)
-        return channel
+        fork = task.fork()
+        idiokit.pipe(self._cleanup(key), fork)
+        return fork
 
     def get(self, *args, **keys):
         key = self._key(*args, **keys)
         if key not in self.tasks:
             return None
-        return self.tasks[key][0]
+        return self.tasks[key]

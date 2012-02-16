@@ -3,15 +3,10 @@ import socket
 import getpass
 import smtplib
 import collections
-from idiokit import threado, timer
+
+import idiokit
+from idiokit import timer, threadpool
 from abusehelper.core import events, taskfarm, services, templates, bot
-
-@threado.stream
-def wait(inner, amount):
-    sleeper = timer.sleep(amount)
-
-    while not sleeper.has_result():
-        yield inner, sleeper
 
 def next_time(time_string):
     try:
@@ -31,21 +26,15 @@ def next_time(time_string):
         return time.mktime(current) - current_time
     return delta
 
-@threado.stream
-def alert(inner, *times):
-    while True:
-        if times:
-            sleeper = timer.sleep(min(map(next_time, times)))
-        else:
-            sleeper = threado.Channel()
+@idiokit.stream
+def alert(*times):
+    if not times:
+        yield idiokit.Event()
+        return
 
-        while not sleeper.has_result():
-            try:
-                yield inner, sleeper
-            except:
-                sleeper.rethrow()
-                raise
-        inner.send()
+    while True:
+        yield timer.sleep(min(map(next_time, times)))
+        yield idiokit.send()
 
 class ReportBot(bot.ServiceBot):
     REPORT_NOW = object()
@@ -57,103 +46,97 @@ class ReportBot(bot.ServiceBot):
         self.collectors = dict()
         self.queue = collections.deque()
 
-    @threado.stream
-    def handle_room(inner, self, name):
+    @idiokit.stream
+    def handle_room(self, name):
         self.log.info("Joining room %r", name)
-        room = yield inner.sub(self.xmpp.muc.join(name, self.bot_name))
+        room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
 
         try:
-            yield inner.sub(room
-                            | events.stanzas_to_events()
-                            | self.distribute(name))
+            yield idiokit.pipe(room,
+                               events.stanzas_to_events(),
+                               self.distribute(name))
         finally:
             self.log.info("Left room %r", name)
 
-    @threado.stream
-    def distribute(inner, self, name):
+    @idiokit.stream
+    def distribute(self, name):
         while True:
-            event = yield inner
+            event = yield idiokit.next()
 
-            collectors = self.collectors.get(name)
-            for collector in collectors:
-                collector.send(event)
+            collectors = self.collectors.get(name, ())
+            for collector in tuple(collectors):
+                try:
+                    yield collector.send(event)
+                except idiokit.BrokenPipe:
+                    pass
 
-    @threado.stream
-    def main(inner, self, queue):
+    @idiokit.stream
+    def main(self, queue):
         if queue:
             self.queue.extendleft(queue)
 
         try:
             while True:
                 while self.queue:
-                    item = self.queue.popleft()
-                    success = yield inner.sub(self.report(item))
+                    item, keys = self.queue.popleft()
+                    success = yield self.report(item, **keys)
                     if not success:
-                        self.queue.append(item)
+                        self.queue.append((item, keys))
 
-                yield inner.sub(wait(1.0))
+                yield timer.sleep(1.0)
         except services.Stop:
-            inner.finish(self.queue)
+            idiokit.stop(self.queue)
 
-    @threado.stream
-    def session(inner, self, state, src_room, **keys):
-        @threado.stream
-        def _alert(inner):
-            alert = self.alert(**keys)
+    @idiokit.stream
+    def session(self, state, src_room, **keys):
+        keys = dict(keys)
+        keys["src_room"] = src_room
 
-            try:
-                while True:
-                    source, item = yield threado.any(inner, alert)
-                    if inner is source:
-                        inner.send(item)
-                    else:
-                        inner.send(self.REPORT_NOW)
-            except:
-                alert.rethrow()
+        def _alert(_):
+            yield self.REPORT_NOW
 
-        @threado.stream
-        def _collect(inner):
-            while True:
-                item = yield inner
-                self.queue.append(item)
+        def _collect(item):
+            self.queue.append((item, keys))
 
-        collector = _alert() | self.collect(state, **keys) | _collect()
+        collector = self.collect(state, **keys) | idiokit.map(_collect)
+        idiokit.pipe(self.alert(**keys), idiokit.map(_alert), collector)
         self.collectors.setdefault(src_room, set()).add(collector)
 
         try:
-            result = yield inner.sub(collector | self.rooms.inc(src_room))
+            result = yield collector | self.rooms.inc(src_room)
         finally:
             collectors = self.collectors.get(src_room, set())
             collectors.discard(collector)
             if not collectors:
                 self.collectors.pop(src_room, None)
 
-        inner.finish(result)
+        idiokit.stop(result)
 
-    @threado.stream
-    def alert(inner, self, times, **keys):
-        yield inner.sub(alert(*times))
+    @idiokit.stream
+    def alert(self, times, **keys):
+        yield alert(*times)
 
-    @threado.stream
-    def collect(inner, self, state, **keys):
+    @idiokit.stream
+    def collect(self, state, **keys):
         if state is None:
             state = events.EventCollector()
 
-        try:
-            while True:
-                event = yield inner
-                if event is self.REPORT_NOW:
-                    inner.send(state.purge())
-                else:
-                    state.append(event)
-        except services.Stop:
-            inner.finish(state)
+        def _collect(event):
+            if event is self.REPORT_NOW:
+                yield state.purge()
+            else:
+                state.append(event)
 
-    @threado.stream
-    def report(inner, self, collected):
-        yield
-        inner.finish(True)
+        try:
+            yield idiokit.map(_collect)
+        except services.Stop:
+            idiokit.stop(state)
+
+    @idiokit.stream
+    def report(self, collected):
+        yield timer.sleep(0.0)
+        idiokit.stop(True)
 
 class MailTemplate(templates.Template):
     def format(self, events, encoding="utf-8"):
@@ -161,7 +144,6 @@ class MailTemplate(templates.Template):
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
         from email.charset import Charset, QP
-        from email.utils import formatdate, make_msgid
 
         parts = list()
         data = templates.Template.format(self, parts, events)
@@ -217,8 +199,8 @@ class MailerService(ReportBot):
             self.smtp_auth_password = getpass.getpass("SMTP password: ")
         self.server = None
 
-    @threado.stream
-    def build_mail(inner, self, events, template="", to=[], cc=[], **keys):
+    @idiokit.stream
+    def build_mail(self, events, template="", to=[], cc=[], **keys):
         """
         Return a mail object produced based on collected events and
         session parameters.
@@ -231,68 +213,31 @@ class MailerService(ReportBot):
                                 attach_and_embed_csv=templates.AttachAndEmbedUnicode(csv),
                                 to=templates.Const(format_addresses(to)),
                                 cc=templates.Const(format_addresses(cc)))
-        yield
-        inner.finish(template.format(events))
+        yield timer.sleep(0.0)
+        idiokit.stop(template.format(events))
 
-    def collect(self, state, **keys):
-        return ReportBot.collect(self, state, **keys) | self._collect(**keys)
-
-    @threado.stream
-    def _collect(inner, self, to=[], cc=[], **keys):
-        from email.header import decode_header
-        from email.utils import formatdate, make_msgid, getaddresses, formataddr
-
-        # FIXME: Use encoding after getaddresses
-        from_addr = getaddresses([self.mail_sender])[0]
-
-        while True:
-            events = yield inner
-            if not events:
-                continue
-
-            msg = yield inner.sub(self.build_mail(events, to=to, cc=cc, **keys))
-
-            if "To" not in msg:
-                msg["To"] = format_addresses(to)
-            if "Cc" not in msg:
-                msg["Cc"] = format_addresses(cc)
-
-            del msg["From"]
-            msg["From"] = formataddr(from_addr)
-            msg["Date"] = formatdate()
-            msg["Message-ID"] = make_msgid()
-            subject = msg.get("Subject", "")
-
-            msg_data = msg.as_string()
-
-            mail_to = msg.get_all("To", list()) + msg.get_all("Cc", list())
-            mail_to = [addr for (name, addr) in getaddresses(mail_to)]
-            mail_to = filter(None, [x.strip() for x in mail_to])
-            for address in mail_to:
-                inner.send(from_addr[1], address, subject, msg_data)
-
-    @threado.stream
-    def main(inner, self, state):
+    @idiokit.stream
+    def main(self, state):
         try:
-            result = yield inner.sub(ReportBot.main(self, state))
+            result = yield ReportBot.main(self, state)
         finally:
             if self.server is not None:
                 _, server = self.server
                 self.server = None
 
                 try:
-                    yield inner.thread(server.quit)
-                except self.TOLERATED_EXCEPTIONS, exc:
+                    yield threadpool.thread(server.quit)
+                except self.TOLERATED_EXCEPTIONS:
                     pass
-        inner.finish(result)
+        idiokit.stop(result)
 
-    @threado.stream
-    def _ensure_connection(inner, self):
+    @idiokit.stream
+    def _ensure_connection(self):
         while self.server is None:
             host, port = self.smtp_host, self.smtp_port
             self.log.info("Connecting %r port %d", host, port)
             try:
-                server = yield inner.thread(smtplib.SMTP, host, port)
+                server = yield threadpool.thread(smtplib.SMTP, host, port)
             except self.TOLERATED_EXCEPTIONS, exc:
                 self.log.error("Error connecting SMTP server: %r", exc)
             else:
@@ -301,7 +246,7 @@ class MailerService(ReportBot):
                 break
 
             self.log.info("Retrying SMTP connection in 10 seconds")
-            yield inner.sub(wait(10.0))
+            yield timer.sleep(10.0)
 
     def _try_to_authenticate(self, server):
         if server.has_extn("starttls"):
@@ -313,59 +258,89 @@ class MailerService(ReportBot):
             server.has_extn("auth")):
             server.login(self.smtp_auth_user, self.smtp_auth_password)
 
-    @threado.stream
-    def _try_to_send(inner, self, item):
-        from_addr, to_addr, subject, msg = item
-
-        yield inner.sub(self._ensure_connection())
+    @idiokit.stream
+    def _try_to_send(self, from_addr, to_addr, subject, msg):
+        yield self._ensure_connection()
 
         ehlo_done, server = self.server
 
         self.log.info("Sending message %r to %r", subject, to_addr)
         try:
             if not ehlo_done:
-                yield inner.thread(server.ehlo)
+                yield threadpool.thread(server.ehlo)
                 self.server = True, server
 
             try:
-                yield inner.thread(server.sendmail, from_addr, to_addr, msg)
+                yield threadpool.thread(server.sendmail, from_addr, to_addr, msg)
             except smtplib.SMTPSenderRefused, refused:
                 if refused.smtp_code != 530:
                     raise
-                yield inner.thread(self._try_to_authenticate, server)
-                yield inner.thread(server.sendmail, from_addr, to_addr, msg)
+                yield threadpool.thread(self._try_to_authenticate, server)
+                yield threadpool.thread(server.sendmail, from_addr, to_addr, msg)
         except smtplib.SMTPDataError, data_error:
             self.log.error("Could not send message to %r: %r. "+
                            "Dropping message from queue.",
                            to_addr, data_error)
-            inner.finish(True)
+            idiokit.stop(True)
         except smtplib.SMTPRecipientsRefused, refused:
             for recipient, reason in refused.recipients.iteritems():
                 self.log.error("Could not send message to %r: %r. "+
                                "Dropping message from queue.",
                                recipient, reason)
-            inner.finish(True)
+            idiokit.stop(True)
         except self.TOLERATED_EXCEPTIONS, exc:
             self.log.error("Could not send message to %r: %r", to_addr, exc)
             self.server = None
             try:
-                yield inner.thread(server.quit)
+                yield threadpool.thread(server.quit)
             except self.TOLERATED_EXCEPTIONS:
                 pass
-            inner.finish(False)
+            idiokit.stop(False)
 
         self.log.info("Sent message to %r", to_addr)
-        inner.finish(True)
+        idiokit.stop(True)
 
-    @threado.stream
-    def report(inner, self, item):
-        while True:
-            result = yield inner.sub(self._try_to_send(item))
-            if result:
-                inner.finish(True)
+    @idiokit.stream
+    def report(self, events, to=[], cc=[], **keys):
+        from email.utils import formatdate, make_msgid, getaddresses, formataddr
 
-            self.log.info("Retrying sending in 10 seconds")
-            yield inner.sub(wait(10.0))
+        if not events:
+            idiokit.stop(True)
+
+        # FIXME: Use encoding after getaddresses
+        from_addr = getaddresses([self.mail_sender])[0]
+
+        msg = yield self.build_mail(events, to=to, cc=cc, **keys)
+
+        if "To" not in msg:
+            msg["To"] = format_addresses(to)
+        if "Cc" not in msg:
+            msg["Cc"] = format_addresses(cc)
+
+        del msg["From"]
+        msg["From"] = formataddr(from_addr)
+        msg["Date"] = formatdate()
+        msg["Message-ID"] = make_msgid()
+        subject = msg.get("Subject", "")
+
+        mail_to = msg.get_all("To", list()) + msg.get_all("Cc", list())
+        mail_to = [addr for (name, addr) in getaddresses(mail_to)]
+        mail_to = filter(None, [x.strip() for x in mail_to])
+
+        # No need to keep both the mail object and mail data in memory.
+        msg_data = msg.as_string()
+        del msg
+
+        for address in mail_to:
+            while True:
+                result = yield self._try_to_send(from_addr[1], address, subject, msg_data)
+                if result:
+                    break
+
+                self.log.info("Retrying sending in 10 seconds")
+                yield timer.sleep(10.0)
+
+        idiokit.stop(True)
 
 if __name__ == "__main__":
     MailerService.from_command_line().execute()
