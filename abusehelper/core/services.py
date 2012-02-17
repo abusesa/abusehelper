@@ -1,6 +1,5 @@
 import uuid
 import random
-import functools
 
 import idiokit
 from idiokit.xmpp.core import XMPPError
