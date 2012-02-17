@@ -8,21 +8,10 @@ import time
 import errno
 import signal
 
-class CommandError(Exception):
-    def __init__(self, message, exitcode=1):
-        Exception.__init__(self, message, exitcode)
-
-        self.message = message
-        self.exitcode = 1
-
 # Helpers
 
-def ensure_not_root():
-    if pwd.getpwuid(os.getuid()).pw_name != "root":
-        return
-    raise CommandError(("trying to start bots as root - " +
-        "run as a different user or specify the --allow-root " +
-        "command line option"))
+def get_effective_username():
+    return pwd.getpwuid(os.getuid()).pw_name
 
 def module_id(module):
     import hashlib
@@ -113,10 +102,7 @@ def logpath(module):
 
 # Commands
 
-def command_start(module, allow_root=False, **_):
-    if not allow_root:
-        ensure_not_root()
-
+def command_start(module):
     if is_running(module):
         print "Already running."
         return
@@ -141,7 +127,7 @@ def command_start(module, allow_root=False, **_):
             return
         time.sleep(0.1)
 
-def command_status(module, **_):
+def command_status(module):
     processes = ps()
     pids = find(module, processes)
     if not pids:
@@ -163,28 +149,25 @@ def command_status(module, **_):
         for pid, command in parents.get(parent_pid, ()):
             print "    pid=%d command=%r" % (pid, command)
 
-def command_stop(module, **_):
+def command_stop(module):
     if not is_running(module):
         print "Nothing running."
     else:
         print "Shutting down."
         _signal(module, "SIGUSR1", signal.SIGUSR1)
 
-def command_kill(module, **_):
+def command_kill(module):
     if not is_running(module):
         print "Nothing running."
     else:
         print "Shutting down."
         _signal(module, "SIGUSR2", signal.SIGUSR2)
 
-def command_restart(module, allow_root=False, **keys):
-    if not allow_root:
-        ensure_not_root()
+def command_restart(module):
+    command_stop(module)
+    command_start(module)
 
-    command_stop(module, allow_root=allow_root, **keys)
-    command_start(module, allow_root=allow_root, **keys)
-
-def command_follow(module, **_):
+def command_follow(module):
     height = 20
     try:
         process = popen("stty", "size", stdin=sys.stdin)
@@ -208,21 +191,24 @@ def command_follow(module, **_):
         send_signal(process.pid, signal.SIGKILL)
 
 if __name__ == "__main__":
-    import textwrap
     from optparse import OptionParser
 
     parser = OptionParser(usage="usage: %prog [options] command module")
-    parser.add_option("-p",
-                      "--python",
-                      dest="python",
-                      default=None,
-                      help=("use the given python executable "+
-                            "instead of %r" % sys.executable))
+    parser.add_option("-p", "--python",
+        dest="python",
+        default=None,
+        help="use the given python executable instead of %r" % sys.executable)
     parser.add_option("--allow-root",
-                      dest="allow_root",
-                      default=False,
-                      help="allow starting bots as the root user")
+        action="store_true",
+        dest="allow_root",
+        default=False,
+        help="allow starting bots as the root user")
     options, args = parser.parse_args()
+
+    if not options.allow_root and get_effective_username() == "root":
+        parser.error("trying to start bots as root - " +
+            "run as a different user or specify the --allow-root " +
+            "command line option")
 
     if options.python is not None:
         os.execlp(options.python, options.python, sys.argv[0], *args)
@@ -237,11 +223,4 @@ if __name__ == "__main__":
     if not callable(command_func):
         raise Exception("no command %r" % command)
 
-    try:
-        command_func(normalized_module(module), allow_root=options.allow_root)
-    except CommandError, error:
-        lines = textwrap.wrap(error.message,
-            subsequent_indent="       ",
-            break_on_hyphens=False)
-        print >> sys.stderr, "ERROR:", "\n".join(lines)
-        sys.exit(error.exitcode)
+    command_func(normalized_module(module))
