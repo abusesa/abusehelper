@@ -179,6 +179,7 @@ class StartupBot(bot.Bot):
             heapq.heappush(self._strategies, (time.time(), strategy))
 
         received = collections.deque()
+
         def handler(signum, frame):
             received.append(signum)
 

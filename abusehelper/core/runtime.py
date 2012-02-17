@@ -73,7 +73,7 @@ class Session(Pipeable):
 
         for key, value in conf.items():
             try:
-                value  = serialize.load(serialize.dump(value))
+                value = serialize.load(serialize.dump(value))
             except serialize.UnregisteredType:
                 raise SessionError("can not serialize key %r value %r" %
                                    (key, value))
@@ -124,8 +124,6 @@ class Room(Pipeable):
             jid.JID(name)
         self.name = name
 
-import idiokit
-from idiokit import timer
 from abusehelper.core import bot, services, log
 
 class Cancel(Exception):
