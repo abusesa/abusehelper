@@ -1,12 +1,17 @@
 from base64 import b64encode, b64decode
 from idiokit.xmlcore import Element
 
-class AlreadyRegistered(Exception): pass
-class AlreadyRegisteredType(AlreadyRegistered): pass
-class AlreadyRegisteredName(AlreadyRegistered): pass
+class AlreadyRegistered(Exception):
+    pass
+class AlreadyRegisteredType(AlreadyRegistered):
+    pass
+class AlreadyRegisteredName(AlreadyRegistered):
+    pass
 
-class UnregisteredType(Exception): pass
-class UnregisteredName(Exception): pass
+class UnregisteredType(Exception):
+    pass
+class UnregisteredName(Exception):
+    pass
 
 class Marshal(object):
     def __init__(self, register_common=True):
@@ -29,7 +34,7 @@ class Marshal(object):
 
         for obj_type in types:
             if obj_type in self.types and not overwrite:
-                raise TypeAlreadyRegistered(obj_type)
+                raise AlreadyRegisteredType(obj_type)
             self.types[obj_type] = dump, name
 
         if name in self.names and not overwrite:
