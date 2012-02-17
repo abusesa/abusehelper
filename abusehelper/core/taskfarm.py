@@ -1,5 +1,5 @@
 import idiokit
-from idiokit import callqueue, timer
+from idiokit import timer
 
 class Counter(object):
     def __init__(self):
