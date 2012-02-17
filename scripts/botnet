@@ -206,7 +206,7 @@ if __name__ == "__main__":
     options, args = parser.parse_args()
 
     if not options.allow_root and get_effective_username() == "root":
-        parser.error("trying to start bots as root - " +
+        parser.error("running as root - " +
             "run as a different user or specify the --allow-root " +
             "command line option")
 
