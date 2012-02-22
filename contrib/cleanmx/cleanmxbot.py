@@ -36,10 +36,10 @@ class CleanMXBot(bot.PollingBot):
     @idiokit.stream
     def poll(self, url, name):
         try:
-            self.log.info('Downloading page from: "%s"', url)
+            self.log.info("Downloading page from: %r", url)
             info, fileobj = yield utils.fetch_url(url)
         except utils.FetchUrlFailed, e:
-            self.log.error('Failed to download page "%s": %r', url, e)
+            self.log.error("Failed to download page %r: %r", url, e)
             return
 
         charset = info.get_param("charset", None)
@@ -51,13 +51,26 @@ class CleanMXBot(bot.PollingBot):
         while True:
             event = yield idiokit.next()
 
+            # A dict telling how to rename raw event keys.
+            # A key is not renamed by default.
+            # Mapping a key to None removes the key.
+            key_mappings = {
+                "time": "firsttime",
+                "id": "cleanmx id",
+                "phishtank": "phishtank id",
+                "line": None
+            }
+
             new = events.Event()
             for key, value in event.items():
+                key = key_mappings.get(key, key)
+                if key is None:
+                    continue
+
                 value = unescape(value).strip()
                 if not value:
                     continue
-                if key == "firsttime":
-                    key = "time"
+
                 new.add(key, value)
 
             if name:
