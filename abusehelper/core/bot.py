@@ -533,6 +533,10 @@ class PollingBot(FeedBot):
     poll_interval = IntParam("wait at least the given amount of seconds "+
                              "before polling the data source again "+
                              "(default: %default seconds)", default=3600)
+    ignore_initial_poll = BoolParam("don't send out events collected during the "+
+                                    "first poll, just use them for deduplication "+
+                                    "(WARNING: an experimental feature, may change "+
+                                    "or be removed without prior notice)")
 
     def __init__(self, *args, **keys):
         FeedBot.__init__(self, *args, **keys)
@@ -552,7 +556,6 @@ class PollingBot(FeedBot):
     def manage_feed(self, key):
         if key not in self._poll_cleanup:
             self._poll_queue.appendleft((time.time(), key))
-            self._poll_dedup.setdefault(key, dict())
         else:
             self._poll_cleanup.discard(key)
 
@@ -583,9 +586,7 @@ class PollingBot(FeedBot):
 
     @idiokit.stream
     def _distribute(self, key):
-        if key not in self._poll_dedup:
-            self._poll_dedup[key] = dict()
-        old_dedups = self._poll_dedup[key]
+        old_dedups = self._poll_dedup.get(key, dict())
         new_dedups = self._poll_dedup[key] = dict()
 
         while True:
@@ -601,6 +602,10 @@ class PollingBot(FeedBot):
                     continue
                 new_dedups.setdefault(room, set()).add(event_key)
 
-                if event_key in old_dedups.get(room, ()):
+                old_keys = old_dedups.get(room, None)
+                if self.ignore_initial_poll and old_keys is None:
                     continue
+                if old_keys is not None and event_key in old_keys:
+                    continue
+
                 yield room.send(event)
