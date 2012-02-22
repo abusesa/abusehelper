@@ -10,7 +10,8 @@ import idiokit
 from abusehelper.core import utils, cymruwhois, bot
 
 class BruteForceBlockerBot(bot.PollingBot):
-    COLUMNS = ["ip", "time", "count", "id"]
+    # Ignore the last column ("id").
+    COLUMNS = ["ip", "time", "count", None]
 
     use_cymru_whois = bot.BoolParam(default=True)
 
