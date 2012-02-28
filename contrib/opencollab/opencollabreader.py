@@ -37,10 +37,8 @@ class OpenCollabReader(bot.FeedBot):
 
     @idiokit.stream
     def feed(self, query):
-        salt = str(random.randint(2**31, 2**32))
-
         def page_id(page):
-            return hashlib.md5(page.encode("utf8") + salt).hexdigest()
+            return hashlib.md5(page.encode("utf8")+self.collab_url).hexdigest()
 
         token = None
         current = dict()
@@ -62,6 +60,7 @@ class OpenCollabReader(bot.FeedBot):
                     event = current.setdefault(page, events.Event())
                     event.add("id", page_id(page))
                     event.add("gwikipagename", page)
+                    event.add("collab_url", self.collab_url+page)
 
                     removed.discard(page)
 
