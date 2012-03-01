@@ -291,7 +291,7 @@ class Mailer(mailer.MailerService):
             data.append(event.value('case', ''))
             data.append(event.value('info', ''))
             data.append(sdate)
-            data.append(event.value('ar-received', ''))
+            data.append(event.value('_received', ''))
             data.append(event.value('feed', ''))
             logfile.write("%s\n" % (' | '.join(data).encode('utf-8')))
 
