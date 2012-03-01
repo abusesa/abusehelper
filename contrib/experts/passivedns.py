@@ -14,7 +14,7 @@ def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
 
         all_data = list()
         while True:
-            data = sock.recv(4096)
+            data = yield sock.recv(4096)
             if not data:
                 break
             all_data.append(data)
