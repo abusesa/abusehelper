@@ -100,7 +100,7 @@ def _unicode_quote(string):
     return string
 
 _UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
-_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\"|[^"])*)")|([^\s"=,]+)|)\s*',
+_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*',
                            re.U)
 def _unicode_parse_part(string, start):
     match = _UNICODE_PART.match(string, start)
@@ -128,6 +128,15 @@ class Event(object):
 
         >>> event.add(u'=', u'"')
         >>> Event.from_unicode(unicode(event)) == event
+        True
+
+        Regression test: Check that character escaping
+        doesn't mess up parsing.
+
+        >>> event = Event()
+        >>> event.add(u"x", u"\\")
+        >>> event.add(u"y", u"b")
+        >>> Event.from_unicode(ur'x="\\", "y"=b') == event
         True
         """
 
