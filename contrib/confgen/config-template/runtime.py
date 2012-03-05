@@ -4,15 +4,15 @@ from abusehelper.core import rules
 from abusehelper.core.config import relative_path, load_module
 from abusehelper.core.runtime import Room, Session
 
-startup = load_module("startup")
+service_room = load_module("startup").service_room
 
 class Base(object):
-    prefix = startup.Bot.service_room
+    prefix = service_room
 
     @classmethod
     def class_name(cls):
         return cls.__name__.lower()
-    
+
     @classmethod
     def class_room(cls):
         return Room(cls.prefix+"."+cls.class_name()+"s")
@@ -21,7 +21,7 @@ class Base(object):
         return Room(self.prefix+"."+self.class_name()+"."+self.name)
 
     def __iter__(self):
-        yield self.room() | Session("historian")
+        yield self.room() | Session("archivebot")
         yield self.main()
 
     def main(self):
@@ -34,7 +34,7 @@ class Source(Base):
 
     def main(self):
         yield (Session(self.name, **self.attrs)
-               | self.room() 
+               | self.room()
                | Session(self.name + ".sanitizer")
                | self.class_room())
 
@@ -43,9 +43,9 @@ class Type(Base):
         self.name = name
 
     def main(self):
-        yield (Source.class_room() 
+        yield (Source.class_room()
                | Session("roomgraph", rule=rules.MATCH("type", self.name))
-               | self.room() 
+               | self.room()
                | self.class_room())
 
 def parse_netblock(netblock):
@@ -126,8 +126,8 @@ def mail(customer):
     template = load_template(customer.mail_template)
     return Session("mailer",
                    customer.prefix, customer.name,
-                   to=customer.mail_to, 
-                   cc=customer.mail_cc, 
+                   to=customer.mail_to,
+                   cc=customer.mail_cc,
                    template=template,
                    times=customer.mail_times)
 
@@ -154,13 +154,13 @@ class Customer(Base):
                 rule = rules.OR(*asns)
 
                 if self.types is None:
-                    yield (Type.class_room() 
-                           | Session("roomgraph", rule=rule) 
+                    yield (Type.class_room()
+                           | Session("roomgraph", rule=rule)
                            | self.room())
                 else:
                     for type in self.types:
-                        yield (Type(name=type).room() 
-                               | Session("roomgraph", rule=rule) 
+                        yield (Type(name=type).room()
+                               | Session("roomgraph", rule=rule)
                                | self.room())
 
         for report in self.reports:
@@ -179,7 +179,7 @@ def configs():
     # Customer definitions
     yield Customer("unknown_to_mail",
                    asns=["3 +127.0.0.1/16"],
-                   reports=[mail], 
+                   reports=[mail],
                    types=["unknown"])
     yield Customer("all_to_room",
                    asns=[1, 2, 3])
