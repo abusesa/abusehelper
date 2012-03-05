@@ -1,185 +1,79 @@
 import re
-import socket
+
 from abusehelper.core import rules
-from abusehelper.core.config import relative_path, load_module
-from abusehelper.core.runtime import Room, Session
+from abusehelper.core.config import load_module
+from abusehelper.core.runtime import Session
 
-service_room = load_module("startup").service_room
+room_prefix = load_module("startup").service_room
 
-class Base(object):
-    prefix = service_room
+sources_room = room_prefix + ".sources"
 
-    @classmethod
-    def class_name(cls):
-        return cls.__name__.lower()
+def archive(room):
+    return Session("archivebot",
+        src_room=room)
 
-    @classmethod
-    def class_room(cls):
-        return Room(cls.prefix+"."+cls.class_name()+"s")
+def source(name, dst_room=None, **attrs):
+    if dst_room is None:
+        dst_room = room_prefix + ".source." + name
 
-    def room(self):
-        return Room(self.prefix+"."+self.class_name()+"."+self.name)
+    yield Session(name,
+        dst_room=dst_room,
+        **attrs)
+    yield archive(dst_room)
 
-    def __iter__(self):
-        yield self.room() | Session("archivebot")
-        yield self.main()
+    yield Session(name + ".sanitizer",
+        src_room=dst_room,
+        dst_room=sources_room)
+    yield archive(sources_room)
 
-    def main(self):
-        return []
+def customer(name, rule, *outputs):
+    room = room_prefix + ".customer." + name
 
-class Source(Base):
-    def __init__(self, name, **attrs):
-        self.name = name
-        self.attrs = attrs
+    yield Session("roomgraph",
+        src_room=sources_room,
+        dst_room=room,
+        rule=rule)
+    yield archive(room)
 
-    def main(self):
-        yield (Session(self.name, **self.attrs)
-               | self.room()
-               | Session(self.name + ".sanitizer")
-               | self.class_room())
+    for output in outputs:
+        yield output(room)
 
-class Type(Base):
-    def __init__(self, name):
-        self.name = name
+def mail(to=[], cc=[], times=["08:00"], template=None):
+    if template is None:
+        template = """
+Subject: AbuseHelper CSV report
 
-    def main(self):
-        yield (Source.class_room()
-               | Session("roomgraph", rule=rules.MATCH("type", self.name))
-               | self.room()
-               | self.class_room())
+# Here is the data:
+%(attach_and_embed_csv, report.csv, ",", time, ip, type)s
+"""
 
-def parse_netblock(netblock):
-    split = netblock.split("/", 1)
-    ip = split[0]
-
-    try:
-        socket.inet_pton(socket.AF_INET, ip)
-    except socket.error:
-        try:
-            socket.inet_pton(socket.AF_INET6, ip)
-        except socket.error:
-            raise ValueError("not a valid IP address %r" % ip)
-        bits = 128
-    else:
-        bits = 32
-
-    if len(split) == 2:
-        bits = int(split[1])
-    return rules.NETBLOCK(ip, bits)
-
-def parse_asn_netblock(item):
-    string = str(item)
-
-    plus_asn = list()
-    minus_asn = list()
-    plus_netblock = list()
-    minus_netblock = list()
-
-    rex = re.compile("^\s*([+-])?\s*([^-+\s]+)\s*")
-    while string:
-        match = rex.search(string)
-        if not match:
-            raise ValueError("invalid asn/netblock rule %r" % item)
-
-        prefix, data = match.groups()
-        string = string[match.end():]
-
-        if data.isdigit():
-            rule = rules.MATCH("asn", unicode(int(data)))
-            if prefix == "-":
-                minus_asn.append(rule)
-            else:
-                plus_asn.append(rule)
-        else:
-            rule = parse_netblock(data)
-            if prefix == "-":
-                minus_netblock.append(rule)
-            else:
-                plus_netblock.append(rule)
-
-    total = list()
-    if plus_asn:
-        total.append(rules.OR(*plus_asn))
-    if minus_asn:
-        total.append(rules.NOT(rules.OR(*minus_asn)))
-    if plus_netblock:
-        total.append(rules.OR(*plus_netblock))
-    if minus_netblock:
-        total.append(rules.NOT(rules.OR(*minus_netblock)))
-
-    if not total:
-        raise ValueError("empty asn/netblock rule")
-    return rules.AND(*total)
-
-template_cache = dict()
-
-def load_template(name):
-    if name not in template_cache:
-        template_file = open(relative_path("template", name))
-        try:
-            template_cache[name] = template_file.read()
-        finally:
-            template_file.close()
-    return template_cache[name]
-
-def mail(customer):
-    template = load_template(customer.mail_template)
-    return Session("mailer",
-                   customer.prefix, customer.name,
-                   to=customer.mail_to,
-                   cc=customer.mail_cc,
-                   template=template,
-                   times=customer.mail_times)
-
-class Customer(Base):
-    asns = [] # Default: no asns
-    types = None # Default: all types
-    reports = [] # Default: no reporting
-
-    mail_to = []
-    mail_cc = []
-    mail_template = "default"
-    mail_times = ["08:00"]
-
-    def __init__(self, name, **attrs):
-        self.name = name
-
-        for key, value in attrs.items():
-            setattr(self, key, value)
-
-    def main(self):
-        if self.asns:
-            asns = map(parse_asn_netblock, self.asns)
-            if asns:
-                rule = rules.OR(*asns)
-
-                if self.types is None:
-                    yield (Type.class_room()
-                           | Session("roomgraph", rule=rule)
-                           | self.room())
-                else:
-                    for type in self.types:
-                        yield (Type(name=type).room()
-                               | Session("roomgraph", rule=rule)
-                               | self.room())
-
-        for report in self.reports:
-            yield self.room() | report(self)
+    def _mail(room):
+        yield Session("mailer",
+            src_room=room,
+            to=to,
+            cc=cc,
+            times=times,
+            template=template)
+    return _mail
 
 def configs():
     # Source definitions
-    yield Source("dshield", asns=[1, 2, 3])
-    yield Source("ircfeed")
 
-    # Type definitions
-    yield Type("malware")
-    yield Type("spam")
-    yield Type("unknown")
+    yield source("dshield",
+        asns=[0, 1, 2, 3])
+
+    yield source("abusech")
 
     # Customer definitions
-    yield Customer("unknown_to_mail",
-                   asns=["3 +127.0.0.1/16"],
-                   reports=[mail],
-                   types=["unknown"])
-    yield Customer("all_to_room",
-                   asns=[1, 2, 3])
+
+    yield customer("everything-to-mail-at-8-o-clock",
+        rules.ANYTHING(),
+        mail(to="someone@example.com", times=["08:00"]))
+
+    yield customer("asn3-or-netblock",
+        rules.OR(
+            rules.MATCH("asn", "3"),
+            rules.NETBLOCK("127.0.0.1", 16)))
+
+    yield customer("fi-urls",
+        rules.MATCH("url", re.compile(r"^http(s)?://[\w\.]+\.fi(\W|$)", re.U | re.I)))

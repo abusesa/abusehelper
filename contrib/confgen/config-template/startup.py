@@ -1,4 +1,5 @@
 import os
+
 from abusehelper.core.config import relative_path
 from abusehelper.core.startup import Bot
 
@@ -21,18 +22,27 @@ def basic(name, *args, **attrs):
 
 def configs():
     # Launch a fine selection of abusehelper.core.* bots
-    yield basic("mailer",
-                smtp_host="@SMTP_HOST@",
-                smtp_port="@SMTP_PORT@",
-                smtp_auth_user="@SMTP_AUTH_USER@",
-                smtp_auth_password="@SMTP_AUTH_PASSWORD@",
-                mail_sender="@MAIL_SENDER@")
-    yield basic("dshield")
+
+    yield basic("runtime",
+        config=relative_path("runtime.py"))
     yield basic("roomgraph")
-    yield basic("archivebot", archive_dir=relative_path("archive"))
-    yield basic("runtime", config=relative_path("runtime.py"))
+    yield basic("archivebot",
+        archive_dir=relative_path("archive"))
+    yield basic("dshield")
+    yield basic("mailer",
+        smtp_host="@SMTP_HOST@",
+        smtp_port="@SMTP_PORT@",
+        smtp_auth_user="@SMTP_AUTH_USER@",
+        smtp_auth_password="@SMTP_AUTH_PASSWORD@",
+        mail_sender="@MAIL_SENDER@")
+
+    # Launch a nice source bot from the contrib. Remember to explicitly
+    # define the bot module name, as this is not a core bot!
+
+    yield basic("abusech", "abusehelper.contrib.abusech.abusechbot")
 
     # Find and launch modules named custom/*.sanitizer.py
+
     for filename in os.listdir(relative_path("custom")):
         if filename.endswith(".sanitizer.py"):
             yield basic(filename[:-3], relative_path("custom", filename))
