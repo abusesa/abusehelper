@@ -6,6 +6,7 @@ from abusehelper.core.startup import Bot
 xmpp_jid = "@XMPP_JID@"
 xmpp_password = "@XMPP_PASSWORD@"
 service_room = "@SERVICE_ROOM@"
+enable_mailer = "@ENABLE_MAILER@"
 
 def basic(name, *args, **attrs):
     template = Bot.template(
@@ -29,12 +30,16 @@ def configs():
     yield basic("archivebot",
         archive_dir=relative_path("archive"))
     yield basic("dshield")
-    yield basic("mailer",
-        smtp_host="@SMTP_HOST@",
-        smtp_port="@SMTP_PORT@",
-        smtp_auth_user="@SMTP_AUTH_USER@",
-        smtp_auth_password="@SMTP_AUTH_PASSWORD@",
-        mail_sender="@MAIL_SENDER@")
+
+    # Maybe run the mailer too
+
+    if enable_mailer:
+        yield basic("mailer",
+            smtp_host="@SMTP_HOST@",
+            smtp_port="@SMTP_PORT@",
+            smtp_auth_user="@SMTP_AUTH_USER@",
+            smtp_auth_password="@SMTP_AUTH_PASSWORD@",
+            mail_sender="@MAIL_SENDER@")
 
     # Launch a nice source bot from the contrib. Remember to explicitly
     # define the bot module name, as this is not a core bot!
