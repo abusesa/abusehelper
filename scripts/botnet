@@ -144,10 +144,10 @@ def command_status(module):
         parents.setdefault(ppid, list()).append((pid, command))
 
     for parent_pid, parent_command in pids:
-        print "  pid=%d command=%r" % (parent_pid, parent_command)
+        print "[%d] %s" % (parent_pid, parent_command)
 
         for pid, command in parents.get(parent_pid, ()):
-            print "    pid=%d command=%r" % (pid, command)
+            print "  [%d] %s" % (pid, command)
 
 def command_stop(module):
     if not is_running(module):
