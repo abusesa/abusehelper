@@ -2,52 +2,16 @@ import re
 import gzip
 import inspect
 import cPickle as pickle
+
+from base64 import b64decode
 from cStringIO import StringIO
 
 import idiokit
 from idiokit.xmlcore import Element, Elements
 
-_ESCAPE = re.compile(u"&(?=#)|[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFF\uFFFE]",
-                     re.U)
-
-def _escape_sub(match):
-    return "&#x%X;" % ord(match.group())
-
-def _escape(string):
-    """Return a string where forbidden XML characters (and & in some
-    cases) have been escaped using XML character references.
-
-    >>> _escape(u"\u0000\uffff")
-    u'&#x0;&#xFFFF;'
-
-    & should only be escaped when it is potentially a part of an escape
-    sequence starting with &#.
-
-    >>> _escape(u"& &#x26;")
-    u'& &#x26;#x26;'
-
-    Other characters are not affected.
-    """
-    return _ESCAPE.sub(_escape_sub, string)
-
-_UNESCAPE = re.compile(u"&#x([0-9a-f]+);", re.I)
-
-def _unescape_sub(match):
-    value = match.group(1)
-    try:
-        return unichr(int(value, 16))
-    except ValueError:
-        return match.group(1)
-
-def _unescape(string):
-    """Return a string where XML character references have been
-    substituted with the corresponding unicode characters.
-
-    >>> _unescape(u"&#x0;&#xFFFF;")
-    u'\\x00\\uffff'
-    """
-
-    return _UNESCAPE.sub(_unescape_sub, string)
+_NON_XML = re.compile(u"[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]", re.U)
+def _replace_non_xml_chars(unicode_obj, replacement=u"\uFFFD"):
+    return _NON_XML.sub(replacement, unicode_obj)
 
 def _normalize(value):
     """Return the value converted to unicode. Raise a TypeError if the
@@ -189,11 +153,22 @@ class Event(object):
         True
         """
 
+        # Future event format
+        for event_element in elements.children("e", EVENT_NS):
+            event = Event()
+            for key_element in event_element.children("k").with_attrs("a"):
+                key = b64decode(key_element.get_attr("a")).decode("utf-8")
+                for value_element in key_element.children("v").with_attrs("a"):
+                    value = b64decode(value_element.get_attr("a")).decode("utf-8")
+                    event.add(key, value)
+            yield event
+
+        # Legacy event format
         for event_element in elements.children("event", EVENT_NS):
             event = Event()
             for attr in event_element.children("attr").with_attrs("key", "value"):
-                key = _unescape(attr.get_attr("key"))
-                value = _unescape(attr.get_attr("value"))
+                key = attr.get_attr("key")
+                value = attr.get_attr("value")
                 event.add(key, value)
             yield event
 
@@ -561,8 +536,8 @@ class Event(object):
         event = Element("event", xmlns=EVENT_NS)
 
         for key, value in self.items():
-            key = _escape(key)
-            value = _escape(value)
+            key = _replace_non_xml_chars(key)
+            value = _replace_non_xml_chars(value)
             attr = Element("attr", key=key, value=value)
             event.add(attr)
 
@@ -570,7 +545,7 @@ class Event(object):
             return event
 
         body = Element("body")
-        body.text = _escape(unicode(self))
+        body.text = _replace_non_xml_chars(unicode(self))
         return Elements(body, event)
 
     def __eq__(self, other):
