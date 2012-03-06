@@ -5,22 +5,11 @@ import shutil
 import getpass
 from idiokit.xmpp import jid
 
-def dummy(_repr):
-    class _dummy(object):
-        def __repr__(self):
-            return _repr
-    return _dummy()
-
-NOT_GIVEN = dummy("<not given>")
+NOT_GIVEN = object()
 
 def input(name, default=NOT_GIVEN, parser=NOT_GIVEN):
-    prompt = name
-    if default is not NOT_GIVEN:
-        prompt += " [" + repr(default) + "]"
-    prompt += ": "
-
     while True:
-        result = raw_input(prompt).strip()
+        result = raw_input(name + ": ").strip()
         if not result:
             if default is NOT_GIVEN:
                 continue
@@ -32,7 +21,7 @@ def input(name, default=NOT_GIVEN, parser=NOT_GIVEN):
         try:
             return parser(result)
         except Exception, error:
-            print >> sys.stderr, "Invalid value for " + name + ":", error
+            print >> sys.stderr, "Invalid value:", error
 
 def password(name):
     while True:
@@ -40,11 +29,16 @@ def password(name):
         if not result:
             continue
 
-        repeated = getpass.getpass(name + " (again): ")
-        if repeated == result:
-            return result
+        while True:
+            repeated = getpass.getpass(name + " (again): ")
+            if not repeated:
+                continue
 
-        print >> sys.stderr, "Passwords do not match"
+            if repeated == result:
+                return result
+
+            print >> sys.stderr, "Passwords do not match"
+            break
 
 def replace(string, values):
     sub = lambda match: repr(values[match.group(2).strip()])
@@ -80,16 +74,13 @@ def generate(dst):
                             XMPP_PASSWORD=password("XMPP password"),
                             SERVICE_ROOM=input("XMPP lobby channel"))
 
-            no = dummy("no")
-            enable_mailer = input("Configure mailer? (yes/no)", no)
-            if enable_mailer and enable_mailer is not no:
+            if input("Configure mailer? yes/[no]", False, parse_yes_no):
                 replaces.update(ENABLE_MAILER=True,
                                 SMTP_HOST=input("SMTP host"),
-                                SMTP_PORT=input("SMTP port", 25, int))
+                                SMTP_PORT=input("SMTP port [25]", 25, int))
 
-                no_auth = dummy("no authentication")
-                smtp_auth_user = input("SMTP auth user", no_auth)
-                if smtp_auth_user is no_auth:
+                smtp_auth_user = input("SMTP auth user [no auth]", None)
+                if smtp_auth_user is None:
                     smtp_auth_user = None
                     smtp_auth_password = None
                 else:
