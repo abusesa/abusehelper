@@ -15,44 +15,44 @@ class UnregisteredName(Exception):
 
 class Marshal(object):
     def __init__(self, register_common=True):
-        self.types = dict()
-        self.names = dict()
+        self._types = dict()
+        self._names = dict()
 
         if register_common:
-            self.register(dump_dict, load_dict, dict, "dict")
+            self.register(dump_dict, load_dict, dict, "d")
             self.register(dump_list, load_list,
-                          (list, tuple, set, frozenset), "list")
-            self.register(dump_int, load_int, int, "int")
-            self.register(dump_float, load_float, float, "float")
-            self.register(dump_nil, load_nil, type(None), "nil")
-            self.register(dump_str, load_str, unicode, "str")
-            self.register(dump_b64, load_b64, str, "b64")
+                          (list, tuple, set, frozenset), "l")
+            self.register(dump_int, load_int, (int, long), "i")
+            self.register(dump_float, load_float, float, "f")
+            self.register(dump_nil, load_nil, type(None), "n")
+            self.register(dump_str, load_str, unicode, "s")
+            self.register(dump_bytes, load_bytes, str, "b")
 
     def register(self, dump, load, types, name, overwrite=False):
         if isinstance(types, type):
             types = [types]
 
         for obj_type in types:
-            if obj_type in self.types and not overwrite:
+            if obj_type in self._types and not overwrite:
                 raise AlreadyRegisteredType(obj_type)
-            self.types[obj_type] = dump, name
+            self._types[obj_type] = dump, name
 
-        if name in self.names and not overwrite:
+        if name in self._names and not overwrite:
             raise AlreadyRegistered(name)
-        self.names[name] = load
+        self._names[name] = load
 
     def dump(self, obj):
         obj_type = type(obj)
-        if obj_type not in self.types:
+        if obj_type not in self._types:
             raise UnregisteredType(obj_type)
-        dump, name = self.types[obj_type]
+        dump, name = self._types[obj_type]
         return dump(self.dump, name, obj)
 
     def load(self, element):
         name = element.name
-        if name not in self.names:
+        if name not in self._names:
             raise UnregisteredName(name)
-        load = self.names[name]
+        load = self._names[name]
         return load(self.load, element)
 
 def dump_list(dump, name, obj):
@@ -89,16 +89,16 @@ def load_nil(load, element):
 
 def dump_str(dump, name, obj):
     element = Element(name)
-    element.text = obj
+    element.text = b64encode(obj.encode("utf-8"))
     return element
 def load_str(load, element):
-    return element.text
+    return b64decode(element.text).decode("utf-8")
 
-def dump_b64(dump, name, obj):
+def dump_bytes(dump, name, obj):
     element = Element(name)
     element.text = b64encode(obj)
     return element
-def load_b64(load, element):
+def load_bytes(load, element):
     return b64decode(element.text)
 
 global_marshal = Marshal()
