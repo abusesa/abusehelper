@@ -103,6 +103,7 @@ def logpath(module):
 # Commands
 
 def command_start(module):
+    module = normalized_module(module)
     if is_running(module):
         print "Already running."
         return
@@ -128,6 +129,8 @@ def command_start(module):
         time.sleep(0.1)
 
 def command_status(module):
+    module = normalized_module(module)
+
     processes = ps()
     pids = find(module, processes)
     if not pids:
@@ -150,6 +153,7 @@ def command_status(module):
             print "  [%d] %s" % (pid, command)
 
 def command_stop(module):
+    module = normalized_module(module)
     if not is_running(module):
         print "Nothing running."
     else:
@@ -157,6 +161,7 @@ def command_stop(module):
         _signal(module, "SIGUSR1", signal.SIGUSR1)
 
 def command_kill(module):
+    module = normalized_module(module)
     if not is_running(module):
         print "Nothing running."
     else:
@@ -164,10 +169,12 @@ def command_kill(module):
         _signal(module, "SIGUSR2", signal.SIGUSR2)
 
 def command_restart(module):
+    module = normalized_module(module)
     command_stop(module)
     command_start(module)
 
 def command_follow(module):
+    module = normalized_module(module)
     height = 20
     try:
         process = popen("stty", "size", stdin=sys.stdin)
@@ -189,6 +196,10 @@ def command_follow(module):
             time.sleep(0.2)
     finally:
         send_signal(process.pid, signal.SIGKILL)
+
+def command_confgen(module):
+    from abusehelper.contrib.confgen import confgen
+    confgen.generate(module)
 
 if __name__ == "__main__":
     from optparse import OptionParser
