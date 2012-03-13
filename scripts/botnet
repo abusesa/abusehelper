@@ -223,8 +223,8 @@ if __name__ == "__main__":
 
     if options.python is not None:
         os.execlp(options.python, options.python, sys.argv[0], *args)
-    if sys.version_info < (2, 5):
-        parser.error("python version < 2.5, use command line option -p/--python")
+    if sys.version_info < (2, 6):
+        parser.error("python version < 2.6, use command line option -p/--python")
 
     if len(args) < 2:
         parser.error("expected command and module arguments")
