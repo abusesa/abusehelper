@@ -25,28 +25,28 @@ class OpenCollabReader(bot.FeedBot):
     def __init__(self, *args, **keys):
         bot.FeedBot.__init__(self, *args, **keys)
 
-        self.collab = wiki.GraphingWiki(self.collab_url,
-            ssl_verify_cert=not self.collab_ignore_cert,
-            ssl_ca_certs=self.collab_extra_ca_certs)
-
         if self.collab_password is None:
             self.collab_password = getpass.getpass("Collab password: ")
-        self.collab.authenticate(self.collab_user, self.collab_password)
 
     def feed_keys(self, query, **keys):
         yield (query,)
 
+    def page_id(self, page):
+        return hashlib.md5(page.encode("utf8") + self.collab_url).hexdigest()
+
     @idiokit.stream
     def feed(self, query):
-        def page_id(page):
-            return hashlib.md5(page.encode("utf8") + self.collab_url).hexdigest()
+        collab = wiki.GraphingWiki(self.collab_url,
+            ssl_verify_cert=not self.collab_ignore_cert,
+            ssl_ca_certs=self.collab_extra_ca_certs)
+        yield threadpool.thread(collab.authenticate, self.collab_user, self.collab_password)
 
         token = None
         current = dict()
         yield timer.sleep(5)
         while True:
             try:
-                result = yield threadpool.thread(self.collab.request, "IncGetMeta", query, token)
+                result = yield threadpool.thread(collab.request, "IncGetMeta", query, token)
             except wiki.WikiFailure as fail:
                 self.log.error("IncGetMeta failed: {0!r}".format(fail))
             else:
@@ -58,7 +58,7 @@ class OpenCollabReader(bot.FeedBot):
 
                 for page, keys in updates.iteritems():
                     event = current.setdefault(page, events.Event())
-                    event.add("id", page_id(page))
+                    event.add("id", self.page_id(page))
                     event.add("gwikipagename", page)
                     event.add("collab_url", self.collab_url + page)
 
@@ -76,7 +76,7 @@ class OpenCollabReader(bot.FeedBot):
                     current.pop(page, None)
 
                     event = events.Event()
-                    event.add("id", page_id(page))
+                    event.add("id", self.page_id(page))
 
                     yield idiokit.send(event)
 
