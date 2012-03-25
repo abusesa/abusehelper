@@ -1,4 +1,3 @@
-import random
 import getpass
 import hashlib
 
@@ -7,10 +6,12 @@ from idiokit import timer, threadpool
 from abusehelper.core import bot, events
 from opencollab import wiki
 
+
 def normalize(value):
     if value.startswith("[[") and value.endswith("]]"):
         return value[2:-2]
     return value
+
 
 class OpenCollabReader(bot.FeedBot):
     poll_interval = bot.IntParam(default=60)
@@ -38,17 +39,16 @@ class OpenCollabReader(bot.FeedBot):
     @idiokit.stream
     def feed(self, query):
         def page_id(page):
-            return hashlib.md5(page.encode("utf8")+self.collab_url).hexdigest()
+            return hashlib.md5(page.encode("utf8") + self.collab_url).hexdigest()
 
         token = None
         current = dict()
         yield timer.sleep(5)
         while True:
             try:
-                result = yield threadpool.thread(self.collab.request,
-                                                 "IncGetMeta", query, token)
-            except Exception, exc:
-                self.log.error("IncGetMeta failed: %s" % exc)
+                result = yield threadpool.thread(self.collab.request, "IncGetMeta", query, token)
+            except wiki.WikiFailure as fail:
+                self.log.error("IncGetMeta failed: {0!r}".format(fail))
             else:
                 incremental, token, (removed, updates) = result
                 removed = set(removed)
@@ -60,7 +60,7 @@ class OpenCollabReader(bot.FeedBot):
                     event = current.setdefault(page, events.Event())
                     event.add("id", page_id(page))
                     event.add("gwikipagename", page)
-                    event.add("collab_url", self.collab_url+page)
+                    event.add("collab_url", self.collab_url + page)
 
                     removed.discard(page)
 
