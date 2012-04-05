@@ -130,7 +130,7 @@ class AbuseCHBot(RSSBot):
             "dropzone": "https://spyeyetracker.abuse.ch/monitor.php?rssfeed=dropurls"
         },
         "palevo": {
-            "c&c": "http://amada.abuse.ch/palevotracker.php?rssfeed"
+            "c&c": "https://palevotracker.abuse.ch/?rssfeed"
         }
     }
 
