@@ -30,23 +30,16 @@ class RSSBot(bot.PollingBot):
 
         self.log.info("Finished downloading the feed.")
         new_events = set()
-        for _, elem in etree.iterparse(fileobj):
-            items = elem.findall("item")
-            if not items:
-                continue
-
-            for item in items:
-                args = {"source": url}
-                for element in list(item):
-                    if element.text and element.tag:
-                        args[element.tag] = element.text
-
-                event = self.create_event(**args)
-                if event:
-                    id = event.value("id", None)
-                    if id:
-                        new_events.add(id)
-                    yield idiokit.send(event)
+        try:
+            for _, elem in etree.iterparse(fileobj):
+                for event in self._parse(elem, url):
+                    if event:
+                        id = event.value("id", None)
+                        if id:
+                            new_events.add(id)
+                        yield idiokit.send(event)
+        except (etree.ParseError, SyntaxError):
+            self.log.error('Invalid format on feed: "%s"', url)
 
         for id in self.past_events:
             if id not in new_events:
@@ -54,6 +47,21 @@ class RSSBot(bot.PollingBot):
                 event.add("id", id)
                 yield idiokit.send(event)
         self.past_events = new_events
+
+
+    def _parse(self, elem, url):
+        items = elem.findall("item")
+        if not items:
+            return 
+
+        for item in items:
+            args = {"source": url}
+            for element in list(item):
+                if element.text and element.tag:
+                    args[element.tag] = element.text
+
+            event = self.create_event(**args)
+            yield event
 
     def create_event(self, **keys):
         event = events.Event()
