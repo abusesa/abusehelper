@@ -24,10 +24,8 @@ class CollectorBot(bot.ServiceBot):
     @idiokit.stream
     def collect(self, name):
         while True:
-            msg = yield idiokit.next()
-
-            for event in msg:
-                self.events[name].append(event)
+            event = yield idiokit.next()
+            self.events[name].append(event)
 
     @idiokit.stream
     def handle_room(self, name):
@@ -193,13 +191,8 @@ class RtirBot(CollectorBot):
                     modified_incident_ids[modified_incident_id])
 
     @idiokit.stream
-    def alert(self, interval):
-        while True:
-            yield timer.sleep(interval)
-            yield idiokit.send()
-
-    @idiokit.stream
-    def send_to_rtir(self):
+    def send_to_rtir(self, interval):
+        yield timer.sleep(interval)
         for room, events in self.events.iteritems():
             self.write_to_rt_ticket(room, events)
             self.events[room] = list()
@@ -210,16 +203,16 @@ class RtirBot(CollectorBot):
     def main(self, state):
         try:
             while True:
-                yield (self.alert(self.rt_write_interval) 
-                       | self.send_to_rtir()
+                yield (self.send_to_rtir(self.rt_write_interval) 
                        | idiokit.consume())
         except services.Stop:
             idiokit.stop()
 
     @idiokit.stream
-    def session(self, state, src_room, rt_url, rt_user, rt_password,
-                rt_requestor, rt_cc, rt_admin_cc, rt_constituency, 
-                rt_write_interval, **keys):
+    def session(self, state, src_room, 
+                rt_url="", rt_user="", rt_password="",
+                rt_requestor="", rt_cc="", rt_admin_cc="", 
+                rt_constituency="", rt_write_interval=60, **keys):
         
         self.rtirs[src_room] = (rt_requestor, rt_cc, 
                                 rt_admin_cc, rt_constituency)
@@ -236,5 +229,3 @@ class RtirBot(CollectorBot):
                     
 if __name__ == "__main__":
     RtirBot.from_command_line().execute()
-
-
