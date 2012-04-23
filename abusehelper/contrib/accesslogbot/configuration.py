@@ -6,3 +6,4 @@ xmpp_jid = ""
 xmpp_password = "FIXME"
 xmpp_ignore_cert = True
 xmpp_extra_ca_certs = None
+xmpp_rate_limit = 10
