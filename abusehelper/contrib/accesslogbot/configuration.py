@@ -1,6 +1,6 @@
 service_room = "FIXME.lobby"
-accesslog_room = "FIXME.accesslog"
-combined_room = "FIXME.combined"
+accesslog_room = service_room + ".accesslog"
+combined_room = service_room + ".combined"
 path = ""
 xmpp_jid = ""
 xmpp_password = "FIXME"
