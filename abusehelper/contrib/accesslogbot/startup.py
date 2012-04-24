@@ -18,7 +18,7 @@ B = Bot.template(xmpp_jid=config.xmpp_jid,
 def configs():
     # bots
     yield B("runtime", config=relative_path("startup.py"))
-    yield B("accesslogbot", relative_path("./", "accesslogbot.py"), path=ACCESS_LOG)
+    yield B("accesslogbot", "abusehelper.contrib.accesslogbot", path=ACCESS_LOG)
     yield B("combiner", "abusehelper.contrib.experts.combiner")
     yield B("cymruexpert", "abusehelper.contrib.experts.cymruexpert")
     yield B("geoipexpert", "abusehelper.contrib.experts.geoipexpert",
