@@ -12,6 +12,7 @@ import xml.etree.cElementTree as etree
 import idiokit
 from abusehelper.core import bot, events, utils
 
+
 class BZ2Reader(object):
     def __init__(self, fileobj):
         self.fileobj = fileobj
@@ -25,22 +26,24 @@ class BZ2Reader(object):
 
         while amount > 0:
             if self.index >= len(self.pending):
-                data = self.fileobj.read(2**16)
+                data = self.fileobj.read(2 ** 16)
                 if not data:
                     break
                 self.pending = self.bz2.decompress(data)
                 self.index = 0
             else:
-                piece = self.pending[self.index:self.index+amount]
+                piece = self.pending[self.index:self.index + amount]
                 self.index += len(piece)
                 amount -= len(piece)
                 result.append(piece)
 
         return "".join(result)
 
+
 class HeadRequest(urllib2.Request):
     def get_method(self):
         return "HEAD"
+
 
 class PhishTankBot(bot.PollingBot):
     application_key = bot.Param("registered application key for PhishTank")
@@ -82,6 +85,8 @@ class PhishTankBot(bot.PollingBot):
         if online is None or online.text != "yes":
             return
 
+        target = entry.find("target")
+
         details = entry.find("details")
         if details is None:
             return
@@ -105,11 +110,13 @@ class PhishTankBot(bot.PollingBot):
             event = events.Event()
             event.add("feed", "phishtank")
             event.add("url", url)
-            event.add("host", "/".join(url.split("/")[:3])+"/")
+            event.add("host", "/".join(url.split("/")[:3]) + "/")
             event.add("ip", ip)
             event.add("asn", announcer)
             if ts:
                 event.add("time", ts)
+            if target is not None:
+                event.add("target", target.text)
             yield idiokit.send(event)
 
     @idiokit.stream
