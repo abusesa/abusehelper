@@ -156,14 +156,10 @@ class AbuseCHBot(RSSBot):
                 continue
 
             feed_types = self.malwares[malware]
-            if types is None:
-                types = feed_types
-
-            for feed_type in types:
+            for feed_type in (feed_types if types is None else types):
                 if feed_type not in feed_types:
                     self.log.error("no support for %r type %r" % (malware, feed_type))
                     continue
-
                 yield (feed_types[feed_type],)
 
     def parse_title(self, string):
