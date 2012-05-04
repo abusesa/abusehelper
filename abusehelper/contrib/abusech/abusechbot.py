@@ -191,7 +191,14 @@ class AbuseCHBot(RSSBot):
 
         if source in self.urls:
             malware, feed_type = self.urls[source]
-            event.add("malware", malware)
+
+            # Provide a default malware name if the event doesn't have one
+            malware_values = event.values("malware") or [malware]
+
+            # Normalize the malware name(s) to lowercase
+            event.clear("malware")
+            event.update("malware", [x.lower() for x in malware_values])
+
             event.add("type", feed_type)
         event.add("source url", source)
 
