@@ -194,8 +194,8 @@ class AbuseCHBot(RSSBot):
             # Normalize the malware name(s) to lowercase
             event.clear("malware")
             event.update("malware", [x.lower() for x in malware_values])
-
             event.add("type", feed_type)
+            event.add("feed", "abuse.ch")
         event.add("source url", source)
 
         return event
