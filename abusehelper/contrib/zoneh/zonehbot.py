@@ -33,9 +33,9 @@ def parse_pubDate(pubdate):
 
         # Add timezone to timestamp as epoch (eg. +0200)
         pubtime = calendar.timegm(pubtime)
-        t_hours = int(tz[:3].replace('0', '')) # (eg. +02)
-        t_mins = int(tz[0] + tz[3:]) # (eg. + 00)
-        pubtime = pubtime + (t_hours * 3600) + (t_mins * 60)
+        tz_hours = int(tz[:3].replace('0', '')) # (eg. +02)
+        tz_mins = int(tz[0] + tz[3:]) # (eg. + 00)
+        pubtime = pubtime - (tz_hours * 3600) - (tz_mins * 60)
 
         # Make a timestamp in report format
         pubtime = time.strftime(REPORT_TIME_FORMAT,
