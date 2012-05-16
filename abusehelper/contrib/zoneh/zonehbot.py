@@ -3,11 +3,15 @@ Zone-H RSS feedbot based on abuse.ch bot and RSSbot.
 
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
+import time
+import calendar
 import socket
 import urlparse
 from abusehelper.core import events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
+INPUT_TIME_FORMAT = "%a, %d %b %Y %H:%M:%S"
+REPORT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S +0000"
 
 def is_ip(string):
     for addr_type in (socket.AF_INET, socket.AF_INET6):
@@ -19,10 +23,26 @@ def is_ip(string):
             return True
     return False
 
-
 def parse_pubDate(pubdate):
-    yield "time", pubdate
+    try:
+        # Split timestamp and timezone info, parse timestamp
+        ts_tz = pubdate.split(' ')
+        ts = ' '.join(ts_tz[:5])
+        tz = ts_tz[5]
+        pubtime = time.strptime(ts, INPUT_TIME_FORMAT)
 
+        # Add timezone to timestamp as epoch (eg. +0200)
+        pubtime = calendar.timegm(pubtime)
+        t_hours = int(tz[:3].replace('0', '')) # (eg. +02)
+        t_mins = int(tz[0] + tz[3:]) # (eg. + 00)
+        pubtime = pubtime + (t_hours * 3600) + (t_mins * 60)
+
+        # Make a timestamp in report format
+        pubtime = time.strftime(REPORT_TIME_FORMAT,
+                                time.gmtime(pubtime))
+        yield "time", pubtime
+    except ValueError:
+        yield "time", str()
 
 def parse_title(title):
     yield "url", title
