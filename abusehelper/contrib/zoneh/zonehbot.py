@@ -86,7 +86,6 @@ class ZoneHBot(RSSBot):
 
     def create_event(self, source=None, **keys):
         event = events.Event()
-        okeys = []
         for name, string in keys.iteritems():
             parse = getattr(self, "parse_" + name, None)
             if parse is None:
@@ -94,14 +93,13 @@ class ZoneHBot(RSSBot):
 
             for key, value in parse(string):
                 event.add(key, value)
-                okeys.append(key)
+                event.add("feed key", key)
 
         if not event.contains():
             return None
 
         event.add("type", "defacement")
         event.add("feed", "zone-h")
-        event.add("feed keys", ",".join(okeys))
         return event
 
 if __name__ == "__main__":
