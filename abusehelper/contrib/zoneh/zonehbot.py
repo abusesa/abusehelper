@@ -13,6 +13,7 @@ from abusehelper.contrib.rssbot.rssbot import RSSBot
 INPUT_TIME_FORMAT = "%a, %d %b %Y %H:%M:%S"
 REPORT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S +0000"
 
+
 def is_ip(string):
     for addr_type in (socket.AF_INET, socket.AF_INET6):
         try:
@@ -22,6 +23,7 @@ def is_ip(string):
         else:
             return True
     return False
+
 
 def parse_pubDate(pubdate):
     try:
@@ -33,8 +35,8 @@ def parse_pubDate(pubdate):
 
         # Add timezone to timestamp as epoch (eg. +0200)
         pubtime = calendar.timegm(pubtime)
-        tz_hours = int(tz[:3].replace('0', '')) # (eg. +02)
-        tz_mins = int(tz[0] + tz[3:]) # (eg. + 00)
+        tz_hours = int(tz[:3].replace('0', ''))  # (eg. +02)
+        tz_mins = int(tz[0] + tz[3:])  # (eg. + 00)
         pubtime = pubtime - (tz_hours * 3600) - (tz_mins * 60)
 
         # Make a timestamp in report format
@@ -43,6 +45,7 @@ def parse_pubDate(pubdate):
         yield "time", pubtime
     except ValueError:
         yield "time", str()
+
 
 def parse_title(title):
     yield "url", title
