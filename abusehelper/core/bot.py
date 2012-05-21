@@ -474,6 +474,10 @@ class FeedBot(ServiceBot):
             tail = self._output_rate_limiter() | tail
 
         self.log.info("Joined room %r", name)
+
+        if self.xmpp_rate_limit:
+            self.log.info("Sending limited to %.f stanzas per second",
+                          self.xmpp_rate_limit)
         try:
             yield events.events_to_elements() | tail
         finally:
@@ -588,6 +592,7 @@ class PollingBot(FeedBot):
     def _distribute(self, key):
         old_dedups = self._poll_dedup.get(key, dict())
         new_dedups = self._poll_dedup[key] = dict()
+        initial_poll = True
 
         while True:
             event = yield idiokit.next()
@@ -604,6 +609,9 @@ class PollingBot(FeedBot):
 
                 old_keys = old_dedups.get(room, None)
                 if self.ignore_initial_poll and old_keys is None:
+                    if initial_poll:
+                        initial_poll = False
+                        self.log.info("Ignoring initial poll")
                     continue
                 if old_keys is not None and event_key in old_keys:
                     continue
