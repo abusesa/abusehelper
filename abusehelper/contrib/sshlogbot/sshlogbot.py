@@ -7,11 +7,12 @@ PARSE_REX = re.compile(" for\s+(\S+)(\s+from\s+(\S+)\s+port\s+(\d+))?")
 def parse(string, base_time):
     """
     >>> parse("Jan 01 00:11:22 srv1 sshd[1000]: Accepted password for xxxx from 10.10.0.1 port 64000 ssh2", time.gmtime())
+    >>> parse("Jan  1 00:11:22 srv1 sshd[1000]: Accepted password for xxxx from 10.10.0.1 port 64000 ssh2", time.gmtime())
     >>> parse("Feb 22 11:22:33 srv1 sshd[2000]: Failed password for xxxx from 10.10.0.2 port 4550 ssh2", time.gmtime())
     >>> parse("Mar 30 22:33:44 srv1 sshd[3000]: fatal: Timeout before authentication for 10.10.0.3", time.gmtime())
     """
 
-    bites = string.split(" ", 5)
+    bites = string.split(None, 5)
     if len(bites) < 6:
         return None
 
