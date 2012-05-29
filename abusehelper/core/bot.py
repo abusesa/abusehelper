@@ -3,6 +3,7 @@ import csv
 import sys
 import inspect
 import logging
+import logging.handlers
 import optparse
 import traceback
 import cPickle as pickle
@@ -262,7 +263,7 @@ class Bot(object):
         if self.log_file is None:
             handler = logging.StreamHandler()
         else:
-            handler = logging.FileHandler(self.log_file)
+            handler = logging.handlers.WatchedFileHandler(self.log_file)
         handler.setFormatter(LineFormatter())
         handler.setLevel(logging.INFO)
 
