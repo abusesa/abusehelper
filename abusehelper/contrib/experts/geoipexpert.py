@@ -1,7 +1,17 @@
+"""
+GeoIPExpert utilizes the pygeoip module for ip geolocation.
+The DB needs to be separately downloaded from MaxMind,
+http://www.maxmind.com/app/city
+There is a free and a commercial versions of the DB, so please
+check their licensing agreement if you are using the free
+version in your deployment:
+http://geolite.maxmind.com/download/geoip/database/LICENSE.txt
+Pygeoip can currently use only the IPv4 version of the DB.
+
+Maintainer: Lari Huttunen <mit-code@huttu.net>
+"""
 import socket
-
 import pygeoip
-
 import idiokit
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts.combiner import Expert
