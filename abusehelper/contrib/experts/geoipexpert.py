@@ -6,12 +6,14 @@ import idiokit
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts.combiner import Expert
 
+
 def is_ipv4(ip):
     try:
         socket.inet_aton(ip)
     except (ValueError, socket.error):
         return False
     return True
+
 
 class GeoIPExpert(Expert):
     geoip_db = bot.Param("path to the GeoIP database")
@@ -53,6 +55,8 @@ class GeoIPExpert(Expert):
                 continue
 
             augmentation.add(key, ip)
+            augmentation.add("geoip data source",
+                "This product includes GeoLite data created by MaxMind, available from http://www.maxmind.com/.")
             yield augmentation
 
     @idiokit.stream
