@@ -55,8 +55,6 @@ class GeoIPExpert(Expert):
                 continue
 
             augmentation.add(key, ip)
-            augmentation.add("geoip data source",
-                "This product includes GeoLite data created by MaxMind, available from http://www.maxmind.com/.")
             yield augmentation
 
     @idiokit.stream
