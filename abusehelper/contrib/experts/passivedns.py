@@ -1,9 +1,28 @@
 import idiokit
+import socket as _socket
 from idiokit import socket
 from abusehelper.core import bot, events
-from combiner import Expert
+from abusehelper.contrib.experts.combiner import Expert
 
 DEFAULT_KEYS = ("domain", "ip", "first seen", "last seen")
+
+def is_ipv4(ip):
+    try:
+        _socket.inet_aton(ip)
+    except (ValueError, _socket.error):
+        return False
+    return True
+
+
+def is_ipv6(ip):
+    if _socket.has_ipv6:
+        try:
+            _socket.inet_pton(socket.AF_INET6, ip)
+        except(ValueError, _socket.error):
+            return False
+        return True
+    else:
+        return False
 
 @idiokit.stream
 def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
@@ -24,6 +43,10 @@ def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
     for line in "".join(all_data).splitlines():
         event = events.Event()
         for key, value in zip(keys, line.split("\t")):
+            if key == 'ip':
+                if not is_ipv4(value):
+                    if not is_ipv6(value):
+                        key = 'domain'
             event.add(key, value)
         yield idiokit.send(eid, event)
 
