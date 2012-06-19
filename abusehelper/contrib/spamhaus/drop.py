@@ -17,7 +17,7 @@ class SpamhausDropBot(bot.PollingBot):
             info, fileobj = yield utils.fetch_url(url)
         except utils.FetchUrlFailed, fuf:
             self.log.error("Download failed: %r", fuf)
-            idiokit.stop()
+            idiokit.stop(False)
         self.log.info("Downloaded")
 
         for line in fileobj.readlines():

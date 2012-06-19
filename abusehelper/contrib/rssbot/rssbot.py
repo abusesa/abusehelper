@@ -26,7 +26,7 @@ class RSSBot(bot.PollingBot):
             _, fileobj = yield utils.fetch_url(url)
         except utils.FetchUrlFailed, e:
             self.log.error('Failed to download feed "%s": %r', url, e)
-            idiokit.stop()
+            idiokit.stop(False)
 
         self.log.info("Finished downloading the feed.")
         new_events = set()
