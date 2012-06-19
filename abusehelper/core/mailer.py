@@ -295,7 +295,7 @@ class MailerService(ReportBot):
                 yield threadpool.thread(server.quit)
             except self.TOLERATED_EXCEPTIONS:
                 pass
-            idiokit.stop(False)
+            idiokit.stop()
 
         self.log.info("Sent message to %r", to_addr)
         idiokit.stop(True)

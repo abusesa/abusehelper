@@ -24,7 +24,7 @@ class ShadowServerMail(imapbot.IMAPBot):
                 data = base64.b64decode(fileobj.read())
             except TypeError, error:
                 self.log.error("Base64 decoding failed: %s", error)
-                idiokit.stop(False)
+                idiokit.stop()
             return StringIO(data)
 
         if encoding == "quoted-printable":
@@ -56,7 +56,7 @@ class ShadowServerMail(imapbot.IMAPBot):
         match = re.match(self.filename_rex, filename)
         if match is None:
             self.log.error("Filename %r did not match", filename)
-            idiokit.stop(False)
+            idiokit.stop()
 
         yield idiokit.pipe(utils.csv_to_events(fileobj),
                            self.normalize(match.groupdict()))
@@ -109,7 +109,7 @@ class ShadowServerMail(imapbot.IMAPBot):
         filename = headers[-1].get_filename(None)
         if filename is None:
             self.log.error("No filename given for the data")
-            idiokit.stop(False)
+            idiokit.stop()
 
         self.log.info("Parsing CSV data from an attachment")
         fileobj = self._decode(headers, fileobj)
@@ -124,7 +124,7 @@ class ShadowServerMail(imapbot.IMAPBot):
             zip = zipfile.ZipFile(fileobj)
         except zipfile.BadZipfile, error:
             self.log.error("ZIP handling failed: %s", error)
-            idiokit.stop(False)
+            idiokit.stop()
 
         for filename in zip.namelist():
             csv_data = StringIO(zip.read(filename))
