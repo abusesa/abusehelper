@@ -7,6 +7,7 @@ import pwd
 import time
 import errno
 import signal
+import platform
 
 # Helpers
 
@@ -224,7 +225,9 @@ if __name__ == "__main__":
     if options.python is not None:
         os.execlp(options.python, options.python, sys.argv[0], *args)
     if sys.version_info < (2, 6):
-        parser.error("python version < 2.6, use command line option -p/--python")
+        parser.error("this tool requires python >= 2.6 " +
+            "(you are running python %s), " % (platform.python_version()) +
+            "use the option -p/--python to define a suitable python executable")
 
     if len(args) < 2:
         parser.error("expected command and module arguments")
