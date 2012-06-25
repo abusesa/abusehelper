@@ -63,6 +63,8 @@ class SessionError(Exception):
     pass
 
 class Session(Pipeable):
+    _HASHABLE = object()
+
     @property
     def conf(self):
         return dict(self._conf)
@@ -75,10 +77,9 @@ class Session(Pipeable):
             try:
                 value = serialize.load(serialize.dump(value))
             except serialize.UnregisteredType:
-                raise SessionError("can not serialize key %r value %r" %
-                                   (key, value))
+                raise SessionError("can not serialize key %r value %r" % (key, value))
             conf[key] = value
-        self.__dict__["_conf"] = frozenset(conf.items())
+        self.__dict__["_conf"] = dict(conf)
         self.__dict__["_hash"] = None
 
     def updated(self, **conf):
@@ -93,8 +94,17 @@ class Session(Pipeable):
         raise AttributeError("%r instances are immutable" % self.__class__)
 
     def __hash__(self):
-        if self._hash is None:
-            self._hash = hash(self.service) ^ hash(self._conf) ^ hash(self.path)
+        if self._hash is not None:
+            return self._hash
+
+        hashed = hash(self.service) ^ hash(self.path)
+        for key, value in sorted(self._conf.iteritems()):
+            hashed ^= hash(key)
+            if hasattr(value, "__hash__") and callable(value.__hash__):
+                hashed ^= hash(value)
+            else:
+                hashed ^= hash(self._HASHABLE)
+        self._hash = hashed
         return self._hash
 
     def __eq__(self, other):

@@ -1,28 +1,5 @@
-import collections
 from base64 import b64encode, b64decode
 from idiokit.xmlcore import Element
-
-class FrozenDict(collections.Mapping):
-    def __init__(self, original):
-        self._dict = dict(original)
-        self._hash = None
-
-    def __hash__(self):
-        if self._hash is None:
-            self._hash = hash(frozenset(self._dict.iteritems()))
-        return self._hash
-
-    def __getitem__(self, key):
-        return self._dict.__getitem__(key)
-
-    def __iter__(self):
-        return iter(self._dict)
-
-    def __len__(self):
-        return len(self._dict)
-
-    def __repr__(self):
-        return repr(self._dict)
 
 class AlreadyRegistered(Exception):
     pass
@@ -42,8 +19,7 @@ class Marshal(object):
         self._names = dict()
 
         if register_common:
-            self.register(dump_dict, load_dict,
-                (dict, FrozenDict), "d")
+            self.register(dump_dict, load_dict, dict, "d")
             self.register(dump_list, load_list,
                 (list, tuple, set, frozenset), "l")
             self.register(dump_int, load_int, (int, long), "i")
@@ -90,7 +66,7 @@ def load_list(load, element):
 def dump_dict(dump, name, obj):
     return dump_list(dump, name, list(obj.items()))
 def load_dict(load, element):
-    return FrozenDict(load_list(load, element))
+    return dict(load_list(load, element))
 
 def dump_int(dump, name, obj):
     element = Element(name)
