@@ -6,7 +6,7 @@ from abusehelper.core import utils, cymruwhois, bot, events
 AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
 class AutoshunBot(bot.PollingBot):
-    COLUMNS = ["ip", "time", "type"]
+    COLUMNS = ["ip", "time", "info"]
 
     feed_url = bot.Param(default=AUTOSHUN_CSV_URL)
     use_cymru_whois = bot.BoolParam(default=True)
@@ -42,6 +42,7 @@ class AutoshunBot(bot.PollingBot):
             event = yield idiokit.next()
             event.add("feed", "autoshun")
             event.add("source url", self.feed_url)
+            event.add("type", "autoshun ids alert")
 
             times = event.values("time")
             event.clear("time")
