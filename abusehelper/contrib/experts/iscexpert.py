@@ -33,10 +33,15 @@ class IscExpert(Expert):
 
             if ip_data:
                 augmentation = events.Event()
-                for key, value in ip_data.iteritems():
-                    key = unicode(key).strip()
-                    value = unicode(value).strip()
-                    augmentation.add("dshield " + key, value)
+
+                if int(ip_data.get("attacks", 0)) == 0:
+                    augmentation.add("dshield attacks", "0")
+                else:
+                    for key, value in ip_data.iteritems():
+                        key = unicode(key).strip()
+                        value = unicode(value).strip()
+                        augmentation.add("dshield " + key, value)
+
                 yield idiokit.send(eid, augmentation)
 
     @idiokit.stream
