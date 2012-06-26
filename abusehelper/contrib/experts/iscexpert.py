@@ -40,6 +40,8 @@ class IscExpert(Expert):
                     for key, value in ip_data.iteritems():
                         key = unicode(key).strip()
                         value = unicode(value).strip()
+                        if key == "country":
+                            key = "cc"
                         augmentation.add("dshield " + key, value)
 
                 yield idiokit.send(eid, augmentation)
