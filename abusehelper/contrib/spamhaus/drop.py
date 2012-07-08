@@ -7,6 +7,7 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 import idiokit
 from abusehelper.core import utils, cymruwhois, bot, events
 
+
 class SpamhausDropBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam(default=True)
 
@@ -36,10 +37,10 @@ class SpamhausDropBot(bot.PollingBot):
                 continue
 
             new = events.Event()
-
             new.add('netblock', netblock)
             new.add('url', url + "?query=" + sbl)
-            new.add('source', 'Spamhaus DROP')
+            new.add('feed', 'spamhaus drop list')
+            new.add('type', 'hijacked network')
 
             if self.use_cymru_whois:
                 values = yield cymruwhois.lookup(netblock.split('/')[0])
