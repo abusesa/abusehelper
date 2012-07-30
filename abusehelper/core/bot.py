@@ -328,7 +328,6 @@ class XMPPBot(Bot):
                              ssl_verify_cert=verify_cert,
                              ssl_ca_certs=self.xmpp_extra_ca_certs)
         self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
-        yield xmpp.core.presence()
         idiokit.stop(xmpp)
 
 from abusehelper.core import services
