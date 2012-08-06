@@ -1,16 +1,16 @@
-from __future__ import with_statement
-
 import os
 import sys
 import time
 import errno
 import heapq
 import signal
-import contextlib
 import subprocess
-import collections
 import cPickle as pickle
+
+import idiokit
+from idiokit import timer
 from abusehelper.core import bot, config
+
 
 def iter_startups(iterable):
     for obj in iterable:
@@ -27,6 +27,7 @@ def iter_startups(iterable):
             module = params.pop("module", None)
             yield Bot(name, module, **params)
             continue
+
 
 class Bot(object):
     _defaults = dict()
@@ -63,18 +64,6 @@ class Bot(object):
     def __startup__(self):
         return self
 
-@contextlib.contextmanager
-def signal_handler(handler):
-    signums = [signal.SIGTERM, signal.SIGINT, signal.SIGUSR1, signal.SIGUSR2]
-    old_handlers = dict((x, signal.getsignal(x)) for x in signums)
-
-    try:
-        for signum in signums:
-            signal.signal(signum, handler)
-        yield
-    finally:
-        for signum, old_handler in old_handlers.items():
-            signal.signal(signum, old_handler)
 
 class StartupBot(bot.Bot):
     def __init__(self, *args, **keys):
@@ -173,57 +162,54 @@ class StartupBot(bot.Bot):
         self.log.info("Sending %s to alive bots" % (signame,))
         self._signal(signum)
 
-    def run(self, poll_interval=0.1):
+    @idiokit.stream
+    def main(self, poll_interval=0.1):
         for conf in iter_startups(config.flatten(self.configs())):
             strategy = self.strategy(conf)
             heapq.heappush(self._strategies, (time.time(), strategy))
 
-        received = collections.deque()
+        try:
+            closing = False
+            term_count = 0
 
-        def handler(signum, frame):
-            received.append(signum)
+            while self._strategies or self._processes:
+                self._poll()
 
-        with signal_handler(handler):
-            try:
-                while not received and (self._strategies or self._processes):
-                    self._poll()
-
+                if closing:
+                    self._close()
+                else:
                     for conf, strategy in self._purge():
                         self.log.info("Launching bot %r from module %r", conf.name, conf.module)
                         process = self._launch(conf)
                         self._processes.add((process, strategy, conf))
 
-                    time.sleep(poll_interval)
-
-                self._poll()
-                self._close()
-
-                count = 0
-                while self._strategies or self._processes:
-                    while received:
-                        signum = received.popleft()
-
-                        if signum == signal.SIGUSR1:
-                            self._clean("SIGTERM", signal.SIGTERM)
-                        elif signum == signal.SIGUSR2:
-                            self._clean("SIGKILL", signal.SIGKILL)
-                        elif count == 0:
-                            self._clean("SIGTERM", signal.SIGTERM)
-                            count += 1
-                        else:
-                            raise KeyboardInterrupt()
-
-                    time.sleep(poll_interval)
-
+                try:
+                    yield timer.sleep(poll_interval)
+                except idiokit.Signal as sig:
                     self._poll()
                     self._close()
-            except KeyboardInterrupt:
-                pass
-            finally:
-                if self._processes:
-                    info = ", ".join("%r[%d]" % (conf.name, process.pid)
-                                     for (process, _, conf) in self._processes)
-                    self.log.info("%d bot(s) left alive: %s" % (len(self._processes), info))
+
+                    signum = sig.args[0]
+                    closing = True
+
+                    if signum == signal.SIGUSR1:
+                        self._clean("SIGTERM", signal.SIGTERM)
+                    elif signum == signal.SIGUSR2:
+                        self._clean("SIGKILL", signal.SIGKILL)
+                    elif term_count == 0:
+                        self._clean("SIGTERM", signal.SIGTERM)
+                        term_count += 1
+                    else:
+                        return
+        finally:
+            if self._processes:
+                info = ", ".join("%r[%d]" % (conf.name, process.pid)
+                                 for (process, _, conf) in self._processes)
+                self.log.info("%d bot(s) left alive: %s" % (len(self._processes), info))
+
+    def run(self):
+        return idiokit.main_loop(self.main())
+
 
 class DefaultStartupBot(StartupBot):
     config = bot.Param("configuration module")
