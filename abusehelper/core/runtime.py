@@ -63,8 +63,6 @@ class SessionError(Exception):
     pass
 
 class Session(Pipeable):
-    _HASHABLE = object()
-
     @property
     def conf(self):
         return dict(self._conf)
@@ -94,17 +92,9 @@ class Session(Pipeable):
         raise AttributeError("%r instances are immutable" % self.__class__)
 
     def __hash__(self):
-        if self._hash is not None:
-            return self._hash
-
-        hashed = hash(self.service) ^ hash(self.path)
-        for key, value in sorted(self._conf.iteritems()):
-            hashed ^= hash(key)
-            if hasattr(value, "__hash__") and callable(value.__hash__):
-                hashed ^= hash(value)
-            else:
-                hashed ^= hash(self._HASHABLE)
-        self._hash = hashed
+        if self._hash is None:
+            self._hash = hash(self.service) ^ hash(self.path)
+            self._hash ^= config.lenient_dict_hash(self._conf)
         return self._hash
 
     def __eq__(self, other):
@@ -118,9 +108,7 @@ class Session(Pipeable):
 
     def __ne__(self, other):
         result = self.__eq__(other)
-        if result is NotImplemented:
-            return result
-        return not result
+        return result if result is NotImplemented else not result
 
     def __runtime__(self):
         return self

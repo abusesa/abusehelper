@@ -57,6 +57,7 @@ class Bot(object):
         self.name = name
 
         self._module = _module
+        self._hash = None
 
         self._params = dict(self._defaults)
         self._params.update(params)
@@ -64,12 +65,31 @@ class Bot(object):
     def __startup__(self):
         return self
 
+    def __hash__(self):
+        if self._hash is not None:
+            self._hash = hash(self.name) ^ hash(self._module)
+            self._hash ^= config.lenient_dict_hash(self._params)
+        return self._hash
+
+    def __eq__(self, other):
+        if not isinstance(other, Bot):
+            return NotImplemented
+        if self.name != other.name:
+            return False
+        if self._module != self._module:
+            return False
+        return self._params == other._params
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        return result if result is NotImplemented else not result
+
 
 class StartupBot(bot.Bot):
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
 
-        self._strategies = list()
+        self._strategies = dict()
         self._processes = set()
 
     def configs(self):
