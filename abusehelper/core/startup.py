@@ -127,8 +127,7 @@ class StartupBot(bot.Bot):
             pickle.dump(conf.params, process.stdin)
             process.stdin.flush()
         except IOError, ioe:
-            self.log.error("Failed sending configuration to bot %r: %r",
-                           conf.name, ioe)
+            self.log.error("Failed sending configuration to bot %r: %r", conf.name, ioe)
 
         return process
 
@@ -138,8 +137,7 @@ class StartupBot(bot.Bot):
                 continue
 
             if process is not None and process.poll() is not None:
-                self.log.info("Bot %r exited with return value %d",
-                              conf.name, process.poll())
+                self.log.info("Bot %r exited with return value %d", conf.name, process.poll())
 
             self._processes.remove((process, strategy, conf))
             heapq.heappush(self._strategies, (time.time(), strategy))
@@ -193,22 +191,9 @@ class StartupBot(bot.Bot):
             term_count = 0
 
             while self._strategies or self._processes:
-                self._poll()
-
-                if closing:
-                    self._close()
-                else:
-                    for conf, strategy in self._purge():
-                        self.log.info("Launching bot %r from module %r", conf.name, conf.module)
-                        process = self._launch(conf)
-                        self._processes.add((process, strategy, conf))
-
                 try:
                     yield timer.sleep(poll_interval)
                 except idiokit.Signal as sig:
-                    self._poll()
-                    self._close()
-
                     signum = sig.args[0]
                     closing = True
 
@@ -221,10 +206,21 @@ class StartupBot(bot.Bot):
                         term_count += 1
                     else:
                         return
+
+                self._poll()
+
+                if closing:
+                    self._close()
+                    continue
+
+                for conf, strategy in self._purge():
+                    self.log.info("Launching bot %r from module %r", conf.name, conf.module)
+                    process = self._launch(conf)
+                    self._processes.add((process, strategy, conf))
         finally:
+            self._poll()
             if self._processes:
-                info = ", ".join("%r[%d]" % (conf.name, process.pid)
-                                 for (process, _, conf) in self._processes)
+                info = ", ".join("%r[%d]" % (conf.name, process.pid) for (process, _, conf) in self._processes)
                 self.log.info("%d bot(s) left alive: %s" % (len(self._processes), info))
 
     def run(self):
