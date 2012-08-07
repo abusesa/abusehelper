@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import errno
-import heapq
 import signal
 import subprocess
 import cPickle as pickle
@@ -66,7 +65,7 @@ class Bot(object):
         return self
 
     def __hash__(self):
-        if self._hash is not None:
+        if self._hash is None:
             self._hash = hash(self.name) ^ hash(self._module)
             self._hash ^= config.lenient_dict_hash(self._params)
         return self._hash
@@ -85,15 +84,25 @@ class Bot(object):
         return result if result is NotImplemented else not result
 
 
+def kill(process, signum):
+    try:
+        os.kill(process.pid, signum)
+    except OSError, ose:
+        if ose.errno != errno.ESRCH:
+            raise
+
+
 class StartupBot(bot.Bot):
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
 
-        self._strategies = list()
-        self._processes = set()
+        self._strategies = dict()
+        self._processes = dict()
+        self._updated = None
 
+    @idiokit.stream
     def configs(self):
-        return []
+        yield timer.sleep(0.0)
 
     def strategy(self, conf, delay=15):
         while True:
@@ -132,44 +141,37 @@ class StartupBot(bot.Bot):
         return process
 
     def _poll(self):
-        for process, strategy, conf in list(self._processes):
+        for conf, (process, strategy) in list(self._processes.iteritems()):
             if process is not None and process.poll() is None:
                 continue
-
             if process is not None and process.poll() is not None:
                 self.log.info("Bot %r exited with return value %d", conf.name, process.poll())
-
-            self._processes.remove((process, strategy, conf))
-            heapq.heappush(self._strategies, (time.time(), strategy))
-
-    def _signal(self, sig):
-        for process, strategy, conf in self._processes:
-            try:
-                os.kill(process.pid, sig)
-            except OSError, ose:
-                if ose.errno != errno.ESRCH:
-                    raise
+            self._processes.pop(conf, None)
+            self._strategies[conf] = time.time(), strategy
+            yield conf
 
     def _purge(self):
         now = time.time()
-        while self._strategies and self._strategies[0][0] <= now:
-            _, strategy = heapq.heappop(self._strategies)
+        for conf, (expiration, strategy) in list(self._strategies.iteritems()):
+            if expiration > now:
+                continue
 
             try:
                 output_value = strategy.next()
             except StopIteration:
+                del self._strategies[conf]
                 continue
 
             if isinstance(output_value, (int, float)):
-                next = output_value + now
-                heapq.heappush(self._strategies, (next, strategy))
+                self._strategies[conf] = output_value + now, strategy
             else:
+                del self._strategies[conf]
                 yield output_value, strategy
 
     def _close(self):
-        for _, strategy in self._strategies:
+        for _, strategy in self._strategies.itervalues():
             strategy.close()
-        self._strategies = list()
+        self._strategies.clear()
 
     def _clean(self, signame, signum):
         self._poll()
@@ -178,19 +180,26 @@ class StartupBot(bot.Bot):
             return
 
         self.log.info("Sending %s to alive bots" % (signame,))
-        self._signal(signum)
+        for conf, (process, _) in self._processes.iteritems():
+            kill(process, signum)
+
+    @idiokit.stream
+    def read(self):
+        try:
+            while True:
+                configs = yield idiokit.next()
+                self._updated = set(iter_startups(config.flatten(configs)))
+        finally:
+            self._updated = None
 
     @idiokit.stream
     def main(self, poll_interval=0.1):
-        for conf in iter_startups(config.flatten(self.configs())):
-            strategy = self.strategy(conf)
-            heapq.heappush(self._strategies, (time.time(), strategy))
-
         try:
+            discard = set()
             closing = False
             term_count = 0
 
-            while self._strategies or self._processes:
+            while True:
                 try:
                     yield timer.sleep(poll_interval)
                 except idiokit.Signal as sig:
@@ -207,24 +216,49 @@ class StartupBot(bot.Bot):
                     else:
                         return
 
-                self._poll()
+                for conf in self._poll():
+                    discard.discard(conf)
 
                 if closing:
                     self._close()
+                    if not self._strategies and not self._processes:
+                        return
+                    continue
+
+                if self._updated is not None:
+                    current = set(self._processes) | set(self._strategies)
+
+                    for conf in (current - self._updated) - discard:
+                        if conf in self._processes:
+                            process, strategy = self._processes[conf]
+                            self.log.info("Sending SIGTERM to %r", conf.name)
+                            kill(process, signal.SIGTERM)
+                        discard.add(conf)
+
+                    for conf in self._updated - current:
+                        self._strategies[conf] = time.time(), self.strategy(conf)
+
+                    self._updated = None
+
+                if discard:
+                    for conf in discard.intersection(self._strategies):
+                        _, strategy = self._strategies.pop(conf)
+                        strategy.close()
+                        discard.discard(conf)
                     continue
 
                 for conf, strategy in self._purge():
                     self.log.info("Launching bot %r from module %r", conf.name, conf.module)
-                    process = self._launch(conf)
-                    self._processes.add((process, strategy, conf))
+                    self._processes[conf] = self._launch(conf), strategy
         finally:
             self._poll()
             if self._processes:
-                info = ", ".join("%r[%d]" % (conf.name, process.pid) for (process, _, conf) in self._processes)
+                info = ", ".join("%r[%d]" % (conf.name, process.pid)
+                    for (conf, (process, _)) in self._processes.iteritems())
                 self.log.info("%d bot(s) left alive: %s" % (len(self._processes), info))
 
     def run(self):
-        return idiokit.main_loop(self.main())
+        return idiokit.main_loop(self.configs() | self.read() | self.main())
 
 
 class DefaultStartupBot(StartupBot):
@@ -234,16 +268,21 @@ class DefaultStartupBot(StartupBot):
     disable = bot.ListParam("bots that are not run (default: run all bots)",
                             default=None)
 
+    @idiokit.stream
     def configs(self):
         configs = config.load_configs(os.path.abspath(self.config))
 
+        output = set()
         for conf in iter_startups(configs):
             names = set([conf.name, conf.module])
             if self.disable is not None and names & set(self.disable):
                 continue
             if self.enable is not None and not (names & set(self.enable)):
                 continue
-            yield conf
+            output.add(conf)
+
+        yield idiokit.send(output)
+        yield idiokit.consume()
 
 if __name__ == "__main__":
     DefaultStartupBot.from_command_line().execute()
