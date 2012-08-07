@@ -89,7 +89,7 @@ class StartupBot(bot.Bot):
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
 
-        self._strategies = dict()
+        self._strategies = list()
         self._processes = set()
 
     def configs(self):
