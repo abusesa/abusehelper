@@ -3,6 +3,7 @@ import sys
 import imp
 import inspect
 import hashlib
+import collections
 
 
 def base_dir(depth=1):
@@ -80,15 +81,37 @@ def load_configs(module_name, config_name="configs"):
     return flatten(config_attr)
 
 
-_HASHABLE = object()
+class HashableFrozenDict(collections.Mapping, collections.Hashable):
+    _HASHABLE = object()
 
+    def __init__(self, *args, **keys):
+        self._dict = dict(*args, **keys)
+        self._hash = None
 
-def lenient_dict_hash(obj):
-    hashed = 0
-    for key, value in sorted(obj.iteritems()):
-        hashed ^= hash(key)
-        if hasattr(value, "__hash__") and callable(value.__hash__):
-            hashed ^= hash(value)
-        else:
-            hashed ^= hash(_HASHABLE)
-    return hashed
+    def __hash__(self):
+        hashed = hash(type(self))
+        for key, value in sorted(self._dict.iteritems()):
+            hashed ^= hash(key)
+            if hasattr(value, "__hash__") and callable(value.__hash__):
+                hashed ^= hash(value)
+            else:
+                hashed ^= hash(self._HASHABLE)
+        return hashed
+
+    def __eq__(self, other):
+        return self._dict == other
+
+    def __getitem__(self, key):
+        return self._dict[key]
+
+    def __iter__(self):
+        return iter(self._dict)
+
+    def __len__(self):
+        return len(self._dict)
+
+    def __contains__(self, key):
+        return key in self._dict
+
+    def __reduce__(self):
+        return type(self), (self._dict,)

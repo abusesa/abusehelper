@@ -77,8 +77,7 @@ class Session(Pipeable):
             except serialize.UnregisteredType:
                 raise SessionError("can not serialize key %r value %r" % (key, value))
             conf[key] = value
-        self.__dict__["_conf"] = dict(conf)
-        self.__dict__["_hash"] = None
+        self.__dict__["_conf"] = config.HashableFrozenDict(conf)
 
     def updated(self, **conf):
         new_conf = dict(self._conf)
@@ -92,10 +91,7 @@ class Session(Pipeable):
         raise AttributeError("%r instances are immutable" % self.__class__)
 
     def __hash__(self):
-        if self._hash is None:
-            self._hash = hash(self.service) ^ hash(self.path)
-            self._hash ^= config.lenient_dict_hash(self._conf)
-        return self._hash
+        return hash(self.service) ^ hash(self.path) ^ hash(self._conf)
 
     def __eq__(self, other):
         if not isinstance(other, Session):

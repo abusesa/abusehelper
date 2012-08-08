@@ -52,23 +52,21 @@ class Bot(object):
         params.setdefault("bot_name", self.name)
         return params
 
-    def __init__(self, name, _module=None, **params):
+    def __init__(self, name, _module=None, **_params):
         self.name = name
 
         self._module = _module
         self._hash = None
 
-        self._params = dict(self._defaults)
-        self._params.update(params)
+        params = dict(self._defaults)
+        params.update(_params)
+        self._params = config.HashableFrozenDict(params)
 
     def __startup__(self):
         return self
 
     def __hash__(self):
-        if self._hash is None:
-            self._hash = hash(self.name) ^ hash(self._module)
-            self._hash ^= config.lenient_dict_hash(self._params)
-        return self._hash
+        return hash(self.name) ^ hash(self._module) ^ hash(self._params)
 
     def __eq__(self, other):
         if not isinstance(other, Bot):
