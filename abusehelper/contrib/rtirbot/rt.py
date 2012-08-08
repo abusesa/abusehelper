@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import cookielib
 import urllib2
 import re
@@ -9,9 +10,11 @@ from collections import defaultdict
 from datetime import date, datetime
 from urllib import urlencode, quote
 from abusehelper.core import templates
-from abusehelper.core.config import relative_path
 
-logging.basicConfig(filename='/var/lib/ah2/production/log/rt.log', 
+def relative_path(*path):
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), *path)
+
+logging.basicConfig(filename='/var/lib/ah2/production/log/rt.log',
                     level=logging.DEBUG)
 
 class RtClient:
@@ -24,7 +27,7 @@ class RtClient:
         cookie = cookielib.LWPCookieJar()
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
         urllib2.install_opener(opener)
-        login = urllib2.Request(url, urlencode({'user': user, 
+        login = urllib2.Request(url, urlencode({'user': user,
                                                 'pass': password}))
         try:
             response = urllib2.urlopen(login)
@@ -52,7 +55,7 @@ class RtClient:
 
         return [response_ok, response_value]
 
-                
+
     def _get_response_status(self, response_value):
         # Status code is embedded into the content
         # returned by the REST API call, e.g.
@@ -66,7 +69,7 @@ class RtClient:
             m = prog.match(line)
             if (m):
                 response_status = int(m.group(2))
-        
+
         return response_status
 
 
@@ -76,7 +79,7 @@ class RtClient:
 
         for line in iter(content.splitlines()):
             m = r.match(line)
-            if (m):                                    
+            if (m):
                 l.append(m.group(group_name))
 
         return l
@@ -89,7 +92,7 @@ class RtClient:
         ticket_id = 0
         pattern = '^# Ticket (?P<id>\d+) created\.$'
         ticket_ids = self._find_in_response(pattern, response_value, 'id')
-        
+
         # Should contain exactly one value
         if len(ticket_ids) == 1:
             ticket_id = ticket_ids[0]
@@ -110,21 +113,21 @@ class RtClient:
 
         if response_ok:
             pattern = '^(?P<id>\d+): (.*)'
-            open_ticket_ids = self._find_in_response(pattern, response_value, 
+            open_ticket_ids = self._find_in_response(pattern, response_value,
                                                      'id')
 
         return open_ticket_ids
-        
+
 
     def create_ticket(self, params):
         url = self.url + "ticket/new"
         response_ok, response_value = self._rt_request(url, params)
 
         if response_ok:
-            ticket_id = self._find_new_ticket_id(response_value)            
+            ticket_id = self._find_new_ticket_id(response_value)
         else:
             ticket_id = 0
-        
+
         return ticket_id
 
 
@@ -138,7 +141,7 @@ class RtClient:
 
     def get_attachments(self, ticket_id):
         # RT stores the actual content in what it calls attachments
-        attachment_ids = [] 
+        attachment_ids = []
         content = ""
 
         url = self.url + 'ticket/' + str(ticket_id) + '/attachments'
@@ -147,11 +150,11 @@ class RtClient:
         if response_ok:
             pattern = 'Attachments:\s+(?P<id>\d+): \([^)]+\)' + \
                 ' \(text/\w+\s\/\s\d+\w*\),*'
-            attachment_ids = self._find_in_response(pattern, response_value, 
+            attachment_ids = self._find_in_response(pattern, response_value,
                                                     'id')
-        
+
             for attachment_id in attachment_ids:
-                content += self._get_attachment_contents(ticket_id, 
+                content += self._get_attachment_contents(ticket_id,
                                                          attachment_id)
 
         return content
@@ -162,7 +165,7 @@ class RtClient:
         url = self.url + 'ticket/' + str(ticket_id) + '/attachments/' + \
             str(attachment_id) +'/content'
         response_ok, response_value = self._rt_request(url)
-        
+
         # Strip off RT header (first line and following blank) from
         # content
         if response_ok:
@@ -185,7 +188,7 @@ class RtClient:
 
             for line in iter(response_value.splitlines()):
                 m = prog.match(line)
-                if (m):                                    
+                if (m):
                     if m.group(2) == "Subject":
                         attribute_dict['subject'] = m.group('subject')
                     elif m.group(4) == "Classification":
@@ -193,7 +196,7 @@ class RtClient:
                             m.group('cf_classification')
                     else:
                         attribute_dict['cf_classification'] = "unknown"
-                 
+
         return attribute_dict
 
 
@@ -203,10 +206,10 @@ class RtClient:
                    "rel": rel,
                    "to": parent }
         response_ok, response_value = self._rt_request(url, params)
-        
+
         return response_ok
 
-            
+
     def get_links(self, ticket_id):
         linked_to_ids = []
         id_list = []
@@ -217,7 +220,7 @@ class RtClient:
         if response_ok:
             pattern = '(Members:)*\s+fsck\.com-rt:' + \
                 '\/\/[^/]+\/ticket\/(?P<id>\d+),*'
-            linked_to_ids = self._find_in_response(pattern, response_value, 
+            linked_to_ids = self._find_in_response(pattern, response_value,
                                                    'id')
 
             for id in linked_to_ids:
@@ -226,7 +229,7 @@ class RtClient:
 
         return id_list
 
-        
+
     def add_ticket_comment(self, ticket_id, content, method):
         params = { "content": "Action: " + method + "\n" +
                    "Text: "  + content }
@@ -235,7 +238,7 @@ class RtClient:
 
         return response_ok
 
-                                        
+
 class RtTicket(object):
     ticket_id = 0
     reported_ip = ""
@@ -244,7 +247,7 @@ class RtTicket(object):
     subject = ""
     owner="nobody"
     status="open"
-    content = u""    
+    content = u""
     cf_ip_list = []
     cf_ah = "Yes"
     cf_constituency = ""
@@ -260,7 +263,7 @@ class RtTicket(object):
         used to add subclass specific attributes to the general
         attributes.
         """
-        
+
         if isinstance(self, (RtIncident, RtInvestigation, RtIncidentReport)):
             extra_parameters = self._generate_extra_parameters()
 
@@ -322,9 +325,9 @@ class RtIncidentReport(RtTicket):
     priority = "50"
     time_worked = ""
     # IRs don't use cf_classification. Used to fwd info to parent.
-    cf_classification = "" 
+    cf_classification = ""
     # Leave empty, unless you want to send mail for created IRs
-    requestor = "" 
+    requestor = ""
 
     def _generate_extra_parameters(self):
         extra_parameters = "Requestor: " + self.requestor + "\n"
@@ -391,11 +394,11 @@ class RtirWorkflow(object):
         Search for IP addresses in a tickets contents and return a
         list of all addresses.
         """
-        
+
         pattern = '(\d+\.\d+\.\d+\.\d+)'
-        prog = re.compile(pattern)        
+        prog = re.compile(pattern)
         ip_list = prog.findall(content)
-    
+
         return ip_list
 
 
@@ -409,10 +412,10 @@ class RtirWorkflow(object):
         open_tickets_dict = defaultdict(list)
         ticket_id_list = []
         incident_id = 0
-        
+
         for ip in cf_ip_list:
             query = " 'CF.{IP}' LIKE '" + ip + "'"
-            for ticket_id in self.rt_client.find_open_tickets(query, 
+            for ticket_id in self.rt_client.find_open_tickets(query,
                                                               "Incidents"):
                 open_tickets_dict[ticket_id].append(ip)
 
@@ -428,12 +431,12 @@ class RtirWorkflow(object):
 
         # find the ticket_id with the longest list of IPs
         if len(open_tickets_dict) > 0:
-            sorted_by_nr_of_ips = sorted(open_tickets_dict, 
-                                         key=lambda x : 
+            sorted_by_nr_of_ips = sorted(open_tickets_dict,
+                                         key=lambda x :
                                          len(open_tickets_dict[x]))
             incident_id = sorted_by_nr_of_ips[-1]
 
-        return incident_id               
+        return incident_id
 
 
     def _is_created_by_ah(self, ticket_id):
@@ -457,7 +460,7 @@ class RtirWorkflow(object):
         """
         # Find related open incidents
         cf_ip_list = self._find_ip_addr_in_content(ticket.content)
-        parent_id = self._find_best_match_incident(ticket.reported_ip, 
+        parent_id = self._find_best_match_incident(ticket.reported_ip,
                                                    cf_ip_list)
         new_ticket_created = 0
         created_by_ah = True
@@ -503,7 +506,7 @@ class RtirWorkflow(object):
         return [parent_id, new_ticket_created, created_by_ah]
 
 
-    def _create_investigation_contents(self, ir_ids, rt_use_ah_template, 
+    def _create_investigation_contents(self, ir_ids, rt_use_ah_template,
                                        cf_classification, type_detail, ip):
         """
         Create the investigation content from new IRs and add it to a
@@ -515,20 +518,20 @@ class RtirWorkflow(object):
         for ir_id in ir_ids:
             attachment_ids = []
             contents += self.rt_client.get_attachments(ir_id)
-        
+
         # Use an AH defined template if rt_use_ah_template is
         # set. Otherwise just send raw content to the investigation
         # ticket and let RT do the template population magic.
         if rt_use_ah_template:
             template = RtTicketTemplate(cf_classification, type_detail)
-            u_contents = template.populate_template(contents.encode("utf-8"), 
+            u_contents = template.populate_template(contents.encode("utf-8"),
                                                     ip)
         else:
             u_contents = (u"\n" + contents).encode('utf-8')
 
         return u_contents
 
-    def create_and_link_investigation(self, rt_requestor, rt_use_ah_template, 
+    def create_and_link_investigation(self, rt_requestor, rt_use_ah_template,
                                       incident_id, ir_ids):
         link_successful = False
         linked_ticket_ids = self.rt_client.get_links(incident_id)
@@ -560,12 +563,12 @@ class RtirWorkflow(object):
             ip = m.group(1)
         else:
             ip = ""
-            
+
 
         if open_investigation_ids:
             if len(open_investigation_ids) == 1:
                 contents = self._create_investigation_contents(
-                    ir_ids, 
+                    ir_ids,
                     rt_use_ah_template,
                     cf_classification,
                     type_detail,
@@ -574,14 +577,14 @@ class RtirWorkflow(object):
                     open_investigation_ids[0],
                     contents,
                     'correspond')
-                logging.info("Investigation %r updated.", 
+                logging.info("Investigation %r updated.",
                              open_investigation_ids[0])
             else:
                 # This should not happen unless someone has manually
                 # launched more investigations. Assuming manually
                 # updated and thus stop processing.
                 link_successful = False
-                logging.info("Auto update of investigation not possible." 
+                logging.info("Auto update of investigation not possible."
                              " Manually updated?")
         else:
             # Generate subject from incident classification and
@@ -596,12 +599,12 @@ class RtirWorkflow(object):
             rt_investigation.subject = subject
             rt_investigation.requestor = rt_requestor
             rt_investigation.status = "open"
-            
+
             rt_investigation_parameters = \
                 rt_investigation.create_ticket_params()
             rt_investigation.id = \
                 self.rt_client.create_ticket(rt_investigation_parameters)
-            
+
             if rt_investigation:
                 link_successful = self.rt_client.link_ticket(
                     rt_investigation.id,
@@ -616,7 +619,7 @@ class RtirWorkflow(object):
             logging.info("Resolving IRs: %r", ir_ids)
             for ir_id in ir_ids:
                 ir_close_status = self.rt_client.close_ticket(ir_id)
-            
+
         return link_successful
 
 
@@ -642,21 +645,21 @@ class RtTicketTemplate(object):
                 name += "_" + type_detail.lower()
 
         try:
-            template_file = codecs.open(relative_path("template", name), 
-                                        "r", "utf-8")            
+            template_file = codecs.open(relative_path("template", name),
+                                        "r", "utf-8")
         except IOError:
             logging.type_detail(
                 "Failed opening template '%s'. Attempting to use default", name)
             try:
-                template_file = codecs.open(relative_path("template", 
-                                                          "default"), 
+                template_file = codecs.open(relative_path("template",
+                                                          "default"),
                                             "r", "utf-8")
             except IOError:
                 logging.type_detail("Failed opening default teplate!")
         finally:
             template = template_file.read()
             template_file.close()
-        
+
         self.template = template
 
 
@@ -670,9 +673,9 @@ class RtTicketTemplate(object):
         for line in content.split("\n"):
             if line != "\n":
                 prepended_content += spaces + (line.lstrip()).rstrip() + "\n"
-        
+
         return prepended_content
-        
+
 
     def populate_template(self, content, ip):
         """

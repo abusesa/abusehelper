@@ -2,6 +2,8 @@ import os
 import sys
 import imp
 import hashlib
+import warnings
+import contextlib
 import collections
 
 import idiokit
@@ -9,23 +11,24 @@ from idiokit import timer
 
 
 def relative_path(*path):
+    warnings.warn("relative_path is deprecated",
+        DeprecationWarning, stacklevel=2)
+
     return os.path.abspath(os.path.join(os.getcwd(), *path))
 
 
-def load_module(module_name, relative_to_cwd=True):
+def load_module(module_name):
+    warnings.warn("load_module is deprecated, " +
+        "use regular importing instead",
+        DeprecationWarning, stacklevel=2)
+
     path, name = os.path.split(module_name)
     if not path:
-        if relative_to_cwd:
-            paths = [os.getcwd()]
-        else:
-            paths = None
-        found = imp.find_module(name, paths)
+        found = imp.find_module(name)
         sys.modules.pop(name, None)
         return imp.load_module(name, *found)
 
-    if relative_to_cwd:
-        module_name = os.path.join(os.getcwd(), module_name)
-
+    module_name = os.path.join(os.getcwd(), module_name)
     module_file = open(module_name, "r")
     try:
         name = hashlib.md5(module_name).hexdigest()
@@ -101,6 +104,29 @@ def flatten(obj):
             yield flattened
 
 
+@contextlib.contextmanager
+def _workdir(workdir):
+    cwd = os.getcwd()
+    try:
+        os.chdir(workdir)
+        yield
+    finally:
+        os.chdir(cwd)
+
+
+def _load_config_module(abspath, module_name="<config>"):
+    with open(abspath, "r") as module_file:
+        old_module = sys.modules.pop(module_name, None)
+        try:
+            module = imp.load_source(module_name, abspath, module_file)
+        finally:
+            if old_module is not None:
+                sys.modules[module_name] = old_module
+            else:
+                sys.modules.pop(module_name, None)
+    return module
+
+
 def load_configs(path, name="configs"):
     abspath = os.path.abspath(path)
     dirname, filename = os.path.split(abspath)
@@ -108,24 +134,22 @@ def load_configs(path, name="configs"):
     sys_path = list(sys.path)
     argv_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-    cwd = os.getcwd()
-    try:
-        os.chdir(dirname)
+    with _workdir(dirname):
         try:
-            sys.path.remove(argv_dir)
-        except ValueError:
-            pass
-        sys.path.insert(0, dirname)
+            try:
+                sys.path.remove(argv_dir)
+            except ValueError:
+                pass
+            sys.path.insert(0, dirname)
 
-        module = load_module(abspath)
-        if not hasattr(module, name):
-            raise ImportError("no {0!r} defined in module {1!r}".format(name, filename))
+            module = _load_config_module(abspath)
+            if not hasattr(module, name):
+                raise ImportError("no {0!r} defined in module {1!r}".format(name, filename))
 
-        config_attr = getattr(module, name)
-        return tuple(flatten(config_attr))
-    finally:
-        os.chdir(cwd)
-        sys.path[:] = sys_path
+            config_attr = getattr(module, name)
+            return tuple(flatten(config_attr))
+        finally:
+            sys.path[:] = sys_path
 
 
 @idiokit.stream

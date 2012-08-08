@@ -1,10 +1,9 @@
 import re
 
 from abusehelper.core import rules
-from abusehelper.core.config import load_module
 from abusehelper.core.runtime import Session
 
-room_prefix = load_module("startup").service_room
+from startup import service_room as room_prefix
 
 sources_room = room_prefix + ".sources"
 

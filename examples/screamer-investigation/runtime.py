@@ -1,16 +1,14 @@
 from abusehelper.core.runtime import Session
-from abusehelper.core.config import load_module
-from abusehelper.core import rules
 
-LOBBY = load_module("./startup.py").LOBBY
+import startup
 
-#repr bot does not support sessions, so to avoid defining 
+#repr bot does not support sessions, so to avoid defining
 #input room in two places we load it from startup.py
-INPUT = load_module("./startup.py").input_room
-OUTPUT = load_module("./startup.py").output_room
+INPUT = startup.input_room
+OUTPUT = startup.output_room
+
 
 def configs():
-    yield Session("passivedns",src_room=INPUT,dst_room=INPUT)
-    yield Session("cymruwhois",src_room=INPUT,dst_room=INPUT)
-
+    yield Session("passivedns", src_room=INPUT, dst_room=INPUT)
+    yield Session("cymruwhois", src_room=INPUT, dst_room=INPUT)
     yield Session("combiner", src_room=INPUT, dst_room=OUTPUT)

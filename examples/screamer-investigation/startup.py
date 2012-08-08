@@ -1,4 +1,3 @@
-from abusehelper.core.config import relative_path
 from abusehelper.core.startup import Bot, DefaultStartupBot
 
 
@@ -17,8 +16,7 @@ B = Bot.template(xmpp_jid=username,
                 )
 def configs():
     yield B("repr","abusehelper.contrib.reprbot.reprbot", room=input_room)
-    yield B("runtime", 
-            config=relative_path("./runtime.py"))
+    yield B("runtime", config="./runtime.py")
     yield B("passivedns", "abusehelper.contrib.experts.passivedns", host=passive_dns_whois_server)
     yield B("cymruwhois", "abusehelper.contrib.experts.cymruexpert")
     yield B("combiner", "abusehelper.contrib.experts.combiner")

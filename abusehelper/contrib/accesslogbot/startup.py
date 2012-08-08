@@ -1,8 +1,8 @@
 from abusehelper.core.startup import Bot
 from abusehelper.core.runtime import Room, Session
-from abusehelper.core.config import load_module, relative_path
 
-config = load_module(relative_path("./", "configuration.py"))
+import configuration as config
+
 ACCESSLOG_ROOM = config.accesslog_room
 ACCESS_LOG = config.path
 COMBINED_ROOM = config.combined_room
@@ -17,13 +17,12 @@ B = Bot.template(xmpp_jid=config.xmpp_jid,
 
 def configs():
     # bots
-    yield B("runtime", config=relative_path("startup.py"))
+    yield B("runtime", config="startup.py")
     yield B("accesslogbot", "abusehelper.contrib.accesslogbot", path=ACCESS_LOG)
     yield B("combiner", "abusehelper.contrib.experts.combiner")
     yield B("cymruexpert", "abusehelper.contrib.experts.cymruexpert")
-    yield B("geoipexpert", "abusehelper.contrib.experts.geoipexpert",
-        geoip_db=relative_path("GeoLiteCity.dat"))
-    yield B("historian", "vsroom.common.historian4", bot_state_file=relative_path("state", "historian"))
+    yield B("geoipexpert", "abusehelper.contrib.experts.geoipexpert", geoip_db="GeoLiteCity.dat")
+    yield B("historian", "vsroom.common.historian4", bot_state_file="state/historian")
 
     # sessions
     yield (Room(ACCESSLOG_ROOM) | Session("accesslogbot") | Room(ACCESSLOG_ROOM))
