@@ -1,8 +1,7 @@
-import os
 import idiokit
-from idiokit import timer
 from idiokit.xmpp import jid
-from abusehelper.core import serialize, config
+from abusehelper.core import serialize, config, bot, services, log
+
 
 def iter_runtimes(obj):
     for obj in config.flatten(obj):
@@ -18,6 +17,7 @@ def iter_runtimes(obj):
                 yield obj
             continue
 
+
 class Pipeable(object):
     def _collect(self):
         return self
@@ -27,8 +27,10 @@ class Pipeable(object):
             raise TypeError("%r is not pipeable" % other)
         return Pipe(self, other)
 
+
 class PipeError(Exception):
     pass
+
 
 class Pipe(Pipeable):
     def __init__(self, *pieces):
@@ -52,15 +54,17 @@ class Pipe(Pipeable):
                                   src_room=prev.name,
                                   dst_room=piece.name)
                 elif isinstance(piece, Session):
-                    raise PipeError("a Session instance has to be piped "+
+                    raise PipeError("a Session instance has to be piped " +
                                     "directly after a Room instance")
             prev = piece
 
         if isinstance(prev, Session):
             yield prev
 
+
 class SessionError(Exception):
     pass
+
 
 class Session(Pipeable):
     @property
@@ -109,6 +113,7 @@ class Session(Pipeable):
     def __runtime__(self):
         return self
 
+
 class Room(Pipeable):
     def __init__(self, name):
         name = unicode(name)
@@ -118,10 +123,10 @@ class Room(Pipeable):
             jid.JID(name)
         self.name = name
 
-from abusehelper.core import bot, services, log
 
 class Cancel(Exception):
     pass
+
 
 class RuntimeBot(bot.XMPPBot):
     service_room = bot.Param()
@@ -203,6 +208,7 @@ class RuntimeBot(bot.XMPPBot):
             return bot.XMPPBot.run(self)
         except idiokit.Signal:
             pass
+
 
 class DefaultRuntimeBot(RuntimeBot):
     config = bot.Param("configuration module")
