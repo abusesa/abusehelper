@@ -41,6 +41,10 @@ class Bot(object):
         return BotTemplate
 
     @property
+    def workdir(self):
+        return self._workdir
+
+    @property
     def module(self):
         if self._module is None:
             return "abusehelper.core." + self.name
@@ -52,9 +56,10 @@ class Bot(object):
         params.setdefault("bot_name", self.name)
         return params
 
-    def __init__(self, name, _module=None, **_params):
+    def __init__(self, name, _module=None, _workdir=None, **_params):
         self.name = name
 
+        self._workdir = _workdir
         self._module = _module
         self._hash = None
 
@@ -62,11 +67,16 @@ class Bot(object):
         params.update(_params)
         self._params = config.HashableFrozenDict(params)
 
+    def with_workdir(self, workdir):
+        if not os.path.isabs(workdir):
+            raise ValueError("work directory path has to be absolute")
+        return Bot(self.name, self._module, workdir, **self._params)
+
     def __startup__(self):
         return self
 
     def __hash__(self):
-        return hash(self.name) ^ hash(self._module) ^ hash(self._params)
+        return hash(self._workdir) ^ hash(self.name) ^ hash(self._module) ^ hash(self._params)
 
     def __eq__(self, other):
         if not isinstance(other, Bot):
@@ -125,7 +135,7 @@ class StartupBot(bot.Bot):
         env = dict(os.environ)
         env["ABUSEHELPER_CONF_FROM_STDIN"] = "1"
         try:
-            process = subprocess.Popen(args, env=env, stdin=subprocess.PIPE)
+            process = subprocess.Popen(args, cwd=conf.workdir, env=env, stdin=subprocess.PIPE)
         except OSError, ose:
             self.log.error("Failed launching bot %r: %r", conf.name, ose)
             return None
@@ -264,7 +274,10 @@ class DefaultStartupBot(StartupBot):
 
     @idiokit.stream
     def configs(self):
-        follow = config.follow_config(self.config)
+        abspath = os.path.abspath(self.config)
+        workdir = os.path.dirname(abspath)
+
+        follow = config.follow_config(abspath)
         while True:
             ok, obj = yield follow.next()
             if not ok:
@@ -273,12 +286,11 @@ class DefaultStartupBot(StartupBot):
 
             output = set()
             for conf in iter_startups(obj):
-                names = set([conf.name, conf.module])
-                if self.disable is not None and names & set(self.disable):
+                if self.disable is not None and conf.name in self.disable:
                     continue
-                if self.enable is not None and not (names & set(self.enable)):
+                if self.enable is not None and conf.name not in self.enable:
                     continue
-                output.add(conf)
+                output.add(conf.with_workdir(workdir))
             yield idiokit.send(output)
 
 if __name__ == "__main__":

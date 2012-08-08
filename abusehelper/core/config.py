@@ -1,7 +1,6 @@
 import os
 import sys
 import imp
-import inspect
 import hashlib
 import collections
 
@@ -9,31 +8,23 @@ import idiokit
 from idiokit import timer
 
 
-def base_dir(depth=1):
-    calling_frame = inspect.stack()[depth]
-    calling_file = calling_frame[1]
-    return os.path.dirname(os.path.abspath(calling_file))
-
-
 def relative_path(*path):
-    return os.path.abspath(os.path.join(base_dir(depth=2), *path))
+    return os.path.abspath(os.path.join(os.getcwd(), *path))
 
 
-def load_module(module_name, relative_to_caller=True):
-    base = base_dir(depth=2)
-
+def load_module(module_name, relative_to_cwd=True):
     path, name = os.path.split(module_name)
     if not path:
-        if relative_to_caller:
-            paths = [base]
+        if relative_to_cwd:
+            paths = [os.getcwd()]
         else:
             paths = None
         found = imp.find_module(name, paths)
         sys.modules.pop(name, None)
         return imp.load_module(name, *found)
 
-    if relative_to_caller:
-        module_name = os.path.join(base, module_name)
+    if relative_to_cwd:
+        module_name = os.path.join(os.getcwd(), module_name)
 
     module_file = open(module_name, "r")
     try:
@@ -42,46 +33,6 @@ def load_module(module_name, relative_to_caller=True):
         return imp.load_source(name, module_name, module_file)
     finally:
         module_file.close()
-
-
-def flatten(obj):
-    """
-    >>> list(flatten([1, 2]))
-    [1, 2]
-    >>> list(flatten([[1, [2, 3]], 4]))
-    [1, 2, 3, 4]
-
-    >>> list(flatten([xrange(1, 3), xrange(3, 5)]))
-    [1, 2, 3, 4]
-
-    >>> list(flatten(list))
-    []
-    """
-
-    if callable(obj):
-        for flattened in flatten(obj()):
-            yield flattened
-        return
-
-    try:
-        iterable = iter(obj)
-    except TypeError:
-        yield obj
-        return
-
-    for item in iterable:
-        for flattened in flatten(item):
-            yield flattened
-
-
-def load_configs(module_name, config_name="configs"):
-    module = load_module(module_name, False)
-    if not hasattr(module, config_name):
-        raise ImportError("no %r defined in module %r" %
-                          (config_name, module_name))
-
-    config_attr = getattr(module, config_name)
-    return flatten(config_attr)
 
 
 class HashableFrozenDict(collections.Mapping, collections.Hashable):
@@ -120,23 +71,71 @@ class HashableFrozenDict(collections.Mapping, collections.Hashable):
         return type(self), (self._dict,)
 
 
+def flatten(obj):
+    """
+    >>> list(flatten([1, 2]))
+    [1, 2]
+    >>> list(flatten([[1, [2, 3]], 4]))
+    [1, 2, 3, 4]
+
+    >>> list(flatten([xrange(1, 3), xrange(3, 5)]))
+    [1, 2, 3, 4]
+
+    >>> list(flatten(list))
+    []
+    """
+
+    if callable(obj):
+        for flattened in flatten(obj()):
+            yield flattened
+        return
+
+    try:
+        iterable = iter(obj)
+    except TypeError:
+        yield obj
+        return
+
+    for item in iterable:
+        for flattened in flatten(item):
+            yield flattened
+
+
+def load_configs(path, name="configs"):
+    abspath = os.path.abspath(path)
+    dirname, filename = os.path.split(abspath)
+
+    cwd = os.getcwd()
+    try:
+        os.chdir(dirname)
+
+        module = load_module(abspath, False)
+        if not hasattr(module, name):
+            raise ImportError("no {0!r} defined in module {1!r}".format(name, filename))
+
+        config_attr = getattr(module, name)
+        return tuple(flatten(config_attr))
+    finally:
+        os.chdir(cwd)
+
+
 @idiokit.stream
-def follow_config(name, poll_interval=1.0):
+def follow_config(path, poll_interval=1.0):
     last_mtime = None
     last_error_msg = None
 
-    name = os.path.abspath(name)
+    abspath = os.path.abspath(path)
     while True:
         try:
-            mtime = os.path.getmtime(name)
+            mtime = os.path.getmtime(abspath)
             if last_mtime != mtime:
-                configs = load_configs(name)
+                configs = load_configs(abspath)
                 yield idiokit.send(True, tuple(flatten(configs)))
 
                 last_error_msg = None
                 last_mtime = mtime
         except Exception as exc:
-            error_msg = "Could not load module {0!r}: {1}".format(name, exc)
+            error_msg = "Could not load module {0!r}: {1}".format(abspath, exc)
             if error_msg != last_error_msg:
                 yield idiokit.send(False, error_msg)
 
