@@ -5,6 +5,9 @@ import inspect
 import hashlib
 import collections
 
+import idiokit
+from idiokit import timer
+
 
 def base_dir(depth=1):
     calling_frame = inspect.stack()[depth]
@@ -115,3 +118,29 @@ class HashableFrozenDict(collections.Mapping, collections.Hashable):
 
     def __reduce__(self):
         return type(self), (self._dict,)
+
+
+@idiokit.stream
+def follow_config(name, poll_interval=1.0):
+    last_mtime = None
+    last_error_msg = None
+
+    name = os.path.abspath(name)
+    while True:
+        try:
+            mtime = os.path.getmtime(name)
+            if last_mtime != mtime:
+                configs = load_configs(name)
+                yield idiokit.send(True, tuple(flatten(configs)))
+
+                last_error_msg = None
+                last_mtime = mtime
+        except Exception as exc:
+            error_msg = "Could not load module {0!r}: {1}".format(name, exc)
+            if error_msg != last_error_msg:
+                yield idiokit.send(False, error_msg)
+
+                last_error_msg = error_msg
+                last_mtime = None
+
+        yield timer.sleep(poll_interval)

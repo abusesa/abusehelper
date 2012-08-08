@@ -146,7 +146,6 @@ class StartupBot(bot.Bot):
                 self.log.info("Bot %r exited with return value %d", conf.name, process.poll())
             self._processes.pop(conf, None)
             self._strategies[conf] = time.time(), strategy
-            yield conf
 
     def _purge(self):
         now = time.time()
@@ -191,7 +190,7 @@ class StartupBot(bot.Bot):
             self._updated = None
 
     @idiokit.stream
-    def main(self, poll_interval=0.1):
+    def main(self, poll_interval=0.25):
         try:
             discard = set()
             closing = False
@@ -214,8 +213,7 @@ class StartupBot(bot.Bot):
                     else:
                         return
 
-                for conf in self._poll():
-                    discard.discard(conf)
+                self._poll()
 
                 if closing:
                     self._close()
@@ -261,26 +259,27 @@ class StartupBot(bot.Bot):
 
 class DefaultStartupBot(StartupBot):
     config = bot.Param("configuration module")
-    enable = bot.ListParam("bots that are run (default: run all bots)",
-                           default=None)
-    disable = bot.ListParam("bots that are not run (default: run all bots)",
-                            default=None)
+    enable = bot.ListParam("bots that are run (default: run all bots)", default=None)
+    disable = bot.ListParam("bots that are not run (default: run all bots)", default=None)
 
     @idiokit.stream
     def configs(self):
-        configs = config.load_configs(os.path.abspath(self.config))
-
-        output = set()
-        for conf in iter_startups(configs):
-            names = set([conf.name, conf.module])
-            if self.disable is not None and names & set(self.disable):
+        follow = config.follow_config(self.config)
+        while True:
+            ok, obj = yield follow.next()
+            if not ok:
+                self.log.error(obj)
                 continue
-            if self.enable is not None and not (names & set(self.enable)):
-                continue
-            output.add(conf)
 
-        yield idiokit.send(output)
-        yield idiokit.consume()
+            output = set()
+            for conf in iter_startups(obj):
+                names = set([conf.name, conf.module])
+                if self.disable is not None and names & set(self.disable):
+                    continue
+                if self.enable is not None and not (names & set(self.enable)):
+                    continue
+                output.add(conf)
+            yield idiokit.send(output)
 
 if __name__ == "__main__":
     DefaultStartupBot.from_command_line().execute()

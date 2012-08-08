@@ -206,33 +206,17 @@ class RuntimeBot(bot.XMPPBot):
 
 class DefaultRuntimeBot(RuntimeBot):
     config = bot.Param("configuration module")
-    poll_interval = bot.IntParam("how often (in seconds) the "+
-                                 "configuration module is checked "+
-                                 "for updates (default: %default)",
-                                 default=1)
 
     @idiokit.stream
     def configs(self):
-        conf_path = os.path.abspath(self.config)
-        last_mtime = None
-        error_msg = None
-
+        follow = config.follow_config(self.config)
         while True:
-            try:
-                mtime = os.path.getmtime(conf_path)
-                if last_mtime != mtime:
-                    last_mtime = mtime
+            ok, obj = yield follow.next()
+            if not ok:
+                self.log.error(obj)
+                continue
 
-                    yield idiokit.send(config.load_configs(conf_path))
-
-                    error_msg = None
-            except BaseException, exception:
-                if error_msg != str(exception):
-                    error_msg = str(exception)
-                    self.log.error("Couldn't load module %r: %s",
-                                   self.config, error_msg)
-
-            yield timer.sleep(self.poll_interval)
+            yield idiokit.send(set(obj))
 
 if __name__ == "__main__":
     DefaultRuntimeBot.from_command_line().execute()
