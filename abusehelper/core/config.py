@@ -105,11 +105,19 @@ def load_configs(path, name="configs"):
     abspath = os.path.abspath(path)
     dirname, filename = os.path.split(abspath)
 
+    sys_path = list(sys.path)
+    argv_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+
     cwd = os.getcwd()
     try:
         os.chdir(dirname)
+        try:
+            sys.path.remove(argv_dir)
+        except ValueError:
+            pass
+        sys.path.insert(0, dirname)
 
-        module = load_module(abspath, False)
+        module = load_module(abspath)
         if not hasattr(module, name):
             raise ImportError("no {0!r} defined in module {1!r}".format(name, filename))
 
@@ -117,6 +125,7 @@ def load_configs(path, name="configs"):
         return tuple(flatten(config_attr))
     finally:
         os.chdir(cwd)
+        sys.path[:] = sys_path
 
 
 @idiokit.stream
@@ -135,7 +144,7 @@ def follow_config(path, poll_interval=1.0):
                 last_error_msg = None
                 last_mtime = mtime
         except Exception as exc:
-            error_msg = "Could not load module {0!r}: {1}".format(abspath, exc)
+            error_msg = "Could not load module {0!r}: {1!r}".format(abspath, exc)
             if error_msg != last_error_msg:
                 yield idiokit.send(False, error_msg)
 
