@@ -41,19 +41,24 @@ def load_module(module_name):
 class HashableFrozenDict(collections.Mapping, collections.Hashable):
     _HASHABLE = object()
 
+    @classmethod
+    def _hashable_item(cls, item):
+        key, value = item
+        if isinstance(value, collections.Hashable):
+            return key, value
+        return key, cls._HASHABLE
+
     def __init__(self, *args, **keys):
         self._dict = dict(*args, **keys)
         self._hash = None
 
     def __hash__(self):
-        hashed = hash(type(self))
-        for key, value in sorted(self._dict.iteritems()):
-            hashed ^= hash(key)
-            if hasattr(value, "__hash__") and callable(value.__hash__):
-                hashed ^= hash(value)
-            else:
-                hashed ^= hash(self._HASHABLE)
-        return hashed
+        if self._hash is not None:
+            return self._hash
+
+        items = frozenset(map(self._hashable_item, self._dict.items()))
+        self._hash = hash(type(self)) ^ hash(items)
+        return self._hash
 
     def __eq__(self, other):
         return self._dict == other
