@@ -1,6 +1,7 @@
 import os
 import sys
 import imp
+import time
 import hashlib
 import warnings
 import contextlib
@@ -158,20 +159,26 @@ def load_configs(path, name="configs"):
 
 
 @idiokit.stream
-def follow_config(path, poll_interval=1.0):
+def follow_config(path, poll_interval=1.0, force_interval=30.0):
+    last_reload = -float("inf")
     last_mtime = None
     last_error_msg = None
 
     abspath = os.path.abspath(path)
     while True:
         try:
+            now = time.time()
+            if now < last_reload:
+                last_reload = now
+
             mtime = os.path.getmtime(abspath)
-            if last_mtime != mtime:
+            if now > last_reload + force_interval or last_mtime != mtime:
                 configs = load_configs(abspath)
                 yield idiokit.send(True, tuple(flatten(configs)))
 
                 last_error_msg = None
                 last_mtime = mtime
+                last_reload = now
         except Exception as exc:
             error_msg = "Could not load module {0!r}: {1!r}".format(abspath, exc)
             if error_msg != last_error_msg:
