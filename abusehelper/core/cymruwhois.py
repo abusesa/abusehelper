@@ -109,7 +109,7 @@ class CymruWhois(object):
 
                 self.buffer = ""
 
-            yield self.socket.sendall(ip + "\n")
+            yield self.socket.sendall(str(ip) + "\n")
             while True:
                 data = yield self.socket.recv(4096)
                 if not data:
