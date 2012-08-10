@@ -27,6 +27,7 @@ class Marshal(object):
             self.register(dump_nil, load_nil, type(None), "n")
             self.register(dump_str, load_str, unicode, "s")
             self.register(dump_bytes, load_bytes, str, "b")
+            self.register(dump_bool, load_bool, bool, "t")
 
     def register(self, dump, load, types, name, overwrite=False):
         if isinstance(types, type):
@@ -100,6 +101,11 @@ def dump_bytes(dump, name, obj):
     return element
 def load_bytes(load, element):
     return b64decode(element.text)
+
+def dump_bool(dump, name, obj):
+    return dump_int(dump, name, int(bool(obj)))
+def load_bool(load, element):
+    return bool(load_int(load, element))
 
 global_marshal = Marshal()
 register = global_marshal.register
