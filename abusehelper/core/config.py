@@ -30,13 +30,10 @@ def load_module(module_name):
         return imp.load_module(name, *found)
 
     module_name = os.path.join(os.getcwd(), module_name)
-    module_file = open(module_name, "r")
-    try:
+    with open(module_name, "r") as module_file:
         name = hashlib.md5(module_name).hexdigest()
         sys.modules.pop(name, None)
         return imp.load_source(name, module_name, module_file)
-    finally:
-        module_file.close()
 
 
 class HashableFrozenDict(collections.Mapping, collections.Hashable):
@@ -57,7 +54,7 @@ class HashableFrozenDict(collections.Mapping, collections.Hashable):
         if self._hash is not None:
             return self._hash
 
-        items = frozenset(map(self._hashable_item, self._dict.items()))
+        items = frozenset(map(self._hashable_item, self._dict.iteritems()))
         self._hash = hash(type(self)) ^ hash(items)
         return self._hash
 
