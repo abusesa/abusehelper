@@ -355,17 +355,11 @@ class Service(object):
 
     @idiokit.stream
     def main(self, state):
-        try:
-            yield idiokit.consume()
-        except Stop:
-            idiokit.stop()
+        yield idiokit.consume()
 
     @idiokit.stream
     def session(self, state, **keys):
-        try:
-            yield idiokit.consume()
-        except Stop:
-            idiokit.stop()
+        yield idiokit.consume()
 
 @idiokit.stream
 def join_lobby(xmpp, name, nick=None):
