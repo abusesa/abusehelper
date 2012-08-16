@@ -1,6 +1,7 @@
 import idiokit
 from idiokit import timer
-from abusehelper.core import events, rules, taskfarm, bot, services
+from abusehelper.core import events, rules, taskfarm, bot
+
 
 class RoomGraphBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
@@ -28,7 +29,7 @@ class RoomGraphBot(bot.ServiceBot):
                 waiters.clear()
 
                 if count > 0:
-                    self.log.info("Seen %d events in room %r", count, name)
+                    self.log.info("Seen {0} events in room {1!r}".format(count, name))
                     count = 0
                 continue
 
@@ -46,13 +47,13 @@ class RoomGraphBot(bot.ServiceBot):
                         yield waiters.pop(dst_room)
 
                     if dst is not None:
-                        waiters[dst_room] = dst.send(event)
+                        waiters[dst_room] = dst.send(event.to_elements())
 
     @idiokit.stream
     def handle_room(self, name):
-        self.log.info("Joining room %r", name)
+        self.log.info("Joining room {0!r}".format(name))
         room = yield self.xmpp.muc.join(name, self.bot_name)
-        self.log.info("Joined room %r", name)
+        self.log.info("Joined room {0!r}".format(name))
 
         distribute = self.distribute(name)
         idiokit.pipe(self._alert() | distribute)
@@ -62,21 +63,17 @@ class RoomGraphBot(bot.ServiceBot):
                 yield elements
 
         try:
-            yield idiokit.pipe(events.events_to_elements(),
-                               room,
-                               idiokit.map(check),
-                               distribute)
+            yield room | idiokit.map(check) | distribute
         finally:
-            self.log.info("Left room %r", name)
+            self.log.info("Left room {0!r}".format(name))
 
     @idiokit.stream
     def session(self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
         classifier = self.srcs.setdefault(src_room, rules.RuleClassifier())
         classifier.inc(rule, dst_room)
+
         try:
             yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
-        except services.Stop:
-            idiokit.stop()
         finally:
             classifier.dec(rule, dst_room)
             if classifier.is_empty():
