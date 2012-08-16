@@ -35,6 +35,7 @@ class BZ2Reader(object):
                 piece = self.pending[self.index:self.index + amount]
                 self.index += len(piece)
                 amount -= len(piece)
+                piece = utils.force_decode(piece).encode("utf-8")
                 result.append(piece)
 
         return "".join(result)
