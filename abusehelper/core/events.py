@@ -29,7 +29,7 @@ def _normalize(value):
     When converting str objects the default encoding is tried, and an
     UnicodeDecodeError is raised if the value can not bot converted.
 
-    >>> _normalize("\xe4") #doctest: +IGNORE_EXCEPTION_DETAIL
+    >>> _normalize("\\xe4") #doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
     ...
     UnicodeDecodeError: <the error goes here>
