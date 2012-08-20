@@ -1,6 +1,7 @@
 import re
 import gzip
 import inspect
+import collections
 import cPickle as pickle
 
 from base64 import b64decode
@@ -64,8 +65,7 @@ def _unicode_quote(string):
     return string
 
 _UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
-_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*',
-                           re.U)
+_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*', re.U)
 def _unicode_parse_part(string, start):
     match = _UNICODE_PART.match(string, start)
     quoted, unquoted = match.groups()
@@ -113,34 +113,33 @@ class Event(object):
     @classmethod
     def from_unicode(cls, string):
         r"""
-        >>> event = Event()
-        >>> event.add(u"a", u"b")
+        >>> event = Event({"a": "b"})
         >>> Event.from_unicode(unicode(event)) == event
         True
 
-        >>> event.add(u'=', u'"')
+        >>> event = event.union({u'=': u'"'})
         >>> Event.from_unicode(unicode(event)) == event
         True
 
         Regression test: Check that character escaping
         doesn't mess up parsing.
 
-        >>> event = Event()
-        >>> event.add(u"x", u"\\")
-        >>> event.add(u"y", u"b")
+        >>> event = Event({
+        ...     u"x": u"\\",
+        ...     u"y": u"b"
+        ... })
         >>> Event.from_unicode(ur'x="\\", "y"=b') == event
         True
         """
 
-        result = cls()
-
         string = string.strip()
         if not string:
-            return result
+            return cls()
+
+        attrs = collections.defaultdict(list)
 
         index = 0
         length = len(string)
-
         while True:
             key, index = _unicode_parse_part(string, index)
             if index >= length:
@@ -151,10 +150,10 @@ class Event(object):
             index += 1
 
             value, index = _unicode_parse_part(string, index)
-            result.add(key, value)
+            attrs[key].append(value)
 
             if index >= length:
-                return result
+                return cls(attrs)
 
             if string[index] != u",":
                 raise ValueError("unexpected character %r at index %d" %
@@ -172,9 +171,7 @@ class Event(object):
         >>> list(Event.from_elements(element)) == [Event()]
         True
 
-        >>> event = Event()
-        >>> event.add("key", "value")
-        >>> event.add("\uffff", "\x05") # include some forbidden XML chars
+        >>> event = Event({"key": "value", "\uffff": "\\x05"}) # include some forbidden XML chars
         >>> element = Element("message")
         >>> element.add(event.to_elements())
         >>> list(Event.from_elements(element)) == [event]
@@ -183,22 +180,22 @@ class Event(object):
 
         # Future event format
         for event_element in elements.children("e", EVENT_NS):
-            event = Event()
+            attrs = collections.defaultdict(list)
             for key_element in event_element.children("k").with_attrs("a"):
                 key = b64decode(key_element.get_attr("a")).decode("utf-8")
                 for value_element in key_element.children("v").with_attrs("a"):
                     value = b64decode(value_element.get_attr("a")).decode("utf-8")
-                    event.add(key, value)
-            yield event
+                    attrs[key].append(value)
+            yield Event(attrs)
 
         # Legacy event format
         for event_element in elements.children("event", EVENT_NS):
-            event = Event()
+            attrs = collections.defaultdict(list)
             for attr in event_element.children("attr").with_attrs("key", "value"):
                 key = attr.get_attr("key")
                 value = attr.get_attr("value")
-                event.add(key, value)
-            yield event
+                attrs[key].append(value)
+            yield Event(attrs)
 
     def __init__(self, *args, **keys):
         """
@@ -361,9 +358,7 @@ class Event(object):
         """Return a tuple of event values (for a specific key, if
         given).
 
-        >>> event = Event()
-        >>> event.add("key", "1", "2")
-        >>> event.add("other", "3", "4")
+        >>> event = Event(key=["1", "2"], other=["3", "4"])
         >>> sorted(event.values())
         [u'1', u'2', u'3', u'4']
         >>> sorted(event.values("key"))
@@ -379,9 +374,7 @@ class Event(object):
         ...         return socket.inet_ntoa(socket.inet_aton(string))
         ...     except socket.error:
         ...         return None
-        >>> event = Event()
-        >>> event.add("key", "1.2.3.4", "abba")
-        >>> event.add("other", "10.10.10.10")
+        >>> event = Event(key=["1.2.3.4", "abba"], other="10.10.10.10")
         >>> event.values("key", parser=ipv4)
         ('1.2.3.4',)
         >>> sorted(event.values(parser=ipv4))
@@ -397,9 +390,7 @@ class Event(object):
         The value can be picked either from the values of some
         specific key or amongst event values.
 
-        >>> event = Event()
-        >>> event.add("key", "1")
-        >>> event.add("other", "2")
+        >>> event = Event(key="1", other="2")
         >>> event.value("key")
         u'1'
         >>> event.value() in [u"1", u"2"]
@@ -435,8 +426,7 @@ class Event(object):
         ...         return int(string)
         ...     except ValueError:
         ...         return None
-        >>> event = Event()
-        >>> event.add("key", "1", "a")
+        >>> event = Event(key=["1", "a"])
         >>> event.value(parser=int_parse)
         1
         >>> event.value("key", parser=int_parse)
@@ -465,7 +455,7 @@ class Event(object):
         >>> event.contains() # Does the event contain any values at all?
         False
 
-        >>> event.add("key", "1")
+        >>> event = event.union(key="1")
         >>> event.contains()
         True
         >>> event.contains("key") # Any value for key "key"?
@@ -488,7 +478,7 @@ class Event(object):
         True
         >>> event.contains("key", parser=int_parse)
         True
-        >>> event.add("other", "x")
+        >>> event = event.union(other="x")
         >>> event.contains("other", parser=int_parse)
         False
         """
@@ -523,8 +513,7 @@ class Event(object):
         >>> event = Event()
         >>> event.items()
         ()
-        >>> event.add("key", "1")
-        >>> event.add("other", "x", "y")
+        >>> event = event.union(key="1", other=["x", "y"])
         >>> sorted(event.items())
         [(u'key', u'1'), (u'other', u'x'), (u'other', u'y')]
 
@@ -561,8 +550,7 @@ class Event(object):
         >>> event = Event()
         >>> event.keys()
         ()
-        >>> event.add("key", "1")
-        >>> event.add("other", "x", "y")
+        >>> event = event.union(key="1", other=["x", "y"])
         >>> sorted(event.keys())
         [u'key', u'other']
 
@@ -582,20 +570,20 @@ class Event(object):
                      if self.contains(key, parser=parser, filter=filter))
 
     def to_elements(self, include_body=True):
-        event = Element("event", xmlns=EVENT_NS)
+        element = Element("event", xmlns=EVENT_NS)
 
         for key, value in self.items():
             key = _replace_non_xml_chars(key)
             value = _replace_non_xml_chars(value)
             attr = Element("attr", key=key, value=value)
-            event.add(attr)
+            element.add(attr)
 
         if not include_body:
-            return event
+            return element
 
         body = Element("body")
         body.text = _replace_non_xml_chars(unicode(self))
-        return Elements(body, event)
+        return Elements(body, element)
 
     def __eq__(self, other):
         if not isinstance(other, Event):
@@ -611,11 +599,9 @@ class Event(object):
     def __unicode__(self):
         """Return an unicode representation of the event.
 
-        >>> e = Event()
-        >>> unicode(e)
+        >>> unicode(Event())
         u''
-        >>> e.add("a,", "b")
-        >>> unicode(e)
+        >>> unicode(Event({"a,": "b"}))
         u'"a,"=b'
 
         The specific order of the key-value pairs is undefined.
@@ -649,11 +635,8 @@ class EventCollector(object):
         """
         >>> import pickle
 
-        >>> event = Event()
-        >>> event.add("1", "2")
-
-        >>> event2 = Event()
-        >>> event2.add("x", "y")
+        >>> event = Event({"1": "2"})
+        >>> event2 = Event(x="y")
 
         >>> original = EventCollector()
         >>> original.append(event)
@@ -682,11 +665,8 @@ class EventCollector(object):
 
     def purge(self):
         """
-        >>> event = Event()
-        >>> event.add("1", "2")
-
-        >>> event2 = Event()
-        >>> event2.add("x", "y")
+        >>> event = Event({"1": "2"})
+        >>> event2 = Event(x="y")
 
         >>> collector = EventCollector()
         >>> collector.append(event)
@@ -720,10 +700,7 @@ class _EventList(object):
                     except EOFError:
                         break
 
-                    event = Event()
-                    for key, values in attrs.iteritems():
-                        event.update(key, values)
-
+                    event = Event(attrs)
                     pos = self._stringio.tell()
                     yield event
                     self._stringio.seek(pos)
