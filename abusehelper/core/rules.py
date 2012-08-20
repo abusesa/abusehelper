@@ -333,24 +333,18 @@ NETBLOCK.serialize_register()
 
 if __name__ == "__main__":
     import unittest
-    from abusehelper.core import events
-
-    class MockEvent(events.Event):
-        def __init__(self, **keys):
-            events.Event.__init__(self)
-            for key, values in keys.iteritems():
-                self.update(key, values)
+    from abusehelper.core.events import Event
 
     class RuleClassifierTests(unittest.TestCase):
         def test_inc(self):
             c = RuleClassifier()
             c.inc(MATCH("a", "b"), "c")
-            assert set(c.classify(MockEvent(a=["b"]))) == set(["c"])
+            assert set(c.classify(Event(a="b"))) == set(["c"])
             assert not c.is_empty()
 
             c.inc(MATCH("a"), "d")
-            assert set(c.classify(MockEvent(a=["b"]))) == set(["c", "d"])
-            assert set(c.classify(MockEvent(a=["x"]))) == set(["d"])
+            assert set(c.classify(Event(a="b"))) == set(["c", "d"])
+            assert set(c.classify(Event(a="x"))) == set(["d"])
             assert not c.is_empty()
 
         def test_dec(self):
@@ -359,11 +353,11 @@ if __name__ == "__main__":
             c.inc(MATCH("a", "b"), "d")
 
             c.dec(MATCH("a", "b"), "c")
-            assert set(c.classify(MockEvent(a=["b"]))) == set(["d"])
+            assert set(c.classify(Event(a="b"))) == set(["d"])
             assert not c.is_empty()
 
             c.dec(MATCH("a", "b"), "d")
-            assert set(c.classify(MockEvent(a=["b"]))) == set([])
+            assert set(c.classify(Event(a="b"))) == set([])
             assert c.is_empty()
 
     class MatchTests(unittest.TestCase):
@@ -373,24 +367,24 @@ if __name__ == "__main__":
 
         def test_match(self):
             rule = MATCH()
-            assert not rule.match(MockEvent())
-            assert rule.match(MockEvent(a=["b"]))
-            assert rule.match(MockEvent(x=["y"]))
+            assert not rule.match(Event())
+            assert rule.match(Event(a="b"))
+            assert rule.match(Event(x="y"))
 
             rule = MATCH("a")
-            assert not rule.match(MockEvent())
-            assert rule.match(MockEvent(a=["b"]))
-            assert not rule.match(MockEvent(x=["y"]))
+            assert not rule.match(Event())
+            assert rule.match(Event(a="b"))
+            assert not rule.match(Event(x="y"))
 
             rule = MATCH("a", "b")
-            assert not rule.match(MockEvent())
-            assert rule.match(MockEvent(a=["b"]))
-            assert not rule.match(MockEvent(a=["a"]))
+            assert not rule.match(Event())
+            assert rule.match(Event(a="b"))
+            assert not rule.match(Event(a="a"))
 
             rule = MATCH("a", re.compile("b", re.U))
-            assert not rule.match(MockEvent())
-            assert rule.match(MockEvent(a=["abba"]))
-            assert not rule.match(MockEvent(a=["aaaa"]))
+            assert not rule.match(Event())
+            assert rule.match(Event(a="abba"))
+            assert not rule.match(Event(a="aaaa"))
 
         def test_eq(self):
             assert MATCH() == MATCH()
@@ -435,8 +429,8 @@ if __name__ == "__main__":
     class NetblockTests(unittest.TestCase):
         def test_bad_data(self):
             rule = NETBLOCK("0.0.0.0", 0)
-            assert not rule.match(MockEvent(ip=[u"not valid"]))
-            assert not rule.match(MockEvent(ip=[u"\xe4 not convertible to ascii"]))
+            assert not rule.match(Event(ip=u"not valid"))
+            assert not rule.match(Event(ip=u"\xe4 not convertible to ascii"))
 
         def test_eq(self):
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.0.0", 16)
@@ -446,30 +440,30 @@ if __name__ == "__main__":
 
         def test_match_ipv6(self):
             rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
-            assert rule.match(MockEvent(ip=["2001:0db8:aaaa:bbbb:cccc::"]))
+            assert rule.match(Event(ip="2001:0db8:aaaa:bbbb:cccc::"))
 
         def test_non_match_ipv6(self):
             rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
-            assert not rule.match(MockEvent(ip=["::1"]))
+            assert not rule.match(Event(ip="::1"))
 
         def test_match_arbitrary_key(self):
             rule = NETBLOCK("1.2.3.4", 24)
-            assert rule.match(MockEvent(somekey=["1.2.3.255"]))
+            assert rule.match(Event(somekey="1.2.3.255"))
 
         def test_non_match_arbitrary_key(self):
             rule = NETBLOCK("1.2.3.4", 24)
-            assert not rule.match(MockEvent(somekey=["1.2.4.255"]))
+            assert not rule.match(Event(somekey="1.2.4.255"))
 
         def test_match_ip_key(self):
             rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
-            assert rule.match(MockEvent(somekey=["4.5.6.255"], ip=["1.2.3.255"]))
+            assert rule.match(Event(somekey="4.5.6.255", ip="1.2.3.255"))
 
         def test_nonmatch_ip_key(self):
             rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
-            assert not rule.match(MockEvent(somekey=["1.2.3.4"], ip=["1.2.4.255"]))
+            assert not rule.match(Event(somekey="1.2.3.4", ip="1.2.4.255"))
 
         def test_non_match_non_ip_data(self):
             rule = NETBLOCK("1.2.3.4", 24)
-            assert not rule.match(MockEvent(ip=["this is just some data"]))
+            assert not rule.match(Event(ip="this is just some data"))
 
     unittest.main()
