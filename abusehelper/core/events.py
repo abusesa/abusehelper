@@ -83,6 +83,34 @@ class Event(object):
     _UNDEFINED = object()
 
     @classmethod
+    def _itemize(cls, *args, **keys):
+        result = dict()
+
+        for obj in args + (keys,):
+            if isinstance(obj, cls):
+                for key, values in obj._attrs.iteritems():
+                    if key not in result:
+                        result[key] = set()
+                    result[key].update(values)
+                continue
+
+            if hasattr(obj, "items"):
+                obj = obj.items()
+
+            for key, values in obj:
+                if isinstance(values, basestring):
+                    values = (values,)
+                elif not values:
+                    continue
+
+                key = _normalize(key)
+                if key not in result:
+                    result[key] = set()
+                result[key].update(_normalize(x) for x in values)
+
+        return result
+
+    @classmethod
     def from_unicode(cls, string):
         r"""
         >>> event = Event()
@@ -172,23 +200,44 @@ class Event(object):
                 event.add(key, value)
             yield event
 
-    def __init__(self, *events):
+    def __init__(self, *args, **keys):
         """
         Regression test: Keep the the correct internal encoding in the
         copy/merge constructor.
 
-        >>> e1 = Event()
-        >>> e1.add(u"\xe4", u"\xe4")
-        >>> e2 = Event(e1)
-        >>> e2.items()
+        >>> event = Event({u"\xe4": u"\xe4"})
+        >>> Event(event).items()
         ((u'\\xe4', u'\\xe4'),)
         """
 
-        self._attrs = dict()
+        self._attrs = self._itemize(*args, **keys)
 
-        for event in events:
-            for key, value in event.items():
-                self.add(key, value)
+    def union(self, *args, **keys):
+        """Return a new event that contains all key-value pairs from
+        appearing in the original event and/or Event(*args, **keys).
+
+        >>> sorted(Event(a=["1", "2"]).union(a=["1", "3"]).items())
+        [(u'a', u'1'), (u'a', u'2'), (u'a', u'3')]
+        """
+
+        return type(self)(self, *args, **keys)
+
+    def difference(self, *args, **keys):
+        """Return a new event that contains all key-value pairs
+        from the original event except those also appearing in
+        Event(*args, **keys).
+
+        >>> sorted(Event(a=["1", "2"]).difference(a=["1", "3"]).items())
+        [(u'a', u'2')]
+        """
+
+        other = self._itemize(*args, **keys)
+        result = dict()
+        for key, values in self._attrs.iteritems():
+            diff = values.difference(other.get(key, ()))
+            if diff:
+                result[key] = diff
+        return type(self)(result)
 
     def add(self, key, value, *values):
         """Add value(s) for a key.
