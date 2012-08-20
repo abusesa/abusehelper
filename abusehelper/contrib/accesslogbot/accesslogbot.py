@@ -19,15 +19,15 @@ class AccessLogBot(TailBot):
         status, bytes = entry[2].split()
         user_agent = entry[5]
 
-        event = events.Event()
-        event.add("source", "accesslog")
-        event.add("ip", ip)
-        event.add("timestamp", timestamp)
-        event.add("request", request)
-        event.add("status", status)
-        event.add("bytes", bytes)
-        event.add("user_agent", user_agent)
-        return event
+        return events.Event({
+            "source": "accesslog",
+            "ip": ip,
+            "timestamp": timestamp,
+            "request": request,
+            "status": status,
+            "bytes": bytes,
+            "user_agent": user_agent
+        })
 
 if __name__ == "__main__":
     AccessLogBot.from_command_line().execute()
