@@ -66,4 +66,4 @@ class EventLogger(object):
             msg = args[0]
 
         event = event.union(logmsg=msg, loglevel=logging.getLevelName(lvl))
-        return self._logger.log(lvl, msg, **dict(extra=dict(event=event)))
+        return self._logger.log(lvl, msg, **{"extra": {"event": event}})
