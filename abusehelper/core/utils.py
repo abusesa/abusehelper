@@ -11,8 +11,10 @@ from idiokit import threadpool
 from abusehelper.core import events
 from cStringIO import StringIO
 
+
 class FetchUrlFailed(Exception):
     pass
+
 
 class HTTPError(FetchUrlFailed):
     def __init__(self, code, msg, headers, fileobj):
@@ -26,26 +28,36 @@ class HTTPError(FetchUrlFailed):
     def __str__(self):
         return "HTTP Error %d: %s" % (self.code, self.msg)
 
+
 @idiokit.stream
-def fetch_url(url, opener=None):
+def fetch_url(url, opener=None, chunk_size=16384):
     if opener is None:
         opener = urllib2.build_opener()
 
     try:
+        output = StringIO()
+
         fileobj = yield threadpool.thread(opener.open, url)
         try:
-            data = yield threadpool.thread(fileobj.read)
+            while True:
+                data = yield threadpool.thread(fileobj.read, chunk_size)
+                if not data:
+                    break
+                output.write(data)
         finally:
             fileobj.close()
 
         info = fileobj.info()
         info = email.parser.Parser().parsestr(str(info), headersonly=True)
 
-        idiokit.stop(info, StringIO(data))
-    except urllib2.HTTPError, he:
+        output.seek(0)
+
+        idiokit.stop(info, output)
+    except urllib2.HTTPError as he:
         raise HTTPError(he.code, he.msg, he.headers, he.fp)
-    except (urllib2.URLError, httplib.HTTPException, socket.error), error:
+    except (urllib2.URLError, httplib.HTTPException, socket.error) as error:
         raise FetchUrlFailed(str(error))
+
 
 def force_decode(string, encodings=["ascii", "utf-8"]):
     if isinstance(string, unicode):
@@ -58,6 +70,7 @@ def force_decode(string, encodings=["ascii", "utf-8"]):
             pass
     return string.decode("latin-1", "replace")
 
+
 def _csv_reader(fileobj, charset=None, **keys):
     if charset is None:
         decode = force_decode
@@ -68,6 +81,7 @@ def _csv_reader(fileobj, charset=None, **keys):
 
     for row in csv.reader(lines, **keys):
         yield map(normalize, row)
+
 
 @idiokit.stream
 def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
@@ -83,6 +97,7 @@ def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
             event.add(key, value)
 
         yield idiokit.send(event)
+
 
 class TimedCache(object):
     def __init__(self, cache_time):
