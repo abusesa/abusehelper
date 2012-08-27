@@ -1,8 +1,9 @@
 import idiokit
 from idiokit import timer, threadpool
-from abusehelper.core import bot, events, taskfarm
+from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 from opencollab import wiki
+
 
 class OpenCollabExpert(Expert):
     collab_url = bot.Param()
@@ -12,8 +13,8 @@ class OpenCollabExpert(Expert):
     collab_extra_ca_certs = bot.Param(default=None)
     cache_query = bot.Param()
     page_keys = bot.ListParam("pagekey=wikikey[,pagekey=wikikey]")
-    poll_interval = bot.IntParam("wait at least the given amount of seconds "+
-                                 "before polling the collab again "+
+    poll_interval = bot.IntParam("wait at least the given amount of seconds " +
+                                 "before polling the collab again " +
                                  "(default: %default seconds)", default=600)
 
     def __init__(self, *args, **keys):
@@ -88,7 +89,7 @@ class OpenCollabExpert(Expert):
                         continue
 
                     for wikikey in self.keys[pagekey]:
-                        newkey = str(pagekey+"_"+wikikey)
+                        newkey = str(pagekey + "_" + wikikey)
                         for value in page.values(wikikey):
                             event.add(newkey, value.strip("[[]]"))
 
