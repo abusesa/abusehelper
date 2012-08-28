@@ -1,3 +1,4 @@
+import hashlib
 import logging
 
 from abusehelper.core import events
@@ -37,6 +38,36 @@ def _level(lvl):
     return log
 
 
+class _StatefulLogger(object):
+    def __init__(self, eid, logger):
+        self._logger = logger
+        self._id = eid
+        self._latest = None
+
+    def open(self, msg, *args, **keys):
+        event = events.Event({"id:open": self._id}, *args, **keys)
+        self._log(msg, event)
+        self._latest = msg, event
+
+    def close(self, msg, *args, **keys):
+        event = events.Event({"id:close": self._id}, *args, **keys)
+        self._log(msg, event)
+        self._latest = None
+
+    def _log(self, msg, event):
+        event_dict = dict((x, event.values(x)) for x in event.keys())
+        self._logger.info(msg, **event_dict)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self._latest is not None:
+            msg, event = self._latest
+            self._log(msg, event)
+            self._latest = None
+
+
 class EventLogger(object):
     def __init__(self, logger):
         self._logger = logger
@@ -67,3 +98,10 @@ class EventLogger(object):
 
         event = event.union(logmsg=msg, loglevel=logging.getLevelName(lvl))
         return self._logger.log(lvl, msg, **{"extra": {"event": event}})
+
+    def stateful(self, *ids):
+        hashed = hashlib.sha1()
+        for piece in ids:
+            hashed.update(hashlib.sha1(piece).digest())
+        logger = _StatefulLogger(hashed.hexdigest(), self)
+        return logger

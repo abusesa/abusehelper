@@ -13,6 +13,7 @@ import idiokit
 from idiokit import timer
 from abusehelper.core import bot, taskfarm, services, events
 
+
 def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
     """
     Return the ISO 8601 formatted timestamp based on the time
@@ -24,6 +25,7 @@ def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
     """
 
     return time.strftime(format, time.gmtime(seconds))
+
 
 def ensure_dir(dir_name):
     """
@@ -39,6 +41,7 @@ def ensure_dir(dir_name):
             raise
     return dir_name
 
+
 class ArchiveBot(bot.ServiceBot):
     archive_dir = bot.Param("directory where archive files are written")
     bot_state_file = None
@@ -51,16 +54,19 @@ class ArchiveBot(bot.ServiceBot):
 
     @idiokit.stream
     def handle_room(self, name):
-        self.log.info("Joining room %r", name)
-        room = yield self.xmpp.muc.join(name, self.bot_name)
-        self.log.info("Joined room %r", name)
+        msg = "room {0!r}".format(name)
+        attrs = events.Event(type="room", service=self.bot_name, room=name)
 
-        try:
-            yield idiokit.pipe(room,
-                               events.stanzas_to_events(),
-                               self.collect(room.jid.bare()))
-        finally:
-            self.log.info("Left room %r", name)
+        with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
+            log.open("Joining " + msg, attrs, status="joining")
+            room = yield self.xmpp.muc.join(name, self.bot_name)
+
+            log.open("Joined " + msg, attrs, status="joined")
+            try:
+                room_jid = room.jid.bare()
+                yield room | events.stanzas_to_events() | self.collect(room_jid)
+            finally:
+                log.close("Left " + msg, attrs, status="left")
 
     @idiokit.stream
     def session(self, state, src_room):
@@ -105,12 +111,12 @@ class ArchiveBot(bot.ServiceBot):
                         self.archive_close(archive)
                         init_done = False
                         needs_flush = False
-                        self.log.info("Closed archive %r" % path)
+                        self.log.info("Closed archive {0!r}".format(path))
 
                     archive = self.archive_open(os.path.join(self.archive_dir, new_path))
                     path = new_path
                     init_done = True
-                    self.log.info("Opened archive %r" % path)
+                    self.log.info("Opened archive {0!r}".format(path))
 
                 self.archive_write(archive, timestamp, room_name, event)
                 needs_flush = True
@@ -118,7 +124,7 @@ class ArchiveBot(bot.ServiceBot):
             if init_done:
                 self.archive_flush(archive)
                 self.archive_close(archive)
-                self.log.info("Closed archive file %r" % path)
+                self.log.info("Closed archive {0!r}".format(path))
 
     # Override these for custom behavior
 

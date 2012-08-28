@@ -2,6 +2,7 @@ import idiokit
 from idiokit import timer
 from abusehelper.core import bot, taskfarm
 
+
 class RoomBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
@@ -9,20 +10,25 @@ class RoomBot(bot.ServiceBot):
 
     @idiokit.stream
     def _handle_room(self, name):
-        self.log.info("Joining room %r", name)
-        room = yield self.xmpp.muc.join(name, self.bot_name)
-        self.log.info("Joined room %r", name)
+        msg = "room {0!r}".format(name)
+        attrs = events.Event(type="room", service=self.bot_name, room=name)
 
-        try:
-            yield room
-        finally:
-            self.log.info("Left room %r", name)
+        with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
+            log.open("Joining " + msg, attrs, status="joining")
+            room = yield self.xmpp.muc.join(name, self.bot_name)
+
+            log.open("Joined " + msg, attrs, status="joined")
+            try:
+                yield room
+            finally:
+                log.close("Left " + msg, attrs, status="left")
 
     def to_room(self, name):
         return self.room_handlers.inc(name) | idiokit.consume()
 
     def from_room(self, name):
         return idiokit.consume() | self.room_handlers.inc(name)
+
 
 import time
 import codecs
@@ -32,19 +38,21 @@ from abusehelper.core import events, services
 
 _encoder = codecs.getencoder("utf-8")
 
+
 def event_id(event):
     result = list()
 
-    for key in sorted(event.keys()):
+    for key, value in sorted(event.items()):
         key = _encoder(key)[0]
-        for value in sorted(event.values(key)):
-            value = _encoder(value)[0]
-            result.append(key)
-            result.append(value)
+        value = _encoder(value)[0]
+        result.append(key)
+        result.append(value)
 
     return sha1("\xc0".join(result)).hexdigest()
 
+
 AUGMENT_KEY = "augment sha-1"
+
 
 @idiokit.stream
 def ignore_augmentations(ignore):
@@ -54,18 +62,20 @@ def ignore_augmentations(ignore):
             continue
         yield idiokit.send(event)
 
+
 @idiokit.stream
 def create_eids():
     while True:
         event = yield idiokit.next()
         yield idiokit.send(event_id(event), event)
 
+
 @idiokit.stream
 def embed_eids():
     while True:
         eid, event = yield idiokit.next()
-        event.add(AUGMENT_KEY, eid)
-        yield idiokit.send(event)
+        yield idiokit.send(event.union({AUGMENT_KEY: eid}))
+
 
 class Expert(RoomBot):
     def __init__(self, *args, **keys):
@@ -108,6 +118,7 @@ class Expert(RoomBot):
             # Skip augmenting by default.
             # Implement yield idiokit.send(eid, augmentation).
 
+
 class Combiner(RoomBot):
     @idiokit.stream
     def collect(self, ids, queue, time_window):
@@ -132,7 +143,7 @@ class Combiner(RoomBot):
 
             augmentation = events.Event(augmentation)
             eids = augmentation.values(AUGMENT_KEY)
-            augmentation.clear(AUGMENT_KEY)
+            augmentation = augmentation.difference({AUGMENT_KEY: eids})
 
             for eid in eids:
                 if eid not in ids:

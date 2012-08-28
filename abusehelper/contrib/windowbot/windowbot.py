@@ -2,6 +2,7 @@ import idiokit
 from idiokit import timer
 from abusehelper.core import bot, taskfarm
 
+
 class RoomBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
@@ -9,14 +10,18 @@ class RoomBot(bot.ServiceBot):
 
     @idiokit.stream
     def _handle_room(self, name):
-        self.log.info("Joining room %r", name)
-        room = yield self.xmpp.muc.join(name, self.bot_name)
-        self.log.info("Joined room %r", name)
+        msg = "room {0!r}".format(name)
+        attrs = events.Event(type="room", service=self.bot_name, room=name)
 
-        try:
-            yield room
-        finally:
-            self.log.info("Left room %r", name)
+        with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
+            log.open("Joining " + msg, attrs, status="joining")
+            room = yield self.xmpp.muc.join(name, self.bot_name)
+
+            log.open("Joined " + msg, attrs, status="joined")
+            try:
+                yield room
+            finally:
+                log.close("Left " + msg, attrs, status="left")
 
     def to_room(self, name):
         return self.room_handlers.inc(name) | idiokit.consume()
@@ -24,10 +29,12 @@ class RoomBot(bot.ServiceBot):
     def from_room(self, name):
         return idiokit.consume() | self.room_handlers.inc(name)
 
+
 import time
 import hashlib
 import collections
 from abusehelper.core import events
+
 
 def event_id(event):
     result = list()
@@ -40,6 +47,7 @@ def event_id(event):
             result.append(value)
 
     return hashlib.md5("\xc0".join(result)).hexdigest()
+
 
 class WindowBot(RoomBot):
     @idiokit.stream

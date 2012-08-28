@@ -1,41 +1,6 @@
-import uuid
-
 import idiokit
 from idiokit import timer
-from abusehelper.core import events, rules, taskfarm, bot
-
-
-class SessionLogger(object):
-    def __init__(self, id, logger, *args, **keys):
-        self._defaults = events.Event(*args, **keys)
-        self._logger = logger
-
-        self._id = id
-        self._latest = None
-
-    def open(self, msg, *args, **keys):
-        event = self._defaults.union({"id:open": self._id}, *args, **keys)
-        self._log(msg, event)
-        self._latest = msg, event
-
-    def close(self, msg, *args, **keys):
-        event = self._defaults.union({"id:close": self._id}, *args, **keys)
-        self._log(msg, event)
-        self._latest = None
-
-    def _log(self, msg, event):
-        event_dict = dict((x, event.values(x)) for x in event.keys())
-        self._logger.info(msg, **event_dict)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        if self._latest is not None:
-            msg, event = self._latest
-            self._log(msg, event)
-            self._latest = None
-        return False
+from abusehelper.core import events, rules, taskfarm, bot, services
 
 
 class RoomGraphBot(bot.ServiceBot):
@@ -43,12 +8,6 @@ class RoomGraphBot(bot.ServiceBot):
         bot.ServiceBot.__init__(self, *args, **keys)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.srcs = dict()
-
-    def session_logger(self, _id=None, *args, **keys):
-        if _id is None:
-            _id = uuid.uuid4().hex
-        logger = SessionLogger(_id, self.log, {"service": self.bot_name}, *args, **keys)
-        return logger
 
     @idiokit.stream
     def _alert(self, interval=15.0):
@@ -93,44 +52,37 @@ class RoomGraphBot(bot.ServiceBot):
     @idiokit.stream
     def handle_room(self, name):
         msg = "room {0!r}".format(name)
+        attrs = events.Event(type="room", service=self.bot_name, room=name)
 
-        with self.session_logger(_id="room:"+name, type="roominfo", room=name) as logger:
-            logger.open("Joining " + msg, status="joining")
+        def check(elements):
+            if name in self.srcs:
+                yield elements
+
+        with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
+            log.open("Joining " + msg, attrs, status="joining")
             room = yield self.xmpp.muc.join(name, self.bot_name)
-            logger.open("Joined " + msg, status="joined")
 
+            log.open("Joined " + msg, attrs, status="joined")
             try:
                 distribute = self.distribute(name)
                 idiokit.pipe(self._alert() | distribute)
-
-                def check(elements):
-                    if name in self.srcs:
-                        yield elements
-
                 yield room | idiokit.map(check) | distribute
             finally:
-                logger.close("Left " + msg, status="left")
+                log.close("Left " + msg, attrs, status="left")
 
     @idiokit.stream
     def session(self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
         classifier = self.srcs.setdefault(src_room, rules.RuleClassifier())
         classifier.inc(rule, dst_room)
 
-        if rule == rules.ANYTHING():
-            msg = "session {0} -> {1}".format(src_room, dst_room)
-        else:
-            msg = "session {0} -[{1}]-> {2}".format(src_room, rule, dst_room)
-
-        with self.session_logger(type="session", src_room=src_room, dst_room=dst_room, rule=repr(rule)) as logger:
-            logger.open("Opened " + msg, status="open")
-            try:
-                yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
-            finally:
-                logger.close("Closed " + msg, status="closed")
-
-                classifier.dec(rule, dst_room)
-                if classifier.is_empty():
-                    self.srcs.pop(src_room, None)
+        try:
+            yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
+        except services.Stop:
+            pass
+        finally:
+            classifier.dec(rule, dst_room)
+            if classifier.is_empty():
+                self.srcs.pop(src_room, None)
 
 if __name__ == "__main__":
     RoomGraphBot.from_command_line().execute()

@@ -8,8 +8,10 @@ import optparse
 import traceback
 import cPickle as pickle
 
+
 class ParamError(Exception):
     pass
+
 
 class Param(object):
     NO_VALUE = object()
@@ -30,6 +32,7 @@ class Param(object):
     def parse(self, value):
         return value
 
+
 class ListParam(Param):
     def __init__(self, *args, **keys):
         self.type = keys.pop("type", Param())
@@ -42,6 +45,7 @@ class ListParam(Param):
                 return map(self.type.parse, split)
         except csv.Error:
             raise ParamError("not a valid comma separated list: %r" % value)
+
 
 class BoolParam(Param):
     nargs = 0
@@ -59,12 +63,14 @@ class BoolParam(Param):
             return False
         raise ParamError("not a valid boolean value: %r" % value)
 
+
 class IntParam(Param):
     def parse(self, value):
         try:
             return int(value)
         except ValueError:
             raise ParamError("not a valid integer value: %r" % value)
+
 
 class FloatParam(Param):
     def parse(self, value):
@@ -73,8 +79,10 @@ class FloatParam(Param):
         except ValueError:
             raise ParamError("not a valid floating point value: %r" % value)
 
+
 def optparse_name(name):
     return name.replace("_", "-")
+
 
 def optparse_callback(option, opt_str, value, parser, callback, parsed):
     try:
@@ -82,6 +90,7 @@ def optparse_callback(option, opt_str, value, parser, callback, parsed):
     except ParamError, error:
         message = "option " + opt_str + ": " + error.args[0]
         raise optparse.OptionValueError(message)
+
 
 class LineFormatter(logging.Formatter):
     def __init__(self):
@@ -104,6 +113,7 @@ class LineFormatter(logging.Formatter):
             record.args = args
 
         return "".join(lines)
+
 
 class Bot(object):
     bot_name = Param("name for the bot (default=%default)")
@@ -129,7 +139,7 @@ class Bot(object):
                 keys[name] = list()
 
                 for i in range(len(bites)):
-                    key = tuple(bites[:i+1])
+                    key = tuple(bites[:i + 1])
                     keys[name].append(key)
                     orders[key] = min(orders.get(key, value.order), value.order)
 
@@ -282,6 +292,7 @@ class Bot(object):
     def run(self):
         pass
 
+
 import time
 import getpass
 import collections
@@ -291,6 +302,7 @@ from idiokit import timer
 from idiokit.xmpp import connect
 from abusehelper.core import log
 
+
 class XMPPBot(Bot):
     xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
     xmpp_password = Param("the XMPP password", default=None)
@@ -298,9 +310,9 @@ class XMPPBot(Bot):
                       default=None)
     xmpp_port = IntParam("the XMPP service port (default: autodetect)",
                          default=None)
-    xmpp_extra_ca_certs = Param("a PEM formatted file of CAs to be used "+
+    xmpp_extra_ca_certs = Param("a PEM formatted file of CAs to be used " +
                                 "in addition to the system CAs", default=None)
-    xmpp_ignore_cert = BoolParam("do not perform any verification "+
+    xmpp_ignore_cert = BoolParam("do not perform any verification " +
                                  "for the XMPP service's SSL certificate")
 
     def __init__(self, *args, **keys):
@@ -330,7 +342,9 @@ class XMPPBot(Bot):
         self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
         idiokit.stop(xmpp)
 
-from abusehelper.core import services
+
+from abusehelper.core import services, version
+
 
 class _Service(services.Service):
     def __init__(self, bot, *args, **keys):
@@ -343,13 +357,12 @@ class _Service(services.Service):
     def session(self, *args, **keys):
         return self.bot.session(*args, **keys)
 
-from abusehelper.core import version
 
 class ServiceBot(XMPPBot):
-    bot_state_file = Param("save bot state to the given path "+
+    bot_state_file = Param("save bot state to the given path " +
                            "(default: do not save state)",
                            default=None)
-    service_room = Param("name of the multi user chat room used "+
+    service_room = Param("name of the multi user chat room used " +
                          "for bot control")
     service_mock_session = ListParam(default=None)
 
@@ -404,10 +417,12 @@ class ServiceBot(XMPPBot):
         except services.Stop:
             pass
 
+
 from abusehelper.core import events, taskfarm
 
+
 class FeedBot(ServiceBot):
-    xmpp_rate_limit = FloatParam("how many XMPP stanzas the bot can send per "+
+    xmpp_rate_limit = FloatParam("how many XMPP stanzas the bot can send per " +
                                  "second (default: no limiting)", default=None)
 
     def __init__(self, *args, **keys):
@@ -454,34 +469,31 @@ class FeedBot(ServiceBot):
         try:
             yield idiokit.pipe(*feeds)
         except services.Stop:
-            idiokit.stop()
+            pass
         finally:
             for key in feed_keys:
                 self._dsts.dec(key, dst_room)
 
     def manage_feed(self, key):
-        return idiokit.pipe(self.feed(*key),
-                            self.augment(),
-                            self._distribute(key))
+        return self.feed(*key) | self.augment() | self._distribute(key)
 
     @idiokit.stream
     def manage_room(self, name):
-        self.log.info("Joining room %r", name)
-        room = yield self.xmpp.muc.join(name, self.bot_name)
+        msg = "room {0!r}".format(name)
+        attrs = events.Event(type="room", service=self.bot_name, room=name)
 
-        tail = self._stats(name) | room | idiokit.consume()
-        if self.xmpp_rate_limit is not None:
-            tail = self._output_rate_limiter() | tail
+        with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
+            log.open("Joining " + msg, attrs, status="joining")
+            room = yield self.xmpp.muc.join(name, self.bot_name)
 
-        self.log.info("Joined room %r", name)
-
-        if self.xmpp_rate_limit:
-            self.log.info("Sending limited to %.f stanzas per second",
-                          self.xmpp_rate_limit)
-        try:
-            yield events.events_to_elements() | tail
-        finally:
-            self.log.info("Left room %r", name)
+            log.open("Joined " + msg, attrs, status="joined")
+            try:
+                tail = self._stats(name) | room | idiokit.consume()
+                if self.xmpp_rate_limit is not None:
+                    tail = self._output_rate_limiter() | tail
+                yield events.events_to_elements() | tail
+            finally:
+                log.close("Left " + msg, attrs, status="left")
 
     @idiokit.stream
     def _distribute(self, key):
@@ -521,10 +533,12 @@ class FeedBot(ServiceBot):
     def augment(self):
         return idiokit.map(lambda x: (x,))
 
+
 import codecs
 from hashlib import md5
 
 _utf8encoder = codecs.getencoder("utf-8")
+
 
 def event_hash(event):
     result = list()
@@ -533,13 +547,14 @@ def event_hash(event):
         result.append(_utf8encoder(value)[0])
     return md5("\xc0".join(result)).digest()
 
+
 class PollingBot(FeedBot):
-    poll_interval = IntParam("wait at least the given amount of seconds "+
-                             "before polling the data source again "+
+    poll_interval = IntParam("wait at least the given amount of seconds " +
+                             "before polling the data source again " +
                              "(default: %default seconds)", default=3600)
-    ignore_initial_poll = BoolParam("don't send out events collected during the "+
-                                    "first poll, just use them for deduplication "+
-                                    "(WARNING: an experimental feature, may change "+
+    ignore_initial_poll = BoolParam("don't send out events collected during the " +
+                                    "first poll, just use them for deduplication " +
+                                    "(WARNING: an experimental feature, may change " +
                                     "or be removed without prior notice)")
 
     def __init__(self, *args, **keys):

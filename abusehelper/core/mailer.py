@@ -8,6 +8,7 @@ import idiokit
 from idiokit import timer, threadpool
 from abusehelper.core import events, taskfarm, services, templates, bot
 
+
 def next_time(time_string):
     try:
         parsed = list(time.strptime(time_string, "%H:%M"))
@@ -26,6 +27,7 @@ def next_time(time_string):
         return time.mktime(current) - current_time
     return delta
 
+
 @idiokit.stream
 def alert(*times):
     if not times:
@@ -35,6 +37,7 @@ def alert(*times):
     while True:
         yield timer.sleep(min(map(next_time, times)))
         yield idiokit.send()
+
 
 class ReportBot(bot.ServiceBot):
     REPORT_NOW = object()
@@ -48,16 +51,18 @@ class ReportBot(bot.ServiceBot):
 
     @idiokit.stream
     def handle_room(self, name):
-        self.log.info("Joining room %r", name)
-        room = yield self.xmpp.muc.join(name, self.bot_name)
-        self.log.info("Joined room %r", name)
+        msg = "room {0!r}".format(name)
+        attrs = events.Event(type="room", service=self.bot_name, room=name)
 
-        try:
-            yield idiokit.pipe(room,
-                               events.stanzas_to_events(),
-                               self.distribute(name))
-        finally:
-            self.log.info("Left room %r", name)
+        with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
+            log.open("Joining " + msg, attrs, status="joining")
+            room = yield self.xmpp.muc.join(name, self.bot_name)
+
+            log.open("Joined " + msg, attrs, status="joined")
+            try:
+                yield room | events.stanzas_to_events() | self.distribute(name)
+            finally:
+                log.close("Left " + msg, attrs, status="left")
 
     @idiokit.stream
     def distribute(self, name):
@@ -138,6 +143,7 @@ class ReportBot(bot.ServiceBot):
         yield timer.sleep(0.0)
         idiokit.stop(True)
 
+
 class MailTemplate(templates.Template):
     def format(self, events, encoding="utf-8"):
         from email import message_from_string
@@ -174,11 +180,13 @@ class MailTemplate(templates.Template):
             msg.attach(part)
         return msg
 
+
 def format_addresses(addrs):
     from email.utils import getaddresses, formataddr
 
     # FIXME: Use encoding after getaddresses
     return ", ".join(map(formataddr, getaddresses(addrs)))
+
 
 class MailerService(ReportBot):
     TOLERATED_EXCEPTIONS = (socket.error, smtplib.SMTPException)
@@ -189,7 +197,7 @@ class MailerService(ReportBot):
                              default=25)
     smtp_auth_user = bot.Param("username for the authenticated SMTP service",
                                default=None)
-    smtp_auth_password = bot.Param("password for the authenticated SMTP "+
+    smtp_auth_password = bot.Param("password for the authenticated SMTP " +
                                    "service", default=None)
 
     def __init__(self, **keys):
@@ -278,13 +286,13 @@ class MailerService(ReportBot):
                 yield threadpool.thread(self._try_to_authenticate, server)
                 yield threadpool.thread(server.sendmail, from_addr, to_addr, msg)
         except smtplib.SMTPDataError, data_error:
-            self.log.error("Could not send message to %r: %r. "+
+            self.log.error("Could not send message to %r: %r. " +
                            "Dropping message from queue.",
                            to_addr, data_error)
             idiokit.stop(True)
         except smtplib.SMTPRecipientsRefused, refused:
             for recipient, reason in refused.recipients.iteritems():
-                self.log.error("Could not send message to %r: %r. "+
+                self.log.error("Could not send message to %r: %r. " +
                                "Dropping message from queue.",
                                recipient, reason)
             idiokit.stop(True)
