@@ -1,4 +1,5 @@
-from idiokit import threado, xmlcore, xmpp
+import idiokit
+from idiokit import xmlcore, xmpp
 from idiokit.xmpp import jid
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts import combiner
@@ -26,71 +27,68 @@ def parse(text):
             return bgpranking
     return None
 
-@threado.stream
-def request(inner, xmpp, to, text):
-    channel = threado.Channel()
+@idiokit.stream
+def request(xmpp, to, text):
+    to = jid.JID(to)
+    body = xmlcore.Element("body")
+    body.text = text
+    yield xmpp.core.message(to, body, type='chat', id='blue')
 
-    def listener(success, value):
-        if success:
-            channel.send(value)
-        else:
-            exc, traceback = value
-            channel.throw(exc, traceback)
+    while True:
+        msg = yield xmpp.next()
+        if(msg.with_attrs("from")):
+            sender = jid.JID(msg.get_attr("from"))
+            if sender.bare() != to.bare():
+                continue
 
-    callback = xmpp.add_listener(listener)
-    try:
-        to = jid.JID(to)
-        body = xmlcore.Element("body")
-        body.text = text
-        xmpp.core.message(to, body, type='chat', id='blue')
-
-
-        while True:
-            source, elements = yield threado.any(inner, channel)
-            if channel is source:
-                for msg in elements.named("message"):
-                    if(msg.with_attrs("from")):
-                        sender = jid.JID(msg.get_attr("from"))
-                        if sender.bare() != to.bare():
-                            continue
-
-                    for body in msg.children().named("body"):
-                        result = parse(body.text)
-                        if result is not None:
-                            inner.finish(result)
-    finally:
-        xmpp.discard_listener(callback)
+            for body in msg.children().named("body"):
+                result = parse(body.text)
+                if result is not None:
+                    idiokit.stop(result)
 
 class BGPRankingBot(combiner.Expert):
+    """
+        Implementation of an expert that will query the BGPRanking
+        server to retrieve the ranking for the IP in the event.
+
+        The ranking are retrieve through a live XMPP session with
+        CIRCL.  This is a typical implementation of a bot-to-bot
+        chat.
+    """
     bgp_jid = bot.Param()
     bgp_pwd = bot.Param()
+    bgp_ejid = bot.Param()
 
-    @threado.stream
-    def main(inner, self, *args, **keys):
-        self.bgp_conn = yield inner.sub(xmpp.connect(self.bgp_jid,
+    @idiokit.stream
+    def main(self, *args, **keys):
+        self.bgp_conn = None
+        self.bgp_conn = yield xmpp.connect(self.bgp_jid,
                                                      self.bgp_pwd,
                                                      None, None,
-                                                     False, None))
+                                                     False, None)
         self.bgp_conn.core.presence()
 
-        yield inner.sub(combiner.Expert.main(self, *args, **keys))
+        yield combiner.Expert.main(self, *args, **keys)
 
-    @threado.stream
-    def augment(inner, self):
+    @idiokit.stream
+    def augment(self):
         while True:
-            eid, event = yield inner
-            if event.contains("bgprank") or not event.contains("ip"):
+            eid, event = yield idiokit.next()
+            if event.contains("bgpranking") or not event.contains("ip"):
                 continue
 
             augmented = events.Event()
 
             for ip in event.values("ip"):
+                if not self.bgp_conn:
+                    continue
+
                 rank = yield request(self.bgp_conn,
-                                     "bgpranking@p.smile.public.lu",
+                                     self.bgp_ejid,
                                      "ip " + ip)
                 augmented.add("bgpranking", rank["Rank"])
 
-            inner.send(eid, augmented)
+            yield idiokit.send(eid, augmented)
 
 if __name__ == "__main__":
     BGPRankingBot.from_command_line().execute()
