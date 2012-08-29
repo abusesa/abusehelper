@@ -194,24 +194,24 @@ class RuntimeBot(bot.XMPPBot):
         })
 
         session_id = session.path or [uuid.uuid4().hex]
-        with self.log.stateful(*session_id) as log:
+        with self.log.stateful(attrs.value("service").encode("utf-8"), *session_id) as log:
             while True:
                 log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
                 try:
                     stream = yield lobby.session(session.service, *session.path, **session.conf)
                 except Cancel:
-                    log.close("Stopped waiting for {0!r}".format(name), attrs, status="stopped")
+                    log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
                     break
                 else:
                     conf_str = u", ".join(conf).encode("unicode-escape")
-                    log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="sent")
+                    log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="running")
 
                 try:
                     yield stream
                 except services.Stop:
                     log.open("Lost connection to {0!r}".format(name), attrs, status="lost")
                 except Cancel:
-                    log.close("Ended connection to {0!r}".format(name), attrs, status="ended")
+                    log.close("Ended connection to {0!r}".format(name), attrs, status="removed")
                     break
 
     def run(self):
