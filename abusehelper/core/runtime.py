@@ -1,6 +1,7 @@
+import uuid
 import idiokit
 from idiokit.xmpp import jid
-from abusehelper.core import serialize, config, bot, services, log
+from abusehelper.core import serialize, events, config, bot, services, log
 
 
 def iter_runtimes(obj):
@@ -155,7 +156,7 @@ class RuntimeBot(bot.XMPPBot):
 
                 for key in set(sessions) - added:
                     stream = sessions.pop(key)
-                    stream.throw(Cancel())
+                    stream.signal(Cancel())
 
                 for session in added - set(sessions):
                     sessions[session] = self.session(lobby, session) | self._catch(errors)
@@ -167,7 +168,7 @@ class RuntimeBot(bot.XMPPBot):
     def main(self):
         xmpp = yield self.xmpp_connect()
 
-        self.log.info("Joining lobby %r", self.service_room)
+        self.log.info("Joining lobby {0!r}".format(self.service_room))
         lobby = yield services.join_lobby(xmpp, self.service_room, self.bot_name)
 
         self.log.addHandler(log.RoomHandler(lobby.room))
@@ -179,29 +180,39 @@ class RuntimeBot(bot.XMPPBot):
     def session(self, lobby, session):
         name = session.service
         if session.path:
-            name += "(" + ".".join(session.path) + ")"
+            name += u"(" + ".".join(session.path) + ")"
 
-        while True:
-            self.log.info("Waiting for %r", name)
-            try:
-                stream = yield lobby.session(session.service,
-                                             *session.path,
-                                             **session.conf)
-            except Cancel:
-                self.log.info("Stopped waiting for %r", name)
-                break
+        conf = []
+        for key, value in session.conf.iteritems():
+            conf.append(key + u"=" + repr(value))
 
-            conf_str = ", ".join("%s=%r" % (key.encode("unicode-escape"), value)
-                                 for (key, value) in session.conf.items())
-            self.log.info("Sent %r conf: %s", name, conf_str)
+        attrs = events.Event({
+            "type": "session",
+            "service": session.service,
+            "path": u".".join(session.path) if session.path else [],
+            "config": u", ".join(conf)
+        })
 
-            try:
-                yield stream
-            except services.Stop:
-                self.log.info("Lost connection to %r", name)
-            except Cancel:
-                self.log.info("Ended connection to %r", name)
-                break
+        session_id = session.path or [uuid.uuid4().hex]
+        with self.log.stateful(*session_id) as log:
+            while True:
+                log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
+                try:
+                    stream = yield lobby.session(session.service, *session.path, **session.conf)
+                except Cancel:
+                    log.close("Stopped waiting for {0!r}".format(name), attrs, status="stopped")
+                    break
+                else:
+                    conf_str = u", ".join(conf).encode("unicode-escape")
+                    log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="sent")
+
+                try:
+                    yield stream
+                except services.Stop:
+                    log.open("Lost connection to {0!r}".format(name), attrs, status="lost")
+                except Cancel:
+                    log.close("Ended connection to {0!r}".format(name), attrs, status="ended")
+                    break
 
     def run(self):
         try:
