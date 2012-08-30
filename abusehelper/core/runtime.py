@@ -25,7 +25,7 @@ class Pipeable(object):
 
     def __or__(self, other):
         if not isinstance(other, Pipeable):
-            raise TypeError("%r is not pipeable" % other)
+            raise TypeError(repr(other) + " is not pipeable")
         return Pipe(self, other)
 
 
@@ -80,7 +80,7 @@ class Session(Pipeable):
             try:
                 value = serialize.load(serialize.dump(value))
             except serialize.UnregisteredType:
-                raise SessionError("can not serialize key %r value %r" % (key, value))
+                raise SessionError("can not serialize key {0!r} value {1!r}".format(key, value))
             conf[key] = value
         self.__dict__["_conf"] = config.HashableFrozenDict(conf)
 
@@ -89,11 +89,11 @@ class Session(Pipeable):
         new_conf.update(conf)
         return Session(self.service, *self.path, **new_conf)
 
-    def __setitem__(self, key, value):
-        raise AttributeError("%r instances are immutable" % self.__class__)
+    def __setattr__(self, key, value):
+        raise AttributeError(self.__class__.__name__ + " instances are immutable")
 
-    def __delitem__(self, key):
-        raise AttributeError("%r instances are immutable" % self.__class__)
+    def __delattr__(self, key):
+        raise AttributeError(self.__class__.__name__ + " instances are immutable")
 
     def __hash__(self):
         return hash(self.service) ^ hash(self.path) ^ hash(self._conf)
