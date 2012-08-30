@@ -141,7 +141,7 @@ class RuntimeBot(bot.XMPPBot):
         try:
             yield idiokit.consume()
         except:
-            errors.throw()
+            errors.signal()
             raise
 
     @idiokit.stream
@@ -162,7 +162,7 @@ class RuntimeBot(bot.XMPPBot):
                     sessions[session] = self.session(lobby, session) | self._catch(errors)
         finally:
             for stream in sessions.values():
-                stream.throw(Cancel())
+                stream.signal(Cancel())
 
     @idiokit.stream
     def main(self):
