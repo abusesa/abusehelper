@@ -500,7 +500,7 @@ class FeedBot(ServiceBot):
         while True:
             event = yield idiokit.next()
 
-            for name in self._dsts.get(key):
+            for name in tuple(self._dsts.get(key)):
                 room = self._rooms.get(name)
                 if room is None:
                     continue
