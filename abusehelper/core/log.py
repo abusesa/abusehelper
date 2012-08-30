@@ -55,8 +55,7 @@ class _StatefulLogger(object):
         self._latest = None
 
     def _log(self, msg, event):
-        event_dict = dict((x, event.values(x)) for x in event.keys())
-        self._logger.info(msg, **event_dict)
+        self._logger._log(logging.INFO, msg, event=event)
 
     def __enter__(self):
         return self
@@ -81,23 +80,14 @@ class EventLogger(object):
     error = _level(logging.ERROR)
     critical = _level(logging.CRITICAL)
 
-    def log(self, lvl, *args, **keys):
-        if len(args) > 1 and keys:
-            raise TypeError("mixed positional and keyword arguments")
+    def log(self, level, msg, *args, **keys):
+        if args:
+            msg = msg % args
+        return self._log(level, msg, **keys)
 
-        event = events.Event(keys)
-
-        if not args:
-            msg = unicode(event).encode("unicode-escape")
-        elif len(args) > 1:
-            msg = args[0] % args[1:]
-        elif keys:
-            msg = args[0] % keys
-        else:
-            msg = args[0]
-
-        event = event.union(logmsg=msg, loglevel=logging.getLevelName(lvl))
-        return self._logger.log(lvl, msg, **{"extra": {"event": event}})
+    def _log(self, level, msg, event=()):
+        event = events.Event(event).union(logmsg=msg, loglevel=logging.getLevelName(level))
+        return self._logger.log(level, msg, **{"extra": {"event": event}})
 
     def stateful(self, *ids):
         hashed = hashlib.sha1()
