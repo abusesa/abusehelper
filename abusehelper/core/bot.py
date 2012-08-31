@@ -20,7 +20,7 @@ class Param(object):
 
     def __init__(self, help=None, short=None, default=NO_VALUE):
         self.short = short
-        self.help = help
+        self.help = None if help is None else inspect.cleandoc(help)
         self.default = default
 
         self.order = Param.param_order
@@ -44,7 +44,7 @@ class ListParam(Param):
                 split = filter(None, map(str.strip, row))
                 return map(self.type.parse, split)
         except csv.Error:
-            raise ParamError("not a valid comma separated list: %r" % value)
+            raise ParamError("not a valid comma separated list: " + repr(value))
 
 
 class BoolParam(Param):
@@ -61,7 +61,7 @@ class BoolParam(Param):
             return True
         if value.lower() in ["off", "no", "0", "false"]:
             return False
-        raise ParamError("not a valid boolean value: %r" % value)
+        raise ParamError("not a valid boolean value: " + repr(value))
 
 
 class IntParam(Param):
@@ -69,7 +69,7 @@ class IntParam(Param):
         try:
             return int(value)
         except ValueError:
-            raise ParamError("not a valid integer value: %r" % value)
+            raise ParamError("not a valid integer value: " + repr(value))
 
 
 class FloatParam(Param):
@@ -77,7 +77,7 @@ class FloatParam(Param):
         try:
             return float(value)
         except ValueError:
-            raise ParamError("not a valid floating point value: %r" % value)
+            raise ParamError("not a valid floating point value: " + repr(value))
 
 
 def optparse_name(name):
@@ -118,7 +118,7 @@ class LineFormatter(logging.Formatter):
 class Bot(object):
     bot_name = Param("name for the bot (default=%default)")
     log_file = Param("write logs to the given path (default: log to stdout)",
-                     default=None)
+        default=None)
 
     @classmethod
     def params(cls):
@@ -179,16 +179,16 @@ class Bot(object):
             if param.short is not None:
                 args = ["-" + optparse_name(param.short)]
 
-            kwargs = dict(default=defaults.get(name, None),
-                          help=param.help,
-                          metavar=name,
-                          dest=name,
-                          action="callback",
-                          type="string" if param.nargs else None,
-                          nargs=param.nargs,
-                          callback=optparse_callback,
-                          callback_args=(param.parse, parsed))
-            parser.add_option(*args, **kwargs)
+            parser.add_option(*args,
+                default=defaults.get(name, None),
+                help=param.help,
+                metavar=name,
+                dest=name,
+                action="callback",
+                type="string" if param.nargs else None,
+                nargs=param.nargs,
+                callback=optparse_callback,
+                callback_args=(param.parse, parsed))
 
         _, args = parser.parse_args()
         for (name, param), value in zip(positional, args):
@@ -257,12 +257,12 @@ class Bot(object):
             elif param.has_default():
                 value = param.default
             else:
-                raise TypeError("missing keyword argument %r" % name)
+                raise TypeError("missing keyword argument " + repr(name))
             setattr(self, name, value)
 
         if keys:
             name = keys.keys()[0]
-            raise TypeError("got an unexpected keyword argument %r" % name)
+            raise TypeError("got an unexpected keyword argument " + repr(name))
 
         self.log = self.create_logger()
 
@@ -305,15 +305,18 @@ from abusehelper.core import log
 
 class XMPPBot(Bot):
     xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
-    xmpp_password = Param("the XMPP password", default=None)
+    xmpp_password = Param("the XMPP password",
+        default=None)
     xmpp_host = Param("the XMPP service host (default: autodetect)",
-                      default=None)
+        default=None)
     xmpp_port = IntParam("the XMPP service port (default: autodetect)",
-                         default=None)
-    xmpp_extra_ca_certs = Param("a PEM formatted file of CAs to be used " +
-                                "in addition to the system CAs", default=None)
-    xmpp_ignore_cert = BoolParam("do not perform any verification " +
-                                 "for the XMPP service's SSL certificate")
+        default=None)
+    xmpp_extra_ca_certs = Param("""
+        a PEM formatted file of CAs to be used in addition to the system CAs
+        """, default=None)
+    xmpp_ignore_cert = BoolParam("""
+        do not perform any verification for the XMPP service's SSL certificate
+        """)
 
     def __init__(self, *args, **keys):
         Bot.__init__(self, *args, **keys)
@@ -332,14 +335,13 @@ class XMPPBot(Bot):
     def xmpp_connect(self):
         verify_cert = not self.xmpp_ignore_cert
 
-        self.log.info("Connecting to XMPP service with JID %r", self.xmpp_jid)
-        xmpp = yield connect(self.xmpp_jid,
-                             self.xmpp_password,
-                             host=self.xmpp_host,
-                             port=self.xmpp_port,
-                             ssl_verify_cert=verify_cert,
-                             ssl_ca_certs=self.xmpp_extra_ca_certs)
-        self.log.info("Connected to XMPP service with JID %r", self.xmpp_jid)
+        self.log.info("Connecting to XMPP service with JID " + repr(self.xmpp_jid))
+        xmpp = yield connect(self.xmpp_jid, self.xmpp_password,
+            host=self.xmpp_host,
+            port=self.xmpp_port,
+            ssl_verify_cert=verify_cert,
+            ssl_ca_certs=self.xmpp_extra_ca_certs)
+        self.log.info("Connected to XMPP service with JID " + repr(self.xmpp_jid))
         idiokit.stop(xmpp)
 
 
@@ -359,40 +361,38 @@ class _Service(services.Service):
 
 
 class ServiceBot(XMPPBot):
-    bot_state_file = Param("save bot state to the given path " +
-                           "(default: do not save state)",
-                           default=None)
-    service_room = Param("name of the multi user chat room used " +
-                         "for bot control")
+    bot_state_file = Param("""
+        save bot state to the given path (default: do not save state)
+        """, default=None)
+    service_room = Param("""
+        name of the multi user chat room used for bot control
+        """)
     service_mock_session = ListParam(default=None)
 
     @idiokit.stream
     def _run(self):
         ver_str = version.version_str()
-        self.log.info("Starting service %r version %s", self.bot_name, ver_str)
+        self.log.info("Starting service {0!r} version {1}".format(self.bot_name, ver_str))
         self.xmpp = yield self.xmpp_connect()
 
         service = _Service(self, self.bot_state_file)
 
         if self.service_mock_session is not None:
-            keys = dict(item.split("=", 1)
-                        for item in self.service_mock_session)
-            self.log.info("Running a mock ression with keys %r" % keys)
+            keys = dict(item.split("=", 1) for item in self.service_mock_session)
+            self.log.info("Running a mock ression with keys " + repr(keys))
             session = yield service.open_session(None, keys)
             yield session | service.run()
             return
 
-        self.log.info("Joining lobby %r", self.service_room)
-        self.lobby = yield services.join_lobby(self.xmpp,
-                                               self.service_room,
-                                               self.bot_name)
+        self.log.info("Joining lobby " + repr(self.service_room))
+        self.lobby = yield services.join_lobby(self.xmpp, self.service_room, self.bot_name)
         self.log.addHandler(log.RoomHandler(self.lobby.room))
 
-        self.log.info("Offering service %r", self.bot_name)
+        self.log.info("Offering service " + repr(self.bot_name))
         try:
             yield self.lobby.offer(self.bot_name, service)
         finally:
-            self.log.info("Retired service %r", self.bot_name)
+            self.log.info("Retired service " + repr(self.bot_name))
 
     def run(self):
         @idiokit.stream
@@ -422,8 +422,10 @@ from abusehelper.core import events, taskfarm
 
 
 class FeedBot(ServiceBot):
-    xmpp_rate_limit = FloatParam("how many XMPP stanzas the bot can send per " +
-                                 "second (default: no limiting)", default=None)
+    xmpp_rate_limit = FloatParam("""
+        how many XMPP stanzas the bot can send per second
+        (default: no limiting)
+        """, default=None)
 
     def __init__(self, *args, **keys):
         ServiceBot.__init__(self, *args, **keys)
@@ -521,7 +523,7 @@ class FeedBot(ServiceBot):
                     yield timer.sleep(sleep)
                 finally:
                     if counter.count > 0:
-                        self.log.info("Sent %d events to room %r", counter.count, name)
+                        self.log.info("Sent {0} events to room {1!r}".format(counter.count, name))
                         counter.count = 0
 
                 sleep = interval
@@ -549,13 +551,16 @@ def event_hash(event):
 
 
 class PollingBot(FeedBot):
-    poll_interval = IntParam("wait at least the given amount of seconds " +
-                             "before polling the data source again " +
-                             "(default: %default seconds)", default=3600)
-    ignore_initial_poll = BoolParam("don't send out events collected during the " +
-                                    "first poll, just use them for deduplication " +
-                                    "(WARNING: an experimental feature, may change " +
-                                    "or be removed without prior notice)")
+    poll_interval = IntParam("""
+        wait at least the given amount of seconds before polling
+        the data source again (default: %default seconds)
+        """, default=3600)
+    ignore_initial_poll = BoolParam("""
+        don't send out events collected during the first poll,
+        just use them for deduplication (WARNING: this is an
+        experimental flag that may change or be removed without
+        prior notice)
+        """)
 
     def __init__(self, *args, **keys):
         FeedBot.__init__(self, *args, **keys)
