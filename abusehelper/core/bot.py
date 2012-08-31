@@ -87,7 +87,7 @@ def optparse_name(name):
 def optparse_callback(option, opt_str, value, parser, callback, parsed):
     try:
         parsed[option.dest] = callback(value)
-    except ParamError, error:
+    except ParamError as error:
         message = "option " + opt_str + ": " + error.args[0]
         raise optparse.OptionValueError(message)
 
@@ -197,7 +197,7 @@ class Bot(object):
 
             try:
                 parsed[name] = param.parse(value)
-            except ParamError, error:
+            except ParamError as error:
                 message = "parameter " + name + ": " + error.args[0]
                 parser.error(message)
 
@@ -220,7 +220,7 @@ class Bot(object):
             if isinstance(value, basestring):
                 try:
                     value = param.parse(value)
-                except ParamError, error:
+                except ParamError as error:
                     raise ParamError("startup parameter " + name + ": " + error.args[0])
             results[name] = value
 
