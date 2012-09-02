@@ -9,7 +9,7 @@ from idiokit import socket
 from abusehelper.core import bot, events, utils
 from abusehelper.contrib.experts.combiner import Expert
 
-DEFAULT_KEYS = ("host", "domain", "ip", "first seen", "last seen")
+DEFAULT_KEYS = ("host", "ip", "first seen", "last seen")
 
 
 def is_ipv4(ip):
@@ -74,7 +74,7 @@ class PassiveDNSExpert(Expert):
         self.cache = utils.TimedCache(cache_time)
 
     def augment_keys(self, *args, **keys):
-        yield (keys.get("resolve", ("domain",)))
+        yield (keys.get("resolve", ("host",)))
 
     @idiokit.stream
     def augment(self, *args):
