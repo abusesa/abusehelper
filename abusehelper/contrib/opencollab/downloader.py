@@ -78,9 +78,9 @@ def fetch_url(url, opener=None, chunk_size=16384):
 
         idiokit.stop(info, output, result_url)
     except urllib2.HTTPError as he:
-        raise HTTPError(he.code, he.msg, he.headers, he.fp)
+        raise utils.HTTPError(he.code, he.msg, he.headers, he.fp)
     except (urllib2.URLError, httplib.HTTPException, socket.error) as error:
-        raise FetchUrlFailed(str(error))
+        raise utils.FetchUrlFailed(str(error))
 
 class DownloadExpert(Expert):
     collab_url = bot.Param()
