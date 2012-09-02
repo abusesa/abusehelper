@@ -1,10 +1,16 @@
+"""
+An expert to augment IPs with passive DNS data.
+
+Maintainer: "Juhani Eronen" <exec@iki.fi>
+"""
 import idiokit
 import socket as _socket
 from idiokit import socket
-from abusehelper.core import bot, events
+from abusehelper.core import bot, events, utils
 from abusehelper.contrib.experts.combiner import Expert
 
-DEFAULT_KEYS = ("domain", "ip", "first seen", "last seen")
+DEFAULT_KEYS = ("host", "domain", "ip", "first seen", "last seen")
+
 
 def is_ipv4(ip):
     try:
@@ -24,12 +30,13 @@ def is_ipv6(ip):
     else:
         return False
 
+
 @idiokit.stream
 def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
     sock = socket.Socket()
     try:
         yield sock.connect((host, port))
-        yield sock.sendall(name + "\r\n")
+        yield sock.sendall(str(name) + "\r\n")
 
         all_data = list()
         while True:
@@ -40,29 +47,51 @@ def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
     except socket.SocketError:
         return
 
-    for line in "".join(all_data).splitlines():
+    lines = "".join(all_data).splitlines()
+    # there will be duplicates
+    lines = set(lines)
+    for line in lines:
         event = events.Event()
         for key, value in zip(keys, line.split("\t")):
             if key == 'ip':
                 if not is_ipv4(value):
                     if not is_ipv6(value):
-                        key = 'domain'
+                        # The particular type of pdns server used here
+                        # only gives you a and ns.
+                        key = 'ns'
             event.add(key, value)
+#        event.add('query', name)
         yield idiokit.send(eid, event)
+
 
 class PassiveDNSExpert(Expert):
     host = bot.Param()
     port = bot.IntParam(default=43)
 
+    def __init__(self, *args, **keys):
+        cache_time = keys.get('cache_time', 3600.0)
+        Expert.__init__(self, *args, **keys)
+        self.cache = utils.TimedCache(cache_time)
+
+    def augment_keys(self, *args, **keys):
+        yield (keys.get("resolve", ("domain",)))
+
     @idiokit.stream
-    def augment(self):
+    def augment(self, *args):
         while True:
             eid, event = yield idiokit.next()
 
-            for name in set(event.values("domain") +
-                            event.values("ip") +
-                            event.values("soa")):
-                yield lookup(self.host, self.port, eid, name)
+            values = set()
+            for arg in args:
+                values.update(event.values(arg))
+
+            for name in values:
+                self.log.info("Querying %r", name)
+                answer = self.cache.get(name, None)
+                if not answer:
+                    answer = lookup(self.host, self.port, eid, name)
+                    self.cache.set(name, answer)
+                    yield answer
 
 if __name__ == "__main__":
     PassiveDNSExpert.from_command_line().execute()
