@@ -60,7 +60,7 @@ def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
                         # only gives you a and ns.
                         key = 'ns'
             event.add(key, value)
-#        event.add('query', name)
+        event.add("expert", "passivedns")
         yield idiokit.send(eid, event)
 
 
