@@ -149,6 +149,7 @@ class WebshotExpert(Expert):
             for url in event.values(key):
                 new = events.Event()
 
+                self.log.info("Taking a webshot of %r", url)
                 success = yield threadpool.thread(self.jsongrab, url)
 
                 if success:

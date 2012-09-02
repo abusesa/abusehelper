@@ -172,6 +172,7 @@ class DownloadExpert(Expert):
                     opener.addheaders = addheaders
 
                 try:
+                    self.log.info("Downloading %r", url)
                     info, fileobj, r_url = yield fetch_url(url, opener=opener)
                     data = fileobj.read()
                     md5sum = md5(data).hexdigest()
