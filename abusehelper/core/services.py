@@ -114,7 +114,7 @@ class Lobby(idiokit.Proxy):
 
         for service_id in previous - self.catalogue.get(jid, set()):
             for task in self.guarded.pop((jid, service_id), ()):
-                task.signal(Unavailable())
+                task.throw(Unavailable())
 
     def handle_iq(self, iq, payload):
         if not iq.with_attrs("from", type="set"):
@@ -189,7 +189,7 @@ class Lobby(idiokit.Proxy):
             sessions = self.jids[jid]
             if session_id in sessions:
                 session = sessions.pop(session_id)
-                session.signal(reason)
+                session.throw(reason)
             if not sessions:
                 del self.jids[jid]
 
@@ -313,7 +313,7 @@ class Service(object):
             raise Stop()
         finally:
             for session in self.sessions.itervalues():
-                session.signal(Stop())
+                session.throw(Stop())
 
             while self.sessions:
                 session = tuple(self.sessions.itervalues())[0]
@@ -328,7 +328,7 @@ class Service(object):
             except Stop:
                 state = None
             except:
-                self.errors.signal()
+                self.errors.throw()
                 raise
             else:
                 if path is not None:
@@ -343,7 +343,7 @@ class Service(object):
             key = path
             while key in self.sessions:
                 old_session = self.sessions[key]
-                yield old_session.signal(Stop())
+                yield old_session.throw(Stop())
                 yield old_session
 
             state = self._get(path)

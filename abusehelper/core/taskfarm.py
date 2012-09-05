@@ -66,7 +66,7 @@ class TaskFarm(object):
 
                 if not self.counter.contains(key) and key in self.tasks:
                     task = self.tasks.pop(key)
-                    task.signal(self.signal)
+                    task.throw(self.signal)
 
     def inc(self, *args, **keys):
         key = self._key(*args, **keys)
