@@ -23,8 +23,6 @@ class CymruWhoisExpert(combiner.Expert):
 
                 augmentation = events.Event()
                 for key, value in items:
-                    if key == 'bgp_prefix':
-                        key = 'bgp prefix'
                     augmentation.add(prefix + key, value)
                 yield idiokit.send(eid, augmentation)
 

@@ -3,6 +3,7 @@ import idiokit
 from abusehelper.core import utils
 from idiokit import socket as idiokit_socket, timer
 
+
 def is_ip(string):
     for addr_type in (socket.AF_INET, socket.AF_INET6):
         try:
@@ -13,13 +14,15 @@ def is_ip(string):
             return True
     return False
 
+
 def ip_values(event, keys):
     for key in keys:
         for value in event.values(key, filter=is_ip):
             yield value
 
+
 class CymruWhois(object):
-    KEYS = "asn", "bgp_prefix", "cc", "registry", "allocated", "as name"
+    KEYS = "asn", "bgp prefix", "cc", "registry", "allocated", "as name"
 
     def __init__(self, wait_time=0.5, cache_time=3600.0):
         self.wait_time = wait_time
