@@ -1,45 +1,52 @@
 import socket
 import idiokit
+import collections
 from abusehelper.core import utils
 from idiokit import socket as idiokit_socket, timer
 
 
-def is_ip(string):
+class Timeout(Exception):
+    pass
+
+
+@idiokit.stream
+def timeout(delay):
+    yield timer.sleep(delay)
+    raise Timeout()
+
+
+def normalized_ip(string):
     for addr_type in (socket.AF_INET, socket.AF_INET6):
         try:
-            socket.inet_pton(addr_type, string)
+            return socket.inet_ntop(addr_type, socket.inet_pton(addr_type, string))
         except (TypeError, ValueError, socket.error):
             pass
-        else:
-            return True
-    return False
+    return None
 
 
 def ip_values(event, keys):
     for key in keys:
-        for value in event.values(key, filter=is_ip):
+        for value in event.values(key, parser=normalized_ip):
             yield value
 
 
 class CymruWhois(object):
     KEYS = "asn", "bgp prefix", "cc", "registry", "allocated", "as name"
 
-    def __init__(self, wait_time=0.5, cache_time=3600.0):
-        self.wait_time = wait_time
-
-        self.cache = utils.TimedCache(cache_time)
-        self.buffer = None
-        self.socket = None
-        self.main = None
-        self.count = 0
+    def __init__(self, cache_time=3600.0, timeout=30.0):
+        self._timeout = timeout
+        self._cache = utils.TimedCache(cache_time)
+        self._pending = collections.deque()
+        self._ips = dict()
+        self._next = idiokit.Event()
+        self._current = None
 
     @idiokit.stream
     def augment(self, *ip_keys):
         while True:
             event = yield idiokit.next()
-
             if not ip_keys:
-                values = event.values(filter=is_ip)
+                values = event.values(parser=normalized_ip)
             else:
                 values = ip_values(event, ip_keys)
 
@@ -51,90 +58,108 @@ class CymruWhois(object):
             yield idiokit.send(event)
 
     @idiokit.stream
-    def lookup(self, ip):
-        if not is_ip(ip):
+    def _lookup(self, ip):
+        if normalized_ip(ip) is None:
             idiokit.stop(())
 
-        values = self.cache.get(ip, None)
-        if values is None:
-            self.count += 1
-            try:
-                if self.main is None:
-                    self.main = self._main()
-                    idiokit.pipe(self._alert(self.wait_time / 2), self.main)
-                main = self.main
+        values = self._cache.get(ip, None)
+        if values is not None:
+            idiokit.stop(values)
 
-                event = idiokit.Event()
-                yield main.send(ip, event)
-                values = yield event | main.fork() | event
-            finally:
-                self.count -= 1
+        if ip not in self._ips:
+            self._ips[ip] = 1, idiokit.Event()
+            self._next.succeed()
+            self._next = idiokit.Event()
+            self._pending.append(ip)
+        count, event = self._ips[ip]
+        self._ips[ip] = count + 1, event
+
+        try:
+            if self._current is None:
+                self._current = self._bulk()
+            values = yield self._current.fork() | event
+        finally:
+            count, _ = self._ips[ip]
+            if count > 1:
+                self._ips[ip] = count - 1, event
+            else:
+                del self._ips[ip]
+
+        idiokit.stop(values)
+
+    @idiokit.stream
+    def lookup(self, ip):
+        values = yield self._lookup(ip)
         idiokit.stop([x for x in zip(self.KEYS, values) if x[1] is not None])
 
     @idiokit.stream
-    def _alert(self, interval):
-        while True:
-            yield timer.sleep(interval)
-            yield idiokit.send()
-
-    @idiokit.stream
-    def _main(self):
-        timeouts = 0
+    def _bulk(self):
         try:
-            while True:
-                item = yield idiokit.next()
-                if item is None:
-                    timeouts += 1
-                    if timeouts < 2:
-                        continue
-                    yield self._close()
-                    if self.count > 0:
-                        continue
-                    break
-
-                ip, event = item
-                values = self.cache.get(ip, None)
-                if values is None:
-                    values = yield self._lookup(ip)
-                    self.cache.set(ip, tuple(values))
-                    timeouts = 0
-                event.succeed(values)
+            while self._pending:
+                try:
+                    yield self._once(0.2)
+                except idiokit_socket.SocketTimeout:
+                    yield timer.sleep(1.0)
+                except idiokit_socket.SocketError:
+                    yield timer.sleep(10.0)
+                else:
+                    yield timer.sleep(2.0)
         finally:
-            self.main = None
+            self._current = None
 
     @idiokit.stream
-    def _lookup(self, ip):
-        while True:
-            if self.socket is None:
-                self.socket = idiokit_socket.Socket()
-                yield self.socket.connect(("whois.cymru.com", 43))
-                yield self.socket.sendall("begin\nverbose\n")
+    def _once(self, wait_timeout):
+        sock = idiokit_socket.Socket()
+        buffer = ""
 
-                self.buffer = ""
+        try:
+            yield sock.connect(("whois.cymru.com", 43), timeout=self._timeout)
+            yield sock.sendall("begin\nverbose\n", timeout=self._timeout)
 
-            yield self.socket.sendall(str(ip) + "\n")
             while True:
-                data = yield self.socket.recv(4096)
-                if not data:
-                    self.socket = None
-                    self.buffer = None
-                    break
+                if not self._pending:
+                    try:
+                        yield timeout(wait_timeout) | self._next
+                    except Timeout:
+                        if not self._pending:
+                            break
 
-                lines = (self.buffer + data).split("\n")
-                self.buffer = lines.pop()
+                current_ip = self._pending[0]
+                count, event = self._ips[current_ip]
+                if count <= 1:
+                    del self._ips[current_ip]
+                    self._pending.popleft()
+                    continue
+                count, event = self._ips[current_ip]
+                self._ips[current_ip] = count + 1, event
 
-                for line in lines:
-                    values = self._parse(line)
-                    if values is not None:
-                        idiokit.stop(values)
+                yield sock.sendall(str(current_ip) + "\n", timeout=self._timeout)
+                while True:
+                    data = yield sock.recv(4096, timeout=self._timeout)
+                    if not data:
+                        raise idiokit_socket.SocketError()
 
-    @idiokit.stream
-    def _close(self):
-        if self.socket is not None:
-            yield self.socket.sendall("end\n")
-            yield self.socket.close()
-        self.socket = None
-        self.buffer = None
+                    lines = (buffer + data).split("\n")
+                    buffer = lines.pop()
+
+                    parsed = dict(set(self._parse(x) for x in lines) - set([None]))
+                    for result_ip, values in parsed.iteritems():
+                        self._cache.set(result_ip, values)
+                        if result_ip not in self._ips:
+                            continue
+
+                        count, event = self._ips[result_ip]
+                        if count > 1:
+                            self._ips[result_ip] = count - 1, event
+                        else:
+                            del self._ips[result_ip]
+                        event.succeed(values)
+
+                    if current_ip in parsed:
+                        self._pending.popleft()
+                        break
+        finally:
+            yield sock.close()
 
     def _parse(self, line):
         line = line.decode("utf-8", "replace")
@@ -143,8 +168,10 @@ class CymruWhois(object):
         if len(bites) != 7:
             return None
 
-        bites.pop(1)
-        return bites
+        ip = normalized_ip(bites.pop(1))
+        if ip is None:
+            return None
+        return ip, tuple(bites)
 
 global_whois = CymruWhois()
 
