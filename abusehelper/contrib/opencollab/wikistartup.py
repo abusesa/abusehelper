@@ -165,6 +165,21 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
                                  "checked for updates (default: %default)",
                                  default=60)
 
+    xmpp_jid = bot.Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)",
+        default=None)
+    xmpp_password = bot.Param("the XMPP password",
+        default=None)
+    xmpp_host = bot.Param("the XMPP service host (default: autodetect)",
+        default=None)
+    xmpp_port = bot.IntParam("the XMPP service port (default: autodetect)",
+        default=None)
+    xmpp_extra_ca_certs = bot.Param("""
+        a PEM formatted file of CAs to be used in addition to the system CAs
+        """, default=None)
+    xmpp_ignore_cert = bot.BoolParam("""
+        do not perform any verification for the XMPP service's SSL certificate
+        """, default=None)
+
     def __init__(self, *args, **keys):
         super(WikiStartupBot, self).__init__(*args, **keys)
         self.collab = None
@@ -199,6 +214,15 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
                 return
             elif len(module) == 1:
                 module = rmlink(module[0])
+
+            keys = ["xmpp_jid", "xmpp_password", "xmpp_host", "xmpp_port",
+                    "xmpp_extra_ca_certs", "xmpp_ignore_cert"]
+            for key in keys:
+                value = list(metas.get(key, set()))
+                if not value:
+                    default = getattr(self, key, None)
+                    if default is not None:
+                        metas[key] = set([unicode(default)])
 
             pages[page] = self.parse_metas(metas)
             if module:
