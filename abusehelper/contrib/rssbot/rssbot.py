@@ -2,6 +2,7 @@ import xml.etree.cElementTree as etree
 import idiokit
 from abusehelper.core import bot, cymruwhois, events, utils
 
+
 class RSSBot(bot.PollingBot):
     feeds = bot.ListParam("a list of RSS feed URLs")
     use_cymru_whois = bot.BoolParam(default=False)
@@ -38,8 +39,8 @@ class RSSBot(bot.PollingBot):
                         if id:
                             new_events.add(id)
                         yield idiokit.send(event)
-        except (etree.ParseError, SyntaxError):
-            self.log.error('Invalid format on feed: "%s"', url)
+        except SyntaxError, e:
+            self.log.error('Invalid format on feed: "%s", "%r"', url, e)
 
         for id in self.past_events:
             if id not in new_events:
