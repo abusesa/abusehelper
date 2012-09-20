@@ -1,5 +1,5 @@
-import xml.etree.cElementTree as etree
 import idiokit
+import xml.etree.cElementTree as etree
 from abusehelper.core import bot, cymruwhois, events, utils
 
 
@@ -49,11 +49,10 @@ class RSSBot(bot.PollingBot):
                 yield idiokit.send(event)
         self.past_events = new_events
 
-
     def _parse(self, elem, url):
         items = elem.findall("item")
         if not items:
-            return 
+            return
 
         for item in items:
             args = {"source": url}
@@ -73,4 +72,3 @@ class RSSBot(bot.PollingBot):
 
 if __name__ == "__main__":
     RSSBot.from_command_line().run()
-
