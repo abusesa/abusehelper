@@ -31,16 +31,23 @@ class RSSBot(bot.PollingBot):
 
         self.log.info("Finished downloading the feed.")
         new_events = set()
-        try:
-            for _, elem in etree.iterparse(fileobj):
-                for event in self._parse(elem, url):
-                    if event:
-                        id = event.value("id", None)
-                        if id:
-                            new_events.add(id)
-                        yield idiokit.send(event)
-        except SyntaxError, e:
-            self.log.error('Invalid format on feed: "%s", "%r"', url, e)
+
+        byte = fileobj.read(1)
+        while byte and byte != "<":
+            byte = fileobj.read(1)
+
+        if byte == "<":
+            fileobj.seek(-1, 1)
+            try:
+                for _, elem in etree.iterparse(fileobj):
+                    for event in self._parse(elem, url):
+                         if event:
+                            id = event.value("id", None)
+                            if id:
+                                new_events.add(id)
+                            yield idiokit.send(event)
+            except SyntaxError, e:
+                self.log.error('Invalid format on feed: "%s", "%r"', url, e)
 
         for id in self.past_events:
             if id not in new_events:
