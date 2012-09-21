@@ -120,38 +120,41 @@ class Expert(RoomBot):
 
 
 class Combiner(RoomBot):
+    def _add(self, ids, queue, time_window, eid):
+        current_time = time.time()
+        expire_time = current_time + time_window
+
+        unique = object()
+        queue.append((expire_time, eid, unique))
+
+        if eid not in ids:
+            ids[eid] = dict(), dict()
+        event_set, augment_set = ids[eid]
+        return unique, event_set, augment_set
+
     @idiokit.stream
     def collect(self, ids, queue, time_window):
         while True:
             event = yield idiokit.next()
 
-            current_time = time.time()
-            expire_time = current_time + time_window
-
             eid = event_id(event)
-            if eid not in ids:
-                queue.append((expire_time, eid))
-                ids[eid] = event, list()
-            else:
-                _, augmentations = ids[eid]
-                ids[eid] = event, augmentations
+            unique, event_set, augment_set = self._add(ids, queue, time_window, eid)
+            event_set[unique] = event.union(*augment_set.values())
 
     @idiokit.stream
     def combine(self, ids, queue, time_window):
         while True:
-            augmentation = yield idiokit.next()
+            augment = yield idiokit.next()
+            augment = events.Event(augment)
 
-            augmentation = events.Event(augmentation)
-            eids = augmentation.values(AUGMENT_KEY)
-            augmentation = augmentation.difference({AUGMENT_KEY: eids})
+            eids = augment.values(AUGMENT_KEY)
+            augment = augment.difference({AUGMENT_KEY: eids})
 
             for eid in eids:
-                if eid not in ids:
-                    expire_time = time.time() + time_window
-                    queue.append((expire_time, eid))
-                    ids[eid] = None, list()
-                event, augmentations = ids[eid]
-                augmentations.append(augmentation)
+                unique, event_set, augment_set = self._add(ids, queue, time_window, eid)
+                augment_set[unique] = augment
+                for unique, event in event_set.items():
+                    event_set[unique] = event.union(augment)
 
     @idiokit.stream
     def cleanup(self, ids, queue):
@@ -161,10 +164,17 @@ class Combiner(RoomBot):
             current_time = time.time()
 
             while queue and queue[0][0] <= current_time:
-                expire_time, eid = queue.popleft()
-                event, augmentations = ids.pop(eid)
+                expire_time, eid, unique = queue.popleft()
+                event_set, augment_set = ids[eid]
+
+                augment_set.pop(unique, None)
+
+                event = event_set.pop(unique, None)
                 if event is not None:
-                    yield idiokit.send(events.Event(event, *augmentations))
+                    yield idiokit.send(event)
+
+                if not event_set and not augment_set:
+                    del ids[eid]
 
     @idiokit.stream
     def session(self, state, src_room, dst_room,
