@@ -18,6 +18,7 @@ class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
     poll_interval = bot.IntParam("how often (in seconds) the collab is " +
                                  "checked for updates (default: %default)",
                                  default=60)
+    decrypt_password = bot.Param("Password for decrypting metas.", default=None)
 
     def __init__(self, *args, **keys):
         super(RuntimeBot, self).__init__(*args, **keys)

@@ -10,6 +10,7 @@ import idiokit
 from idiokit import timer
 from abusehelper.core import bot, rules
 from abusehelper.core.startup import Bot, StartupBot
+from abusehelper.contrib.opencollab.crypto import decrypt, DecryptionError
 
 TYPES = {"True":True, "true":True, "False":False, "false":False, "None":None,
          "none":None}
@@ -141,8 +142,12 @@ class WikiConfigInterface:
                             values[index] = value
                 else:
                     try:
-                        values[index] = json.loads(value)
-                    except ValueError:
+                        if self.decrypt_password:
+                            values[index] = decrypt(value,
+                                                    self.decrypt_password)
+                        else:
+                            values[index] = json.loads(value)
+                    except (ValueError, DecryptionError, TypeError):
                         values[index] = value
 
             if len(values) == 1:
@@ -164,11 +169,12 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
     poll_interval = bot.IntParam("how often (in seconds) the collab is " +
                                  "checked for updates (default: %default)",
                                  default=60)
+    decrypt_password = bot.Param("Password for decrypting metas.", default=None)
 
     xmpp_jid = bot.Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)",
         default=None)
     xmpp_password = bot.Param("the XMPP password",
-        default=None)
+        default="")
     xmpp_host = bot.Param("the XMPP service host (default: autodetect)",
         default=None)
     xmpp_port = bot.IntParam("the XMPP service port (default: autodetect)",
