@@ -1,4 +1,5 @@
 import uuid
+import string
 import random
 
 import idiokit
@@ -363,5 +364,11 @@ class Service(object):
 
 @idiokit.stream
 def join_lobby(xmpp, name, nick=None):
+    random_string = unicode(random.randint(0, 10 ** 6))
+    if nick is None:
+        nick = random_string
+    else:
+        nick = nick + "-" + random_string
+
     room = yield xmpp.muc.join(name, nick)
     idiokit.stop(Lobby(xmpp, room))
