@@ -482,7 +482,12 @@ class FeedBot(ServiceBot):
     @idiokit.stream
     def manage_room(self, name):
         msg = "room {0!r}".format(name)
-        attrs = events.Event(type="room", service=self.bot_name, room=name)
+        attrs = events.Event({
+            "type": "room",
+            "service": self.bot_name,
+            "sent events": "0",
+            "room": name
+        })
 
         with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
             log.open("Joining " + msg, attrs, status="joining")
@@ -523,7 +528,12 @@ class FeedBot(ServiceBot):
                     yield timer.sleep(sleep)
                 finally:
                     if counter.count > 0:
-                        self.log.info("Sent {0} events to room {1!r}".format(counter.count, name))
+                        self.log.info("Sent {0} events to room {1!r}".format(counter.count, name),
+                            event=events.Event({
+                                "type": "room",
+                                "service": self.bot_name,
+                                "sent events": unicode(counter.count),
+                                "room": name}))
                         counter.count = 0
 
                 sleep = interval

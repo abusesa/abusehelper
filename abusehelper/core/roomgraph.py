@@ -8,37 +8,43 @@ class RoomGraphBot(bot.ServiceBot):
         bot.ServiceBot.__init__(self, *args, **keys)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
         self.srcs = dict()
+        self.stats = dict()
+
+    def _inc_stats(self, room, seen=0, sent=0):
+        seen_count, sent_count = self.stats.get(room, (0, 0))
+        self.stats[room] = seen_count + seen, sent_count + sent
 
     @idiokit.stream
-    def _alert(self, interval=15.0):
+    def _log_stats(self, interval=15.0):
         while True:
             yield timer.sleep(interval)
-            yield idiokit.send(None)
+
+            for room, (seen, sent) in self.stats.iteritems():
+                self.log.info("Room {0!r}: seen {1}, sent {2} events".format(room, seen, sent),
+                    event=events.Event({
+                        "type": "room",
+                        "service": self.bot_name,
+                        "seen events": unicode(seen),
+                        "sent events": unicode(sent),
+                        "room": room}))
+            self.stats.clear()
+
+    def main(self, *args, **keys):
+        return self._log_stats() | bot.ServiceBot.main(self, *args, **keys)
 
     @idiokit.stream
     def distribute(self, name):
-        count = 0
         waiters = dict()
 
         while True:
             elements = yield idiokit.next()
 
-            if elements is None:
-                for waiter in waiters.values():
-                    yield waiter
-                waiters.clear()
-
-                if count > 0:
-                    self.log.info("Seen {0} events in room {1!r}".format(count, name))
-                    count = 0
-                continue
-
             classifier = self.srcs.get(name, None)
-            if classifier is None:
-                continue
 
             for event in events.Event.from_elements(elements):
-                count += 1
+                self._inc_stats(name, seen=1)
+                if classifier is None:
+                    continue
 
                 for dst_room in classifier.classify(event):
                     dst = self.rooms.get(dst_room)
@@ -48,11 +54,18 @@ class RoomGraphBot(bot.ServiceBot):
 
                     if dst is not None:
                         waiters[dst_room] = dst.send(event.to_elements())
+                        self._inc_stats(dst_room, sent=1)
 
     @idiokit.stream
     def handle_room(self, name):
         msg = "room {0!r}".format(name)
-        attrs = events.Event(type="room", service=self.bot_name, room=name)
+        attrs = events.Event({
+            "type": "room",
+            "service": self.bot_name,
+            "seen events": "0",
+            "sent events": "0",
+            "room": name
+        })
 
         def check(elements):
             if name in self.srcs:
@@ -64,9 +77,7 @@ class RoomGraphBot(bot.ServiceBot):
 
             log.open("Joined " + msg, attrs, status="joined")
             try:
-                distribute = self.distribute(name)
-                idiokit.pipe(self._alert() | distribute)
-                yield room | idiokit.map(check) | distribute
+                yield room | idiokit.map(check) | self.distribute(name)
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
