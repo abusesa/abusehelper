@@ -66,7 +66,7 @@ def _aes256(key, iv, data, encrypt=True):
     return out
 
 
-def crypt(data, password, iterations=2048):
+def crypt(data, password, iterations=4096):
     key_length = 32
 
     enc_salt = gen_salt(key_length)
@@ -97,22 +97,24 @@ class DecryptionError(Exception):
     pass
 
 
-def _validate(data, validations):
-    result = dict()
+def _validate(data, validator):
+    if callable(validator):
+        try:
+            return validator(data)
+        except (ValueError, TypeError):
+            DecryptionError("could not validate")
 
-    for key, value in validations.iteritems():
-        if key not in data:
-            raise DecryptionError("missing key {0!r}".format(key))
+    if isinstance(validator, dict):
+        result = dict()
 
-        if isinstance(value, dict):
+        for key, value in validator.iteritems():
+            if key not in data:
+                raise DecryptionError("missing key {0!r}".format(key))
             result[key] = _validate(data[key], value)
-        else:
-            try:
-                result[key] = value(data[key])
-            except (ValueError, TypeError):
-                raise DecryptionError("could not validate key {0!r}".format(key))
 
-    return result
+        return result
+
+    raise DecryptionError("validator {0!r} not a dict or callable".format(validator))
 
 
 def decrypt(data, password):
@@ -155,9 +157,70 @@ def decrypt(data, password):
 
 
 if __name__ == "__main__":
-    plaintext = sys.argv[1]
-    password = sys.argv[2]
+    import getpass
+    from optparse import OptionParser
 
-    enc = crypt(plaintext, password)
-    print "encrypted:", enc
-    print "decrypted:", decrypt(enc, password)
+    parser = OptionParser()
+    parser.add_option("-d", "--decrypt",
+        action="store_true",
+        help="decrypt the input (default: encrypt input)",
+        dest="decrypt")
+    parser.add_option("-p", "--password",
+        help="the password used for encryption/decryption " +
+            "(default: ask interactively)",
+        metavar="PASSWORD",
+        dest="password",
+        default=None)
+    parser.add_option("-o", "--output",
+        help="write the output to a file (default: write to STDOUT)",
+        metavar="FILENAME",
+        default=None)
+    parser.add_option("-i", "--input",
+        help="read the input from a file (default: read from STDIN)",
+        metavar="FILENAME",
+        default=None)
+    parser.add_option("--iterations",
+        type="int",
+        help="the number of iterations used by the key derivation" +
+            "function (default: %default), only valid when encrypting",
+        metavar="ITERATIONS",
+        default=4096)
+
+    options, args = parser.parse_args()
+
+    def get_password():
+        while True:
+            password = ""
+
+            while not password:
+                password = getpass.getpass("Password: ")
+
+            if password == getpass.getpass("Confirm password: "):
+                return password
+
+            print >> sys.stderr, "Passwords do not match, try again."
+
+    if options.input is None:
+        input_data = raw_input("Input: ")
+    else:
+        with open(options.input, "rb") as input_file:
+            input_data = input_file.read()
+
+    if options.password is not None:
+        password = options.password
+    else:
+        password = get_password()
+
+    if options.decrypt:
+        output_data = decrypt(input_data, password)
+    else:
+        iterations = options.iterations
+        output_data = crypt(input_data, password, iterations=iterations)
+
+    if options.output is None:
+        sys.stdout.write(output_data)
+        sys.stdout.flush()
+    else:
+        with open(options.output, "wb") as output_file:
+            output_file.write(output_data)
+            output_file.flush()
