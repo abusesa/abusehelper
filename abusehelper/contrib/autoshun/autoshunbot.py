@@ -1,9 +1,24 @@
 import idiokit
 import time as _time
 import calendar
-from abusehelper.core import utils, cymruwhois, bot, events
+from abusehelper.core import utils, cymruwhois, bot
 
 AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
+
+# Based on analysis in VSRoom for the most common types.
+classification = (
+    ("ZeroAccess", "malware" "ZeroAccess"),
+    ("Sipvicious", "protocol", "sip"),
+    ("SSH", "protocol", "ssh"),
+    ("Tomcat", "protocol", "http"),
+    ("WEB Proxy", "protocol", "http"),
+    ("Double HTTP", "protocol", "http"),
+    ("Wordpress", "protocol", "http"),
+    ("DHL Spambot", "type", "spambot"),
+    ("Spam Bot", "type", "spambot"),
+    ("Terminal Server", "protocol", "rdp"),
+)
+
 
 class AutoshunBot(bot.PollingBot):
     COLUMNS = ["ip", "time", "info"]
@@ -42,18 +57,30 @@ class AutoshunBot(bot.PollingBot):
             event = yield idiokit.next()
             event.add("feed", "autoshun")
             event.add("source url", self.feed_url)
-            event.add("type", "autoshun ids alert")
-
+            for d in event.values("info"):
+                event.add("description", d)
+                for name, key, value in classification:
+                    if d.startswith(name):
+                        event.add(key, value)
+                        if key == "malware":
+                            event.add("type", "botnet drone")
+                        elif key == "protocol":
+                            event.add("type", "brute-force")
+                        if value == "spambot":
+                            event.add("type", "botnet drone")
+            event.clear("info")
+            if not event.contains("type"):
+                event.add("type", "ids alert")
             times = event.values("time")
             event.clear("time")
             for time in times:
-                event.add("time", self._normalize_time(time))
+                event.add("source time", self._normalize_time(time))
             yield idiokit.send(event)
 
     def _normalize_time(self, time):
         parsed = _time.strptime(time, "%Y-%m-%d %H:%M:%S")
         seconds = calendar.timegm(parsed)
-        seconds += 5 * 3600 # UTC-5 to UTC
+        seconds += 5 * 3600  # UTC-5 to UTC
         time_tuple = _time.gmtime(seconds)
         return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
 
