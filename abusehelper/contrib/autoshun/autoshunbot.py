@@ -6,8 +6,8 @@ from abusehelper.core import utils, cymruwhois, bot
 AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
 # Based on analysis in VSRoom for the most common types.
-classification = (
-    ("ZeroAccess", "malware" "ZeroAccess"),
+CLASSIFICATION = (
+    ("ZeroAccess", "malware", "ZeroAccess"),
     ("Sipvicious", "protocol", "sip"),
     ("SSH", "protocol", "ssh"),
     ("Tomcat", "protocol", "http"),
@@ -59,7 +59,7 @@ class AutoshunBot(bot.PollingBot):
             event.add("source url", self.feed_url)
             for d in event.values("info"):
                 event.add("description", d)
-                for name, key, value in classification:
+                for name, key, value in CLASSIFICATION:
                     if d.startswith(name):
                         event.add(key, value)
                         if key == "malware":
