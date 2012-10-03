@@ -51,7 +51,7 @@ class GeoIPExpert(Expert):
 
             cc = record.get("country_code", None)
             if cc:
-                augmentation.add("geoip_cc", cc)
+                augmentation.add("geoip cc", cc)
 
             latitude = record.get("latitude", None)
             if latitude:
