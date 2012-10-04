@@ -115,7 +115,7 @@ class PhishTankBot(bot.PollingBot):
             event.add("ip", ip)
             event.add("asn", announcer)
             if ts:
-                event.add("time", ts)
+                event.add("source time", ts)
             if target is not None:
                 event.add("target", target.text)
             yield idiokit.send(event)
