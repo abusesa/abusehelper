@@ -36,16 +36,17 @@ class OpenBLBot(bot.PollingBot):
 
             event = events.Event()
             event.add("ip", ip)
-            event.add("time", time)
-            event.add("feed", "OpenBL")
+            event.add("source time", time)
+            event.add("feed", "openbl")
             event.add("source url", self.feed_url)
-            event.add("type", "ssh brute-force")
+            event.add("type", "brute-force")
+            event.add("protocol", "ssh")
 
             yield idiokit.send(event)
 
     def _normalize_time(self, time):
         seconds = int(time)
-        seconds -= 1 * 3600 # UTC+1 to UTC
+        seconds -= 1 * 3600  # UTC+1 to UTC
         time_tuple = _time.gmtime(seconds)
         return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
 
