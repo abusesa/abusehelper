@@ -12,6 +12,7 @@ from abusehelper.core import bot, events, utils
 
 cdata = re.compile("(.*?)\<\!\[CDATA\[(.*?)\]\]\>")
 
+
 def unescape(string):
     """
     >>> unescape("one&nbsp;<![CDATA[two&nbsp;]]>three")
@@ -26,6 +27,7 @@ def unescape(string):
         result.append(data)
 
     return "".join(result)
+
 
 class CleanMXBot(bot.PollingBot):
     def feed_keys(self, csv_url, csv_name=None, **keys):
@@ -55,7 +57,7 @@ class CleanMXBot(bot.PollingBot):
             # A key is not renamed by default.
             # Mapping a key to None removes the key.
             key_mappings = {
-                "time": "firsttime",
+                "time": "source time",
                 "id": "cleanmx id",
                 "phishtank": "phishtank id",
                 "line": None
