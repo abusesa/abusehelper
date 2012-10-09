@@ -78,6 +78,8 @@ def parse_rule(tokens):
         return tstring
 
 class WikiConfigInterface:
+    default_metas = dict()
+
     @idiokit.stream
     def configs(self):
         self.collab = wiki.GraphingWiki(self.collab_url,
@@ -88,6 +90,17 @@ class WikiConfigInterface:
 
         while True:
             self.log.info("Reading configs")
+            if self.defaults_page:
+                previous_defaults = self.default_metas.copy()
+                pages = self.get_metas(self.defaults_page)
+                for page, metas in pages.iteritems():
+                    metas = self.parse_page(page, metas)
+                    metas = self.parse_metas(metas)
+                    self.default_metas.update(metas)
+                if self.default_metas != previous_defaults:
+                    self.log.info("Defaults values changed on page %r",
+                                  self.defaults_page)
+                
             pages = self.get_metas(self.category)
             if pages:
                 bots = self.parse_pages(pages)
@@ -166,6 +179,8 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
 
     category = bot.Param("Page category (default: %default)",
                          default="CategoryBot")
+    defaults_page = bot.Param("Page for default values for bot arguments", 
+                              default=None)
     poll_interval = bot.IntParam("how often (in seconds) the collab is " +
                                  "checked for updates (default: %default)",
                                  default=60)
@@ -191,16 +206,30 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
         self.collab = None
         self._metas = dict()
 
+    def parse_page(self, page, metas):
+        metas = dict(metas)
+        for key in ['gwikilabel', 'gwikicategory']:
+            try:
+                del metas[key]
+            except KeyError:
+                pass
+
+        keys = ["xmpp_jid", "xmpp_password", "xmpp_host", "xmpp_port",
+                "xmpp_extra_ca_certs", "xmpp_ignore_cert"]
+        for key in keys:
+            value = list(metas.get(key, set()))
+            if not value:
+                default = getattr(self, key, None)
+                if default is not None:
+                    metas[key] = set([unicode(default)])
+
+        return metas
+
     def parse_pages(self, pages):
         bots = list()
 
         for page, metas in pages.iteritems():
-            metas = dict(metas)
-            for key in ['gwikilabel', 'gwikicategory']:
-                try:
-                    del metas[key]
-                except KeyError:
-                    pass
+            metas = self.parse_page(page, metas)
 
             name = list(metas.pop("name", set()))
             if not name:
@@ -221,16 +250,12 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
             elif len(module) == 1:
                 module = rmlink(module[0])
 
-            keys = ["xmpp_jid", "xmpp_password", "xmpp_host", "xmpp_port",
-                    "xmpp_extra_ca_certs", "xmpp_ignore_cert"]
-            for key in keys:
-                value = list(metas.get(key, set()))
-                if not value:
-                    default = getattr(self, key, None)
-                    if default is not None:
-                        metas[key] = set([unicode(default)])
-
             pages[page] = self.parse_metas(metas)
+
+            for key in self.default_metas:
+                if not key in metas:
+                    metas[key] = self.default_metas[key]
+
             if module:
                 bots.append(Bot(name, module, **metas))
             else:
