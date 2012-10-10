@@ -90,7 +90,7 @@ class WikiConfigInterface:
 
         while True:
             self.log.info("Reading configs")
-            if self.defaults_page:
+            if getattr(self, "defaults_page", None):
                 previous_defaults = self.default_metas.copy()
                 pages = self.get_metas(self.defaults_page)
                 for page, metas in pages.iteritems():
