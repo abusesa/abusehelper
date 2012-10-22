@@ -145,14 +145,19 @@ class WikiConfigInterface:
                         pass
 
                 if value.startswith("[[") and value.endswith("]]"):
-                    content = self.get_content(rmlink(value))
-                    if content:
-                        values[index] = content
+                    if key in ["room", "src_room", "dst_room"]:
+                        content = rmlink(value)
+                        if content:
+                            values[index] = content
                     else:
-                        try:
-                            values[index] = json.loads(value)
-                        except ValueError:
-                            values[index] = value
+                        content = self.get_content(rmlink(value))
+                        if content:
+                            values[index] = content
+                        else:
+                            try:
+                                values[index] = json.loads(value)
+                            except ValueError:
+                                values[index] = value
                 else:
                     try:
                         if self.decrypt_password:
