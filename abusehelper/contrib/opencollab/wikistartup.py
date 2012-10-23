@@ -258,6 +258,12 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
             elif len(module) == 1:
                 module = rmlink(module[0])
 
+            enable = list(metas.pop("enabled", set()))
+            if enable:
+                val = enable[0]
+                if val in TYPES and not TYPES[val]:
+                    continue
+
             pages[page] = self.parse_metas(metas)
 
             for key in self.default_metas:

@@ -4,7 +4,7 @@ from opencollab import wiki
 from abusehelper.core import bot
 from abusehelper.core.runtime import RuntimeBot, Session
 
-from abusehelper.contrib.opencollab.wikistartup import WikiConfigInterface, rmlink
+from abusehelper.contrib.opencollab.wikistartup import WikiConfigInterface, rmlink, TYPES
 
 class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
     collab_url = bot.Param("Collab url")
@@ -54,6 +54,12 @@ class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
                 return
             elif len(state) == 1:
                 state = rmlink(state[0])
+
+            enable = list(metas.pop("enabled", set()))
+            if enable:
+                val = enable[0]
+                if val in TYPES and not TYPES[val]:
+                    continue
 
             for room_key in ["src_room", "dst_room"]:
                 room = list(metas.get(room_key, set()))
