@@ -126,7 +126,8 @@ if __name__ == "__main__":
 
         mogrifier.insert(time.time(), Event({
             "ip": "1.2.3.5",
-            "feed": ["shadow", "kekkis"]
+            "feed": ["one", "two"],
+            "asn": "2"
         }))
 
     demo('''{
