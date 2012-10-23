@@ -19,6 +19,9 @@ TOKENS = {"AND":rules.AND, "OR":rules.OR, "NOT":rules.NOT,
           "MATCH":rules.MATCH, "NETBLOCK":rules.NETBLOCK,
           "ANYTHING":rules.ANYTHING}
 
+# Keys that are handled as a list in existing code should be lists
+LIST_KEYS = ['resolve', 'asns']
+
 def startswith(string, words):
     for word in words:
         if string.startswith(word):
@@ -168,7 +171,7 @@ class WikiConfigInterface:
                     except (ValueError, DecryptionError, TypeError):
                         values[index] = value
 
-            if len(values) == 1:
+            if len(values) == 1 and key not in LIST_KEYS:
                 values = values[0]
             metas[key] = values
 
