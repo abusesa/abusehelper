@@ -30,40 +30,6 @@ def is_ipv6(ip):
     else:
         return False
 
-
-@idiokit.stream
-def lookup(host, port, name, keys=DEFAULT_KEYS):
-    sock = socket.Socket()
-    try:
-        yield sock.connect((host, port))
-        yield sock.sendall(str(name) + "\r\n")
-
-        all_data = list()
-        while True:
-            data = yield sock.recv(4096)
-            if not data:
-                break
-            all_data.append(data)
-    except socket.SocketError:
-        return
-
-    lines = "".join(all_data).splitlines()
-    # there will be duplicates
-    lines = set(lines)
-    for line in lines:
-        event = events.Event()
-        for key, value in zip(keys, line.split("\t")):
-            if key == 'ip':
-                if not is_ipv4(value):
-                    if not is_ipv6(value):
-                        # The particular type of pdns server used here
-                        # only gives you a and ns.
-                        key = 'ns'
-            event.add(key, value)
-        event.add("expert", "passivedns")
-        yield idiokit.send(event)
-
-
 class PassiveDNSExpert(Expert):
     host = bot.Param()
     port = bot.IntParam(default=43)
@@ -77,6 +43,44 @@ class PassiveDNSExpert(Expert):
         yield (keys.get("resolve", ("host",)))
 
     @idiokit.stream
+    def lookup(self, host, port, eid, name, keys=DEFAULT_KEYS):
+        all_data = self.cache.get(name, None)
+        if not all_data:
+            sock = socket.Socket()
+            try:
+                yield sock.connect((host, port))
+                yield sock.sendall(str(name) + "\r\n")
+
+                all_data = list()
+                while True:
+                    data = yield sock.recv(4096)
+                    if not data:
+                        break
+                    all_data.append(data)
+            except socket.SocketError:
+                return
+
+            self.cache.set(name, all_data)
+        else:
+            yield idiokit.timer.sleep(0)
+
+        lines = "".join(all_data).splitlines()
+        # there will be duplicates
+        lines = set(lines)
+        for line in lines:
+            event = events.Event()
+            for key, value in zip(keys, line.split("\t")):
+                if key == 'ip':
+                    if not is_ipv4(value):
+                        if not is_ipv6(value):
+                            # The particular type of pdns server used here
+                            # only gives you a and ns.
+                            key = 'ns'
+                event.add(key, value)
+            event.add("expert", "passivedns")
+            yield idiokit.send(eid, event)
+
+    @idiokit.stream
     def augment(self, *args):
         while True:
             eid, event = yield idiokit.next()
@@ -87,13 +91,8 @@ class PassiveDNSExpert(Expert):
 
             for name in values:
                 self.log.info("Querying %r", name)
-                answer = self.cache.get(name, None)
-                if not answer:
-                    answer = yield lookup(self.host, self.port, name)
-                    self.cache.set(name, answer)
-                    yield idiokit.send(eid, answer)
-                else:
-                    yield idiokit.send(eid, answer)
+                answer = self.lookup(self.host, self.port, eid, name)
+                yield answer
 
 if __name__ == "__main__":
     PassiveDNSExpert.from_command_line().execute()
