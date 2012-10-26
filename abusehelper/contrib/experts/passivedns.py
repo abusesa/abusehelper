@@ -32,7 +32,7 @@ def is_ipv6(ip):
 
 
 @idiokit.stream
-def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
+def lookup(host, port, name, keys=DEFAULT_KEYS):
     sock = socket.Socket()
     try:
         yield sock.connect((host, port))
@@ -61,7 +61,7 @@ def lookup(host, port, eid, name, keys=DEFAULT_KEYS):
                         key = 'ns'
             event.add(key, value)
         event.add("expert", "passivedns")
-        yield idiokit.send(eid, event)
+        yield idiokit.send(event)
 
 
 class PassiveDNSExpert(Expert):
@@ -89,11 +89,11 @@ class PassiveDNSExpert(Expert):
                 self.log.info("Querying %r", name)
                 answer = self.cache.get(name, None)
                 if not answer:
-                    answer = lookup(self.host, self.port, eid, name)
+                    answer = yield lookup(self.host, self.port, name)
                     self.cache.set(name, answer)
-                    yield idiokit.send(answer)
+                    yield idiokit.send(eid, answer)
                 else:
-                    yield idiokit.send(answer)
+                    yield idiokit.send(eid, answer)
 
 if __name__ == "__main__":
     PassiveDNSExpert.from_command_line().execute()

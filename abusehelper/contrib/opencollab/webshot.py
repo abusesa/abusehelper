@@ -92,8 +92,9 @@ class WebshotExpert(Expert):
 
         metas = dict()
 
+        check_url = url.rstrip('/')
         for entry in data['log']['entries']:
-            if not entry['request']['url'].rstrip('/') == url:
+            if not entry['request']['url'].rstrip('/') == check_url:
                 continue
 
             grab_epoch = timegm(strptime(entry['startedDateTime'].split('.')[0], 
