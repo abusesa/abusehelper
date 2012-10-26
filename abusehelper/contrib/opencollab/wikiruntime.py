@@ -30,7 +30,7 @@ class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
 
         for page, metas in pages.iteritems():
             metas = dict(metas)
-            for key in ['gwikilabel', 'gwikicategory']:
+            for key in ['gwikilabel', 'gwikicategory', 'host', 'purpose']:
                 try:
                     del metas[key]
                 except KeyError:

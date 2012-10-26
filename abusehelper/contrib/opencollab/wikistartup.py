@@ -148,7 +148,7 @@ class WikiConfigInterface:
                         pass
 
                 if value.startswith("[[") and value.endswith("]]"):
-                    if key in ["room", "src_room", "dst_room"]:
+                    if key in ["room", "src_room", "dst_room", "host"]:
                         content = rmlink(value)
                         if content:
                             values[index] = content

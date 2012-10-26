@@ -12,15 +12,12 @@ import httplib
 import email
 
 from idiokit import threadpool
-from abusehelper.core import bot, events, taskfarm
+from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 import abusehelper.core.utils as utils
 
-from tempfile import mkstemp
 from random import choice
 from StringIO import StringIO
-from time import strptime
-from calendar import timegm
 from hashlib import md5
 
 from opencollab.wiki import GraphingWiki
