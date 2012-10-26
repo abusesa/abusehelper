@@ -91,7 +91,9 @@ class PassiveDNSExpert(Expert):
                 if not answer:
                     answer = lookup(self.host, self.port, eid, name)
                     self.cache.set(name, answer)
-                    yield answer
+                    yield idiokit.send(answer)
+                else:
+                    yield idiokit.send(answer)
 
 if __name__ == "__main__":
     PassiveDNSExpert.from_command_line().execute()
