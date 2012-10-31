@@ -42,13 +42,6 @@ class Roomreader(bot.XMPPBot):
                 if sender.resource is None:
                     continue
 
-                ## Preserving this code for documentative purposes.
-                ## You've gotta love the logic behind type & status.
-                # for presence in message.named("presence").with_attrs("from"):
-                #     type = presence.get_attr("type", None)
-                #     for newstatus in presence.children('status'):
-                #         status = newstatus.text
-
                 resource = sender.resource.encode("unicode-escape")
                 bare = unicode(sender.bare()).encode("unicode-escape")
 
@@ -68,11 +61,10 @@ class Roomreader(bot.XMPPBot):
                                   body.text.encode("unicode-escape"))
 
                 if self.show_events:
-                    for event in message.children("event"):
-                        event = events.Event.from_element(event)
+                    for event in events.Event.from_elements(message):
                         self.log.info("<%s> %s",
-                                    unicode(sender).encode("unicode-escape"),
-                                    event)
+                                      unicode(sender).encode("unicode-escape"),
+                                      event)
 
 if __name__ == "__main__":
     Roomreader.from_command_line().run()
