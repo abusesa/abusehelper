@@ -3,6 +3,7 @@ import idiokit
 from idiokit import xmpp
 from abusehelper.core import bot
 
+
 @idiokit.stream
 def peel_messages():
     while True:
@@ -11,26 +12,33 @@ def peel_messages():
         for message in elements.named("message"):
             yield idiokit.send(message.children())
 
+
 class BridgeBot(bot.Bot):
     xmpp_src_jid = bot.Param("the XMPP src JID")
-    xmpp_src_password = bot.Param("the XMPP src password", default=None)
+    xmpp_src_password = bot.Param("the XMPP src password",
+        default=None)
     xmpp_src_room = bot.Param("the XMPP src room")
-    xmpp_src_ignore_cert = bot.BoolParam("a PEM formatted file of CAs to be "+
-                                         "used in addition to the system CAs",
-                                         default=None)
-    xmpp_src_extra_ca_certs = bot.Param("do not perform any verification for "+
-                                        "the XMPP service's SSL certificate",
-                                        default=None)
+    xmpp_src_ignore_cert = bot.BoolParam("""
+        do not perform any verification for
+        the XMPP service's SSL certificate
+        """)
+    xmpp_src_extra_ca_certs = bot.Param("""
+        a PEM formatted file of CAs to be
+        used in addition to the system CAs
+        """, default=None)
 
     xmpp_dst_jid = bot.Param("the XMPP dst JID")
-    xmpp_dst_password = bot.Param("the XMPP dst password", default=None)
+    xmpp_dst_password = bot.Param("the XMPP dst password",
+        default=None)
     xmpp_dst_room = bot.Param("the XMPP dst room")
-    xmpp_dst_ignore_cert = bot.BoolParam("a PEM formatted file of CAs to be "+
-                                         "used in addition to the system CAs",
-                                         default=None)
-    xmpp_dst_extra_ca_certs = bot.Param("do not perform any verification for "+
-                                        "the XMPP service's SSL certificate",
-                                        default=None)
+    xmpp_dst_ignore_cert = bot.BoolParam("""
+        do not perform any verification for
+        the XMPP service's SSL certificate
+        """)
+    xmpp_dst_extra_ca_certs = bot.Param("""
+        a PEM formatted file of CAs to be
+        used in addition to the system CAs
+        """, default=None)
 
     def __init__(self, **keys):
         bot.Bot.__init__(self, **keys)
