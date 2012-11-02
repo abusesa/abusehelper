@@ -50,9 +50,8 @@ class ListParam(Param):
 class BoolParam(Param):
     nargs = 0
 
-    def __init__(self, *args, **keys):
-        keys.setdefault("default", False)
-        Param.__init__(self, *args, **keys)
+    def __init__(self, help=None, short=None):
+        Param.__init__(self, help=help, short=short, default=False)
 
     def parse(self, value=None):
         if value is None:

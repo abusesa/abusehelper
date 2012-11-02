@@ -5,6 +5,7 @@ from idiokit.irc import connect
 
 from abusehelper.core import events, utils, bot
 
+
 class IRCFeedBot(bot.FeedBot):
     irc_host = bot.Param()
     irc_channel = bot.Param()
@@ -13,11 +14,14 @@ class IRCFeedBot(bot.FeedBot):
     irc_own_nick = bot.Param(default="ircbot")
     irc_password = bot.Param(default=None)
     irc_use_ssl = bot.BoolParam()
-    irc_extra_ca_certs = bot.Param("a PEM formatted file of CAs to be used "+
-                                   "in addition to the system CAs",
-                                   default=None)
-    irc_ignore_cert = bot.BoolParam("do not perform any verification "+
-                                    "for the IRC server's SSL certificate")
+    irc_extra_ca_certs = bot.Param("""
+        a PEM formatted file of CAs to be used
+        in addition to the system CAs
+        """, default=None)
+    irc_ignore_cert = bot.BoolParam("""
+        do not perform any verification
+        for the IRC server's SSL certificate
+        """)
 
     def filter(self, prefix, command, params):
         if command != "PRIVMSG":
@@ -51,24 +55,25 @@ class IRCFeedBot(bot.FeedBot):
     @idiokit.stream
     def feed(self):
         self.log.info("Connecting to IRC server %r port %d",
-                      self.irc_host, self.irc_port)
+            self.irc_host, self.irc_port)
         irc = yield connect(self.irc_host, self.irc_port, self.irc_own_nick,
-                            password=self.irc_password,
-                            ssl=self.irc_use_ssl,
-                            ssl_verify_cert=not self.irc_ignore_cert,
-                            ssl_ca_certs=self.irc_extra_ca_certs)
+            password=self.irc_password,
+            ssl=self.irc_use_ssl,
+            ssl_verify_cert=not self.irc_ignore_cert,
+            ssl_ca_certs=self.irc_extra_ca_certs)
         self.log.info("Connected to IRC server %r port %d",
-                      self.irc_host, self.irc_port)
+            self.irc_host, self.irc_port)
 
         yield irc.join(self.irc_channel)
         self.log.info("Joined IRC channel %r", self.irc_channel)
 
         yield irc | self._handle()
 
+
 class IRCFeedService(IRCFeedBot):
     def parse(self, prefix, command, params):
         field_rex = r"([^\s=]+)='([^']*)'"
-        data_rex = r"^([^\s>]+)>\s*(("+ field_rex +"\s*,?\s*)*)\s*$"
+        data_rex = r"^([^\s>]+)>\s*((" + field_rex + "\s*,?\s*)*)\s*$"
 
         match = re.match(data_rex, utils.force_decode(params[-1]))
         if not match:

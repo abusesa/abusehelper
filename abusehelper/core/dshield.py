@@ -4,7 +4,7 @@ from abusehelper.core import utils, cymruwhois, bot
 class DShieldBot(bot.PollingBot):
     COLUMNS = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
 
-    use_cymru_whois = bot.BoolParam(default=False)
+    use_cymru_whois = bot.BoolParam()
 
     def feed_keys(self, asns=(), **keys):
         for asn in asns:
