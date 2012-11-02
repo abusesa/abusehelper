@@ -9,7 +9,7 @@ from abusehelper.core import utils, cymruwhois, bot, events
 
 
 class SpamhausDropBot(bot.PollingBot):
-    use_cymru_whois = bot.BoolParam(default=True)
+    use_cymru_whois = bot.BoolParam()
 
     @idiokit.stream
     def poll(self, url="http://www.spamhaus.org/drop/drop.lasso"):

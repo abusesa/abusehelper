@@ -12,7 +12,7 @@ from abusehelper.contrib.rssbot.rssbot import RSSBot
 class ProjectHoneyPotBot(RSSBot):
     feeds = bot.ListParam(default=[
             "http://www.projecthoneypot.org/list_of_ips.php?rss=1"])
-    use_cymru_whois = bot.BoolParam(default=True)
+    use_cymru_whois = bot.BoolParam()
 
     def create_event(self, **kw):
         if not kw.get('description', ''):

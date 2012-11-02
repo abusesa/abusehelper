@@ -24,7 +24,7 @@ class AutoshunBot(bot.PollingBot):
     COLUMNS = ["ip", "time", "info"]
 
     feed_url = bot.Param(default=AUTOSHUN_CSV_URL)
-    use_cymru_whois = bot.BoolParam(default=True)
+    use_cymru_whois = bot.BoolParam()
 
     def poll(self):
         pipe = self._poll(url=self.feed_url)

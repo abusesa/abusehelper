@@ -3,7 +3,7 @@ from abusehelper.core import cymruwhois, bot, events
 
 
 class SpamhausSblBot(bot.PollingBot):
-    use_cymru_whois = bot.BoolParam(default=True)
+    use_cymru_whois = bot.BoolParam()
     sbl_filepath = bot.Param("Filename of Spamhaus SBL file")
 
     def _event(self):

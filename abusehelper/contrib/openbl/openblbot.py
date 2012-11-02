@@ -7,7 +7,7 @@ OPENBL_FEED_URL = "https://www.openbl.org/lists/date.txt"
 
 class OpenBLBot(bot.PollingBot):
     feed_url = bot.Param(default=OPENBL_FEED_URL)
-    use_cymru_whois = bot.BoolParam(default=True)
+    use_cymru_whois = bot.BoolParam()
 
     def poll(self):
         pipe = self._poll(url=self.feed_url)

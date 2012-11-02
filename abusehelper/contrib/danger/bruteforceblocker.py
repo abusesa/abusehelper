@@ -13,7 +13,7 @@ class BruteForceBlockerBot(bot.PollingBot):
     # Ignore the last column ("id").
     COLUMNS = ["ip", "time", "count", None]
 
-    use_cymru_whois = bot.BoolParam(default=True)
+    use_cymru_whois = bot.BoolParam()
 
     def poll(self):
         if self.use_cymru_whois:

@@ -5,7 +5,7 @@ from abusehelper.core import bot, cymruwhois, events, utils
 
 class RSSBot(bot.PollingBot):
     feeds = bot.ListParam("a list of RSS feed URLs")
-    use_cymru_whois = bot.BoolParam(default=False)
+    use_cymru_whois = bot.BoolParam()
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
