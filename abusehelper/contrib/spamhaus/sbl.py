@@ -1,5 +1,6 @@
 import idiokit
-from abusehelper.core import utils, cymruwhois, bot, events
+from abusehelper.core import cymruwhois, bot, events
+
 
 class SpamhausSblBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam(default=True)
@@ -42,13 +43,13 @@ class SpamhausSblBot(bot.PollingBot):
                     ips.append(ip)
             self.log.info("Read %d ip addresses" % len(ips))
         except IOError, ioe:
-            self.log.error("Could not open %s: %s" % (full_path, ioe))
+            self.log.error("Could not open %s: %s" % (self.sbl_filepath, ioe))
 
         for ip in ips:
             event = events.Event()
             event.add("ip", ip)
             event.add("feed", "spamhaus block list")
-            event.add("type", "spam")
+            event.add("type", "spambot")
 
             if self.use_cymru_whois:
                 values = yield cymruwhois.lookup(ip)
