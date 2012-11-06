@@ -45,7 +45,7 @@ class Malc0deBot(RSSBot):
             if not key or not value:
                 continue
 
-            if key in ["URL", "ASN", "MD5"]:
+            if key in ["URL", "MD5"]:
                 if key == "URL":
                     value = "hxxp://" + value
                 event.add(key.lower(), value)
