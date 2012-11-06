@@ -41,7 +41,7 @@ class RSSBot(bot.PollingBot):
             try:
                 for _, elem in etree.iterparse(fileobj):
                     for event in self._parse(elem, url):
-                         if event:
+                        if event:
                             id = event.value("id", None)
                             if id:
                                 new_events.add(id)
