@@ -1,8 +1,26 @@
+"""
+Malc0de RSS bot.
+
+Maintainer: Lari Huttunen <mit-code@huttu.net>
+"""
+import socket
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
+
 class Malc0deBot(RSSBot):
     feeds = bot.ListParam(default=["http://malc0de.com/rss/"])
+    resolve_ip = bot.BoolParam()
+
+    def is_ip(self, string):
+        for addr_type in (socket.AF_INET, socket.AF_INET6):
+            try:
+                socket.inet_pton(addr_type, string)
+            except (ValueError, socket.error):
+                pass
+            else:
+                return True
+        return False
 
     def create_event(self, **keys):
         description = keys.get("description", None)
@@ -11,10 +29,11 @@ class Malc0deBot(RSSBot):
 
         event = events.Event()
         event.add("feed", "malc0de")
+        event.add("type", "malware")
 
         link = keys.get("link", None)
         if link:
-            event.add("link", link)
+            event.add("source url", link)
 
         for part in description.split(","):
             pair = part.split(":", 1)
@@ -26,13 +45,18 @@ class Malc0deBot(RSSBot):
             if not key or not value:
                 continue
 
-            if key in ["URL", "Country", "ASN", "MD5"]:
+            if key in ["URL", "ASN", "MD5"]:
+                if key == "URL":
+                    value = "hxxp://" + value
                 event.add(key.lower(), value)
             elif key == "IP Address":
-                event.add("ip", value)
+                if not self.resolve_ip:
+                    event.add("ip", value)
 
-        if not event.contains("ip"):
-            return None
+        host = keys.get("title", None)
+        if not self.is_ip(host):
+            event.add("host", host)
+
         return event
 
 if __name__ == "__main__":
