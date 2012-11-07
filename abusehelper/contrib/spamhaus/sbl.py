@@ -12,7 +12,7 @@ class SpamhausSblBot(bot.PollingBot):
         event.add("type", "spam")
         if spamhaus_id:
             spamhaus_id = "SBL" + str(int(spamhaus_id.replace("$", ""), base=10))
-            event.add("spamhaus id", spamhaus_id)
+            event.add("sbl id", spamhaus_id)
             event.add("source url", "http://www.spamhaus.org/sbl/query/" + spamhaus_id)
         return event
 
