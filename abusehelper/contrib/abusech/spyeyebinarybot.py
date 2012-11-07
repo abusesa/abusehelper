@@ -33,7 +33,7 @@ class SpyEyeBinaryBot(RSSBot):
         # handle link data
         link = keys.get("link", None)
         if link:
-            event.add("source url", link)
+            event.add("description url", link)
         # handle title data
         br = re.compile('[()]')
         title = keys.get("title")
