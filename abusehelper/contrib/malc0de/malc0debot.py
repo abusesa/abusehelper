@@ -10,7 +10,7 @@ from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 class Malc0deBot(RSSBot):
     feeds = bot.ListParam(default=["http://malc0de.com/rss/"])
-    resolve_ip = bot.BoolParam()
+    treat_as_dns_source = bot.BoolParam()
 
     def is_ip(self, string):
         for addr_type in (socket.AF_INET, socket.AF_INET6):
@@ -50,7 +50,7 @@ class Malc0deBot(RSSBot):
                     value = "hxxp://" + value
                 event.add(key.lower(), value)
             elif key == "IP Address":
-                if not self.resolve_ip:
+                if not self.treat_as_dns_source:
                     event.add("ip", value)
 
         host = keys.get("title", None)
