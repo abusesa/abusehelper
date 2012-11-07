@@ -33,7 +33,7 @@ class Malc0deBot(RSSBot):
 
         link = keys.get("link", None)
         if link:
-            event.add("source url", link)
+            event.add("description url", link)
 
         for part in description.split(","):
             pair = part.split(":", 1)
