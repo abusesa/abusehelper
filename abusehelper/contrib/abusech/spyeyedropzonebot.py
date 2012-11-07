@@ -55,7 +55,7 @@ class ZeusDropzoneBot(RSSBot):
                     continue
                 if key == "Status":
                     event.add(key.lower(), value)
-                elif key == "URL":
+                elif key == "SpyEye DropURL":
                     event.add("url", value)
                     parsed = urlparse.urlparse(value)
                     host = parsed.netloc
