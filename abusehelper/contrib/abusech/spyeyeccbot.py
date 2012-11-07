@@ -70,7 +70,7 @@ class SpyEyeCcBot(RSSBot):
                     event.add(key.lower(), value)
                 elif key == "Level":
                     level = self.resolve_level(value)
-                    if level:
+                    if level and level != "unknown":
                         event.add("description", level)
                 elif key == "SBL" and value != "Not listed":
                     key = key.lower() + " id"
