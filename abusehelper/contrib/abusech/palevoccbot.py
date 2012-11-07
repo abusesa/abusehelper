@@ -52,7 +52,8 @@ class PalevoCcBot(RSSBot):
                 if key == "Status":
                     event.add(key.lower(), value)
                 elif key == "SBL" and value != "Not listed":
-                    event.add(key.lower(), value)
+                    key = key.lower() + " id"
+                    event.add(key, value)
                 elif key == "IP address":
                     if not self.treat_as_dns_source:
                         event.add("ip", value)
