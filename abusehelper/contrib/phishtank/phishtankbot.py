@@ -6,6 +6,7 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 
 import bz2
 import urllib2
+import urlparse
 from datetime import datetime
 import xml.etree.cElementTree as etree
 
@@ -111,7 +112,9 @@ class PhishTankBot(bot.PollingBot):
             event = events.Event()
             event.add("feed", "phishtank")
             event.add("url", url)
-            event.add("host", "/".join(url.split("/")[:3]) + "/")
+            parsed = urlparse.urlparse(url)
+            host = parsed.netloc
+            event.add("host", host)
             event.add("ip", ip)
             event.add("asn", announcer)
             if ts:
