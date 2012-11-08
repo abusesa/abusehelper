@@ -39,6 +39,7 @@ class ProjectHoneyPotBot(RSSBot):
             if ip:
                 url = "http://www.projecthoneypot.org/ip_" + ip
                 event.add("description url", url)
+                event.add("ip", ip)
         # handle description data
         description = keys.get("description", None)
         if description:
