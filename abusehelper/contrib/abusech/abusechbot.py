@@ -8,21 +8,13 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 import re
 import cgi
 import time
-import socket
 import urlparse
 
 from abusehelper.core import events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
-def is_ip(string):
-    for addr_type in (socket.AF_INET, socket.AF_INET6):
-        try:
-            socket.inet_pton(addr_type, string)
-        except (ValueError, socket.error):
-            pass
-        else:
-            return True
-    return False
+from . import is_ip
+
 
 def parse_title(title):
     """
@@ -58,6 +50,7 @@ def parse_title(title):
         yield "time", time.strftime("%Y-%m-%d %H:%M:%S UTC", timestamp)
         break
 
+
 def parse_link(link):
     """
     >>> sorted(parse_link("https://spyeyetracker.abuse.ch/monitor.php?host=www.example.com"))
@@ -77,6 +70,7 @@ def parse_link(link):
         if is_ip(host):
             yield "ip", host
 
+
 _levels = {
     "1": "bulletproof hosted",
     "2": "hacked webserver",
@@ -85,7 +79,9 @@ _levels = {
     "5": "hosted on a fastflux botnet"
 }
 
+
 _sbl_prefix = "http://www.spamhaus.org/sbl/sbl.lasso?query="
+
 
 def parse_description(description):
     for part in description.split(","):
@@ -112,6 +108,7 @@ def parse_description(description):
             yield "level", _levels.get(value, value)
         else:
             yield key, value
+
 
 class AbuseCHBot(RSSBot):
     feeds = None

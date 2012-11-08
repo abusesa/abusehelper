@@ -3,11 +3,13 @@ abuse.ch Zeus dropzone RSS feed.
 
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
+
 import re
-import socket
 import urlparse
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
+
+from . import is_ip
 
 
 class ZeusDropzoneBot(RSSBot):
@@ -17,16 +19,6 @@ class ZeusDropzoneBot(RSSBot):
     # dropped if it is present in the source even if the bool param
     # treat_as_dns_source is set below.
     treat_as_dns_source = bot.BoolParam()
-
-    def is_ip(self, string):
-        for addr_type in (socket.AF_INET, socket.AF_INET6):
-            try:
-                socket.inet_pton(addr_type, string)
-            except (ValueError, socket.error):
-                pass
-            else:
-                return True
-        return False
 
     def create_event(self, **keys):
         event = events.Event()
@@ -59,7 +51,7 @@ class ZeusDropzoneBot(RSSBot):
                     event.add("url", value)
                     parsed = urlparse.urlparse(value)
                     host = parsed.netloc
-                    if self.is_ip(host):
+                    if is_ip(host):
                         event.add("ip", host)
                     else:
                         event.add("host", host)

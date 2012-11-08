@@ -3,26 +3,18 @@ abuse.ch Zeus C&C RSS feed bot.
 
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
+
 import re
-import socket
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
+
+from . import is_ip
 
 
 class ZeusCcBot(RSSBot):
     feeds = bot.ListParam(default=["https://zeustracker.abuse.ch/rss.php"])
     # If treat_as_dns_source is set, the feed ip is dropped.
     treat_as_dns_source = bot.BoolParam()
-
-    def is_ip(self, string):
-        for addr_type in (socket.AF_INET, socket.AF_INET6):
-            try:
-                socket.inet_pton(addr_type, string)
-            except (ValueError, socket.error):
-                pass
-            else:
-                return True
-        return False
 
     def resolve_level(self, v):
         levels = {
@@ -47,7 +39,7 @@ class ZeusCcBot(RSSBot):
             t = title.split()
             host = t[0]
             date = " ".join(t[1:])
-            if self.is_ip(host):
+            if is_ip(host):
                 event.add("ip", host)
             else:
                 event.add("host", host)
