@@ -5,63 +5,39 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
 
 import re
-from abusehelper.core import bot, events
-from abusehelper.contrib.rssbot.rssbot import RSSBot
+from abusehelper.core import bot
 
-from . import is_ip, resolve_level
+from . import host_or_ip, split_description, resolve_level, AbuseCHFeedBot
 
 
-class SpyEyeCcBot(RSSBot):
+class SpyEyeCcBot(AbuseCHFeedBot):
+    feed_malware = "SpyEye"
+    feed_type = "c&c"
+
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker"])
     # If treat_as_dns_source is set, the feed ip is dropped.
     treat_as_dns_source = bot.BoolParam()
 
-    def create_event(self, **keys):
-        event = events.Event()
-        # handle link data
-        link = keys.get("link", None)
-        if link:
-            event.add("description url", link)
-        # handle title data
-        title = keys.get("title", None)
-        if title:
-            t = []
-            t = title.split()
-            host = t[0]
-            date = " ".join(t[1:])
-            if is_ip(host):
-                event.add("ip", host)
-            else:
-                event.add("host", host)
-            br = re.compile('[()]')
-            date = br.sub('', date)
-            date = date + " UTC"
-            event.add("source time", date)
-        # handle description data
-        description = keys.get("description", None)
-        if description:
-            for part in description.split(","):
-                pair = part.split(":", 1)
-                if len(pair) < 2:
-                    continue
-                key = pair[0].strip()
-                value = pair[1].strip()
-                if not key or not value:
-                    continue
-                if key == "Status":
-                    event.add(key.lower(), value)
-                elif key == "Level":
-                    event.update("description", resolve_level(value))
-                elif key == "SBL" and value != "Not listed":
-                    key = key.lower() + " id"
-                    event.add(key, value)
-                elif key == "IP address":
-                    if not self.treat_as_dns_source:
-                        event.add("ip", value)
-        event.add("feed", "abuse.ch")
-        event.add("malware", "SpyEye")
-        event.add("type", "c&c")
-        return event
+    def parse_title(self, title):
+        pieces = title.split(None, 1)
+
+        yield host_or_ip(pieces[0])
+
+        if len(pieces) > 1:
+            date = pieces[1]
+            date = re.sub("[()]", "", date)
+            yield "source time", date + " UTC"
+
+    def parse_description(self, description):
+        for key, value in split_description(description):
+            if key == "status":
+                yield key, value
+            elif key == "level":
+                yield "description", resolve_level(value)
+            elif key == "sbl" and value.lower() != "not listed":
+                yield key + " id", value
+            elif key == "ip address" and not self.treat_as_dns_source:
+                yield "ip", value
 
 if __name__ == "__main__":
     SpyEyeCcBot.from_command_line().execute()

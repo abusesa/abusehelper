@@ -13,7 +13,7 @@ import urlparse
 from abusehelper.core import events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
-from . import is_ip
+from . import parse_ip
 
 
 def parse_title(title):
@@ -67,7 +67,7 @@ def parse_link(link):
     for host in query.get("host", []):
         yield "host", host
 
-        if is_ip(host):
+        if parse_ip(host):
             yield "ip", host
 
 

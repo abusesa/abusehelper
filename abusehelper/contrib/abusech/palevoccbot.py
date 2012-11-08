@@ -6,7 +6,7 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 
 from abusehelper.core import bot
 
-from . import is_ip, split_description, AbuseCHFeedBot
+from . import host_or_ip, split_description, AbuseCHFeedBot
 
 
 class PalevoCcBot(AbuseCHFeedBot):
@@ -20,11 +20,7 @@ class PalevoCcBot(AbuseCHFeedBot):
     def parse_title(self, title):
         pieces = title.split(None, 1)
 
-        host = pieces[0]
-        if is_ip(host):
-            yield "ip", host
-        else:
-            yield "host", host
+        yield host_or_ip(pieces[0])
 
         if len(pieces) > 1:
             yield "source time", pieces[1]

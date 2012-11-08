@@ -6,15 +6,26 @@ from abusehelper.core import events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 
-def is_ip(string):
+def parse_ip(string):
     for addr_type in (socket.AF_INET, socket.AF_INET6):
         try:
-            socket.inet_pton(addr_type, string)
+            return socket.inet_ntop(addr_type, socket.inet_pton(addr_type, string))
         except (ValueError, socket.error):
             pass
-        else:
-            return True
-    return False
+    return None
+
+
+def host_or_ip(host):
+    ip = parse_ip(host)
+    if ip is None:
+        return "host", host
+    else:
+        return "ip", ip
+
+
+def host_or_ip_from_url(url):
+    parsed = urlparse.urlparse(url)
+    return host_or_ip(parsed.netloc)
 
 
 _levels = {
@@ -30,12 +41,8 @@ def resolve_level(value):
     return tuple(_levels.get(value, []))
 
 
-def host_or_ip_from_url(url):
-    parsed = urlparse.urlparse(url)
-    if is_ip(parsed.netloc):
-        return "ip", parsed.netloc
-    else:
-        return "host", parsed.netloc
+def sanitize_url(url):
+    return re.sub("^http:\/\/", "hxxp://", url)
 
 
 def split_description(description):
