@@ -48,17 +48,6 @@ class ZeusCcBot(RSSBot):
                 value = pair[1].strip()
                 if not key or not value:
                     continue
-        # handle description data
-        description = keys.get("description", None)
-        if description:
-            for part in description.split(","):
-                pair = part.split(":", 1)
-                if len(pair) < 2:
-                    continue
-                key = pair[0].strip()
-                value = pair[1].strip()
-                if not key or not value:
-                    continue
                 if key == "Status":
                     event.add(key.lower(), value)
                 elif key == "level":
