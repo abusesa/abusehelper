@@ -56,7 +56,7 @@ class AutoshunBot(bot.PollingBot):
         while True:
             event = yield idiokit.next()
             event.add("feed", "autoshun")
-            event.add("source url", self.feed_url)
+            event.add("description url", self.feed_url)
             for d in event.values("info"):
                 event.add("description", d)
                 for name, key, value in CLASSIFICATION:

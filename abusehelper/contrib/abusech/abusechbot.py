@@ -193,7 +193,7 @@ class AbuseCHBot(RSSBot):
             event.update("malware", [x.lower() for x in malware_values])
             event.add("type", feed_type)
             event.add("feed", "abuse.ch")
-        event.add("source url", source)
+        event.add("description url", source)
 
         return event
 

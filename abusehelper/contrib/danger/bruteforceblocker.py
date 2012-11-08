@@ -44,7 +44,7 @@ class BruteForceBlockerBot(bot.PollingBot):
             event.add("last seen", timestamp.replace("# ", "") + " UTC")
         event.clear("time")
 
-        event.add("source url", url)
+        event.add("description url", url)
         yield event
 
 if __name__ == "__main__":

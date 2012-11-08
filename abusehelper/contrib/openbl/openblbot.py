@@ -5,6 +5,7 @@ from abusehelper.core import utils, cymruwhois, bot, events
 
 OPENBL_FEED_URL = "https://www.openbl.org/lists/date.txt"
 
+
 class OpenBLBot(bot.PollingBot):
     feed_url = bot.Param(default=OPENBL_FEED_URL)
     use_cymru_whois = bot.BoolParam()
@@ -38,7 +39,7 @@ class OpenBLBot(bot.PollingBot):
             event.add("ip", ip)
             event.add("source time", time)
             event.add("feed", "openbl")
-            event.add("source url", self.feed_url)
+            event.add("description url", self.feed_url)
             event.add("type", "brute-force")
             event.add("protocol", "ssh")
 
