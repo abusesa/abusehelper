@@ -10,6 +10,9 @@ from . import is_ip, split_description, AbuseCHFeedBot
 
 
 class PalevoCcBot(AbuseCHFeedBot):
+    feed_malware = "Palevo"
+    feed_type = "c&c"
+
     feeds = bot.ListParam(default=["https://palevotracker.abuse.ch/?rssfeed"])
     # If treat_as_dns_source is set, the feed ip is dropped.
     treat_as_dns_source = bot.BoolParam()
