@@ -57,7 +57,7 @@ class ProjectHoneyPotBot(RSSBot):
                     event.add("count", value)
                 elif key == "Last":
                     event.add("source time", value)
-        event.add("feed", "projechoneypot")
+        event.add("feed", "projecthoneypot")
         event.add("type", "spam")
 
         return event
