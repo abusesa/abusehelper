@@ -11,13 +11,9 @@ from abusehelper.contrib.rssbot.rssbot import RSSBot
 
 from . import is_ip
 
+
 class ZeusDropzoneBot(RSSBot):
     feeds = bot.ListParam(default=["https://zeustracker.abuse.ch/monitor.php?urlfeed=dropzones"])
-    # Please note that this feed does *not* report ips per se. They are derived
-    # below from the URL if the URL is an ip URL. That is why the ip is never
-    # dropped if it is present in the source even if the bool param
-    # treat_as_dns_source is set below.
-    treat_as_dns_source = bot.BoolParam()
 
     def create_event(self, **keys):
         event = events.Event()
