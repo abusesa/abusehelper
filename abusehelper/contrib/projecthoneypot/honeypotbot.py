@@ -1,69 +1,63 @@
 """
 Project Honeypot feed handler.
 
-Maintainer: Jussi Eronen <exec@iki.fi>
+Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
-
-from time import strftime, strptime
 
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
+
 class ProjectHoneyPotBot(RSSBot):
     feeds = bot.ListParam(default=[
-            "http://www.projecthoneypot.org/list_of_ips.php?rss=1"])
-    use_cymru_whois = bot.BoolParam()
+            "http://www.projecthoneypot.org/list_of_ips.php?by=1&rss=1",
+            "http://www.projecthoneypot.org/list_of_ips.php?by=4&rss=1",
+            "http://www.projecthoneypot.org/list_of_ips.php?by=7&rss=1",
+            "http://www.projecthoneypot.org/list_of_ips.php?by=10&rss=1",
+            "http://www.projecthoneypot.org/list_of_ips.php?by=13&rss=1",
+            "http://www.projecthoneypot.org/list_of_ips.php?by=16&rss=1",
+            "http://www.projecthoneypot.org/list_of_ips.php?by=19&rss=1"])
+    treat_as_dns_source = bot.BoolParam()
 
-    def create_event(self, **kw):
-        if not kw.get('description', ''):
-            return None
-        description = kw['description'].split(' | ')
-        if len(description) < 2:
-            return None
-        if not kw.get('title', ''):
-            return None
-        title = kw.get('title').split(' | ')
-        if not len(title) == 2:
-            return None
-        ip, badness = title
-
+    def create_event(self, **keys):
         event = events.Event()
-        if 'source' in kw:
-            event.add('source url', kw.get('source'))
-        event.add('ip', ip)
-        event.add('more info', 'http://www.projecthoneypot.org/ip_' + ip)
-
-        badtypes = {'H': 'spam harvester',
-                    'S': 'mail server',
+        # handle title data
+        descriptions = {'H': 'harvester',
+                    'S': 'spam server',
                     'D': 'dictionary attacker',
                     'W': 'bad web host',
-                    'C': 'comment spammer'}
+                    'C': 'comment spammer',
+                    'R': 'rule breaker'}
+        title = keys.get("title").split(' | ')
+        if len(title) == 2:
+            ip, types = title
+            if types == "Se":
+                return None
+            for item in descriptions:
+                if item in types:
+                    event.add('description', descriptions[item])
+            if ip:
+                url = "http://www.projecthoneypot.org/ip_" + ip
+                event.add("description url", url)
+        # handle description data
+        description = keys.get("description", None)
+        if description:
+            for part in description.split(" | "):
+                pair = part.split(":", 1)
+                if len(pair) < 2:
+                    continue
 
-        for item in badtypes:
-            if item in badness:
-                event.add('type', badtypes[item])
-
-        descritems = [x.strip().split(': ') for x in
-                      description[1:]]
-
-        descrtypes = {'Total': 'count',
-                      'First': 'firstseen',
-                      'Last': 'lastseen'}
-        for key, val in descritems:
-            if key in descrtypes:
-                if key == 'Total':
-                    val = val.replace(',', '')
-                event.add(descrtypes[key], val)
-
-        if kw.get('pubDate', ''):
-            pubdate = kw.get('pubDate')
-            try:
-                ts = strptime(pubdate, '%B %d %Y %I:%M:%S %p')
-                pubtime = strftime("%Y-%m-%d %H:%M:%S UTC", ts)
-
-                event.add('pubtime', pubtime)
-            except ValueError:
-                pass
+                key = pair[0].strip()
+                value = pair[1].strip()
+                if not key or not value:
+                    continue
+                if key == "Total":
+                    value = value.replace(',', '')
+                    event.add("count", value)
+                elif key == "Last":
+                    event.add("source time", value)
+        event.add("feed", "projechoneypot")
+        event.add("type", "spam")
 
         return event
 
