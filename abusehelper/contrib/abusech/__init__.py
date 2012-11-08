@@ -10,3 +10,16 @@ def is_ip(string):
         else:
             return True
     return False
+
+
+_levels = {
+    "1": ["bulletproof hosted"],
+    "2": ["hacked webserver"],
+    "3": ["free hosting service"],
+    "4": [],  # "4" denotes an unknown level
+    "5": ["hosted on a fastflux botnet"]
+}
+
+
+def resolve_level(value):
+    return tuple(_levels.get(value, []))

@@ -8,23 +8,13 @@ import re
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
 
-from . import is_ip
+from . import is_ip, resolve_level
 
 
 class ZeusCcBot(RSSBot):
     feeds = bot.ListParam(default=["https://zeustracker.abuse.ch/rss.php"])
     # If treat_as_dns_source is set, the feed ip is dropped.
     treat_as_dns_source = bot.BoolParam()
-
-    def resolve_level(self, v):
-        levels = {
-            "1": "bulletproof hosted",
-            "2": "hacked webserver",
-            "3": "free hosting service",
-            "4": "unknown",
-            "5": "hosted on a fastflux botnet"
-        }
-        return levels[v]
 
     def create_event(self, **keys):
         event = events.Event()
@@ -72,9 +62,7 @@ class ZeusCcBot(RSSBot):
                 if key == "Status":
                     event.add(key.lower(), value)
                 elif key == "level":
-                    level = self.resolve_level(value)
-                    if level and level != "unknown":
-                        event.add("description", level)
+                    event.update("description", resolve_level(value))
                 elif key == "SBL" and value != "Not listed":
                     key = key.lower() + " id"
                     event.add(key, value)
