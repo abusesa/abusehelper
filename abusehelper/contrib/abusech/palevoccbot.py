@@ -4,55 +4,36 @@ abuse.ch Palevo C&C feed RSS bot.
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
 
-from abusehelper.core import bot, events
-from abusehelper.contrib.rssbot.rssbot import RSSBot
+from abusehelper.core import bot
 
-from . import is_ip
+from . import is_ip, split_description, AbuseCHFeedBot
 
 
-class PalevoCcBot(RSSBot):
+class PalevoCcBot(AbuseCHFeedBot):
     feeds = bot.ListParam(default=["https://palevotracker.abuse.ch/?rssfeed"])
     # If treat_as_dns_source is set, the feed ip is dropped.
     treat_as_dns_source = bot.BoolParam()
 
-    def create_event(self, **keys):
-        event = events.Event()
-        # handle link data
-        link = keys.get("link", None)
-        if link:
-            event.add("description url", link)
-        # handle title data
-        title = keys.get("title", None)
-        if title:
-            host, date = title.split()
-            if is_ip(host):
-                event.add("ip", host)
-            else:
-                event.add("host", host)
-            event.add("source time", date)
-        # handle description data
-        description = keys.get("description", None)
-        if description:
-            for part in description.split(","):
-                pair = part.split(":", 1)
-                if len(pair) < 2:
-                    continue
-                key = pair[0].strip()
-                value = pair[1].strip()
-                if not key or not value:
-                    continue
-                if key == "Status":
-                    event.add(key.lower(), value)
-                elif key == "SBL" and value != "Not listed":
-                    key = key.lower() + " id"
-                    event.add(key, value)
-                elif key == "IP address":
-                    if not self.treat_as_dns_source:
-                        event.add("ip", value)
-        event.add("feed", "abuse.ch")
-        event.add("malware", "Palevo")
-        event.add("type", "c&c")
-        return event
+    def parse_title(self, title):
+        pieces = title.split(None, 1)
+
+        host = pieces[0]
+        if is_ip(host):
+            yield "ip", host
+        else:
+            yield "host", host
+
+        if len(pieces) > 1:
+            yield "source time", pieces[1]
+
+    def parse_description(self, description):
+        for key, value in split_description(description):
+            if key == "status":
+                yield key, value
+            elif key == "sbl" and value.lower() != "not listed":
+                yield key + " id", value
+            elif key == "ip address" and not self.treat_as_dns_source:
+                yield "ip", value
 
 if __name__ == "__main__":
     PalevoCcBot.from_command_line().execute()
