@@ -66,7 +66,7 @@ class AutoshunBot(bot.PollingBot):
                             event.add("type", "botnet drone")
                         elif key == "protocol":
                             event.add("type", "brute-force")
-                        if value == "spambot":
+                        if value == "spam":
                             event.add("type", "botnet drone")
             event.clear("info")
             if not event.contains("type"):
