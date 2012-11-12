@@ -14,8 +14,8 @@ CLASSIFICATION = (
     ("WEB Proxy", "protocol", "http"),
     ("Double HTTP", "protocol", "http"),
     ("Wordpress", "protocol", "http"),
-    ("DHL Spambot", "type", "spambot"),
-    ("Spam Bot", "type", "spambot"),
+    ("DHL Spambot", "type", "spam"),
+    ("Spam Bot", "type", "spam"),
     ("Terminal Server", "protocol", "rdp"),
 )
 
