@@ -393,6 +393,8 @@ class NETBLOCK(_Rule):
             return False
 
         ip_num, ip_bits = value
+        if ip_bits is not None and not 0 <= ip_bits <= self.max_bits:
+            return False
         if ip_bits is not None and ip_bits < self.bits:
             return False
 
@@ -554,8 +556,10 @@ if __name__ == "__main__":
             assert rule.match(Event(cidr="2001:0db8:aaaa:bbbb:cccc::/64"))
             assert not rule.match(Event(cidr="::1/32"))
 
-        def test_non_match_non_ip_data(self):
+        def test_non_match_bad_data(self):
             rule = NETBLOCK("1.2.3.4", 24)
+            assert not rule.match(Event(ip="1.2.3.4/-1"))
+            assert not rule.match(Event(ip="1.2.3.4/33"))
             assert not rule.match(Event(ip=u"this is just some data"))
             assert not rule.match(Event(ip=u"\xe4 not convertible to ascii"))
 
