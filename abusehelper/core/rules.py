@@ -138,7 +138,7 @@ class MATCH(_Rule):
         self.flags = flags
 
     def __repr__(self):
-        return self.__class__.__name__ + ("(%r, %r)" % (self.key, self.value))
+        return self.__class__.__name__ + repr((self.key, self.value))
 
     def match_with_cache(self, event, cache):
         if self.key is None:
@@ -370,7 +370,7 @@ class NETBLOCK(_Rule):
             self.ip_num = ip_num & self.mask
             break
         else:
-            raise NETBLOCKError("could not parse IP %r" % ip)
+            raise NETBLOCKError("could not parse " + repr(ip))
 
         self.keys = None if keys is None else frozenset(keys)
         _Rule.__init__(self, (self.parser, self.ip_num, self.bits, self.keys))
