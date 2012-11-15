@@ -5,8 +5,10 @@ import operator
 import functools
 import re
 
+
 class RuleError(Exception):
     pass
+
 
 class RuleClassifier(object):
     def __init__(self):
@@ -44,6 +46,7 @@ class RuleClassifier(object):
 
     def is_empty(self):
         return not self._rules
+
 
 class _Rule(object):
     @classmethod
@@ -83,8 +86,10 @@ class _Rule(object):
     def match_with_cache(self, obj, cache):
         return False
 
+
 class MATCHError(RuleError):
     pass
+
 
 class MATCH(_Rule):
     _flags = dict(I=re.I, X=re.X, M=re.M, S=re.S)
@@ -141,6 +146,7 @@ class MATCH(_Rule):
         return event.contains(self.key, filter=self.filter)
 MATCH.serialize_register()
 
+
 class NOT(_Rule):
     @classmethod
     def dump_rule(cls, dump, name, rule):
@@ -165,6 +171,7 @@ class NOT(_Rule):
     def match_with_cache(self, obj, cache):
         return not self.child.match(obj, cache)
 NOT.serialize_register()
+
 
 class OR(_Rule):
     @classmethod
@@ -193,6 +200,7 @@ class OR(_Rule):
         return False
 OR.serialize_register()
 
+
 class AND(_Rule):
     @classmethod
     def dump_rule(cls, dump, name, rule):
@@ -220,6 +228,7 @@ class AND(_Rule):
         return True
 AND.serialize_register()
 
+
 class ANYTHING(_Rule):
     @classmethod
     def dump_rule(cls, dump, name, rule):
@@ -246,15 +255,16 @@ from socket import inet_aton, inet_pton, AF_INET6, error
 
 _ACCEPTABLE_ERRORS = (error, UnicodeEncodeError, TypeError)
 
-_unpack_ipv4 = struct.Struct("!I").unpack
+
 def _parse_ipv4(string):
     try:
         packed = inet_aton(string)
         return _unpack_ipv4(packed)[0]
     except _ACCEPTABLE_ERRORS:
         return None
+_unpack_ipv4 = struct.Struct("!I").unpack
 
-_unpack_ipv6 = struct.Struct("!QQ").unpack
+
 def _parse_ipv6(string):
     try:
         packed = inet_pton(AF_INET6, string)
@@ -262,9 +272,12 @@ def _parse_ipv6(string):
         return None
     hi, lo = _unpack_ipv6(packed)
     return ((hi << 64) | lo)
+_unpack_ipv6 = struct.Struct("!QQ").unpack
+
 
 class NETBLOCKError(RuleError):
     pass
+
 
 class NETBLOCK(_Rule):
     @classmethod
@@ -301,7 +314,7 @@ class NETBLOCK(_Rule):
             ip_num = parser(ip)
             if ip_num is not None:
                 self.parser = parser
-                self.mask = ((1 << size) - 1) ^ ((1 << (size-bits)) - 1)
+                self.mask = ((1 << size) - 1) ^ ((1 << (size - bits)) - 1)
                 self.ip_num = ip_num & self.mask
                 break
         else:
@@ -330,6 +343,7 @@ class NETBLOCK(_Rule):
                 return True
         return False
 NETBLOCK.serialize_register()
+
 
 if __name__ == "__main__":
     import unittest
