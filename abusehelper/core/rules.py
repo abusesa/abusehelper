@@ -250,29 +250,63 @@ class ANYTHING(_Rule):
     match_with_cache = match
 ANYTHING.serialize_register()
 
+
 import struct
-from socket import inet_aton, inet_pton, AF_INET6, error
+from socket import inet_ntop, inet_pton, AF_INET, AF_INET6, error
 
 _ACCEPTABLE_ERRORS = (error, UnicodeEncodeError, TypeError)
 
 
-def _parse_ipv4(string):
+def _split_bits(string):
+    bites = string.split("/", 1)
+    if len(bites) == 1:
+        return string, None
+
     try:
-        packed = inet_aton(string)
-        return _unpack_ipv4(packed)[0]
-    except _ACCEPTABLE_ERRORS:
+        bits = int(bites[1])
+    except ValueError:
         return None
-_unpack_ipv4 = struct.Struct("!I").unpack
+    return bites[0], bits
 
 
-def _parse_ipv6(string):
+def _parse_ipv4_block(string):
+    split = _split_bits(string)
+    if split is None:
+        return None
+
+    ip, bits = split
     try:
-        packed = inet_pton(AF_INET6, string)
+        packed = inet_pton(AF_INET, ip)
     except _ACCEPTABLE_ERRORS:
         return None
-    hi, lo = _unpack_ipv6(packed)
-    return ((hi << 64) | lo)
-_unpack_ipv6 = struct.Struct("!QQ").unpack
+
+    ip_num, = struct.unpack("!I", packed)
+    return ip_num, bits
+
+
+def _format_ipv4(ip_num):
+    return inet_ntop(AF_INET, struct.pack("!I", ip_num))
+
+
+def _parse_ipv6_block(string):
+    split = _split_bits(string)
+    if split is None:
+        return None
+
+    ip, bits = split
+    try:
+        packed = inet_pton(AF_INET6, ip)
+    except _ACCEPTABLE_ERRORS:
+        return None
+
+    hi, lo = struct.unpack("!QQ", packed)
+    return ((hi << 64) | lo), bits
+
+
+def _format_ipv6(ip_num):
+    hi = ip_num >> 64
+    lo = ip_num & 0xffffffffffffffff
+    return inet_ntop(AF_INET6, struct.pack("!QQ", hi, lo))
 
 
 class NETBLOCKError(RuleError):
@@ -293,6 +327,7 @@ class NETBLOCK(_Rule):
         bits = element.get_attr("bits", None)
         if None in (ip, bits):
             raise RuleError(element)
+
         try:
             bits = int(bits)
         except ValueError:
@@ -303,34 +338,65 @@ class NETBLOCK(_Rule):
             keys = serialize.load_list(load, child)
         return cls(ip, bits, keys)
 
-    def __init__(self, ip, bits, keys=None):
-        if keys is not None:
-            keys = frozenset(keys)
-        self.keys = keys
-        self.ip = ip
-        self.bits = bits
+    _versions = [
+        (_parse_ipv4_block, _format_ipv4, 32),
+        (_parse_ipv6_block, _format_ipv6, 128)
+    ]
 
-        for (parser, size) in ((_parse_ipv4, 32), (_parse_ipv6, 128)):
-            ip_num = parser(ip)
-            if ip_num is not None:
-                self.parser = parser
-                self.mask = ((1 << size) - 1) ^ ((1 << (size - bits)) - 1)
-                self.ip_num = ip_num & self.mask
-                break
+    def __init__(self, ip, bits=None, keys=None):
+        for parser, formatter, max_bits in self._versions:
+            result = parser(ip)
+            if result is None:
+                continue
+
+            ip_num, ip_bits = result
+            if ip_bits is not None and bits is not None:
+                raise NETBLOCKError("{0!r} already contains bits".format(ip))
+
+            if ip_bits is None:
+                ip_bits = bits if bits is not None else max_bits
+
+            if not 0 <= ip_bits <= max_bits:
+                msg = "bits not in range (got {0}, expected 0-{1})".format(ip_bits, max_bits)
+                raise NETBLOCKError(msg)
+
+            self.parser = parser
+            self.max_bits = max_bits
+
+            self.bits = bits if ip_bits is None else ip_bits
+            self.mask = ((1 << max_bits) - 1) ^ ((1 << (max_bits - self.bits)) - 1)
+
+            self.ip = formatter(ip_num)
+            self.ip_num = ip_num & self.mask
+            break
         else:
             raise NETBLOCKError("could not parse IP %r" % ip)
 
+        self.keys = None if keys is None else frozenset(keys)
         _Rule.__init__(self, (self.parser, self.ip_num, self.bits, self.keys))
 
     def __repr__(self):
-        keys = self.keys
-        if keys is not None:
-            keys = tuple(keys)
-        args = ", ".join(map(repr, (self.ip, self.bits, keys)))
-        return self.__class__.__name__ + "(" + args + ")"
+        args = []
+
+        if self.bits == self.max_bits:
+            args.append(repr(self.ip))
+        else:
+            args.append(repr(self.ip + "/" + str(self.bits)))
+
+        if self.keys is not None:
+            args.append("keys=" + repr(list(self.keys)))
+
+        return self.__class__.__name__ + "(" + ", ".join(args) + ")"
 
     def _filter(self, value):
-        return value is not None and value & self.mask == self.ip_num
+        if value is None:
+            return False
+
+        ip_num, ip_bits = value
+        if ip_bits is not None and ip_bits < self.bits:
+            return False
+
+        return ip_num & self.mask == self.ip_num
 
     def match_with_cache(self, event, cache):
         if self.keys is None:
@@ -441,30 +507,62 @@ if __name__ == "__main__":
             assert AND(a, a) != AND(b, b)
 
     class NetblockTests(unittest.TestCase):
-        def test_bad_data(self):
-            rule = NETBLOCK("0.0.0.0", 0)
-            assert not rule.match(Event(ip=u"not valid"))
-            assert not rule.match(Event(ip=u"\xe4 not convertible to ascii"))
-
         def test_eq(self):
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.0.0", 16)
             assert NETBLOCK("0.0.0.0", 16) == NETBLOCK("0.0.255.255", 16)
             assert NETBLOCK("0.0.0.0", 24) != NETBLOCK("0.0.255.255", 24)
             assert NETBLOCK("::", 24) != NETBLOCK("0.0.0.0", 24)
 
+        def test_cidr_constructor(self):
+            assert NETBLOCK("1.2.3.4") == NETBLOCK("1.2.3.4/32")
+            assert NETBLOCK("1.2.3.4", 32) == NETBLOCK("1.2.3.4/32")
+            assert NETBLOCK("1.2.3.4", 16) == NETBLOCK("1.2.3.4/16")
+            assert NETBLOCK("1.2.3.4", 16) != NETBLOCK("1.2.3.4")
+
+            assert NETBLOCK("2001:0db8:ac10:fe01::") == NETBLOCK("2001:0db8:ac10:fe01::/128")
+            assert NETBLOCK("2001:0db8:ac10:fe01::", 128) == NETBLOCK("2001:0db8:ac10:fe01::/128")
+            assert NETBLOCK("2001:0db8:ac10:fe01::", 64) == NETBLOCK("2001:0db8:ac10:fe01::/64")
+            assert NETBLOCK("2001:0db8:ac10:fe01::", 64) != NETBLOCK("2001:0db8:ac10:fe01::")
+
+            self.assertRaises(NETBLOCKError, NETBLOCK, "1.2.3.4/16", 16)
+            self.assertRaises(NETBLOCKError, NETBLOCK, "2001:0db8:ac10:fe01::/32", 32)
+
+        def test_match_ipv4(self):
+            rule = NETBLOCK("1.2.3.4", 16)
+            assert rule.match(Event(ip="1.2.3.4"))
+            assert rule.match(Event(ip="1.2.0.0"))
+            assert not rule.match(Event(ip="0.0.0.0"))
+
+        def test_match_ipv4_cidr(self):
+            rule = NETBLOCK("1.2.3.4", 16)
+            assert not rule.match(Event(cidr="1.2.3.4/0"))
+            assert not rule.match(Event(cidr="1.2.3.4/8"))
+            assert rule.match(Event(cidr="1.2.3.4/16"))
+            assert rule.match(Event(cidr="1.2.3.4/24"))
+            assert not rule.match(Event(cidr="0.0.0.0/16"))
+
         def test_match_ipv6(self):
             rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
             assert rule.match(Event(ip="2001:0db8:aaaa:bbbb:cccc::"))
-
-        def test_non_match_ipv6(self):
-            rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
             assert not rule.match(Event(ip="::1"))
+
+        def test_match_ipv6_cidr(self):
+            rule = NETBLOCK("2001:0db8:ac10:fe01::", 32)
+            assert not rule.match(Event(cidr="2001:0db8:aaaa:bbbb:cccc::/0"))
+            assert not rule.match(Event(cidr="2001:0db8:aaaa:bbbb:cccc::/16"))
+            assert rule.match(Event(cidr="2001:0db8:aaaa:bbbb:cccc::/32"))
+            assert rule.match(Event(cidr="2001:0db8:aaaa:bbbb:cccc::/64"))
+            assert not rule.match(Event(cidr="::1/32"))
+
+        def test_non_match_non_ip_data(self):
+            rule = NETBLOCK("1.2.3.4", 24)
+            assert not rule.match(Event(ip=u"this is just some data"))
+            assert not rule.match(Event(ip=u"\xe4 not convertible to ascii"))
 
         def test_match_arbitrary_key(self):
             rule = NETBLOCK("1.2.3.4", 24)
             assert rule.match(Event(somekey="1.2.3.255"))
 
-        def test_non_match_arbitrary_key(self):
             rule = NETBLOCK("1.2.3.4", 24)
             assert not rule.match(Event(somekey="1.2.4.255"))
 
@@ -472,12 +570,7 @@ if __name__ == "__main__":
             rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
             assert rule.match(Event(somekey="4.5.6.255", ip="1.2.3.255"))
 
-        def test_nonmatch_ip_key(self):
             rule = NETBLOCK("1.2.3.4", 24, keys=["ip"])
             assert not rule.match(Event(somekey="1.2.3.4", ip="1.2.4.255"))
-
-        def test_non_match_non_ip_data(self):
-            rule = NETBLOCK("1.2.3.4", 24)
-            assert not rule.match(Event(ip="this is just some data"))
 
     unittest.main()
