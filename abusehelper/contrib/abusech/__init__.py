@@ -88,7 +88,9 @@ class AbuseCHFeedBot(RSSBot):
         event = events.Event({
             "feed": self.feed_name,
             "malware": self.feed_malware,
-            "type": self.feed_type
+            "type": self.feed_type,
+            "description": "This host is most likely serving a " + \
+                self.feed_malware + " " + self.feed_type + "."
         })
 
         for input_key, input_value in keys.iteritems():
