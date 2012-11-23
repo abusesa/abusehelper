@@ -57,6 +57,8 @@ class Malc0deBot(RSSBot):
         if not self.is_ip(host):
             event.add("host", host)
 
+        event.add("description", "Malware URL")
+
         return event
 
 if __name__ == "__main__":
