@@ -29,11 +29,11 @@ def host_or_ip_from_url(url):
 
 
 _levels = {
-    "1": ["bulletproof hosted"],
-    "2": ["hacked webserver"],
-    "3": ["free hosting service"],
+    "1": ["The malicious service is hosted on a bulletproof server."],
+    "2": ["The malicious service is offered through a hacked webserver."],
+    "3": ["The malicious service is offered through a free hosting service."],
     "4": [],  # "4" denotes an unknown level
-    "5": ["hosted on a fastflux botnet"]
+    "5": ["The malicious service is hosted on a fastflux botnet."]
 }
 
 
