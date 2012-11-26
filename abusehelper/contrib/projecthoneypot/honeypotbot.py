@@ -35,7 +35,9 @@ class ProjectHoneyPotBot(RSSBot):
                 return None
             for item in descriptions:
                 if item in types:
-                    event.add('description', descriptions[item])
+                    desc = "This host is most likely part of SPAM infrastructure " + \
+                        "(" + descriptions[item] + ")."
+                    event.add('description', desc)
             if ip:
                 url = "http://www.projecthoneypot.org/ip_" + ip
                 event.add("description url", url)
