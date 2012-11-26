@@ -89,7 +89,7 @@ class AbuseCHFeedBot(RSSBot):
             "feed": self.feed_name,
             "malware": self.feed_malware,
             "type": self.feed_type,
-            "description": "This host is most likely serving a " + \
+            "description": "This host is most likely hosting a " + \
                 self.feed_malware + " " + self.feed_type + "."
         })
 
