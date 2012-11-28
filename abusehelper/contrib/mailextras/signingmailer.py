@@ -92,11 +92,19 @@ class Mailer(mailer.MailerService):
     rt_user = bot.Param("RT server username", default='')
     rt_passwd = bot.Param("RT server user password", default='')
     rt_queue = bot.Param("RT queue to create tickets to", default='')
-    rt_close_delay = bot.IntParam("Delay after which generated tickets are closed", 
-                               default=300)
+    rt_close_delay = \
+        bot.IntParam("Delay after which generated tickets are closed", 
+                     default=300)
+    rt_manual_queue = \
+        bot.Param("RT queue to move tickets with no valid recipient",
+                  default='')
+    debug = bot.Param("Do not send, only debug how the mail would be sent",
+                  default='')
     sent_dir = bot.Param("Directory for logs on sent data", default='')
-    ticket_preamble = bot.Param("A possible ticketing header, eg. CERT in [CERT #1]", 
-                                default='')
+    ticket_preamble = \
+        bot.Param("A possible ticketing header, eg. CERT in [CERT #1]", 
+                  default='')
+
 
     def get_random_ticket_no(self, **kw):
         from random import randint as randrange
@@ -116,14 +124,19 @@ class Mailer(mailer.MailerService):
         else:
             self.log.info("Could not close ticket %s", number)
 
-    def rt_ticket(self, **kw):
+    def rt_ticket(self, manual=False, **kw):
         headers = {"Content-type": "application/x-www-form-urlencoded",
                    "Accept": "text/plain"}
         hostport = self.rt_server
         host, port = hostport.split(':')
         user = self.rt_user
         passwd = self.rt_passwd
-        queue = self.rt_queue
+
+        if manual:
+            queue = self.rt_manual_queue
+        else:
+            queue = self.rt_queue
+
         if not host or not port or not user or not passwd or not queue:
             self.log.error("Could contact RT, bad or missing args" +
                            "(host: %s port: %s user: %s queue: %s) or passwd",
@@ -311,15 +324,27 @@ class Mailer(mailer.MailerService):
 
         kws = dict(keywords)
 
+        # If we only have our own irt mailbox as recipient, it means
+        # the ticket won't be sent to the real customer, and we need
+        # to do some manual handling. Hence, do not close the ticket,
+        # and send it to the manual queue.
         manual = False
-        if keys.get('to', '') == keys.get('cc', ''):
+        addrs = keys.get('to', ())
+        addrs = addrs + keys.get('cc', ())
+        addrs = set(addrs)
+        addrs.discard(kws.get('irt_email', ''))
+        if not addrs:
             keys['cc'] = []
             manual = True
             kws["ticket_subject"] = kws.get('manual_subject', 
                                             'ERROR: no manual subject defined')
             keys['manual'] = True
 
-        number = yield threadpool.thread(self.rt_ticket, **kws)
+        if keys.has_key('to_override'):
+            keys['to'] = keys['to_override']
+            keys['cc'] = []
+
+        number = yield threadpool.thread(self.rt_ticket, manual, **kws)
         if manual:
             self.log.info("No valid recipients, manual ticket: %s" % number)
 
@@ -350,6 +375,17 @@ class Mailer(mailer.MailerService):
                 self.log.info("Not closing manual ticket %s" % number)
 
         idiokit.stop(success)
+
+    @idiokit.stream
+    def _try_to_send(self, from_addr, to_addr, subject, msg):
+        if self.debug:
+            yield timer.sleep(0)
+            self.log.info("DEBUG: Would have sent message to %r", 
+                          to_addr)
+            idiokit.stop(True)
+        else:
+            result = yield self._try_to_send(from_addr, to_addr, subject, msg)
+            idiokit.stop(result)
 
     def collect(self, *args, **keys):
         return self._stats(keys.get("src_room", "COLLECT")) \

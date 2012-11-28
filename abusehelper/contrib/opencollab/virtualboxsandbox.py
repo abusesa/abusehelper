@@ -145,7 +145,7 @@ class VirtualboxSandboxExpert(Expert):
                         "VBoxManage startvm %s --type headless", self.vmname)
 
                     # Sleep for a bit more than the timeout
-                    yield idiokit.timer.sleep(int(self.timeout) + 30)
+                    yield idiokit.timer.sleep(int(self.timeout) * 2)
 
                     # Take a screenshot
                     yield self._run_command(
