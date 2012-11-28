@@ -13,6 +13,7 @@ class OpenCollabExpert(Expert):
     collab_extra_ca_certs = bot.Param(default=None)
     cache_query = bot.Param()
     page_keys = bot.ListParam("pagekey=wikikey[,pagekey=wikikey]")
+    join_keys = bot.BoolParam("Join pagekeys and wikikeys on events", default=True)
     poll_interval = bot.IntParam("wait at least the given amount of seconds " +
                                  "before polling the collab again " +
                                  "(default: %default seconds)", default=600)
@@ -89,7 +90,11 @@ class OpenCollabExpert(Expert):
                         continue
 
                     for wikikey in self.keys[pagekey]:
-                        newkey = str(pagekey + "_" + wikikey)
+                        if self.join_keys:
+                            newkey = str(pagekey + "_" + wikikey)
+                        else:
+                            newkey = str(wikikey)
+
                         for value in page.values(wikikey):
                             event.add(newkey, value.strip("[[]]"))
 
