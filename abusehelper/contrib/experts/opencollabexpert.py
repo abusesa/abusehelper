@@ -13,7 +13,7 @@ class OpenCollabExpert(Expert):
     collab_extra_ca_certs = bot.Param(default=None)
     cache_query = bot.Param()
     page_keys = bot.ListParam("pagekey=wikikey[,pagekey=wikikey]")
-    disable_join_keys = bot.BoolParam("Disable pagekey and wikikey joining on events", default=False)
+    disable_join_keys = bot.BoolParam("Disable pagekey and wikikey joining on events")
     poll_interval = bot.IntParam("wait at least the given amount of seconds " +
                                  "before polling the collab again " +
                                  "(default: %default seconds)", default=600)
