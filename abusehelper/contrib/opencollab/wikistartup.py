@@ -103,7 +103,7 @@ class WikiConfigInterface:
                 if self.default_metas != previous_defaults:
                     self.log.info("Defaults values changed on page %r",
                                   self.defaults_page)
-                
+
             pages = self.get_metas(self.category)
             if pages:
                 bots = self.parse_pages(pages)
@@ -185,29 +185,38 @@ class WikiStartupBot(WikiConfigInterface, StartupBot):
     collab_ignore_cert = bot.BoolParam()
     collab_extra_ca_certs = bot.Param(default=None)
 
-    category = bot.Param("Page category (default: %default)",
-                         default="CategoryBot")
-    defaults_page = bot.Param("Page for default values for bot arguments", 
-                              default=None)
-    poll_interval = bot.IntParam("how often (in seconds) the collab is " +
-                                 "checked for updates (default: %default)",
-                                 default=60)
-    decrypt_password = bot.Param("Password for decrypting metas.", default=None)
+    category = bot.Param("""
+        page category (default: %default)
+        """, default="CategoryBot")
+    defaults_page = bot.Param("""
+        page for default values for bot arguments
+        """, default=None)
+    poll_interval = bot.IntParam("""
+        how often (in seconds) the collab is
+        checked for updates (default: %default)
+        """, default=60)
+    decrypt_password = bot.Param("""
+        password for decrypting metas
+        """, default=None)
 
-    xmpp_jid = bot.Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)",
-        default=None)
-    xmpp_password = bot.Param("the XMPP password",
-        default="")
-    xmpp_host = bot.Param("the XMPP service host (default: autodetect)",
-        default=None)
-    xmpp_port = bot.IntParam("the XMPP service port (default: autodetect)",
-        default=None)
+    xmpp_jid = bot.Param("""
+        the XMPP JID (e.g. xmppuser@xmpp.example.com)
+        """, default=None)
+    xmpp_password = bot.Param("""
+        the XMPP password,
+        """, default="")
+    xmpp_host = bot.Param("""
+        the XMPP service host (default: autodetect),
+        """, default=None)
+    xmpp_port = bot.IntParam("""
+        the XMPP service port (default: autodetect),
+        """, default=None)
     xmpp_extra_ca_certs = bot.Param("""
         a PEM formatted file of CAs to be used in addition to the system CAs
         """, default=None)
     xmpp_ignore_cert = bot.BoolParam("""
         do not perform any verification for the XMPP service's SSL certificate
-        """, default=None)
+        """)
 
     def __init__(self, *args, **keys):
         super(WikiStartupBot, self).__init__(*args, **keys)
