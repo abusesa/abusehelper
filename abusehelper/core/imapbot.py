@@ -9,6 +9,7 @@ from idiokit import threadpool, timer
 from cStringIO import StringIO
 from abusehelper.core import bot
 
+
 @idiokit.stream
 def collect():
     collection = list()
@@ -19,15 +20,29 @@ def collect():
     except StopIteration:
         idiokit.stop(collection)
 
+
 class IMAPBot(bot.FeedBot):
     poll_interval = bot.IntParam(default=300)
     filter = bot.Param(default="(UNSEEN)")
 
-    mail_server = bot.Param()
-    mail_port = bot.IntParam(default=993)
-    mail_user = bot.Param()
-    mail_password = bot.Param(default=None)
-    mail_box = bot.Param(default="INBOX")
+    mail_server = bot.Param("the mail server hostname")
+    mail_port = bot.IntParam("""
+        the mail server port (default: 993 for SSL connections,
+        143 for plain text connections)
+        """, default=None)
+    mail_user = bot.Param("""
+        the username used for mail server authentication
+        """)
+    mail_password = bot.Param("""
+        the password used for mail server authentication
+        """, default=None)
+    mail_box = bot.Param("""
+        the polled mailbox (default: %default)
+        """, default="INBOX")
+    mail_disable_ssl = bot.BoolParam("""
+        connect to the mail server using unencrypted plain
+        text connections (default: use encrypted SSL connections)
+        """)
 
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
@@ -85,9 +100,20 @@ class IMAPBot(bot.FeedBot):
                 yield threadpool.thread(self.disconnect, mailbox)
 
     def connect(self):
+        if self.mail_disable_ssl:
+            mail_class = imaplib.IMAP4
+            mail_port_default = 143
+        else:
+            mail_class = imaplib.IMAP4_SSL
+            mail_port_default = 993
+
+        mail_port = self.mail_port
+        if mail_port is None:
+            mail_port = mail_port_default
+
         self.log.info("Connecting to IMAP server %r port %d",
-                      self.mail_server, self.mail_port)
-        mailbox = imaplib.IMAP4_SSL(self.mail_server, self.mail_port)
+                      self.mail_server, mail_port)
+        mailbox = mail_class(self.mail_server, mail_port)
 
         self.log.info("Logging in to IMAP server %s port %d",
                       self.mail_server, self.mail_port)
