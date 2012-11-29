@@ -47,6 +47,14 @@ class IMAPBot(bot.FeedBot):
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
 
+        if self.mail_disable_ssl:
+            default_mail_port = 143
+        else:
+            default_mail_port = 993
+
+        if self.mail_port is None:
+            self.mail_port = default_mail_port
+
         if self.mail_password is None:
             self.mail_password = getpass.getpass("Mail password: ")
         self.queue = self.run_mailbox()
@@ -100,20 +108,14 @@ class IMAPBot(bot.FeedBot):
                 yield threadpool.thread(self.disconnect, mailbox)
 
     def connect(self):
+        self.log.info("Connecting to IMAP server %r port %d",
+                      self.mail_server, self.mail_port)
+
         if self.mail_disable_ssl:
             mail_class = imaplib.IMAP4
-            mail_port_default = 143
         else:
             mail_class = imaplib.IMAP4_SSL
-            mail_port_default = 993
-
-        mail_port = self.mail_port
-        if mail_port is None:
-            mail_port = mail_port_default
-
-        self.log.info("Connecting to IMAP server %r port %d",
-                      self.mail_server, mail_port)
-        mailbox = mail_class(self.mail_server, mail_port)
+        mailbox = mail_class(self.mail_server, self.mail_port)
 
         self.log.info("Logging in to IMAP server %s port %d",
                       self.mail_server, self.mail_port)
