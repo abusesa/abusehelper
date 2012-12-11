@@ -230,61 +230,52 @@ class MailerService(ReportBot):
             result = yield ReportBot.main(self, state)
         finally:
             if self.server is not None:
-                _, server = self.server
-                self.server = None
-
                 try:
-                    yield threadpool.thread(server.quit)
+                    yield threadpool.thread(self.server.quit)
                 except self.TOLERATED_EXCEPTIONS:
                     pass
+                finally:
+                    self.server = None
         idiokit.stop(result)
 
     @idiokit.stream
     def _ensure_connection(self):
+        if self.server is not None:
+            return
+
         while self.server is None:
             host, port = self.smtp_host, self.smtp_port
             self.log.info("Connecting %r port %d", host, port)
             try:
-                server = yield threadpool.thread(smtplib.SMTP, host, port)
+                self.server = yield threadpool.thread(smtplib.SMTP, host, port)
             except self.TOLERATED_EXCEPTIONS, exc:
                 self.log.error("Error connecting SMTP server: %r", exc)
             else:
                 self.log.info("Connected to the SMTP server")
-                self.server = False, server
                 break
 
             self.log.info("Retrying SMTP connection in 10 seconds")
             yield timer.sleep(10.0)
 
-    def _try_to_authenticate(self, server):
-        if server.has_extn("starttls"):
-            server.starttls()
-            server.ehlo()
+        yield threadpool.thread(self.server.ehlo)
+
+        if self.server.has_extn("starttls"):
+            yield threadpool.thread(self.server.starttls)
+            yield threadpool.thread(self.server.ehlo)
 
         if (self.smtp_auth_user is not None and
             self.smtp_auth_password is not None and
-            server.has_extn("auth")):
-            server.login(self.smtp_auth_user, self.smtp_auth_password)
+            self.server.has_extn("auth")):
+            yield threadpool.thread(self.server.login,
+                self.smtp_auth_user, self.smtp_auth_password)
 
     @idiokit.stream
     def _try_to_send(self, from_addr, to_addr, subject, msg):
-        yield self._ensure_connection()
-
-        ehlo_done, server = self.server
-
-        self.log.info("Sending message %r to %r", subject, to_addr)
         try:
-            if not ehlo_done:
-                yield threadpool.thread(server.ehlo)
-                self.server = True, server
+            yield self._ensure_connection()
 
-            try:
-                yield threadpool.thread(server.sendmail, from_addr, to_addr, msg)
-            except smtplib.SMTPSenderRefused, refused:
-                if refused.smtp_code != 530:
-                    raise
-                yield threadpool.thread(self._try_to_authenticate, server)
-                yield threadpool.thread(server.sendmail, from_addr, to_addr, msg)
+            self.log.info("Sending message %r to %r", subject, to_addr)
+            yield threadpool.thread(self.server.sendmail, from_addr, to_addr, msg)
         except smtplib.SMTPDataError, data_error:
             self.log.error("Could not send message to %r: %r. " +
                            "Dropping message from queue.",
@@ -298,11 +289,12 @@ class MailerService(ReportBot):
             idiokit.stop(True)
         except self.TOLERATED_EXCEPTIONS, exc:
             self.log.error("Could not send message to %r: %r", to_addr, exc)
-            self.server = None
             try:
-                yield threadpool.thread(server.quit)
+                yield threadpool.thread(self.server.quit)
             except self.TOLERATED_EXCEPTIONS:
                 pass
+            finally:
+                self.server = None
             idiokit.stop(False)
 
         self.log.info("Sent message to %r", to_addr)
