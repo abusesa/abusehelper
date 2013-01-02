@@ -11,13 +11,16 @@ import platform
 
 # Helpers
 
+
 def get_effective_username():
     return pwd.getpwuid(os.getuid()).pw_name
+
 
 def module_id(module):
     import hashlib
 
     return hashlib.sha1(module).hexdigest() + "-" + module
+
 
 def popen(*args, **keys):
     import subprocess
@@ -28,12 +31,14 @@ def popen(*args, **keys):
     defaults.update(keys)
     return subprocess.Popen(args, **defaults)
 
+
 def send_signal(pid, signum):
     try:
         os.kill(pid, signum)
     except OSError, ose:
         if ose.errno != errno.ESRCH:
             raise
+
 
 def ps():
     process = popen("ps", "-wweo", "pid=,ppid=,command=")
@@ -52,6 +57,7 @@ def ps():
         found.append((int(pid), int(ppid), command))
     return found
 
+
 def find(module, processes=None):
     rex = re.compile(r"\s" + re.escape(module_id(module)))
     if processes is None:
@@ -63,8 +69,10 @@ def find(module, processes=None):
             found.append((int(pid), command))
     return found
 
+
 def is_running(module):
     return not not find(module)
+
 
 def _signal(module, signame, signum):
     waiting = set()
@@ -91,17 +99,21 @@ def _signal(module, signame, signum):
             print "Warning, some instances survived:"
             print "  pid=%d command=%r" % (pid, command)
 
+
 def normalized_module(module):
     module = os.path.abspath(module)
     if os.path.isdir(module):
         module = os.path.join(module, "startup.py")
     return module
 
+
 def logpath(module):
     path, filename = os.path.split(module)
     return os.path.join(path, "log", filename + ".log")
 
+
 # Commands
+
 
 def command_start(module):
     module = normalized_module(module)
@@ -129,6 +141,7 @@ def command_start(module):
             return
         time.sleep(0.1)
 
+
 def command_status(module):
     module = normalized_module(module)
 
@@ -153,6 +166,7 @@ def command_status(module):
         for pid, command in parents.get(parent_pid, ()):
             print "  [%d] %s" % (pid, command)
 
+
 def command_stop(module):
     module = normalized_module(module)
     if not is_running(module):
@@ -160,6 +174,7 @@ def command_stop(module):
     else:
         print "Shutting down."
         _signal(module, "SIGUSR1", signal.SIGUSR1)
+
 
 def command_kill(module):
     module = normalized_module(module)
@@ -169,10 +184,12 @@ def command_kill(module):
         print "Shutting down."
         _signal(module, "SIGUSR2", signal.SIGUSR2)
 
+
 def command_restart(module):
     module = normalized_module(module)
     command_stop(module)
     command_start(module)
+
 
 def command_follow(module):
     module = normalized_module(module)
@@ -185,7 +202,7 @@ def command_follow(module):
         stdout, _ = process.communicate()
         if process.returncode == 0:
             try:
-                height = max(int(stdout.split()[0])-2, 0)
+                height = max(int(stdout.split()[0]) - 2, 0)
             except ValueError:
                 pass
 
@@ -198,9 +215,11 @@ def command_follow(module):
     finally:
         send_signal(process.pid, signal.SIGKILL)
 
+
 def command_confgen(module):
     from abusehelper.contrib.confgen import confgen
     confgen.generate(module)
+
 
 def main():
     from optparse import OptionParser
