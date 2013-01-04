@@ -54,7 +54,7 @@ def fetch_url(url, opener=None, chunk_size=16384):
 
         idiokit.stop(info, output)
     except urllib2.HTTPError as he:
-        raise HTTPError(he.code, he.msg, he.headers, he.fp)
+        raise HTTPError(he.code, he.msg, he.hdrs, he.fp)
     except (urllib2.URLError, httplib.HTTPException, socket.error) as error:
         raise FetchUrlFailed(str(error))
 
