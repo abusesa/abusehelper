@@ -4,17 +4,12 @@ import sys
 import time
 import errno
 import signal
+import select
 
 from botnet import Command
 
 
 # Helpers
-
-def module_id(module):
-    import hashlib
-
-    return hashlib.sha1(module).hexdigest() + "-" + module
-
 
 def popen(*args, **keys):
     import subprocess
@@ -36,8 +31,24 @@ def send_signal(pid, signum):
             raise
 
 
-def ps():
-    process = popen("ps", "-wweo", "pid=,ppid=,command=")
+def name_for_signal(signum, default=None):
+    for key, value in vars(signal).iteritems():
+        if not key.startswith("SIG"):
+            continue
+        if key.startswith("SIG_"):
+            continue
+        if value != signum:
+            continue
+        return key
+    return default
+
+
+def ps(all_users=False):
+    options = "-wwo"
+    if all_users:
+        options += "e"
+
+    process = popen("ps", options, "pid=,ppid=,command=")
     stdout, stderr = process.communicate()
     if process.returncode != 0:
         sys.stderr.write(stderr)
@@ -54,88 +65,65 @@ def ps():
     return found
 
 
-def find(module, processes=None):
-    rex = re.compile(r"\s" + re.escape(module_id(module)))
-    if processes is None:
-        processes = ps()
+# Instance
 
-    found = list()
-    for pid, ppid, command in processes:
-        if rex.search(command):
-            found.append((int(pid), command))
-    return found
+class Instance(object):
+    def __init__(self, instance):
+        instance = os.path.abspath(instance)
+        if os.path.isdir(instance):
+            instance = os.path.join(instance, "startup.py")
+        self._instance = instance
 
+    @property
+    def _id(self):
+        import hashlib
 
-def is_running(module):
-    return bool(find(module))
+        instance = self._instance
+        return hashlib.sha1(instance).hexdigest() + "-" + instance
 
+    @property
+    def path(self):
+        return self._instance
 
-def _signal(module, signame, signum):
-    waiting = set()
+    @property
+    def logpath(self):
+        path, filename = os.path.split(self.path)
+        return os.path.join(path, "log", filename + ".log")
 
-    try:
-        while True:
-            pids = find(module)
-            if not pids:
-                break
+    @property
+    def is_running(self):
+        return bool(self.find())
 
-            for item in pids:
-                if item in waiting:
-                    continue
-                pid, command = item
+    @property
+    def exists(self):
+        return os.path.exists(self.path)
 
-                send_signal(pid, signum)
-                print "Sent {0} to process {1}.".format(signame, pid)
+    def find(self, processes=None):
+        rex = re.compile(r"\s" + re.escape(self._id))
+        if processes is None:
+            processes = ps()
 
-            waiting = set(pids)
-            time.sleep(0.2)
-    finally:
-        pids = find(module)
-        if pids:
-            print "Warning, some instances survived:"
-            print "  pid={0} command={1!r}".format(pid, command)
+        found = list()
+        for pid, ppid, command in processes:
+            if rex.search(command):
+                found.append((int(pid), command))
+        return found
 
-
-def normalized_module(module):
-    module = os.path.abspath(module)
-    if os.path.isdir(module):
-        module = os.path.join(module, "startup.py")
-    return module
-
-
-def logpath(module):
-    path, filename = os.path.split(module)
-    return os.path.join(path, "log", filename + ".log")
-
-
-# Commands
-
-class _LegacyCommand(Command):
-    def run(self, parser, options, args):
-        if not args:
-            parser.error("expected a module argument")
-        if len(args) > 1:
-            parser.error("expected only one module argument")
-        self.run_for_module(normalized_module(args[0]))
-
-    def run_for_module(self, module):
-        pass
-
-
-class Start(_LegacyCommand):
-    def run_for_module(self, module):
-        module = normalized_module(module)
-        if is_running(module):
-            print "Already running."
+    def start(self):
+        if not self.exists:
+            yield "Instance does not exist."
+            return
+        if self.is_running:
+            yield "Already running."
             return
 
-        logfile = open(logpath(module), "a")
+        logfile = open(self.logpath, "a")
         try:
-            print "Starting."
+            yield "Starting."
             process = popen(sys.executable,
                 "-m", "runpy",
-                "abusehelper.core.startup", module,
-                module_id(module),
+                "abusehelper.core.startup", self.path,
+                self._id,
                 stdout=logfile,
                 stderr=logfile,
                 close_fds=True)
@@ -145,71 +133,128 @@ class Start(_LegacyCommand):
         for _ in xrange(20):
             code = process.poll()
             if code is not None:
-                print "Warning, process died with return code {0}".format(code)
+                yield "Warning, process died with return code {0}.".format(code)
                 return
             time.sleep(0.1)
 
-
-class Stop(_LegacyCommand):
-    def __init__(self, kill=False):
-        Command.__init__(self)
-
-        self._kill = kill
-
-    def run_for_module(self, module):
-        if not is_running(module):
-            print "Nothing running."
+    def stop(self, signum, signame=None):
+        if not self.is_running:
+            yield "Nothing running."
             return
 
-        print "Shutting down."
-        if self._kill:
-            _signal(module, "SIGUSR2", signal.SIGUSR2)
-        else:
-            _signal(module, "SIGUSR1", signal.SIGUSR1)
+        yield "Shutting down."
+        if signame is None:
+            signame = name_for_signal(signum, "signal {0}".format(signum))
 
+        previous = set()
+        try:
+            while True:
+                pids = set(self.find())
+                if not pids:
+                    break
 
-class Restart(_LegacyCommand):
-    def __init__(self):
-        _LegacyCommand.__init__(self)
+                for pid, command in pids - previous:
+                    send_signal(pid, signum)
+                    yield "Sent {0} to process {1}.".format(signame, pid)
 
-        self._stop = Stop()
-        self._start = Start()
+                previous = pids
+                time.sleep(0.2)
+        finally:
+            pids = set(self.find())
+            for index, (pid, command) in enumerate(pids):
+                if index == 0:
+                    yield "Warning, some instances survived:"
+                yield "  pid={0} command={1!r}".format(pid, command)
 
-    def prep(self, parser):
-        self._stop.prep(parser)
-        self._start.prep(parser)
-
-    def run(self, parser, options, args):
-        self._stop.run(parser, options, args)
-        self._start.run(parser, options, args)
-
-
-class Status(_LegacyCommand):
-    def run_for_module(self, module):
+    def status(self):
         processes = ps()
-        pids = find(module, processes)
+        pids = self.find(processes)
         if not pids:
-            print "Not running."
+            yield "Not running."
             return
 
         if len(pids) == 1:
-            print "1 instance running:"
+            yield "1 instance running:"
         else:
-            print "{0} instances running:".format(len(pids))
+            yield "{0} instances running:".format(len(pids))
 
         parents = dict()
         for pid, ppid, command in processes:
             parents.setdefault(ppid, list()).append((pid, command))
 
         for parent_pid, parent_command in pids:
-            print "[{0}] {1}".format(parent_pid, parent_command)
+            yield "[{0}] {1}".format(parent_pid, parent_command)
 
             for pid, command in parents.get(parent_pid, ()):
-                print "  [{0}] {1}".format(pid, command)
+                yield "  [{0}] {1}".format(pid, command)
+
+    def follow(self, lines=20):
+        if not self.exists:
+            yield "Instance does not exist."
+            return
+
+        process = popen("tail", "-n", str(lines), "-f", self.logpath)
+        streams = set([process.stdout, process.stderr])
+
+        try:
+            while self.is_running and streams:
+                readable, _, errors = select.select(streams, (), (), 0.5)
+                for stream in readable:
+                    line = stream.readline()
+                    if not line:
+                        streams.discard(stream)
+                        continue
+
+                    yield line.rstrip("\n").rstrip("\r")
+        finally:
+            send_signal(process.pid, signal.SIGKILL)
 
 
-class Follow(_LegacyCommand):
-    def run_for_module(self, module):
+# Commands
+
+class InstanceCommand(Command):
+    def run(self, parser, options, args):
+        if not args:
+            parser.error("expected a instance argument")
+        if len(args) > 1:
+            parser.error("expected only one instance argument")
+        return self.run_for_instance(Instance(args[0]))
+
+    def run_for_instance(self, instance):
+        return []
+
+
+class Start(InstanceCommand):
+    def run_for_instance(self, instance):
+        yield instance.start()
+
+
+class Stop(InstanceCommand):
+    def __init__(self, kill=False):
+        Command.__init__(self)
+
+        self._kill = kill
+
+    def run_for_instance(self, instance):
+        if not self._kill:
+            yield instance.stop(signal.SIGUSR1)
+        else:
+            yield instance.stop(signal.SIGUSR2)
+
+
+class Restart(InstanceCommand):
+    def run_for_instance(self, instance):
+        yield instance.stop(signal.SIGUSR1)
+        yield instance.start()
+
+
+class Status(InstanceCommand):
+    def run_for_instance(self, instance):
+        yield instance.status()
+
+
+class Follow(InstanceCommand):
+    def run_for_instance(self, instance):
         height = 20
         try:
             process = popen("stty", "size", stdin=sys.stdin)
@@ -222,15 +267,7 @@ class Follow(_LegacyCommand):
                     height = max(int(stdout.split()[0]) - 2, 0)
                 except ValueError:
                     pass
-
-        process = popen("tail", "-n", str(height), "-f", logpath(module),
-            stdout=sys.stdout,
-            stderr=sys.stderr)
-        try:
-            while is_running(module):
-                time.sleep(0.2)
-        finally:
-            send_signal(process.pid, signal.SIGKILL)
+        yield instance.follow(lines=height)
 
 
 def register_commands(botnet):

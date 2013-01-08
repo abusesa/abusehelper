@@ -5,6 +5,24 @@ import platform
 from optparse import OptionParser
 
 
+def _flatten(iterable):
+    stack = [iter(iterable)]
+
+    while stack:
+        last = stack.pop()
+        if isinstance(last, basestring):
+            yield last
+            continue
+
+        try:
+            item = last.next()
+        except StopIteration:
+            pass
+        else:
+            stack.append(last)
+            stack.append(item)
+
+
 class Botnet(object):
     def __init__(self):
         self._commands = dict()
@@ -63,7 +81,8 @@ class Botnet(object):
         command_obj.prep(parser)
 
         options, args = self._parse(parser, options, args[1:])
-        command_obj.run(parser, options, args)
+        for line in _flatten(command_obj.run(parser, options, args)):
+            print line
 
     def register_commands(self, *args, **keys):
         self._commands.update(*args, **keys)

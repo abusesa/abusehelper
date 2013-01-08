@@ -6,6 +6,9 @@ Command = botnet.Command
 
 
 def main():
-    botnet = Botnet()
-    botnet.load_module(commands)
-    botnet.run()
+    try:
+        botnet = Botnet()
+        botnet.load_module(commands)
+        botnet.run()
+    except KeyboardInterrupt:
+        pass
