@@ -43,12 +43,8 @@ def name_for_signal(signum, default=None):
     return default
 
 
-def ps(all_users=False):
-    options = "-wwo"
-    if all_users:
-        options += "e"
-
-    process = popen("ps", options, "pid=,ppid=,command=")
+def ps():
+    process = popen("ps", "-wweo", "pid=,ppid=,command=")
     stdout, stderr = process.communicate()
     if process.returncode != 0:
         sys.stderr.write(stderr)
@@ -210,6 +206,30 @@ class Instance(object):
             send_signal(process.pid, signal.SIGKILL)
 
 
+def running_instances():
+    import hashlib
+
+    rex = re.compile("\s([a-f0-9]{40})-", re.I)
+
+    for pid, _, command in ps():
+        match = rex.search(command)
+        if not match:
+            continue
+
+        start = match.end()
+        hashed = match.group(1)
+
+        candidate = hashlib.sha1()
+        if hashed == candidate.hexdigest():
+            yield pid, Instance("")
+            continue
+
+        for index in xrange(start, len(command)):
+            candidate.update(command[index])
+            if hashed == candidate.hexdigest():
+                yield pid, Instance(command[start:index + 1])
+
+
 # Commands
 
 class InstanceCommand(Command):
@@ -218,43 +238,45 @@ class InstanceCommand(Command):
             parser.error("expected a instance argument")
         if len(args) > 1:
             parser.error("expected only one instance argument")
-        return self.run_for_instance(Instance(args[0]))
+        return self.run_for_instance(options, Instance(args[0]))
 
-    def run_for_instance(self, instance):
+    def run_for_instance(self, _, instance):
         return []
 
 
 class Start(InstanceCommand):
-    def run_for_instance(self, instance):
+    def run_for_instance(self, _, instance):
         yield instance.start()
 
 
 class Stop(InstanceCommand):
-    def __init__(self, kill=False):
-        Command.__init__(self)
+    def prep(self, parser):
+        parser.add_option("-k", "--kill",
+            action="store_true",
+            dest="kill",
+            default=False,
+            help="kill botnet using SIGKILL")
 
-        self._kill = kill
-
-    def run_for_instance(self, instance):
-        if not self._kill:
+    def run_for_instance(self, options, instance):
+        if not options.kill:
             yield instance.stop(signal.SIGUSR1)
         else:
             yield instance.stop(signal.SIGUSR2)
 
 
 class Restart(InstanceCommand):
-    def run_for_instance(self, instance):
+    def run_for_instance(self, _, instance):
         yield instance.stop(signal.SIGUSR1)
         yield instance.start()
 
 
 class Status(InstanceCommand):
-    def run_for_instance(self, instance):
+    def run_for_instance(self, _, instance):
         yield instance.status()
 
 
 class Follow(InstanceCommand):
-    def run_for_instance(self, instance):
+    def run_for_instance(self, _, instance):
         height = 20
         try:
             process = popen("stty", "size", stdin=sys.stdin)
@@ -270,12 +292,28 @@ class Follow(InstanceCommand):
         yield instance.follow(lines=height)
 
 
+class List(Command):
+    def run(self, parser, options, args):
+        instances = list(running_instances())
+        if not instances:
+            yield "No running instances."
+            return
+
+        if len(instances) == 1:
+            yield "1 instance running:"
+        else:
+            yield "{0} instances running:".format(len(instances))
+
+        for pid, instance in instances:
+            yield "[{0}] {1}".format(pid, instance.path)
+
+
 def register_commands(botnet):
     botnet.register_commands({
         "start": Start(),
         "stop": Stop(),
-        "kill": Stop(kill=True),
         "restart": Restart(),
         "status": Status(),
-        "follow": Follow()
+        "follow": Follow(),
+        "list": List()
     })
