@@ -255,7 +255,7 @@ class Stop(InstanceCommand):
             action="store_true",
             dest="kill",
             default=False,
-            help="kill botnet using SIGKILL")
+            help="stop the botnet(s) with the SIGKILL signal")
 
     def run_for_instance(self, options, instance):
         if not options.kill:

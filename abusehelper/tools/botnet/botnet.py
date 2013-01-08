@@ -30,8 +30,8 @@ class Botnet(object):
     def _is_root(self):
         return pwd.getpwuid(os.getuid()).pw_name == "root"
 
-    def _parse(self, parser, options, args):
-        options, args = parser.parse_args(args=args, values=options)
+    def _parse(self, parser):
+        options, args = parser.parse_args()
 
         if not options.allow_root and self._is_root():
             parser.error("running as root - " +
@@ -49,7 +49,7 @@ class Botnet(object):
 
         return options, args
 
-    def run(self, options=None, args=None):
+    def run(self):
         parser = OptionParser()
 
         parser.set_usage("usage: %prog [options] command [...]")
@@ -65,7 +65,7 @@ class Botnet(object):
             help="allow starting bots as the root user")
 
         parser.disable_interspersed_args()
-        options, args = self._parse(parser, options, args)
+        options, args = self._parse(parser)
 
         if not args:
             parser.error("no command defined")
@@ -80,8 +80,8 @@ class Botnet(object):
         command_obj = self._commands[command]
         command_obj.prep(parser)
 
-        options, args = self._parse(parser, options, args[1:])
-        for line in _flatten(command_obj.run(parser, options, args)):
+        options, args = self._parse(parser)
+        for line in _flatten(command_obj.run(parser, options, args[1:])):
             print line
 
     def register_commands(self, *args, **keys):
