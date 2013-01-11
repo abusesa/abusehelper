@@ -1,5 +1,5 @@
 import idiokit
-from idiokit import timer
+
 
 class Counter(object):
     def __init__(self):
@@ -41,8 +41,10 @@ class Counter(object):
         for key, values in self.keys.iteritems():
             yield key, values
 
+
 class TaskStopped(Exception):
     pass
+
 
 class TaskFarm(object):
     def __init__(self, task, signal=TaskStopped(), grace_period=1.0):
@@ -62,7 +64,7 @@ class TaskFarm(object):
             yield idiokit.consume()
         finally:
             if self.counter.dec(key):
-                yield timer.sleep(self.grace_period)
+                yield idiokit.sleep(self.grace_period)
 
                 if not self.counter.contains(key) and key in self.tasks:
                     task = self.tasks.pop(key)

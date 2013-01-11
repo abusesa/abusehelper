@@ -297,7 +297,6 @@ import getpass
 import collections
 
 import idiokit
-from idiokit import timer
 from idiokit.xmpp import connect
 from abusehelper.core import log
 
@@ -438,13 +437,13 @@ class FeedBot(ServiceBot):
     @idiokit.stream
     def _output_rate_limiter(self):
         while self.xmpp_rate_limit <= 0.0:
-            yield timer.sleep(1.0)
+            yield idiokit.sleep(1.0)
 
         while True:
             delta = max(time.time() - self._last_output, 0)
             delay = 1.0 / self.xmpp_rate_limit - delta
             if delay > 0.0:
-                yield timer.sleep(delay)
+                yield idiokit.sleep(delay)
             self._last_output = time.time()
 
             msg = yield idiokit.next()
@@ -524,7 +523,7 @@ class FeedBot(ServiceBot):
 
             while True:
                 try:
-                    yield timer.sleep(sleep)
+                    yield idiokit.sleep(sleep)
                 finally:
                     if counter.count > 0:
                         self.log.info("Sent {0} events to room {1!r}".format(counter.count, name),
@@ -580,7 +579,7 @@ class PollingBot(FeedBot):
 
     @idiokit.stream
     def poll(self, *args, **keys):
-        yield timer.sleep(0.0)
+        yield idiokit.sleep(0.0)
 
     def feed_keys(self, *args, **keys):
         yield ()
@@ -602,7 +601,7 @@ class PollingBot(FeedBot):
         try:
             while True:
                 while not self._poll_queue or self._poll_queue[0][0] > time.time():
-                    yield timer.sleep(1.0)
+                    yield idiokit.sleep(1.0)
 
                 _, key = self._poll_queue.popleft()
                 if key in self._poll_cleanup:

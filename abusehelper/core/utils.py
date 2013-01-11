@@ -7,7 +7,6 @@ import collections
 import email.parser
 
 import idiokit
-from idiokit import threadpool
 from abusehelper.core import events
 from cStringIO import StringIO
 
@@ -37,10 +36,10 @@ def fetch_url(url, opener=None, chunk_size=16384):
     try:
         output = StringIO()
 
-        fileobj = yield threadpool.thread(opener.open, url)
+        fileobj = yield idiokit.thread(opener.open, url)
         try:
             while True:
-                data = yield threadpool.thread(fileobj.read, chunk_size)
+                data = yield idiokit.thread(fileobj.read, chunk_size)
                 if not data:
                     break
                 output.write(data)

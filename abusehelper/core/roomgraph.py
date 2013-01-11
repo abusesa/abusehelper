@@ -1,5 +1,4 @@
 import idiokit
-from idiokit import timer
 from abusehelper.core import events, rules, taskfarm, bot, services
 
 
@@ -17,7 +16,7 @@ class RoomGraphBot(bot.ServiceBot):
     @idiokit.stream
     def _log_stats(self, interval=15.0):
         while True:
-            yield timer.sleep(interval)
+            yield idiokit.sleep(interval)
 
             for room, (seen, sent) in self.stats.iteritems():
                 self.log.info("Room {0!r}: seen {1}, sent {2} events".format(room, seen, sent),

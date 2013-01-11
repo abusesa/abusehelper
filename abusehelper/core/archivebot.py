@@ -10,7 +10,6 @@ import time
 import errno
 
 import idiokit
-from idiokit import timer
 from abusehelper.core import bot, taskfarm, services, events
 
 
@@ -83,7 +82,7 @@ class ArchiveBot(bot.ServiceBot):
     @idiokit.stream
     def _alert(self, flush_interval=2.0):
         while True:
-            yield timer.sleep(flush_interval)
+            yield idiokit.sleep(flush_interval)
             yield idiokit.send()
 
     @idiokit.stream

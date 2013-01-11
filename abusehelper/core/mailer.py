@@ -5,7 +5,6 @@ import smtplib
 import collections
 
 import idiokit
-from idiokit import timer, threadpool
 from abusehelper.core import events, taskfarm, services, templates, bot
 
 
@@ -35,7 +34,7 @@ def alert(*times):
         return
 
     while True:
-        yield timer.sleep(min(map(next_time, times)))
+        yield idiokit.sleep(min(map(next_time, times)))
         yield idiokit.send()
 
 
@@ -89,7 +88,7 @@ class ReportBot(bot.ServiceBot):
                     if not success:
                         self.queue.append((item, keys))
 
-                yield timer.sleep(1.0)
+                yield idiokit.sleep(1.0)
         except services.Stop:
             idiokit.stop(self.queue)
 
@@ -140,7 +139,7 @@ class ReportBot(bot.ServiceBot):
 
     @idiokit.stream
     def report(self, collected):
-        yield timer.sleep(0.0)
+        yield idiokit.sleep(0.0)
         idiokit.stop(True)
 
 
@@ -221,7 +220,7 @@ class MailerService(ReportBot):
                                 attach_and_embed_csv=templates.AttachAndEmbedUnicode(csv),
                                 to=templates.Const(format_addresses(to)),
                                 cc=templates.Const(format_addresses(cc)))
-        yield timer.sleep(0.0)
+        yield idiokit.sleep(0.0)
         idiokit.stop(template.format(events))
 
     @idiokit.stream
@@ -231,7 +230,7 @@ class MailerService(ReportBot):
         finally:
             if self.server is not None:
                 try:
-                    yield threadpool.thread(self.server.quit)
+                    yield idiokit.thread(self.server.quit)
                 except self.TOLERATED_EXCEPTIONS:
                     pass
                 finally:
@@ -247,7 +246,7 @@ class MailerService(ReportBot):
             host, port = self.smtp_host, self.smtp_port
             self.log.info("Connecting %r port %d", host, port)
             try:
-                self.server = yield threadpool.thread(smtplib.SMTP, host, port)
+                self.server = yield idiokit.thread(smtplib.SMTP, host, port)
             except self.TOLERATED_EXCEPTIONS, exc:
                 self.log.error("Error connecting SMTP server: %r", exc)
             else:
@@ -255,18 +254,18 @@ class MailerService(ReportBot):
                 break
 
             self.log.info("Retrying SMTP connection in 10 seconds")
-            yield timer.sleep(10.0)
+            yield idiokit.sleep(10.0)
 
-        yield threadpool.thread(self.server.ehlo)
+        yield idiokit.thread(self.server.ehlo)
 
         if self.server.has_extn("starttls"):
-            yield threadpool.thread(self.server.starttls)
-            yield threadpool.thread(self.server.ehlo)
+            yield idiokit.thread(self.server.starttls)
+            yield idiokit.thread(self.server.ehlo)
 
         if (self.smtp_auth_user is not None and
             self.smtp_auth_password is not None and
             self.server.has_extn("auth")):
-            yield threadpool.thread(self.server.login,
+            yield idiokit.thread(self.server.login,
                 self.smtp_auth_user, self.smtp_auth_password)
 
     @idiokit.stream
@@ -275,7 +274,7 @@ class MailerService(ReportBot):
             yield self._ensure_connection()
 
             self.log.info("Sending message %r to %r", subject, to_addr)
-            yield threadpool.thread(self.server.sendmail, from_addr, to_addr, msg)
+            yield idiokit.thread(self.server.sendmail, from_addr, to_addr, msg)
         except smtplib.SMTPDataError, data_error:
             self.log.error("Could not send message to %r: %r. " +
                            "Dropping message from queue.",
@@ -290,7 +289,7 @@ class MailerService(ReportBot):
         except self.TOLERATED_EXCEPTIONS, exc:
             self.log.error("Could not send message to %r: %r", to_addr, exc)
             try:
-                yield threadpool.thread(self.server.quit)
+                yield idiokit.thread(self.server.quit)
             except self.TOLERATED_EXCEPTIONS:
                 pass
             finally:
@@ -338,7 +337,7 @@ class MailerService(ReportBot):
                     break
 
                 self.log.info("Retrying sending in 10 seconds")
-                yield timer.sleep(10.0)
+                yield idiokit.sleep(10.0)
 
         idiokit.stop(True)
 

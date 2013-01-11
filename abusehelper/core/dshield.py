@@ -1,6 +1,7 @@
 import idiokit
 from abusehelper.core import utils, cymruwhois, bot
 
+
 class DShieldBot(bot.PollingBot):
     COLUMNS = ["ip", "reports", "targets", "firstseen", "lastseen", "updated"]
 
@@ -63,6 +64,7 @@ class DShieldBot(bot.PollingBot):
             event = yield idiokit.next()
             if event.contains("asn", asn):
                 yield idiokit.send(event)
+
 
 if __name__ == "__main__":
     DShieldBot.from_command_line().execute()

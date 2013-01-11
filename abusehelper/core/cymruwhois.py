@@ -2,7 +2,7 @@ import socket
 import idiokit
 import collections
 from abusehelper.core import utils
-from idiokit import socket as idiokit_socket, timer
+from idiokit import socket as idiokit_socket
 
 
 class Timeout(Exception):
@@ -11,7 +11,7 @@ class Timeout(Exception):
 
 @idiokit.stream
 def timeout(delay):
-    yield timer.sleep(delay)
+    yield idiokit.sleep(delay)
     raise Timeout()
 
 
@@ -99,11 +99,11 @@ class CymruWhois(object):
                 try:
                     yield self._once(0.2)
                 except idiokit_socket.SocketTimeout:
-                    yield timer.sleep(1.0)
+                    yield idiokit.sleep(1.0)
                 except idiokit_socket.SocketError:
-                    yield timer.sleep(10.0)
+                    yield idiokit.sleep(10.0)
                 else:
-                    yield timer.sleep(2.0)
+                    yield idiokit.sleep(2.0)
         finally:
             self._current = None
 

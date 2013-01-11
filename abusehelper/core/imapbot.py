@@ -5,7 +5,6 @@ import imaplib
 import email.parser
 
 import idiokit
-from idiokit import threadpool, timer
 from cStringIO import StringIO
 from abusehelper.core import bot
 
@@ -76,14 +75,14 @@ class IMAPBot(bot.FeedBot):
                     delay = min(min_delay, max_delay)
                     while mailbox is None:
                         try:
-                            mailbox = yield threadpool.thread(self.connect)
+                            mailbox = yield idiokit.thread(self.connect)
                         except (imaplib.IMAP4.abort, socket.error), error:
                             self.log.error("Failed IMAP connection: %r", error)
                         else:
                             break
 
                         self.log.info("Retrying connection in %.02f seconds", delay)
-                        yield timer.sleep(delay)
+                        yield idiokit.sleep(delay)
                         delay = min(2 * delay, max_delay)
 
                     event, name, args, keys = item
@@ -92,9 +91,9 @@ class IMAPBot(bot.FeedBot):
 
                     try:
                         method = getattr(mailbox, name)
-                        result = yield threadpool.thread(method, *args, **keys)
+                        result = yield idiokit.thread(method, *args, **keys)
                     except (imaplib.IMAP4.abort, socket.error), error:
-                        yield threadpool.thread(self.disconnect, mailbox)
+                        yield idiokit.thread(self.disconnect, mailbox)
                         self.log.error("Lost IMAP connection: %r", error)
                         mailbox = None
                     except imaplib.IMAP4.error, error:
@@ -105,7 +104,7 @@ class IMAPBot(bot.FeedBot):
                         break
         finally:
             if mailbox is not None:
-                yield threadpool.thread(self.disconnect, mailbox)
+                yield idiokit.thread(self.disconnect, mailbox)
 
     def connect(self):
         self.log.info("Connecting to IMAP server %r port %d",
@@ -156,7 +155,7 @@ class IMAPBot(bot.FeedBot):
     def noop(self, noop_interval=10.0):
         while True:
             yield self.call("noop")
-            yield timer.sleep(noop_interval)
+            yield idiokit.sleep(noop_interval)
 
     # Main polling
 
@@ -164,7 +163,7 @@ class IMAPBot(bot.FeedBot):
     def poll(self):
         while True:
             yield self.fetch_mails(self.filter)
-            yield timer.sleep(self.poll_interval)
+            yield idiokit.sleep(self.poll_interval)
 
     @idiokit.stream
     def get_header(self, uid, section):

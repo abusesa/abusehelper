@@ -7,7 +7,6 @@ import subprocess
 import cPickle as pickle
 
 import idiokit
-from idiokit import timer
 from abusehelper.core import bot, config
 
 
@@ -110,7 +109,7 @@ class StartupBot(bot.Bot):
 
     @idiokit.stream
     def configs(self):
-        yield timer.sleep(0.0)
+        yield idiokit.sleep(0.0)
 
     def strategy(self, conf, delay=15):
         while True:
@@ -208,7 +207,7 @@ class StartupBot(bot.Bot):
 
             while True:
                 try:
-                    yield timer.sleep(poll_interval)
+                    yield idiokit.sleep(poll_interval)
                 except idiokit.Signal as sig:
                     signum = sig.args[0]
                     closing = True

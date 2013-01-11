@@ -8,7 +8,6 @@ import contextlib
 import collections
 
 import idiokit
-from idiokit import timer
 
 
 def relative_path(*path):
@@ -184,4 +183,4 @@ def follow_config(path, poll_interval=1.0, force_interval=30.0):
                 last_error_msg = error_msg
                 last_mtime = None
 
-        yield timer.sleep(poll_interval)
+        yield idiokit.sleep(poll_interval)
