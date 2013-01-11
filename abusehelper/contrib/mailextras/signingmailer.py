@@ -2,7 +2,6 @@ import re
 import os
 import urllib
 import httplib
-import hashlib
 
 import pyme.core
 try:
@@ -15,7 +14,6 @@ from time import gmtime, strftime
 from email.mime.text import MIMEText
 
 import idiokit
-from idiokit import timer, threadpool
 from abusehelper.core import mailer, templates, bot
 
 from iodef import XMLFormatter
@@ -93,7 +91,7 @@ class Mailer(mailer.MailerService):
     rt_passwd = bot.Param("RT server user password", default='')
     rt_queue = bot.Param("RT queue to create tickets to", default='')
     rt_close_delay = \
-        bot.IntParam("Delay after which generated tickets are closed", 
+        bot.IntParam("Delay after which generated tickets are closed",
                      default=300)
     rt_manual_queue = \
         bot.Param("RT queue to move tickets with no valid recipient",
@@ -102,12 +100,11 @@ class Mailer(mailer.MailerService):
                   default='')
     sent_dir = bot.Param("Directory for logs on sent data", default='')
     ticket_preamble = \
-        bot.Param("A possible ticketing header, eg. CERT in [CERT #1]", 
+        bot.Param("A possible ticketing header, eg. CERT in [CERT #1]",
                   default='')
 
 
     def get_random_ticket_no(self, **kw):
-        from random import randint as randrange
         number = unicode(randrange(80000, 100000))
         return number
 
@@ -115,7 +112,7 @@ class Mailer(mailer.MailerService):
     def close_ticket(self, number, **kw):
         self.log.info("Sleeping for %s seconds before closing ticket %s",
                       self.rt_close_delay, number)
-        yield timer.sleep(self.rt_close_delay)
+        yield idiokit.sleep(self.rt_close_delay)
         kw['action'] = "edit"
         kw['content'] = "Status: resolved\nid: ticket/%s\n" % (number)
         success = self.rt_ticket(**kw)
@@ -192,7 +189,7 @@ class Mailer(mailer.MailerService):
             return u"-1"
 
     def build_mail(self, *args, **keys):
-        return threadpool.thread(self._build_mail, *args, **keys)
+        return idiokit.thread(self._build_mail, *args, **keys)
 
     def _build_mail(self,
                     events, number,
@@ -248,7 +245,7 @@ class Mailer(mailer.MailerService):
 
         charset = Charset(encoding)
         charset.header_encoding = QP
-        msg["Subject"] = charset.header_encode("%s%s%s" % 
+        msg["Subject"] = charset.header_encode("%s%s%s" %
                                                (number, subject, postscript))
 
         if not self.sign_keys or not self.passphrase:
@@ -336,7 +333,7 @@ class Mailer(mailer.MailerService):
         if not addrs:
             keys['cc'] = []
             manual = True
-            kws["ticket_subject"] = kws.get('manual_subject', 
+            kws["ticket_subject"] = kws.get('manual_subject',
                                             'ERROR: no manual subject defined')
             keys['manual'] = True
 
@@ -344,7 +341,7 @@ class Mailer(mailer.MailerService):
             keys['to'] = keys['to_override']
             keys['cc'] = []
 
-        number = yield threadpool.thread(self.rt_ticket, manual, **kws)
+        number = yield idiokit.thread(self.rt_ticket, manual, **kws)
         if manual:
             self.log.info("No valid recipients, manual ticket: %s" % number)
 
@@ -362,7 +359,7 @@ class Mailer(mailer.MailerService):
 
             logfile = file(fname, "a")
             try:
-                yield threadpool.thread(self._log_events, events, logfile)
+                yield idiokit.thread(self._log_events, events, logfile)
             finally:
                 logfile.flush()
                 logfile.close()
@@ -379,9 +376,7 @@ class Mailer(mailer.MailerService):
     @idiokit.stream
     def _try_to_send(self, from_addr, to_addr, subject, msg):
         if self.debug:
-            yield timer.sleep(0)
-            self.log.info("DEBUG: Would have sent message to %r", 
-                          to_addr)
+            self.log.info("DEBUG: Would have sent message to %r", to_addr)
             idiokit.stop(True)
         else:
             result = yield self._try_to_send(from_addr, to_addr, subject, msg)
@@ -408,11 +403,11 @@ class Mailer(mailer.MailerService):
         @idiokit.stream
         def logger():
             try:
-                yield timer.sleep(interval / 2.0)
+                yield idiokit.sleep(interval / 2.0)
                 log()
 
                 while True:
-                    yield timer.sleep(interval)
+                    yield idiokit.sleep(interval)
                     log()
             finally:
                 log()

@@ -2,7 +2,6 @@ import getpass
 import hashlib
 
 import idiokit
-from idiokit import timer, threadpool
 from abusehelper.core import bot, events
 from opencollab import wiki
 
@@ -39,14 +38,14 @@ class OpenCollabReader(bot.FeedBot):
         collab = wiki.GraphingWiki(self.collab_url,
             ssl_verify_cert=not self.collab_ignore_cert,
             ssl_ca_certs=self.collab_extra_ca_certs)
-        yield threadpool.thread(collab.authenticate, self.collab_user, self.collab_password)
+        yield idiokit.thread(collab.authenticate, self.collab_user, self.collab_password)
 
         token = None
         current = dict()
-        yield timer.sleep(5)
+        yield idiokit.sleep(5)
         while True:
             try:
-                result = yield threadpool.thread(collab.request, "IncGetMeta", query, token)
+                result = yield idiokit.thread(collab.request, "IncGetMeta", query, token)
             except wiki.WikiFailure as fail:
                 self.log.error("IncGetMeta failed: {0!r}".format(fail))
             else:
@@ -80,7 +79,8 @@ class OpenCollabReader(bot.FeedBot):
 
                     yield idiokit.send(event)
 
-            yield timer.sleep(self.poll_interval)
+            yield idiokit.sleep(self.poll_interval)
+
 
 if __name__ == "__main__":
     OpenCollabReader.from_command_line().execute()

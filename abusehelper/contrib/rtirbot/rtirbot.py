@@ -6,20 +6,17 @@ maintain this code, please feel free to do so in my stead.
 Maintainer: Jussi Eronen <exec@iki.fi>
 """
 
-import getpass
 from collections import defaultdict
-from datetime import date, datetime
-from time import strftime
 import idiokit
-from idiokit import timer
-from abusehelper.core import events, taskfarm, services, templates, bot
+from abusehelper.core import events, taskfarm, services, bot
 from abusehelper.contrib.rtirbot import rt
+
 
 class CollectorBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
-        self.events = dict()       
+        self.events = dict()
 
     @idiokit.stream
     def collect(self, name):
@@ -34,12 +31,12 @@ class CollectorBot(bot.ServiceBot):
         self.log.info("Joined room %r", name)
 
         try:
-            yield (room 
+            yield (room
                    | events.stanzas_to_events()
                    | self.collect(name))
         finally:
             self.log.info("Left room %r", name)
-            
+
 
 class RtirBot(CollectorBot):
     rt_url = bot.Param("URL of RT instance")
@@ -53,11 +50,11 @@ class RtirBot(CollectorBot):
     def __init__(self, *args, **keys):
         CollectorBot.__init__(self, *args, **keys)
         self.rtirs = dict()
-        
+
         # Create RT Client
         self.log.info("Connecting to RT %s" % self.rt_url)
         try:
-            self.rt_client = rt.RtClient(self.rt_url, self.rt_user, 
+            self.rt_client = rt.RtClient(self.rt_url, self.rt_user,
                                          self.rt_password)
         except:
             self.log.info("Failed connecting to RT")
@@ -66,7 +63,6 @@ class RtirBot(CollectorBot):
 
         # Create RT Workflow automator
         self.rt_wf = rt.RtirWorkflow(self.rt_client)
-
 
     def write_to_rt_ticket(self, room, events):
         rtir_params = self.rtirs.get(room, None)
@@ -108,7 +104,7 @@ class RtirBot(CollectorBot):
 
                 line = " | ".join(line_list)
 
-                if line:                    
+                if line:
                     # Create an empty ticket and populate with AH event data
                     ticket = rt.RtIncidentReport()
                     ticket.reported_ip = ip
@@ -143,11 +139,11 @@ class RtirBot(CollectorBot):
                     # incident and link to it. If an open incident exists
                     # link the new ticket.
                     if ticket.ticket_id:
-                        self.log.info("RT Events written to ticket %r", 
+                        self.log.info("RT Events written to ticket %r",
                                       ticket.ticket_id)
                         parent_id, ticket_created, created_by_ah = \
                             self.rt_wf.link_or_create_and_link_parent(ticket)
-                    
+
                         # Keep track of all created IRs and modified
                         # incidents.  Generate investigations after
                         # all current events are processed.  Do NOT
@@ -165,10 +161,10 @@ class RtirBot(CollectorBot):
 
                         if parent_id:
                             if ticket_created:
-                                self.log.info("RT created parent ticket %r", 
+                                self.log.info("RT created parent ticket %r",
                                               parent_id)
                             else:
-                                self.log.info("RT linked parent ticket %r", 
+                                self.log.info("RT linked parent ticket %r",
                                               parent_id)
                         else:
                             self.log.info("RT Linking/creation of " + \
@@ -177,7 +173,7 @@ class RtirBot(CollectorBot):
                         self.log.info("Could not write events to RT")
                 else:
                     self.log.info("No event data to parse")
-            
+
         # If new IRs ere created and incidents modified, process them
         # and create investigations with content from open IRs. Close
         # IRs once the investigation is successfully generated. Future
@@ -192,7 +188,7 @@ class RtirBot(CollectorBot):
 
     @idiokit.stream
     def send_to_rtir(self, interval):
-        yield timer.sleep(interval)
+        yield idiokit.sleep(interval)
         for room, events in self.events.iteritems():
             self.write_to_rt_ticket(room, events)
             self.events[room] = list()
@@ -203,20 +199,20 @@ class RtirBot(CollectorBot):
     def main(self, state):
         try:
             while True:
-                yield (self.send_to_rtir(self.rt_write_interval) 
+                yield (self.send_to_rtir(self.rt_write_interval)
                        | idiokit.consume())
         except services.Stop:
             idiokit.stop()
 
     @idiokit.stream
-    def session(self, state, src_room, 
+    def session(self, state, src_room,
                 rt_url="", rt_user="", rt_password="",
-                rt_requestor="", rt_cc="", rt_admin_cc="", 
+                rt_requestor="", rt_cc="", rt_admin_cc="",
                 rt_constituency="", rt_write_interval=60, **keys):
-        
-        self.rtirs[src_room] = (rt_requestor, rt_cc, 
+
+        self.rtirs[src_room] = (rt_requestor, rt_cc,
                                 rt_admin_cc, rt_constituency)
-        
+
         self.events.setdefault(src_room, list())
 
         try:
@@ -226,6 +222,7 @@ class RtirBot(CollectorBot):
         finally:
             del self.rtirs[src_room]
             del self.events[src_room]
-                    
+
+
 if __name__ == "__main__":
     RtirBot.from_command_line().execute()

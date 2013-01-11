@@ -8,31 +8,28 @@ An example bot for controlling a VirtualBox-based sandbox. Assumptions:
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
 """
+
 import os
-import socket
 import idiokit
-import urllib2
-import httplib
-import email
-import shutil
 
 from subprocess import Popen, PIPE, STDOUT
 
-from idiokit import threadpool
 from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 
 from opencollab.wiki import GraphingWiki
-from opencollab.wiki import WikiFailure
 from opencollab.util.file import uploadFile
 
+
 def run_command(cmd):
-    p = Popen(cmd, stdout=PIPE, stderr=STDOUT, 
+    p = Popen(cmd, stdout=PIPE, stderr=STDOUT,
               shell=True, close_fds=True)
     return p.stdout.read(), p.returncode
 
+
 class Continue(Exception):
     pass
+
 
 class VirtualboxSandboxExpert(Expert):
     collab_url = bot.Param()
@@ -49,9 +46,9 @@ class VirtualboxSandboxExpert(Expert):
     outdir = bot.Param("Output directory on host")
     outdir_win = bot.Param("Output directory on guest")
     timeout = bot.IntParam("Timeout", default=120)
-    script_name = bot.Param("The name of the script guest runs", 
+    script_name = bot.Param("The name of the script guest runs",
                             default="script.bat")
-    sample_name = bot.Param("The name of the sample guest runs", 
+    sample_name = bot.Param("The name of the sample guest runs",
                             default="sample.exe")
     analysisfile = bot.Param("", default="logger.bin")
     sandparser = bot.Param("Sandbox parser", default=None)
@@ -67,8 +64,8 @@ class VirtualboxSandboxExpert(Expert):
                                    ssl_ca_certs=self.collab_extra_ca_certs)
         self.collab.authenticate(self.collab_user, self.collab_password)
 
-        self.script = self.script % self.__dict__                    
-        file(os.path.join(self.scriptdir, 'script.bat'), 
+        self.script = self.script % self.__dict__
+        file(os.path.join(self.scriptdir, 'script.bat'),
              'wb').write(self.script.encode('cp1252').replace('\n', '\r\n'))
         self.log.info("Started with script %s", self.script)
 
@@ -89,9 +86,9 @@ class VirtualboxSandboxExpert(Expert):
             if not data:
                 continue
             try:
-                self.log.info("Uploading file: %r (data %r...)", 
+                self.log.info("Uploading file: %r (data %r...)",
                               fname, repr(data[:10]))
-                status = uploadFile(self.collab, page, '', fname, data=data)
+                uploadFile(self.collab, page, '', fname, data=data)
             except (IOError, TypeError, RuntimeError), msg:
                 self.log.error("Upload failed: %r", msg)
                 return
@@ -103,8 +100,8 @@ class VirtualboxSandboxExpert(Expert):
 
     @idiokit.stream
     def _run_command(self, cmd, *args):
-        out, s = yield threadpool.thread(run_command, cmd % args)
-        if s: 
+        out, s = yield idiokit.thread(run_command, cmd % args)
+        if s:
             self.log.error(out)
             raise Continue()
         idiokit.stop(out)
@@ -120,7 +117,7 @@ class VirtualboxSandboxExpert(Expert):
                 try:
                     # Grab malware from wiki
                     self.log.info("Getting %r from wiki", md5sum)
-                    data = yield threadpool.thread(
+                    data = yield idiokit.thread(
                         self.get_attachment, md5sum)
 
                     # Put sample in place
@@ -145,14 +142,14 @@ class VirtualboxSandboxExpert(Expert):
                         "VBoxManage startvm %s --type headless", self.vmname)
 
                     # Sleep for a bit more than the timeout
-                    yield idiokit.timer.sleep(int(self.timeout) * 2)
+                    yield idiokit.sleep(int(self.timeout) * 2)
 
                     # Take a screenshot
                     yield self._run_command(
                         "VBoxManage controlvm %s screenshotpng %s",
                         self.vmname,
                         os.path.join(self.outdir, "screenshot.png"))
-                                      
+
                     # Power off vm
                     yield self._run_command("VBoxManage controlvm %s poweroff",
                                             self.vmname)
@@ -163,16 +160,16 @@ class VirtualboxSandboxExpert(Expert):
 
                     # Run analysis
                     analysis = yield self._run_command("%s %s/%s",
-                                                       self.sandparser, 
+                                                       self.sandparser,
                                                        self.outdir,
                                                        self.analysisfile)
 
                     self.log.info("Done with sandbox run for %r", md5sum)
                     # Upload to wiki
-                    yield threadpool.thread(self.upload_analysis, md5sum,
-                                            analysis, 
-                                            os.path.join(self.outdir, 
-                                                         "screenshot.png"))
+                    yield idiokit.thread(self.upload_analysis, md5sum,
+                        analysis,
+                        os.path.join(self.outdir,
+                                     "screenshot.png"))
 
                     # Cleanup
                     for dn, fn in ((self.outdir, 'logger.bin'),
@@ -187,6 +184,7 @@ class VirtualboxSandboxExpert(Expert):
                     new.add("sandbox analysis", self.collab_url + md5sum)
 
                 yield idiokit.send(eid, new)
+
 
 if __name__ == "__main__":
     VirtualboxSandboxExpert.from_command_line().execute()

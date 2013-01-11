@@ -2,6 +2,7 @@ import os
 import idiokit
 from abusehelper.core import events, bot
 
+
 def follow_file(filename):
     prev_inode = None
     prev_size = None
@@ -43,6 +44,7 @@ def follow_file(filename):
         prev_size = size
         prev_mtime = mtime
         prev_inode = inode
+
 
 def tail_file(filename, offset=None):
     first = True
@@ -91,6 +93,7 @@ def tail_file(filename, offset=None):
 
         yield None
 
+
 class TailBot(bot.FeedBot):
     path = bot.Param("path to the followed file")
 
@@ -98,7 +101,7 @@ class TailBot(bot.FeedBot):
     def feed(self):
         for result in tail_file(self.path):
             if result is None:
-                yield idiokit.timer.sleep(2.0)
+                yield idiokit.sleep(2.0)
                 continue
 
             mtime, line = result
@@ -118,6 +121,7 @@ class TailBot(bot.FeedBot):
             return
 
         return {"line": line}
+
 
 if __name__ == "__main__":
     TailBot.from_command_line().execute()

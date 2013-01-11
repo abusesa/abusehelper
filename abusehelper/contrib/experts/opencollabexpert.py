@@ -1,5 +1,4 @@
 import idiokit
-from idiokit import timer, threadpool
 from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 from opencollab import wiki
@@ -49,7 +48,7 @@ class OpenCollabExpert(Expert):
 
         while True:
             try:
-                result = yield threadpool.thread(self.collab.request, "IncGetMeta", query, token)
+                result = yield idiokit.thread(self.collab.request, "IncGetMeta", query, token)
             except Exception, exc:
                 self.log.error("IncGetMeta failed: %s" % exc)
             else:
@@ -76,7 +75,7 @@ class OpenCollabExpert(Expert):
                     self.cache.pop(page, None)
 
             self.log.info("%i pages in cache", len(self.cache))
-            yield timer.sleep(self.poll_interval)
+            yield idiokit.sleep(self.poll_interval)
 
     @idiokit.stream
     def augment(self):

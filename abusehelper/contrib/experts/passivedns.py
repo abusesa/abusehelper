@@ -61,8 +61,6 @@ class PassiveDNSExpert(Expert):
                 return
 
             self.cache.set(name, all_data)
-        else:
-            yield idiokit.timer.sleep(0)
 
         lines = "".join(all_data).splitlines()
         # there will be duplicates

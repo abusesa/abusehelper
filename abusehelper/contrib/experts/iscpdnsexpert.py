@@ -9,7 +9,6 @@ import idiokit
 import urllib2
 import simplejson as json
 
-from idiokit import timer, threadpool
 from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 import abusehelper.core.utils as utils
@@ -30,7 +29,7 @@ def ipv6_addr_reverse(ipv6):
     return ':'.join(re.findall('(....)', ''.join(ipv6)))
 
 class ISCPDNSExpert(Expert):
-    server = bot.Param("Passive DNS server URL", 
+    server = bot.Param("Passive DNS server URL",
                        default="https://dnsdb-api.isc.org")
     apikey = bot.Param("Service API key")
 

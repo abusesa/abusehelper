@@ -1,5 +1,4 @@
 import idiokit
-from idiokit import timer
 from abusehelper.core import bot, taskfarm
 
 
@@ -159,7 +158,7 @@ class Combiner(RoomBot):
     @idiokit.stream
     def cleanup(self, ids, queue):
         while True:
-            yield timer.sleep(1.0)
+            yield idiokit.sleep(1.0)
 
             current_time = time.time()
 

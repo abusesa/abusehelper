@@ -7,7 +7,6 @@ from StringIO import StringIO
 from opencollab import wiki
 
 import idiokit
-from idiokit import timer
 from abusehelper.core import bot, rules
 from abusehelper.core.startup import Bot, StartupBot
 from abusehelper.contrib.opencollab.crypto import decrypt, DecryptionError
@@ -109,7 +108,7 @@ class WikiConfigInterface:
                 bots = self.parse_pages(pages)
                 if bots:
                     yield idiokit.send(bots)
-            yield timer.sleep(self.poll_interval)
+            yield idiokit.sleep(self.poll_interval)
 
     def get_metas(self, query):
         try:
