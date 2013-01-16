@@ -367,7 +367,9 @@ class Mailer(mailer.MailerService):
             self.log.info("Finished writing events to log file %r" % fname)
 
             if not manual:
-                self.close_ticket(number, **kws)
+                # Close ticket, if any
+                if number and self.rt_close_delay > 0:
+                    self.close_ticket(number, **kws)
             else:
                 self.log.info("Not closing manual ticket %s" % number)
 
@@ -376,6 +378,7 @@ class Mailer(mailer.MailerService):
     @idiokit.stream
     def _try_to_send(self, from_addr, to_addr, subject, msg):
         if self.debug:
+            yield idiokit.sleep(0)
             self.log.info("DEBUG: Would have sent message to %r", to_addr)
             idiokit.stop(True)
         else:
