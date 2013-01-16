@@ -19,6 +19,7 @@ class RTExpert(Expert):
     rt_passwd = bot.Param("RT server user password")
     rt_queue = bot.Param("RT queue to create tickets to")
     ticket_subject = bot.Param("Subject text to use for the tickets")
+    ticket_owner = bot.Param("RT ticket owner", default="")
     subject_key = bot.Param("Event key to use as ticket subject", 
                             default="")
     content_key = bot.Param("Event key to use as ticket content", 
@@ -33,12 +34,17 @@ class RTExpert(Expert):
         passwd = self.rt_passwd
         queue = self.rt_queue
 
+        owner = self.ticket_owner
+        if not owner:
+            owner = self.rt_user
+ 
         params = urllib.urlencode({'user': user, 'pass': passwd}) + "&"
         text = kw.get('ticket_text', '')
         subject = kw.get('ticket_subject', '')
         urlpath =  "/REST/1.0/ticket/new"
         content = "id: ticket/new\nStatus: new\n" + \
-            "Subject: %s\nQueue: %s\nText: %s\n" % (subject, queue, text)
+            "Subject: %s\nQueue: %s\nText: %s\n" % (subject, queue, text) + \
+            "Owner: %s\n" % (owner)
 
         params += urllib.urlencode({"content": content})
 
