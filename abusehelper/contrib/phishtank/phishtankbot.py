@@ -4,6 +4,7 @@ PhishTank feed handler. Requires a PhishTank application key.
 Maintainer: Jussi Eronen <exec@iki.fi>
 """
 
+import re
 import bz2
 import urllib2
 import urlparse
@@ -37,6 +38,7 @@ class BZ2Reader(object):
                 self.index += len(piece)
                 amount -= len(piece)
                 piece = utils.force_decode(piece).encode("utf-8")
+                piece = re.sub(r"[\x01-\x1F\x7F]", "", piece)
                 result.append(piece)
 
         return "".join(result)
