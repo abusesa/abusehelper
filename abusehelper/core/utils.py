@@ -15,6 +15,10 @@ class FetchUrlFailed(Exception):
     pass
 
 
+class FetchUrlTimeout(FetchUrlFailed):
+    pass
+
+
 class HTTPError(FetchUrlFailed):
     def __init__(self, code, msg, headers, fileobj):
         FetchUrlFailed.__init__(self, code, msg)
@@ -25,18 +29,18 @@ class HTTPError(FetchUrlFailed):
         self.fileobj = fileobj
 
     def __str__(self):
-        return "HTTP Error %d: %s" % (self.code, self.msg)
+        return "HTTP Error {0}: {1}".format(self.code, self.msg)
 
 
 @idiokit.stream
-def fetch_url(url, opener=None, chunk_size=16384):
+def fetch_url(url, opener=None, timeout=60.0, chunk_size=16384):
     if opener is None:
         opener = urllib2.build_opener()
 
     try:
         output = StringIO()
 
-        fileobj = yield idiokit.thread(opener.open, url)
+        fileobj = yield idiokit.thread(opener.open, url, timeout=timeout)
         try:
             while True:
                 data = yield idiokit.thread(fileobj.read, chunk_size)
@@ -54,7 +58,11 @@ def fetch_url(url, opener=None, chunk_size=16384):
         idiokit.stop(info, output)
     except urllib2.HTTPError as he:
         raise HTTPError(he.code, he.msg, he.hdrs, he.fp)
-    except (urllib2.URLError, httplib.HTTPException, socket.error) as error:
+    except urllib2.URLError as error:
+        if isinstance(error.reason, socket.timeout):
+            raise FetchUrlTimeout("fetching URL timed out")
+        raise FetchUrlFailed(str(error))
+    except (httplib.HTTPException, socket.error) as error:
         raise FetchUrlFailed(str(error))
 
 
