@@ -38,7 +38,7 @@ class BZ2Reader(object):
                 self.index += len(piece)
                 amount -= len(piece)
                 piece = utils.force_decode(piece).encode("utf-8")
-                piece = re.sub(r"[\x01-\x1F\x7F]", "", piece)
+                piece = re.sub(r"[\x7F-\x84\x86-\x9F]", "", piece)
                 result.append(piece)
 
         return "".join(result)
