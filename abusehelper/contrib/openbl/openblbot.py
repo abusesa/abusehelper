@@ -3,8 +3,11 @@ import time as _time
 
 from abusehelper.core import utils, cymruwhois, bot, events
 
-OPENBL_FEED_URL = "https://www.openbl.org/lists/date.txt"
+OPENBL_FEED_URL = "https://www.openbl.org/lists/date_all.txt"
 
+def normalize_time(time):
+    seconds = int(time) - 1 * 3600  # UTC+1 to UTC
+    return _time.strftime("%Y-%m-%d %H:%M:%S UTC", _time.gmtime(seconds))
 
 class OpenBLBot(bot.PollingBot):
     feed_url = bot.Param(default=OPENBL_FEED_URL)
@@ -33,7 +36,7 @@ class OpenBLBot(bot.PollingBot):
                 continue
 
             ip, time = line.split()
-            time = self._normalize_time(time)
+            time = normalize_time(time)
 
             event = events.Event()
             event.add("ip", ip)
@@ -42,15 +45,10 @@ class OpenBLBot(bot.PollingBot):
             event.add("description url", self.feed_url)
             event.add("type", "brute-force")
             event.add("description",
-                "This host has most likely been performing brute-force attacks "
-                "on one of the following services: FTP, SSH, POP3, IMAP, IMAPS or POP3S.")
+                "This host has most likely been performing brute-force "
+                "attacks on one of the following services: FTP, SSH, POP3, "
+                "IMAP, IMAPS or POP3S.")
             yield idiokit.send(event)
-
-    def _normalize_time(self, time):
-        seconds = int(time)
-        seconds -= 1 * 3600  # UTC+1 to UTC
-        time_tuple = _time.gmtime(seconds)
-        return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
 
 if __name__ == "__main__":
     OpenBLBot.from_command_line().execute()
