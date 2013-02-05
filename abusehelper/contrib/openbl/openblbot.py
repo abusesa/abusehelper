@@ -12,10 +12,8 @@ class OpenBLBot(bot.PollingBot):
 
     def poll(self):
         pipe = self._poll(url=self.feed_url)
-
         if self.use_cymru_whois:
             pipe = pipe | cymruwhois.augment("ip")
-
         return pipe
 
     @idiokit.stream
@@ -51,6 +49,7 @@ class OpenBLBot(bot.PollingBot):
         seconds -= 1 * 3600  # UTC+1 to UTC
         time_tuple = _time.gmtime(seconds)
         return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
+
 
 if __name__ == "__main__":
     OpenBLBot.from_command_line().execute()
