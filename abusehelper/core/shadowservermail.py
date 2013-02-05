@@ -79,10 +79,11 @@ class ShadowServerMail(imapbot.IMAPBot):
 
     @idiokit.stream
     def handle_text_plain(self, headers, fileobj):
+        fileobj = self._decode(headers, fileobj)
+
         filename = headers[-1].get_filename(None)
         if filename is not None:
             self.log.info("Parsing CSV data from an attachment")
-            fileobj = self._decode(headers, fileobj)
             result = yield self.parse_csv(filename, fileobj)
             idiokit.stop(result)
 
@@ -100,7 +101,6 @@ class ShadowServerMail(imapbot.IMAPBot):
                 continue
 
             self.log.info("Parsing CSV data from the URL")
-            fileobj = self._decode(headers, fileobj)
             result = yield self.parse_csv(filename, fileobj)
             idiokit.stop(result)
 
