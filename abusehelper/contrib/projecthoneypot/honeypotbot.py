@@ -17,7 +17,6 @@ class ProjectHoneyPotBot(RSSBot):
             "http://www.projecthoneypot.org/list_of_ips.php?by=13&rss=1",
             "http://www.projecthoneypot.org/list_of_ips.php?by=16&rss=1",
             "http://www.projecthoneypot.org/list_of_ips.php?by=19&rss=1"])
-    treat_as_dns_source = bot.BoolParam()
 
     def create_event(self, **keys):
         event = events.Event()
@@ -42,6 +41,8 @@ class ProjectHoneyPotBot(RSSBot):
                 url = "http://www.projecthoneypot.org/ip_" + ip
                 event.add("description url", url)
                 event.add("ip", ip)
+            else:
+                return None
         # handle description data
         description = keys.get("description", None)
         if description:
