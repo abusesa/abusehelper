@@ -28,10 +28,8 @@ class AutoshunBot(bot.PollingBot):
 
     def poll(self):
         pipe = self._poll(url=self.feed_url)
-
         if self.use_cymru_whois:
             pipe = pipe | cymruwhois.augment("ip")
-
         return pipe | self._normalize()
 
     @idiokit.stream

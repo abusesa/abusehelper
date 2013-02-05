@@ -5,9 +5,11 @@ from abusehelper.core import utils, cymruwhois, bot, events
 
 OPENBL_FEED_URL = "https://www.openbl.org/lists/date_all.txt"
 
+
 def normalize_time(time):
     seconds = int(time) - 1 * 3600  # UTC+1 to UTC
     return _time.strftime("%Y-%m-%d %H:%M:%S UTC", _time.gmtime(seconds))
+
 
 class OpenBLBot(bot.PollingBot):
     feed_url = bot.Param(default=OPENBL_FEED_URL)
@@ -15,10 +17,8 @@ class OpenBLBot(bot.PollingBot):
 
     def poll(self):
         pipe = self._poll(url=self.feed_url)
-
         if self.use_cymru_whois:
             pipe = pipe | cymruwhois.augment("ip")
-
         return pipe
 
     @idiokit.stream
