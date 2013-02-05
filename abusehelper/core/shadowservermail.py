@@ -13,7 +13,7 @@ class ShadowServerMail(imapbot.IMAPBot):
 
     # Assume the file names to be something like
     # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
-    filename_rex = bot.Param(default=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>.*)-[^-]+\..*")
+    filename_rex = bot.Param(default=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>[^-]*).*\..*")
 
     def _decode(self, headers, fileobj):
         encoding = headers[-1].get_all("content-transfer-encoding", ["7bit"])[0]
