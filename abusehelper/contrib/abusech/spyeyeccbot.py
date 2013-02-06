@@ -15,8 +15,6 @@ class SpyEyeCcBot(AbuseCHFeedBot):
     feed_type = "c&c"
 
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker"])
-    # If treat_as_dns_source is set, the feed ip is dropped.
-    treat_as_dns_source = bot.BoolParam()
 
     def parse_title(self, title):
         pieces = title.split(None, 1)
@@ -36,7 +34,7 @@ class SpyEyeCcBot(AbuseCHFeedBot):
                 yield "description", resolve_level(value)
             elif key == "sbl" and value.lower() != "not listed":
                 yield key + " id", value
-            elif key == "ip address" and not self.treat_as_dns_source:
+            elif key == "ip address":
                 yield "ip", value
 
 if __name__ == "__main__":

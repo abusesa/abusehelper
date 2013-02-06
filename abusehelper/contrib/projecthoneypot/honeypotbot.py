@@ -17,10 +17,10 @@ class ProjectHoneyPotBot(RSSBot):
             "http://www.projecthoneypot.org/list_of_ips.php?by=13&rss=1",
             "http://www.projecthoneypot.org/list_of_ips.php?by=16&rss=1",
             "http://www.projecthoneypot.org/list_of_ips.php?by=19&rss=1"])
-    treat_as_dns_source = bot.BoolParam()
 
-    def create_event(self, **keys):
+    def create_event(self, source, **keys):
         event = events.Event()
+        event.add("feed url", source)
         # handle title data
         descriptions = {'H': 'harvester',
                     'S': 'spam server',
@@ -33,15 +33,22 @@ class ProjectHoneyPotBot(RSSBot):
             ip, types = title
             if types == "Se":
                 return None
+            items = []
             for item in descriptions:
                 if item in types:
-                    desc = "This host is most likely part of SPAM infrastructure " + \
-                        "(" + descriptions[item] + ")."
-                    event.add('description', desc)
+                    items.append(descriptions[item])
+            if len(items) > 0:
+                desc = "This host is most likely part of SPAM infrastructure as: " + \
+                    ", ".join(items) + "."
+                event.add('description', desc)
             if ip:
                 url = "http://www.projecthoneypot.org/ip_" + ip
                 event.add("description url", url)
                 event.add("ip", ip)
+            else:
+                # events should always contain an ip
+                # drop the event if it does not
+                return None
         # handle description data
         description = keys.get("description", None)
         if description:
