@@ -42,6 +42,8 @@ class ProjectHoneyPotBot(RSSBot):
                 event.add("description url", url)
                 event.add("ip", ip)
             else:
+                # events should always contain an ip
+                # drop the event if it does not
                 return None
         # handle description data
         description = keys.get("description", None)
