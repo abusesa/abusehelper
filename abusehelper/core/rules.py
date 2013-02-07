@@ -405,7 +405,7 @@ class NETBLOCK(_Rule):
     @classmethod
     def dump_rule(cls, dump, name, rule):
         element = Element(
-            name, first=rule.range.first, last=rule.range.first)
+            name, first=rule.range.first, last=rule.range.last)
         if rule.keys is not None:
             element.add(serialize.dump_list(dump, "keys", rule.keys))
         return element
@@ -420,7 +420,7 @@ class NETBLOCK(_Rule):
         keys = None
         for child in element.children():
             keys = serialize.load_list(load, child)
-        return cls.from_range(first, last, keys)
+        return cls(first, last, keys)
 
     def __init__(self, ip_or_cidr_or_range, bits_or_last=None, keys=None):
         try:
