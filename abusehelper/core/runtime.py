@@ -68,13 +68,23 @@ class SessionError(Exception):
 
 
 class Session(Pipeable):
+    __slots__ = "_conf", "_service", "_path"
+
     @property
     def conf(self):
         return dict(self._conf)
 
+    @property
+    def service(self):
+        return self._service
+
+    @property
+    def path(self):
+        return self._path
+
     def __init__(self, service, *path, **conf):
-        self.__dict__["service"] = service
-        self.__dict__["path"] = tuple(path)
+        self._service = service
+        self._path = tuple(path)
 
         for key, value in conf.items():
             try:
@@ -82,21 +92,15 @@ class Session(Pipeable):
             except serialize.UnregisteredType:
                 raise SessionError("can not serialize key {0!r} value {1!r}".format(key, value))
             conf[key] = value
-        self.__dict__["_conf"] = config.HashableFrozenDict(conf)
+        self._conf = config.HashableFrozenDict(conf)
 
     def updated(self, **conf):
         new_conf = dict(self._conf)
         new_conf.update(conf)
         return Session(self.service, *self.path, **new_conf)
 
-    def __setattr__(self, key, value):
-        raise AttributeError(self.__class__.__name__ + " instances are immutable")
-
-    def __delattr__(self, key):
-        raise AttributeError(self.__class__.__name__ + " instances are immutable")
-
     def __hash__(self):
-        return hash(self.service) ^ hash(self.path) ^ hash(self._conf)
+        return hash(self._service) ^ hash(self._path) ^ hash(self._conf)
 
     def __eq__(self, other):
         if not isinstance(other, Session):
@@ -113,6 +117,14 @@ class Session(Pipeable):
 
     def __runtime__(self):
         return self
+
+    def __repr__(self):
+        args = [repr(self._service)] + map(repr, self._path)
+        for key, value in self._conf.iteritems():
+            args.append(key + "=" + repr(value))
+
+        prefix = __name__ + "." + self.__class__.__name__
+        return prefix + "(" + ", ".join(args) + ")"
 
 
 class Room(Pipeable):
