@@ -191,7 +191,6 @@ class Match(Rule):
     atom_types = tuple([
         atoms.Star,
         atoms.Rex,
-        atoms.IP,
         atoms.String
     ])
 

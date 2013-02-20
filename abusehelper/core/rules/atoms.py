@@ -166,7 +166,7 @@ class IP(Atom):
             range = IPRange.from_autodetected(value)
         except ValueError:
             return False
-        return self._range.equals(range)
+        return self._range == range
 
     def contains(self, value):
         try:
