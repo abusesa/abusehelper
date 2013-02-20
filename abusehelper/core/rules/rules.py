@@ -11,7 +11,6 @@ __all__ = [
     "Rule",
     "And", "Or", "No",
     "Match", "NonMatch",
-    "In", "NotIn",
     "Fuzzy",
     "parse", "rule"
 ]
@@ -186,19 +185,30 @@ class No(Rule):
 class Match(Rule):
     precedence = 2
 
-    op_string = "="
-    op_parser = RegExp(r"\s*==?\s*")
+    atom_conversions = [
+        (type(None), lambda x: atoms.Star()),
+        (basestring, atoms.String),
+        (type(re.compile(".")), atoms.Rex.from_re)
+    ]
+
     atom_types = tuple([
         atoms.Star,
         atoms.Rex,
-        atoms.String
+        atoms.String,
+        atoms.IP
     ])
 
+    atom_info = {
+        atoms.Star: ("=", RegExp(r"\s*==?\s*")),
+        atoms.Rex: ("=", RegExp(r"\s*==?\s*")),
+        atoms.String: ("=", RegExp(r"\s*==?\s*")),
+        atoms.IP: (" in ", RegExp(r"\s+in\s+", re.I))
+    }
+
     star = atoms.Star()
-    regexp_type = type(re.compile("."))
 
     @classmethod
-    def parser(cls, *args, **keys):
+    def parser(cls, _):
         @transform(atoms.Star.parser())
         def key_star(_):
             return None
@@ -207,11 +217,17 @@ class Match(Rule):
         def key_string(string):
             return string.value
 
+        atom_patterns = []
+        for atom_type in cls.atom_types:
+            _, atom_pattern = cls.atom_info[atom_type]
+            atom_patterns.append(Sequence(
+                atom_pattern, atom_type.parser()
+            ).take(1))
+
         pattern = Sequence(
             OneOf(key_star, key_string),
-            cls.op_parser,
-            OneOf(*[x.parser() for x in cls.atom_types])
-        ).take(0, 2)
+            OneOf(*atom_patterns)
+        )
 
         @transform(pattern)
         def create((key, value)):
@@ -219,12 +235,9 @@ class Match(Rule):
         return create
 
     def __init__(self, key=None, value=None):
-        if value is None:
-            value = atoms.Star()
-        elif isinstance(value, basestring):
-            value = atoms.String(value)
-        elif isinstance(value, self.regexp_type):
-            value = atoms.Rex.from_re(value)
+        for converted_type, conversion_func in self.atom_conversions:
+            if isinstance(value, converted_type):
+                value = conversion_func(value)
 
         if not isinstance(value, self.atom_types):
             raise TypeError("unexpected value " + repr(value))
@@ -246,7 +259,8 @@ class Match(Rule):
             key = "*"
         else:
             key = self._key
-        return key + unicode(self.op_string) + unicode(self._value)
+        op, _ = self.atom_info[type(self._value)]
+        return key + unicode(op) + unicode(self._value)
 
     def match_with_cache(self, event, cache):
         if self._key is None:
@@ -258,41 +272,25 @@ class Match(Rule):
 
 
 class NonMatch(Match):
-    op_string = "!="
-    op_parser = RegExp(r"\s*!=\s*")
+    atom_info = {
+        atoms.Star: ("!=", RegExp(r"\s*!=\s*")),
+        atoms.Rex: ("!=", RegExp(r"\s*!=\s*")),
+        atoms.String: ("!=", RegExp(r"\s*!=\s*")),
+        atoms.IP: (" not in ", RegExp(r"\s+not\s+in\s+", re.I))
+    }
 
     def filter(self, value):
         return not self._value.match(value)
 
 
-class In(Match):
-    op_string = " in "
-    op_parser = RegExp(r"\s+in\s+", re.I)
-
-    atom_types = tuple([
-        atoms.IP
-    ])
-
-    def filter(self, value):
-        return self._value.contains(value)
-
-
-class NotIn(In):
-    op_string = " not in "
-    op_parser = RegExp(r"\s+not\s+in\s+", re.I)
-
-    def filter(self, value):
-        return not self._value.contains(value)
-
-
 class Fuzzy(Rule):
     precedence = 3
 
-    atom_types = [
+    atom_types = tuple([
         atoms.IP,
         atoms.Rex,
         atoms.String
-    ]
+    ])
 
     @classmethod
     def parser(cls, _):
@@ -306,17 +304,15 @@ class Fuzzy(Rule):
 
         self._atom = atom
         self._is_key_type = isinstance(atom, atoms.String)
-        self._is_value_type = isinstance(atom, tuple(self.atom_types))
+        self._is_value_type = isinstance(atom, self.atom_types)
 
     def match_with_cache(self, event, cache):
         if self._is_key_type:
-            if any(self._atom.fuzzy, event.keys()):
+            if any(self._atom.match, event.keys()):
                 return True
-
         if self._is_atom_type:
-            if event.contains(filter=self._atom.fuzzy):
+            if event.contains(filter=self._atom.match):
                 return True
-
         return False
 
     def __unicode__(self):
@@ -329,8 +325,6 @@ _rule_parser = RuleParser(
     No,
     Match,
     NonMatch,
-    In,
-    NotIn,
     Fuzzy
 )
 

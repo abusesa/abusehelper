@@ -13,17 +13,10 @@ __all__ = ["String", "Rex", "IP"]
 
 class Atom(Matcher):
     @classmethod
-    def parser(self):
-        raise NotImplementedError()
+    def parser(cls):
+        return cls()
 
-    match = None
-    contains = None
-
-    def fuzzy(self, value):
-        if self.contains is not None:
-            return self.contains(value)
-        if self.match is not None:
-            return self.match(value)
+    def match(self, value):
         return False
 
 
@@ -154,7 +147,7 @@ class IP(Atom):
         else:
             range = IPRange.from_autodetected(range, extra)
 
-        Atom.__init__(self, (range,))
+        Atom.__init__(self, (unicode(range),))
 
         self._range = range
 
@@ -166,14 +159,4 @@ class IP(Atom):
             range = IPRange.from_autodetected(value)
         except ValueError:
             return False
-        return self._range == range
-
-    def contains(self, value):
-        try:
-            range = IPRange.from_autodetected(value)
-        except ValueError:
-            return False
         return self._range.contains(range)
-
-    def fuzzy(self, value):
-        return self.contains(value)

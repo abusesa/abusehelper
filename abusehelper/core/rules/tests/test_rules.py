@@ -93,8 +93,8 @@ class TestMatch(unittest.TestCase):
         self.assertEqual(Match(value="b"), parse("*=b"))
         self.assertEqual(Match(), parse("*=*"))
 
-        self.assertEqual(Match("a", atoms.IP("1.2.3.4")), parse("a=1.2.3.4"))
-        self.assertEqual(Match("a", atoms.IP("1.2.3.4")), parse("a=1.2.3.4/32"))
+        self.assertEqual(Match("a", atoms.IP("1.2.3.4")), parse("a in 1.2.3.4"))
+        self.assertEqual(Match("a", atoms.IP("1.2.3.4")), parse("a in 1.2.3.4/32"))
 
 
 class TestNonMatch(unittest.TestCase):
@@ -118,6 +118,9 @@ class TestNonMatch(unittest.TestCase):
         self.assertEqual(NonMatch("a"), parse("a!=*"))
         self.assertEqual(NonMatch(value="b"), parse("*!=b"))
         self.assertEqual(NonMatch(), parse("*!=*"))
+
+        self.assertEqual(NonMatch("a", atoms.IP("1.2.3.4")), parse("a not in 1.2.3.4"))
+        self.assertEqual(NonMatch("a", atoms.IP("1.2.3.4")), parse("a not in 1.2.3.4/32"))
 
 
 class TestFuzzy(unittest.TestCase):
