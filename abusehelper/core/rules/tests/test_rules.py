@@ -96,6 +96,9 @@ class TestMatch(unittest.TestCase):
         self.assertEqual(Match("a", atoms.IP("1.2.3.4")), parse("a in 1.2.3.4"))
         self.assertEqual(Match("a", atoms.IP("1.2.3.4")), parse("a in 1.2.3.4/32"))
 
+    def test_to_unicode(self):
+        self.assertEqual(unicode(Match("a b", "c")), u'"a b"=c')
+
 
 class TestNonMatch(unittest.TestCase):
     def test_init_conversions(self):

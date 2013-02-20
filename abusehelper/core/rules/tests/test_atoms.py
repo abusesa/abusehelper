@@ -62,9 +62,13 @@ class TestRex(unittest.TestCase):
         self.assertEqual(parser.parse(r'/\//'), (Rex(r'\/'), ""))
 
     def test_to_unicode(self):
-        self.assertEqual(unicode(Rex('a')), '/a/')
-        self.assertEqual(unicode(Rex('a', ignore_case=True)), '/a/i')
-        self.assertEqual(unicode(Rex('/')), r'/\//')
+        self.assertEqual(unicode(Rex(r'a')), r'/a/')
+        self.assertEqual(unicode(Rex(r'a', ignore_case=True)), r'/a/i')
+        self.assertEqual(unicode(Rex(r"a|b|c")), r"/a|b|c/")
+
+        # Unescaped forward slashes have to be escaped, but already escaped
+        # forward slashes must be left intact.
+        self.assertEqual(unicode(Rex(r'\\\//')), r'/\\\/\//')
 
     def test_matching(self):
         self.assertTrue(Rex('a').match('a'))

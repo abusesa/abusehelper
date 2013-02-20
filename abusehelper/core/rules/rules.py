@@ -191,6 +191,11 @@ class Match(Rule):
         (type(re.compile(".")), atoms.Rex.from_re)
     ]
 
+    key_types = tuple([
+        atoms.Star,
+        atoms.String
+    ])
+
     atom_types = tuple([
         atoms.Star,
         atoms.Rex,
@@ -234,13 +239,19 @@ class Match(Rule):
             return cls(key, value)
         return create
 
-    def __init__(self, key=None, value=None):
+    def _convert_and_check(self, obj, types):
         for converted_type, conversion_func in self.atom_conversions:
-            if isinstance(value, converted_type):
-                value = conversion_func(value)
+            if isinstance(obj, converted_type):
+                obj = conversion_func(obj)
 
-        if not isinstance(value, self.atom_types):
-            raise TypeError("unexpected value " + repr(value))
+        if not isinstance(obj, types):
+            raise TypeError("unexpected value " + repr(obj))
+
+        return obj
+
+    def __init__(self, key=None, value=None):
+        key = self._convert_and_check(key, self.key_types)
+        value = self._convert_and_check(value, self.atom_types)
 
         if key is None and value == self.star:
             Rule.__init__(self)
@@ -255,17 +266,13 @@ class Match(Rule):
         self._value = value
 
     def __unicode__(self):
-        if self._key is None:
-            key = "*"
-        else:
-            key = self._key
         op, _ = self.atom_info[type(self._value)]
-        return key + unicode(op) + unicode(self._value)
+        return unicode(self._key) + unicode(op) + unicode(self._value)
 
     def match_with_cache(self, event, cache):
-        if self._key is None:
+        if self._key == self.star:
             return event.contains(filter=self.filter)
-        return event.contains(self._key, filter=self.filter)
+        return event.contains(self._key.value, filter=self.filter)
 
     def filter(self, value):
         return self._value.match(value)

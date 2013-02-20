@@ -104,8 +104,16 @@ class Rex(Atom):
         else:
             Atom.__init__(self, args, (("ignore_case", ignore_case,)))
 
+    _escape_slash_rex = re.compile(r"((?:^|[^\\])(?:\\\\)*?)(\/)", re.U)
+
+    def _escape_slash(self, match):
+        return match.group(1) + "\\" + match.group(2)
+
     def __unicode__(self):
-        result = "/" + re.escape(self._regexp.pattern) + "/"
+        pattern = self._regexp.pattern
+        pattern = self._escape_slash_rex.sub(self._escape_slash, pattern)
+
+        result = "/" + pattern + "/"
         if (self._regexp.flags & re.I) != 0:
             result += "i"
         return result
