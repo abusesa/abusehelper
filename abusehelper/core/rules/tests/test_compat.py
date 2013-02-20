@@ -2,7 +2,14 @@ import re
 import unittest
 from abusehelper.core.events import Event
 
-from ..compat import MATCHError, MATCH, AND, OR, NETBLOCK
+from ..compat import MATCHError, MATCH, AND, OR, NETBLOCK, ANYTHING
+
+
+class TestANYTHING(unittest.TestCase):
+    def test_match(self):
+        rule = ANYTHING()
+        self.assertTrue(rule.match(Event()))
+        self.assertTrue(rule.match(Event(a="b")))
 
 
 class TestMATCH(unittest.TestCase):

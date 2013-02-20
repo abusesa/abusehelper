@@ -29,4 +29,4 @@ def NETBLOCK(ip_or_range, bits_or_end=None, keys=None):
 
 
 def ANYTHING():
-    return rules.Match()
+    return rules.Or(rules.Match(), rules.No(rules.Match()))
