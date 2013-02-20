@@ -25,10 +25,8 @@ class TestAnd(unittest.TestCase):
         b = Match("b", "b")
         c = Match("c", "c")
 
-        abc = And(a, And(b, c))
-        self.assertEqual(abc, parse("a=a and b=b and c=c"))
-        self.assertEqual(abc, parse("a=a and (b=b and c=c)"))
-        self.assertNotEqual(abc, parse("(a=a and b=b) and c=c"))
+        self.assertEqual(And(a, b, c), parse("a=a and b=b and c=c"))
+        self.assertEqual(And(a, And(b, c)), parse("a=a and (b=b and c=c)"))
         self.assertEqual(And(And(a, b), c), parse("(a=a and b=b) and c=c"))
 
         ab = And(a, b)
@@ -55,10 +53,8 @@ class TestOr(unittest.TestCase):
         b = Match("b", "b")
         c = Match("c", "c")
 
-        abc = Or(a, Or(b, c))
-        self.assertEqual(abc, parse("a=a or b=b or c=c"))
-        self.assertEqual(abc, parse("a=a or (b=b or c=c)"))
-        self.assertNotEqual(abc, parse("(a=a or b=b) or c=c"))
+        self.assertEqual(Or(a, b, c), parse("a=a or b=b or c=c"))
+        self.assertEqual(Or(a, Or(b, c)), parse("a=a or (b=b or c=c)"))
         self.assertEqual(Or(Or(a, b), c), parse("(a=a or b=b) or c=c"))
 
         ab = Or(a, b)
@@ -140,4 +136,11 @@ class TestFuzzy(unittest.TestCase):
 
 
 class TestParse(unittest.TestCase):
-    pass
+    def test_and_or(self):
+        self.assertEqual(
+            parse("a=a and b=b and c=c or d=d"),
+            parse("a=a and b=b and (c=c or d=d)"))
+
+        self.assertEqual(
+            parse("a=a and b=b or c=c and d=d"),
+            parse("a=a and (b=b or (c=c and d=d))"))

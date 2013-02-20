@@ -135,3 +135,30 @@ class OneOf(Parser):
         if index >= length:
             return None, None
         return parsers[index], (data, (data, index + 1, length, parsers))
+
+
+class Repeat(Parser):
+    def __init__(self, parser, min=0, max=None):
+        self._parser = parser
+        self._min = min
+        self._max = max
+
+    def init_parse(self, data):
+        if self._max is not None:
+            if self._min > self._max:
+                return None, None
+            if self._max <= 0:
+                return None, (data, [])
+        return self._parser, (data, (data, []))
+
+    def cont_parse(self, match, (data, results)):
+        if not match:
+            if len(results) < self._min:
+                return None, None
+            return None, (data, results)
+
+        data, result = match
+        results.append(result)
+        if self._max is None or len(results) <= self._max:
+            return self._parser, (data, (data, results))
+        return None, (data, results)

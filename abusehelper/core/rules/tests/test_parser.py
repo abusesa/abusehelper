@@ -56,3 +56,7 @@ class TestSequence(unittest.TestCase):
 
 class TestOneOf(unittest.TestCase):
     pass
+
+
+class TestRepeat(unittest.TestCase):
+    pass

@@ -4,7 +4,7 @@ import re
 
 from .core import Matcher
 from . import atoms
-from .parser import Parser, RegExp, Sequence, OneOf, ForwardRef, transform
+from .parser import Parser, RegExp, Sequence, OneOf, ForwardRef, transform, Repeat
 
 
 __all__ = [
@@ -85,29 +85,42 @@ class BinaryRule(Rule):
 
     @classmethod
     def parser(cls, rule_parser):
-        whitespace = RegExp(r"\s+")
+        space = RegExp(r"\s+")
         higher = rule_parser.expr(lambda x: x.precedence > cls.precedence)
+        expr = parens(rule_parser.expr())
+        name = RegExp(re.escape(cls.name), re.I)
 
         pattern = Sequence(
             OneOf(
-                Sequence(higher, whitespace).take(0),
-                parens(rule_parser.expr())
+                Sequence(higher, space).take(0),
+                expr
             ),
 
-            RegExp(re.escape(cls.name), re.I),
+            name,
+
+            Repeat(
+                Sequence(
+                    OneOf(
+                        Sequence(space, higher, space).take(1),
+                        expr
+                    ),
+                    name
+                ).take(0)
+            ),
 
             OneOf(
                 Sequence(
-                    whitespace,
+                    space,
                     rule_parser.expr(lambda x: x.precedence >= cls.precedence)
                 ).take(1),
-                parens(rule_parser.expr())
+                expr
             )
-        ).take(0, 2)
+        ).take(0, 2, 3)
 
         @transform(pattern)
-        def create((left, right)):
-            return cls(left, right)
+        def create((left, mid, right)):
+            rules = [left] + list(mid) + [right]
+            return cls(*rules)
         return create
 
     def __init__(self, first, *rest):
@@ -119,21 +132,10 @@ class BinaryRule(Rule):
         texts = []
         for rule in self._rules:
             text = unicode(rule)
-            if type(rule) != type(self):
-                if rule.precedence <= self.precedence:
-                    text = "(" + text + ")"
+            if rule.precedence <= self.precedence:
+                text = "(" + text + ")"
             texts.append(text)
         return (u" " + self.name + u" ").join(texts)
-
-
-class And(BinaryRule):
-    name = "and"
-
-    def match_with_cache(self, obj, cache):
-        for rule in self._rules:
-            if not rule.match(obj, cache):
-                return False
-        return True
 
 
 class Or(BinaryRule):
@@ -144,6 +146,16 @@ class Or(BinaryRule):
             if rule.match(obj, cache):
                 return True
         return False
+
+
+class And(BinaryRule):
+    name = "and"
+
+    def match_with_cache(self, obj, cache):
+        for rule in self._rules:
+            if not rule.match(obj, cache):
+                return False
+        return True
 
 
 class No(Rule):
@@ -253,9 +265,9 @@ class Match(Rule):
         key = self._convert_and_check(key, self.key_types)
         value = self._convert_and_check(value, self.atom_types)
 
-        if key is None and value == self.star:
+        if key == self.star and value == self.star:
             Rule.__init__(self)
-        elif key is None:
+        elif key == self.star:
             Rule.__init__(self, (), (("value", value),))
         elif value == self.star:
             Rule.__init__(self, (key,))
