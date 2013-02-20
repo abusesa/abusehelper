@@ -57,7 +57,7 @@ class OpenCollabReader(bot.FeedBot):
 
                 for page, keys in updates.iteritems():
                     event = current.setdefault(page, events.Event())
-                    event.add("id", self.page_id(page))
+                    event.add("id:open", self.page_id(page))
                     event.add("gwikipagename", page)
                     event.add("collab url", self.collab_url + page)
 
@@ -75,7 +75,7 @@ class OpenCollabReader(bot.FeedBot):
                     current.pop(page, None)
 
                     event = events.Event()
-                    event.add("id", self.page_id(page))
+                    event.add("id:close", self.page_id(page))
 
                     yield idiokit.send(event)
 

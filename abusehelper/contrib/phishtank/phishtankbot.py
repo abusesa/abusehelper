@@ -8,6 +8,7 @@ import re
 import bz2
 import urllib2
 import urlparse
+import collections
 from datetime import datetime
 import xml.etree.cElementTree as etree
 
@@ -15,31 +16,79 @@ import idiokit
 from abusehelper.core import bot, events, utils
 
 
+def _replace_non_xml_chars(unicode_obj, replacement=u"\uFFFD"):
+    return _NON_XML.sub(replacement, unicode_obj)
+_NON_XML = re.compile(u"[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]", re.U)
+
+
 class BZ2Reader(object):
     def __init__(self, fileobj):
-        self.fileobj = fileobj
+        self._fileobj = fileobj
+        self._bz2 = bz2.BZ2Decompressor()
 
-        self.bz2 = bz2.BZ2Decompressor()
-        self.pending = ""
-        self.index = 0
+        self._line_buffer = collections.deque([""])
+
+        self._current_line = ""
+        self._current_offset = 0
+
+    def _read_raw(self, chunk_size=65536):
+        while True:
+            compressed = self._fileobj.read(chunk_size)
+            if not compressed:
+                return ""
+
+            decompressed = self._bz2.decompress(compressed)
+            if decompressed:
+                return decompressed
+
+    def _read_line(self):
+        if not self._line_buffer:
+            return ""
+
+        while len(self._line_buffer) == 1:
+            raw = self._read_raw()
+            if not raw:
+                return self._line_buffer.pop()
+
+            last = self._line_buffer.pop()
+            self._line_buffer.extend((last + raw).splitlines(True))
+
+        return self._line_buffer.popleft()
+
+    def _mangle_line(self, line, target="utf-8"):
+        # Forcibly decode the bytes into an unicode object.
+        try:
+            decoded = line.decode("utf-8")
+        except UnicodeDecodeError:
+            decoded = line.decode("latin-1")
+
+        # Remove characters that are not proper XML 1.0.
+        sanitized = _replace_non_xml_chars(decoded)
+
+        return sanitized.encode("utf-8")
+
+    def _read(self, amount):
+        while self._current_offset >= len(self._current_line):
+            line = self._read_line()
+            if not line:
+                return ""
+
+            self._current_line = self._mangle_line(line)
+            self._current_offset = 0
+
+        data = self._current_line[self._current_offset:self._current_offset + amount]
+        self._current_offset += len(data)
+        return data
 
     def read(self, amount):
         result = list()
 
         while amount > 0:
-            if self.index >= len(self.pending):
-                data = self.fileobj.read(2 ** 16)
-                if not data:
-                    break
-                self.pending = self.bz2.decompress(data)
-                self.index = 0
-            else:
-                piece = self.pending[self.index:self.index + amount]
-                self.index += len(piece)
-                amount -= len(piece)
-                piece = utils.force_decode(piece).encode("utf-8")
-                piece = re.sub(r"[\x7F-\x84\x86-\x9F]", "", piece)
-                result.append(piece)
+            data = self._read(amount)
+            if not data:
+                break
+            amount -= len(data)
+            result.append(data)
 
         return "".join(result)
 

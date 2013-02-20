@@ -13,7 +13,7 @@ class ShadowServerMail(imapbot.IMAPBot):
 
     # Assume the file names to be something like
     # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
-    filename_rex = bot.Param(default=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>.*)-[^-]+\..*")
+    filename_rex = bot.Param(default=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>[^-]*).*\..*")
 
     def _decode(self, headers, fileobj):
         encoding = headers[-1].get_all("content-transfer-encoding", ["7bit"])[0]
@@ -79,10 +79,11 @@ class ShadowServerMail(imapbot.IMAPBot):
 
     @idiokit.stream
     def handle_text_plain(self, headers, fileobj):
+        fileobj = self._decode(headers, fileobj)
+
         filename = headers[-1].get_filename(None)
         if filename is not None:
             self.log.info("Parsing CSV data from an attachment")
-            fileobj = self._decode(headers, fileobj)
             result = yield self.parse_csv(filename, fileobj)
             idiokit.stop(result)
 
@@ -100,7 +101,6 @@ class ShadowServerMail(imapbot.IMAPBot):
                 continue
 
             self.log.info("Parsing CSV data from the URL")
-            fileobj = self._decode(headers, fileobj)
             result = yield self.parse_csv(filename, fileobj)
             idiokit.stop(result)
 

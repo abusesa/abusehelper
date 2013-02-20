@@ -3,6 +3,7 @@ from abusehelper.core import serialize
 
 import operator
 import functools
+import math
 import re
 
 
@@ -254,53 +255,37 @@ ANYTHING.serialize_register()
 import struct
 from socket import inet_ntop, inet_pton, AF_INET, AF_INET6, error
 
-_ACCEPTABLE_ERRORS = (error, UnicodeEncodeError, TypeError)
+
+class NETBLOCKError(RuleError):
+    pass
 
 
-def _split_bits(string):
-    bites = string.split("/", 1)
-    if len(bites) == 1:
-        return string, None
+class IPRangeError(NETBLOCKError):
+    pass
 
+
+def _parse_ipv4(ip):
     try:
-        bits = int(bites[1])
-    except ValueError:
-        return None
-    return bites[0], bits
-
-
-def _parse_ipv4_block(string):
-    split = _split_bits(string)
-    if split is None:
-        return None
-
-    ip, bits = split
-    try:
-        packed = inet_pton(AF_INET, ip)
-    except _ACCEPTABLE_ERRORS:
+        packed = inet_pton(AF_INET, ip.strip())
+    except (error, UnicodeEncodeError):
         return None
 
     ip_num, = struct.unpack("!I", packed)
-    return ip_num, bits
+    return ip_num
 
 
 def _format_ipv4(ip_num):
     return inet_ntop(AF_INET, struct.pack("!I", ip_num))
 
 
-def _parse_ipv6_block(string):
-    split = _split_bits(string)
-    if split is None:
-        return None
-
-    ip, bits = split
+def _parse_ipv6(ip):
     try:
-        packed = inet_pton(AF_INET6, ip)
-    except _ACCEPTABLE_ERRORS:
+        packed = inet_pton(AF_INET6, ip.strip())
+    except (error, UnicodeEncodeError):
         return None
 
     hi, lo = struct.unpack("!QQ", packed)
-    return ((hi << 64) | lo), bits
+    return (hi << 64) | lo
 
 
 def _format_ipv6(ip_num):
@@ -309,96 +294,155 @@ def _format_ipv6(ip_num):
     return inet_ntop(AF_INET6, struct.pack("!QQ", hi, lo))
 
 
-class NETBLOCKError(RuleError):
-    pass
+class IPRange(object):
+    _ip_versions = {
+        4: (_parse_ipv4, _format_ipv4, 32),
+        6: (_parse_ipv6, _format_ipv6, 128)
+    }
+
+    @classmethod
+    def _parse_ip(cls, ip):
+        for version, (parser, _, max_bits) in cls._ip_versions.iteritems():
+            num = parser(ip)
+            if num is not None:
+                return version, num
+        raise IPRangeError("invalid IP address " + repr(ip))
+
+    @classmethod
+    def _max_bits(cls, version):
+        parser, formatter, max_bits = cls._ip_versions[version]
+        return max_bits
+
+    @classmethod
+    def _format_ip(cls, version, num):
+        parser, formatter, max_bits = cls._ip_versions[version]
+        return formatter(num)
+
+    @classmethod
+    def from_cidr(cls, cidr, bits=None):
+        parts = cidr.split("/")
+        if len(parts) == 1:
+            ip = parts[0]
+        elif len(parts) == 2:
+            if bits is not None:
+                raise IPRangeError(repr(cidr) + " already contains bits")
+            ip, bits = parts
+        else:
+            raise IPRangeError("invalid CIDR " + repr(cidr))
+
+        ip_version, ip_num = cls._parse_ip(ip)
+        max_bits = cls._max_bits(ip_version)
+
+        if bits is None:
+            bits = max_bits
+        else:
+            try:
+                bits = int(bits)
+            except ValueError:
+                raise IPRangeError("invalid bits " + repr(bits))
+
+            if not 0 <= bits <= max_bits:
+                raise IPRangeError("bits not in range " +
+                    "(got {0!r}, expected 0-{1!r})".format(bits, max_bits))
+
+        mask = ((1 << max_bits) - 1) ^ ((1 << (max_bits - bits)) - 1)
+        first = ip_num & mask
+        last = first + (1 << (max_bits - bits)) - 1
+        return cls(ip_version, first, last)
+
+    @classmethod
+    def from_range(cls, first, last=None):
+        parts = first.split("-")
+        if len(parts) == 1:
+            first = parts[0]
+        elif len(parts) == 2:
+            if last is not None:
+                raise IPRangeError(repr(first) + " already contains an last IP")
+            first, last = parts
+        else:
+            raise IPRangeError("invalid IP range " + repr(first))
+
+        first_version, first_num = cls._parse_ip(first)
+        if last is None:
+            return cls(first_version, first_num, first_num + 1)
+
+        last_version, last_num = cls._parse_ip(last)
+        if first_version != last_version:
+            raise IPRangeError("mismatching IPs " + repr(first) + " and " + repr(last))
+        return cls(first_version, first_num, last_num)
+
+    def __init__(self, version, first, last):
+        self._version = version
+        self._first = first
+        self._last = last
+
+    @property
+    def first(self):
+        return self._format_ip(self._version, self._first)
+
+    @property
+    def last(self):
+        return self._format_ip(self._version, self._last)
+
+    def contains(self, other):
+        if self._version != other._version:
+            return False
+        return self._first <= other._first <= other._last <= self._last
+
+    def as_minimal_string(self):
+        count = self._last - self._first + 1
+        if count == 1:
+            return self.first
+
+        bits = self._max_bits(self._version) - int(math.log(count, 2))
+        if IPRange.from_cidr(self.first, bits).contains(self):
+            return self.first + "/" + repr(bits)
+
+        return self.first + "-" + self.last
 
 
 class NETBLOCK(_Rule):
     @classmethod
     def dump_rule(cls, dump, name, rule):
-        element = Element(name, ip=rule.ip, bits=rule.bits)
+        element = Element(
+            name, first=rule.range.first, last=rule.range.last)
         if rule.keys is not None:
             element.add(serialize.dump_list(dump, "keys", rule.keys))
         return element
 
     @classmethod
     def load_rule(cls, load, element):
-        ip = element.get_attr("ip", None)
-        bits = element.get_attr("bits", None)
-        if None in (ip, bits):
+        if not element.with_attrs("first", "last"):
             raise RuleError(element)
-
-        try:
-            bits = int(bits)
-        except ValueError:
-            raise RuleError(element)
+        first = element.get_attr("first")
+        last = element.get_attr("last")
 
         keys = None
         for child in element.children():
             keys = serialize.load_list(load, child)
-        return cls(ip, bits, keys)
+        return cls(first, last, keys)
 
-    _versions = [
-        (_parse_ipv4_block, _format_ipv4, 32),
-        (_parse_ipv6_block, _format_ipv6, 128)
-    ]
-
-    def __init__(self, ip, bits=None, keys=None):
-        for parser, formatter, max_bits in self._versions:
-            result = parser(ip)
-            if result is None:
-                continue
-
-            ip_num, ip_bits = result
-            if ip_bits is not None and bits is not None:
-                raise NETBLOCKError("{0!r} already contains bits".format(ip))
-
-            if ip_bits is None:
-                ip_bits = bits if bits is not None else max_bits
-
-            if not 0 <= ip_bits <= max_bits:
-                msg = "bits not in range (got {0}, expected 0-{1})".format(ip_bits, max_bits)
-                raise NETBLOCKError(msg)
-
-            self.parser = parser
-            self.max_bits = max_bits
-
-            self.bits = bits if ip_bits is None else ip_bits
-            self.mask = ((1 << max_bits) - 1) ^ ((1 << (max_bits - self.bits)) - 1)
-
-            self.ip = formatter(ip_num)
-            self.ip_num = ip_num & self.mask
-            break
-        else:
-            raise NETBLOCKError("could not parse " + repr(ip))
+    def __init__(self, ip_or_cidr_or_range, bits_or_last=None, keys=None):
+        try:
+            self.range = IPRange.from_cidr(ip_or_cidr_or_range, bits_or_last)
+        except IPRangeError:
+            self.range = IPRange.from_range(ip_or_cidr_or_range, bits_or_last)
 
         self.keys = None if keys is None else frozenset(keys)
-        _Rule.__init__(self, (self.parser, self.ip_num, self.bits, self.keys))
+        _Rule.__init__(self, (self.range.first, self.range.last, self.keys))
 
     def __repr__(self):
-        args = []
-
-        if self.bits == self.max_bits:
-            args.append(repr(self.ip))
-        else:
-            args.append(repr(self.ip + "/" + str(self.bits)))
-
+        args = [repr(self.range.as_minimal_string())]
         if self.keys is not None:
             args.append("keys=" + repr(list(self.keys)))
-
         return self.__class__.__name__ + "(" + ", ".join(args) + ")"
 
     def _filter(self, value):
-        if value is None:
+        try:
+            range = IPRange.from_cidr(value)
+        except IPRangeError:
             return False
-
-        ip_num, ip_bits = value
-        if ip_bits is not None and not 0 <= ip_bits <= self.max_bits:
-            return False
-        if ip_bits is not None and ip_bits < self.bits:
-            return False
-
-        return ip_num & self.mask == self.ip_num
+        return self.range.contains(range)
 
     def match_with_cache(self, event, cache):
         if self.keys is None:
@@ -407,7 +451,7 @@ class NETBLOCK(_Rule):
             keys = self.keys
 
         for key in keys:
-            if event.contains(key, parser=self.parser, filter=self._filter):
+            if event.contains(key, filter=self._filter):
                 return True
         return False
 NETBLOCK.serialize_register()
@@ -529,11 +573,19 @@ if __name__ == "__main__":
             self.assertRaises(NETBLOCKError, NETBLOCK, "1.2.3.4/16", 16)
             self.assertRaises(NETBLOCKError, NETBLOCK, "2001:0db8:ac10:fe01::/32", 32)
 
+        def test_range_constructor(self):
+            assert NETBLOCK("10.0.1.2") == NETBLOCK("10.0.1.2", "10.0.1.2")
+            assert NETBLOCK("10.0.0.0/16") == NETBLOCK("10.0.0.0 - 10.0.255.255")
+            assert NETBLOCK("10.0.0.0", "10.0.255.255") == NETBLOCK("10.0.0.0 - 10.0.255.255")
+            assert NETBLOCK("10.0.0.0/16") != NETBLOCK("10.0.0.0 - 10.0.255.0")
+
+            self.assertRaises(NETBLOCKError, NETBLOCK, "10.0.0.0 - 10.0.255.255", "10.0.255.255")
+
         def test_match_ipv4(self):
-            rule = NETBLOCK("1.2.3.4", 16)
-            assert rule.match(Event(ip="1.2.3.4"))
-            assert rule.match(Event(ip="1.2.0.0"))
-            assert not rule.match(Event(ip="0.0.0.0"))
+            rule = NETBLOCK("10.0.0.0", "10.0.0.254")
+            assert rule.match(Event(ip="10.0.0.0"))
+            assert rule.match(Event(ip="10.0.0.1"))
+            assert not rule.match(Event(ip="10.0.0.255"))
 
         def test_match_ipv4_cidr(self):
             rule = NETBLOCK("1.2.3.4", 16)
