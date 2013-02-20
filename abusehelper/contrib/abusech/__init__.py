@@ -84,13 +84,14 @@ class AbuseCHFeedBot(RSSBot):
         for output_key, output_value in parser(input_value):
             yield output_key, output_value
 
-    def create_event(self, **keys):
+    def create_event(self, source, **keys):
         event = events.Event({
             "feed": self.feed_name,
             "malware": self.feed_malware,
             "type": self.feed_type,
             "description": "This host is most likely hosting a " + \
-                self.feed_malware + " " + self.feed_type + "."
+                self.feed_malware + " " + self.feed_type + ".",
+            "feed url": source
         })
 
         for input_key, input_value in keys.iteritems():

@@ -59,7 +59,7 @@ class OpenCollabReader(bot.FeedBot):
                     event = current.setdefault(page, events.Event())
                     event.add("id", self.page_id(page))
                     event.add("gwikipagename", page)
-                    event.add("collab_url", self.collab_url + page)
+                    event.add("collab url", self.collab_url + page)
 
                     removed.discard(page)
 
