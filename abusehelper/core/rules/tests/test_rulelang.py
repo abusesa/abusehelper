@@ -15,6 +15,10 @@ class TestRule(unittest.TestCase):
 
 
 class TestParse(unittest.TestCase):
+    def test_ignore_extra_whitespace(self):
+        self.assertEqual(parse("  a  "), parse("a"))
+        self.assertEqual(parse("(  a  )"), parse("a"))
+
     def test_and(self):
         a = Match("a", "a")
         b = Match("b", "b")
