@@ -2,35 +2,11 @@ from __future__ import absolute_import
 
 import re
 
-from .core import Matcher
+from . import core
 from . import atoms
-from .parser import Parser, RegExp, Sequence, OneOf, ForwardRef, transform, Repeat
 
 
-__all__ = [
-    "Rule",
-    "And", "Or", "No",
-    "Match", "NonMatch",
-    "Fuzzy",
-    "parse", "rule"
-]
-
-
-def parens(parser):
-    return Sequence(
-        RegExp(r"\(\s*"),
-        parser,
-        RegExp(r"\s*\)")
-    ).take(1)
-
-
-class Rule(Matcher):
-    precedence = float("inf")
-
-    @classmethod
-    def parser(self, rule_parser):
-        raise NotImplementedError()
-
+class Rule(core.Matcher):
     def match(self, obj, cache=None):
         if cache is None:
             cache = dict()
@@ -45,225 +21,63 @@ class Rule(Matcher):
         return False
 
 
-class RuleParser(Parser):
-    def __init__(self, *rules):
-        refs = {}
-        for rule in set(rules):
-            refs[rule] = ForwardRef()
-
-        self._rules = []
-        for rule in sorted(rules, key=lambda x: x.precedence):
-            self._rules.append((rule, refs[rule]))
-
-        self._expr = ForwardRef()
-        parsers = [ref for (_, ref) in self._rules] + [parens(self._expr)]
-        self._expr.set(OneOf(*parsers))
-
-        for rule, ref in self._rules:
-            ref.set(rule.parser(self))
-
-    def expr(self, filter=None):
-        if filter is None:
-            return self._expr
-
-        filtered = []
-        for rule, parser in self._rules:
-            if filter(rule):
-                filtered.append(parser)
-        filtered.append(parens(self._expr))
-
-        return OneOf(*filtered)
-
-    def parse(self, string):
-        return self._expr.parse(string.strip())
-
-
-class BinaryRule(Rule):
-    precedence = 0
-
-    name = "binary"
-
-    @classmethod
-    def parser(cls, rule_parser):
-        space = RegExp(r"\s+")
-        higher = rule_parser.expr(lambda x: x.precedence > cls.precedence)
-        expr = parens(rule_parser.expr())
-        name = RegExp(re.escape(cls.name), re.I)
-
-        pattern = Sequence(
-            OneOf(
-                Sequence(higher, space).take(0),
-                expr
-            ),
-
-            name,
-
-            Repeat(
-                Sequence(
-                    OneOf(
-                        Sequence(space, higher, space).take(1),
-                        expr
-                    ),
-                    name
-                ).take(0)
-            ),
-
-            OneOf(
-                Sequence(
-                    space,
-                    rule_parser.expr(lambda x: x.precedence >= cls.precedence)
-                ).take(1),
-                expr
-            )
-        ).take(0, 2, 3)
-
-        @transform(pattern)
-        def create((left, mid, right)):
-            rules = [left] + list(mid) + [right]
-            return cls(*rules)
-        return create
-
+class And(Rule):
     def __init__(self, first, *rest):
         self._rules = (first,) + rest
 
         Rule.__init__(self, frozenset(self._rules))
 
-    def __unicode__(self):
-        texts = []
-        for rule in self._rules:
-            text = unicode(rule)
-            if rule.precedence <= self.precedence:
-                text = "(" + text + ")"
-            texts.append(text)
-        return (u" " + self.name + u" ").join(texts)
-
-
-class Or(BinaryRule):
-    name = "or"
+    @property
+    def subrules(self):
+        return self._rules
 
     def match_with_cache(self, obj, cache):
-        for rule in self._rules:
-            if rule.match(obj, cache):
-                return True
-        return False
-
-
-class And(BinaryRule):
-    name = "and"
-
-    def match_with_cache(self, obj, cache):
-        for rule in self._rules:
+        for rule in self.subrules:
             if not rule.match(obj, cache):
                 return False
         return True
 
 
+class Or(And):
+    def match_with_cache(self, obj, cache):
+        for rule in self.subrules:
+            if rule.match(obj, cache):
+                return True
+        return False
+
+
 class No(Rule):
-    precedence = 1
-
-    @classmethod
-    def parser(cls, rule_parser):
-        pattern = Sequence(
-            RegExp(r"no", re.I),
-            OneOf(
-                parens(rule_parser.expr()),
-                Sequence(
-                    RegExp(r"\s+"),
-                    rule_parser.expr(lambda x: x.precedence >= cls.precedence)
-                ).take(1)
-            )
-        ).take(1)
-
-        @transform(pattern)
-        def create(rule):
-            return cls(rule)
-        return create
-
     def __init__(self, rule):
         Rule.__init__(self, (rule,))
 
         self._rule = rule
 
+    @property
+    def subrule(self):
+        return self._rule
+
     def match_with_cache(self, obj, cache):
         return not self._rule.match(obj, cache)
 
-    def __unicode__(self):
-        text = unicode(self._rule)
-        if self._rule.precedence < self.precedence:
-            text = u"(" + text + u")"
-        return u"no " + text
-
 
 class Match(Rule):
-    precedence = 2
-
     atom_conversions = [
         (type(None), lambda x: atoms.Star()),
         (basestring, atoms.String),
-        (type(re.compile(".")), atoms.Rex.from_re)
+        (type(re.compile(".")), atoms.RegExp.from_re)
     ]
-
-    key_types = tuple([
-        atoms.Star,
-        atoms.String
-    ])
-
-    atom_types = tuple([
-        atoms.Star,
-        atoms.Rex,
-        atoms.String,
-        atoms.IP
-    ])
-
-    atom_info = {
-        atoms.Star: ("=", RegExp(r"\s*==?\s*")),
-        atoms.Rex: ("=", RegExp(r"\s*==?\s*")),
-        atoms.String: ("=", RegExp(r"\s*==?\s*")),
-        atoms.IP: (" in ", RegExp(r"\s+in\s+", re.I))
-    }
 
     star = atoms.Star()
 
-    @classmethod
-    def parser(cls, _):
-        @transform(atoms.Star.parser())
-        def key_star(_):
-            return None
-
-        @transform(atoms.String.parser())
-        def key_string(string):
-            return string.value
-
-        atom_patterns = []
-        for atom_type in cls.atom_types:
-            _, atom_pattern = cls.atom_info[atom_type]
-            atom_patterns.append(Sequence(
-                atom_pattern, atom_type.parser()
-            ).take(1))
-
-        pattern = Sequence(
-            OneOf(key_star, key_string),
-            OneOf(*atom_patterns)
-        )
-
-        @transform(pattern)
-        def create((key, value)):
-            return cls(key, value)
-        return create
-
-    def _convert_and_check(self, obj, types):
+    def _convert(self, obj):
         for converted_type, conversion_func in self.atom_conversions:
             if isinstance(obj, converted_type):
-                obj = conversion_func(obj)
-
-        if not isinstance(obj, types):
-            raise TypeError("unexpected value " + repr(obj))
-
+                return conversion_func(obj)
         return obj
 
     def __init__(self, key=None, value=None):
-        key = self._convert_and_check(key, self.key_types)
-        value = self._convert_and_check(value, self.atom_types)
+        key = self._convert(key)
+        value = self._convert(value)
 
         if key == self.star and value == self.star:
             Rule.__init__(self)
@@ -277,9 +91,13 @@ class Match(Rule):
         self._key = key
         self._value = value
 
-    def __unicode__(self):
-        op, _ = self.atom_info[type(self._value)]
-        return unicode(self._key) + unicode(op) + unicode(self._value)
+    @property
+    def key(self):
+        return self._key
+
+    @property
+    def value(self):
+        return self._value
 
     def match_with_cache(self, event, cache):
         if self._key == self.star:
@@ -287,77 +105,29 @@ class Match(Rule):
         return event.contains(self._key.value, filter=self.filter)
 
     def filter(self, value):
-        return self._value.match(value)
+        return self.value.match(value)
 
 
 class NonMatch(Match):
-    atom_info = {
-        atoms.Star: ("!=", RegExp(r"\s*!=\s*")),
-        atoms.Rex: ("!=", RegExp(r"\s*!=\s*")),
-        atoms.String: ("!=", RegExp(r"\s*!=\s*")),
-        atoms.IP: (" not in ", RegExp(r"\s+not\s+in\s+", re.I))
-    }
-
     def filter(self, value):
-        return not self._value.match(value)
+        return not self.value.match(value)
 
 
 class Fuzzy(Rule):
-    precedence = 3
-
-    atom_types = tuple([
-        atoms.IP,
-        atoms.Rex,
-        atoms.String
-    ])
-
-    @classmethod
-    def parser(cls, _):
-        @transform(OneOf(*[x.parser() for x in cls.atom_types]))
-        def create(result):
-            return cls(result)
-        return create
+    @property
+    def atom(self):
+        return self._atom
 
     def __init__(self, atom):
         Rule.__init__(self, (atom,))
 
         self._atom = atom
         self._is_key_type = isinstance(atom, atoms.String)
-        self._is_value_type = isinstance(atom, self.atom_types)
 
     def match_with_cache(self, event, cache):
         if self._is_key_type:
             if any(self._atom.match, event.keys()):
                 return True
-        if self._is_atom_type:
-            if event.contains(filter=self._atom.match):
-                return True
+        if event.contains(filter=self._atom.match):
+            return True
         return False
-
-    def __unicode__(self):
-        return unicode(self._atom)
-
-
-_rule_parser = RuleParser(
-    And,
-    Or,
-    No,
-    Match,
-    NonMatch,
-    Fuzzy
-)
-
-
-def parse(string):
-    string = unicode(string)
-
-    parsed = _rule_parser.parse(string)
-    if parsed and not parsed[1]:
-        return parsed[0]
-    raise ValueError("can not parse rule " + repr(string))
-
-
-def rule(obj):
-    if isinstance(obj, basestring):
-        return parse(obj)
-    return obj

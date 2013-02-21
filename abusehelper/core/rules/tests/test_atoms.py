@@ -3,83 +3,46 @@ from __future__ import unicode_literals
 import re
 import unittest
 
-from ..atoms import Star, String, Rex, IP
+from ..atoms import Star, String, RegExp, IP
 
 
 class TestStar(unittest.TestCase):
-    def test_parsing(self):
-        parser = Star.parser()
-        self.assertEqual(parser.parse('* test'), (Star(), ' test'))
-
-    def test_to_unicode(self):
-        self.assertEqual('*', unicode(Star()))
-
     def test_matching(self):
         self.assertTrue(Star().match(''))
         self.assertTrue(Star().match('anything'))
 
 
 class TestString(unittest.TestCase):
-    def test_parsing(self):
-        parser = String.parser()
-        self.assertEqual(parser.parse('atom test'), (String('atom'), ' test'))
-        self.assertEqual(
-            parser.parse('"\\" \\/ \\r \\n \\b \\f \\uffff" test'),
-            (String('" / \r \n \b \f \uffff'), ' test'))
-
-        # Empty strings must to be quoted
-        self.assertIs(parser.parse(''), None)
-        self.assertEqual(parser.parse('""'), (String(''), ''))
-
-        self.assertEqual(parser.parse("*"), None)
-
-    def test_to_unicode(self):
-        self.assertEqual('""', unicode(String('')))
-        self.assertEqual('"*"', unicode(String('*')))
-
     def test_matching(self):
         self.assertTrue(String('atom').match('atom'))
         self.assertTrue(String('atom').match('ATOM'))
 
 
-class TestRex(unittest.TestCase):
+class TestRegExp(unittest.TestCase):
     def test_from_re(self):
         # re.U and re.S flags are implicitly set
-        self.assertEqual(Rex.from_re(re.compile('a', re.U)), Rex('a'))
-        self.assertEqual(Rex.from_re(re.compile('a', re.S)), Rex('a'))
+        self.assertEqual(RegExp.from_re(re.compile('a', re.U)), RegExp('a'))
+        self.assertEqual(RegExp.from_re(re.compile('a', re.S)), RegExp('a'))
 
         # re.I flag can be set explicitly
-        self.assertEqual(Rex.from_re(re.compile('a', re.I)), Rex('a', ignore_case=True))
+        self.assertEqual(
+            RegExp.from_re(re.compile('a', re.I)),
+            RegExp('a', ignore_case=True))
 
         # re.M, re.L and re.X are forbidden
         for flag in [re.M, re.L, re.X]:
-            self.assertRaises(ValueError, Rex.from_re, re.compile('a', flag))
-
-    def test_parsing(self):
-        parser = Rex.parser()
-        self.assertEqual(parser.parse('/a/'), (Rex('a'), ""))
-        self.assertEqual(parser.parse('/a/i'), (Rex('a', ignore_case=True), ""))
-        self.assertEqual(parser.parse(r'/\//'), (Rex(r'\/'), ""))
-
-    def test_to_unicode(self):
-        self.assertEqual(unicode(Rex(r'a')), r'/a/')
-        self.assertEqual(unicode(Rex(r'a', ignore_case=True)), r'/a/i')
-        self.assertEqual(unicode(Rex(r"a|b|c")), r"/a|b|c/")
-
-        # Unescaped forward slashes have to be escaped, but already escaped
-        # forward slashes must be left intact.
-        self.assertEqual(unicode(Rex(r'\\\//')), r'/\\\/\//')
+            self.assertRaises(ValueError, RegExp.from_re, re.compile('a', flag))
 
     def test_matching(self):
-        self.assertTrue(Rex('a').match('a'))
+        self.assertTrue(RegExp('a').match('a'))
 
         # Matching only to the beginning of the string must be explicitly defined
-        self.assertTrue(Rex('a').match('ba'))
-        self.assertFalse(Rex('^a').match('ba'))
+        self.assertTrue(RegExp('a').match('ba'))
+        self.assertFalse(RegExp('^a').match('ba'))
 
         # Matches are case sensitive by default
-        self.assertFalse(Rex('a').match('A'))
-        self.assertTrue(Rex('a', ignore_case=True).match('A'))
+        self.assertFalse(RegExp('a').match('A'))
+        self.assertTrue(RegExp('a', ignore_case=True).match('A'))
 
 
 class TestIP(unittest.TestCase):
