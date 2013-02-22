@@ -134,7 +134,6 @@ class AccessLogBot(TailBot):
     path = bot.Param("access_log file path")
 
     def parse(self, line, _):
-        self.log.info(line)
         line = line.strip()
         if not line:
             return
