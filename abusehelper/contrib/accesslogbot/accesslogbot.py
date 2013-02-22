@@ -38,107 +38,114 @@ def convert_date(datestring, to_format="%Y-%m-%d %H:%M:%S UTC"):
     return time.strftime(to_format, time.gmtime(timestamp))
 
 
+def split_prefix(string, separator=" "):
+    left, _, right = string.partition(separator)
+    return left.strip(), right.strip()
+
+
+def parse_log_line(line):
+    """
+    >>> sorted(parse_log_line('192.0.2.0 a b [01/Jan/1970:00:00:00 +0000] "/" 200 1337'))
+    [('bytes', '1337'), ('ident', 'a'), ('ip', '192.0.2.0'), ('request', '/'), ('status', '200'), ('timestamp', '01/Jan/1970:00:00:00 +0000'), ('user', 'b')]
+
+    >>> sorted(parse_log_line('192.0.2.0 - - [01/Jan/1970:00:00:00 +0000] "/" 200 1337'))
+    [('bytes', '1337'), ('ip', '192.0.2.0'), ('request', '/'), ('status', '200'), ('timestamp', '01/Jan/1970:00:00:00 +0000')]
+
+    >>> sorted(parse_log_line('192.0.2.0 - - [01/Jan/1970:00:00:00 +0000] "/" 200 1337 "referer" "useragent"'))
+    [('bytes', '1337'), ('ip', '192.0.2.0'), ('referer', 'referer'), ('request', '/'), ('status', '200'), ('timestamp', '01/Jan/1970:00:00:00 +0000'), ('user_agent', 'useragent')]
+    """
+
+    # LogFormat "%h %l %u %t \"%r\" %>s %b" common
+    # LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" combined
+
+    ip, right = split_prefix(line)
+    yield "ip", ip
+
+    ident, right = split_prefix(right)
+    if ident and ident != "-":
+        yield "ident", ident
+
+    user, right = split_prefix(right)
+    if user and user != "-":
+        yield "user", user
+
+    if not right.startswith("["):
+        return
+    timestamp, right = split_prefix(right[1:], "]")
+    yield "timestamp", timestamp
+
+    if not right.startswith("\""):
+        return
+    request, right = split_prefix(right[1:], "\"")
+    yield "request", request
+
+    status, right = split_prefix(right)
+    if status and status != "-":
+        yield "status", status
+
+    bytes, right = split_prefix(right)
+    if bytes and bytes != "-":
+        yield "bytes", bytes
+
+    if not right.startswith("\""):
+        return
+    referer, right = split_prefix(right[1:], "\"")
+    if referer and referer != "-":
+        yield "referer", referer
+
+    if not right.startswith("\""):
+        return
+    user_agent, _ = split_prefix(right[1:], "\"")
+    if user_agent and user_agent != "-":
+        yield "user_agent", user_agent
+
+
+def parse_request(request):
+    # Split request also into three parts
+    method, url, protocol = request.split(" ", 3)
+    yield "method", method
+    yield "url", url
+    yield "protocol", protocol
+
+
+def parse_user_agent(user_agent):
+    # Split user agent into software-version key-value pairs
+    user_agent = user_agent.strip()
+
+    products = list()
+    while user_agent:
+        if user_agent.startswith("("):
+            _, user_agent = split_prefix(user_agent[1:], ")")
+            continue
+
+        left, user_agent = split_prefix(user_agent)
+        split = left.split("/", 2)
+        if len(split) != 2:
+            continue
+
+        sw, version = split
+        if sw and version:
+            yield sw.lower(), version
+            products.append(sw + "/" + version)
+    yield "product", products
+
+
 class AccessLogBot(TailBot):
     path = bot.Param("access_log file path")
 
     def parse(self, line, _):
+        self.log.info(line)
         line = line.strip()
         if not line:
             return
 
-        # LogFormat "%h %l %u %t \"%r\" %>s %b" common
-        # LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" combined
-
-        facts = {}
-
-        try:
-            left, _, right = line.partition(" ")
-            facts["ip"] = left.strip()
-            right = right.strip()
-
-            left, _, right = right.partition(" ")
-            if left != "-":
-                facts["ident"] = left.strip()
-                right = right.strip()
-
-            left, _, right = right.partition(" ")
-            if left != "-":
-                facts["user"] = left.strip()
-                right = right.strip()
-
-            if right.startswith("["):
-                left, _, right = right[1:].partition("]")
-                facts["timestamp"] = convert_date(left.strip())
-                right = right.strip()
-            else:
-                raise InputError("could not parse timestamp")
-
-            if right.startswith("\""):
-                left, _, right = right[1:].partition("\"")
-                facts["request"] = left.strip()
-                right = right.strip()
-            else:
-                raise InputError("could not parse request")
-
-            left, _, right = right.partition(" ")
-            if left != "-":
-                facts["status"] = left.strip()
-                right = right.strip()
-
-            left, _, right = right.partition(" ")
-            if left != "-":
-                facts["bytes"] = left.strip()
-                right = right.strip()
-
-            if right.startswith("\""):
-                left, _, right = right[1:].partition("\"")
-                if left != "-":
-                    facts["referer"] = left
-                right = right.strip()
-            else:
-                raise InputError("could not parse referer")
-
-            if right.startswith("\""):
-                left, _, right = right[1:].partition("\"")
-                if left != "-":
-                    facts["user_agent"] = left
-            else:
-                raise InputError("could not parse user_agent")
-
-        except InputError:
-            # All good
-            pass
-
-
-        if facts["request"]:
-            # Split request also into three parts
-            method, url, protocol = facts["request"].split(" ", 3)
-            facts["method"]   = method
-            facts["url"]      = url
-            facts["protocol"] = protocol
-
-
-        if facts["user_agent"]:
-            # Split user agent into software-version key-value pairs
-            uatemp = facts["user_agent"].strip()
-            facts["product"] = list()
-            comments = list()
-            while uatemp:
-                if uatemp.startswith("("):
-                    left, _, right = uatemp[1:].partition(")")
-                    comments.append(left.strip())
-                    uatemp = right.strip()
-                else:
-                    left, _, right = uatemp.strip().partition(" ")
-                    try:
-                        sw, version = left.split("/")
-                        if sw and version:
-                            facts[sw.lower()] = version
-                            facts["product"].append(sw+"/"+version)
-                    except ValueError:
-                        continue
-                    uatemp = right.strip()
-
+        facts = dict(parse_log_line(line))
+        if "timestamp" in facts:
+            facts["timestamp"] = convert_date(facts["timestamp"])
+        if "request" in facts:
+            facts.update(parse_request(facts["request"]))
+        if "user_agent" in facts:
+            facts.update(parse_user_agent(facts["user_agent"]))
         return events.Event(facts)
 
 
