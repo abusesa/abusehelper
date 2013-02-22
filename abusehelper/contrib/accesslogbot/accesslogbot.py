@@ -1,16 +1,41 @@
 from abusehelper.core import bot, events
 from abusehelper.contrib.tailbot.tailbot import TailBot
 
+import re
 import time
+from calendar import timegm
 
-def convert_date(value):
+
+DATE_REX = re.compile(
+    r"^(\d{1,2}/.+?/\d{4}:\d{1,2}:\d{1,2}:\d{1,2})\s+([+-]\d{4})$")
+
+
+def convert_date(datestring, to_format="%Y-%m-%d %H:%M:%S UTC"):
+    """
+    >>> convert_date('01/Jan/1970:00:00:00 +0000')
+    '1970-01-01 00:00:00 UTC'
+    >>> convert_date('01/Jan/1970:00:00:00 -0100')
+    '1970-01-01 01:00:00 UTC'
+    >>> convert_date('01/Jan/1970:01:00:00 +0100')
+    '1970-01-01 00:00:00 UTC'
+
+    >>> convert_date('half past midnight')
+    'half past midnight'
+    """
+
+    match = DATE_REX.match(datestring)
+    if not match:
+        return datestring
+
+    datetime, timezone = match.groups()
     try:
-        ts = time.strptime(value, "%d/%b/%Y:%H:%M:%S +0000")
-        ts = time.strftime("%Y-%m-%d %H:%M:%S UTC", ts)
+        timestamp = timegm(time.strptime(datetime, "%d/%b/%Y:%H:%M:%S"))
     except ValueError:
-        ts = value
+        return datestring
 
-    return ts
+    tz_offset = int(timezone)
+    timestamp -= 3600 * (tz_offset // 100) + 60 * (tz_offset % 100)
+    return time.strftime(to_format, time.gmtime(timestamp))
 
 
 class AccessLogBot(TailBot):
