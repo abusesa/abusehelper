@@ -61,35 +61,39 @@ class No(Rule):
 
 
 class Match(Rule):
-    atom_conversions = [
+    _to_atom = [
         (type(None), lambda x: atoms.Star()),
         (basestring, atoms.String),
         (type(re.compile(".")), atoms.RegExp.from_re)
     ]
 
-    star = atoms.Star()
+    _from_atom = [
+        (atoms.Star, lambda x: None),
+        (atoms.String, lambda x: x.value)
+    ]
 
-    def _convert(self, obj):
-        for converted_type, conversion_func in self.atom_conversions:
+    _star = atoms.Star()
+
+    def _convert(self, obj, conversions):
+        for converted_type, conversion_func in conversions:
             if isinstance(obj, converted_type):
                 return conversion_func(obj)
         return obj
 
     def __init__(self, key=None, value=None):
-        key = self._convert(key)
-        value = self._convert(value)
+        self._key = self._convert(key, self._to_atom)
+        self._value = self._convert(value, self._to_atom)
 
-        if key == self.star and value == self.star:
+        arg_key = self._convert(self._key, self._from_atom)
+        arg_value = self._convert(self._value, self._from_atom)
+        if arg_key is None and arg_value is None:
             Rule.__init__(self)
-        elif key == self.star:
-            Rule.__init__(self, (), (("value", value),))
-        elif value == self.star:
-            Rule.__init__(self, (key,))
+        elif arg_key is None:
+            Rule.__init__(self, (), (("value", arg_value),))
+        elif arg_value is None:
+            Rule.__init__(self, (), (("key", arg_key),))
         else:
-            Rule.__init__(self, (key, value))
-
-        self._key = key
-        self._value = value
+            Rule.__init__(self, (arg_key, arg_value))
 
     @property
     def key(self):
@@ -100,7 +104,7 @@ class Match(Rule):
         return self._value
 
     def match_with_cache(self, event, cache):
-        if self._key == self.star:
+        if self._key == self._star:
             return event.contains(filter=self.filter)
         return event.contains(self._key.value, filter=self.filter)
 
