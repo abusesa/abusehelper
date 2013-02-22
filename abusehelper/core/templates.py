@@ -1,11 +1,16 @@
+from __future__ import absolute_import
+
 import csv
 from cStringIO import StringIO
 from email.mime.text import MIMEText
-from abusehelper.core.utils import force_decode
+
+from .utils import force_decode
+
 
 class Formatter(object):
     def format(self, result, events, *args):
         raise NotImplementedError()
+
 
 class Const(object):
     def __init__(self, value):
@@ -13,6 +18,7 @@ class Const(object):
 
     def format(self, obj, events):
         return self.value
+
 
 class AttachAndEmbedUnicode(object):
     def __init__(self, formatter, subtype="plain"):
@@ -23,17 +29,20 @@ class AttachAndEmbedUnicode(object):
         data = self.formatter.format(parts, events, *args)
 
         part = MIMEText(data.encode("utf-8"), self.subtype, "utf-8")
-        part.add_header("Content-Disposition",
-                        "attachment",
-                        filename=filename)
+        part.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=filename)
 
         parts.append(part)
         return data
+
 
 class AttachUnicode(AttachAndEmbedUnicode):
     def format(self, *args, **keys):
         AttachAndEmbedUnicode.format(self, *args, **keys)
         return u""
+
 
 class _EventDict(object):
     def __init__(self, event, encoder=unicode):
@@ -43,6 +52,7 @@ class _EventDict(object):
     def __getitem__(self, key):
         value = self.event.value(key, u"")
         return self.encoder(value)
+
 
 class CSVFormatter(object):
     def __init__(self, keys=True):
@@ -76,6 +86,7 @@ class CSVFormatter(object):
 
         return self._decode(stringio.getvalue())
 
+
 class Template(object):
     class _Formatter(object):
         def __init__(self, obj, events, formatters):
@@ -99,14 +110,3 @@ class Template(object):
     def format(self, obj, events):
         formatter = self._Formatter(obj, events, self.formatters)
         return self.data % formatter
-
-import unittest
-
-class TemplateRegressionTests(unittest.TestCase):
-    def test_issue_32(self):
-        # Issue 32: Templating does not accept "," as csv separator
-        template = Template('%(csv, ",", column_name)s', csv=CSVFormatter())
-        assert template.format(None, []).rstrip() == "column_name"
-
-if __name__ == "__main__":
-    unittest.main()

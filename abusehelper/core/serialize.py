@@ -152,7 +152,7 @@ def load_bool(load, element):
 
 
 def dump_rule(dump, name, rule):
-    return dump_str(dump, name, unicode(rule))
+    return dump_str(dump, name, rules.format(rule))
 
 
 def load_rule(load, element):

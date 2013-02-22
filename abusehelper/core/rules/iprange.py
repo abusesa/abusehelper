@@ -3,7 +3,7 @@ import math
 import struct
 from socket import inet_ntop, inet_pton, AF_INET, AF_INET6, error
 
-from . import parser
+import parsing
 
 
 def parse_ipv4(ip):
@@ -66,7 +66,7 @@ ipv4 = IPVersion(32, parse_ipv4, format_ipv4)
 ipv6 = IPVersion(128, parse_ipv6, format_ipv6)
 
 
-class IPRangeParser(parser.Parser):
+class IPRangeParser(parsing.Parser):
     def __init__(self, version, pattern):
         self._version = version
 
@@ -74,17 +74,16 @@ class IPRangeParser(parser.Parser):
         self._cidr_rex = re.compile(r"\s*/\s*(\d{1,5})", re.U | re.I)
         self._range_rex = re.compile(r"\s*-\s*(" + pattern + r")", re.U | re.I)
 
-    def init_parse(self, data):
+    def parse_gen(self, (string, start, end)):
         ver = self._version
-        string, start, end = data
 
         match = self._ip_rex.match(string, start, end)
         if match is None:
-            return None, None
+            yield None, None
 
         first = ver.parse(match.group(1))
         if first is None:
-            return None, None
+            yield None, None
 
         start = match.end()
 
@@ -92,18 +91,18 @@ class IPRangeParser(parser.Parser):
         if match:
             bits = int(match.group(1))
             if not 0 <= bits <= ver.max_bits:
-                return None, None
+                yield None, None
             first, last = ver.range_from_bitmask(first, bits)
-            return None, ((string, match.end(), end), IPRange(ver, first, last))
+            yield None, (IPRange(ver, first, last), (string, match.end(), end))
 
         match = self._range_rex.match(string, start, end)
         if match:
             last = self._version.parse(match.group(1))
             if last is None:
-                return None, None
-            return None, ((string, match.end(), end), IPRange(ver, first, last))
+                yield None, None
+            yield None, (IPRange(ver, first, last), (string, match.end(), end))
 
-        return None, ((string, start, end), IPRange(ver, first, first))
+        yield None, (IPRange(ver, first, first), (string, start, end))
 
 
 ipv4_parser = IPRangeParser(ipv4, r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
@@ -111,9 +110,7 @@ ipv6_parser = IPRangeParser(ipv6, r"[0-9a-f]*:[0-9a-f]*:[0-9a-f:]*")
 
 
 class IPRange(object):
-    @classmethod
-    def parser(cls):
-        return parser.OneOf(ipv4_parser, ipv6_parser)
+    parser = parsing.union(ipv4_parser, ipv6_parser)
 
     @classmethod
     def _parse_ip(cls, string):
@@ -182,7 +179,7 @@ class IPRange(object):
             return cls(version, first, last)
 
         raise ValueError(
-            "bitmask {0} outside range 0-{1}".format(bits, version.max_bits))
+            "bitmask {0} outside of range 0-{1}".format(bits, version.max_bits))
 
     @classmethod
     def from_ip(cls, ip):
