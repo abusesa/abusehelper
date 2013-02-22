@@ -2,7 +2,9 @@ import re
 import os
 import time
 
-PARSE_REX = re.compile(" for\s+(\S+)(\s+from\s+(\S+)\s+port\s+(\d+))?")
+PARSE_REX = re.compile(r"(?P<auth>\S+)\s+(?P<authtype>\S+)\s+" +
+                r"for\s+(?P<invalid>invalid\s+user)?\s*(?P<user>\S+)\s+" +
+                r"from\s+(?P<ip>\S+)\s+port\s+(?P<port>\S+)")
 
 def parse(string, base_time):
     """
@@ -32,16 +34,15 @@ def parse(string, base_time):
 
     match = PARSE_REX.search(bites[5])
     if match is not None:
-        _for, group, _from, port = match.groups()
-        if group is not None:
-            result["user"] = _for
-            result["ip"] = _from
-            result["port"] = port
-        else:
-            result["ip"] = _for
-        result["message"] = bites[5][:match.start()]
+        groups = match.groupdict()
+        for group in groups:
+            if groups[group] is not None:
+                if group == "invalid":
+                    result["auth"] = groups[group]
+                else:
+                    result[group] = groups[group]
     else:
-        result["message"] = bites[5]
+        return None
 
     return result
 
