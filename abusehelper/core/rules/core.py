@@ -1,26 +1,33 @@
+import weakref
+import threading
+
+
 class Matcher(object):
-    def __init__(self, args=(), keys=()):
-        self._hashable = args, keys
-        self._hash = None
+    _lock = threading.Lock()
+    _refs = weakref.WeakValueDictionary()
 
-    def __hash__(self):
-        if self._hash is None:
-            self._hash = hash((type(self), self._hashable))
-        return self._hash
+    def __new__(cls, *args, **keys):
+        instance = object.__new__(cls)
+        instance.init(*args, **keys)
 
-    def __eq__(self, other):
-        if type(other) != type(self):
-            return NotImplemented
-        return other._hashable == self._hashable
+        key = cls, instance.unique_key()
 
-    def __ne__(self, other):
-        eq = self.__eq__(other)
-        if eq is NotImplemented:
-            return NotImplemented
-        return not eq
+        with cls._lock:
+            return cls._refs.setdefault(key, instance)
+
+    def init(self):
+        pass
+
+    def unique_key(self):
+        return None
+
+    def arguments(self):
+        return ()
 
     def __repr__(self):
-        args, keys = self._hashable
-        arg_info = map(repr, args)
-        arg_info.extend(key + "=" + repr(value) for (key, value) in keys)
+        args, keys = self.arguments()
+
+        arg_info = []
+        arg_info.extend(repr(x) for x in args)
+        arg_info.extend(key + "=" + repr(value) for key, value in keys)
         return self.__class__.__name__ + "(" + ", ".join(arg_info) + ")"

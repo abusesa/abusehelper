@@ -22,10 +22,16 @@ class Rule(core.Matcher):
 
 
 class And(Rule):
-    def __init__(self, first, *rest):
-        self._rules = (first,) + rest
+    def init(self, first, *rest):
+        Rule.init(self)
 
-        Rule.__init__(self, frozenset(self._rules))
+        self._rules = frozenset((first,) + rest)
+
+    def unique_key(self):
+        return self._rules
+
+    def arguments(self):
+        return self._rules, []
 
     @property
     def subrules(self):
@@ -47,10 +53,16 @@ class Or(And):
 
 
 class No(Rule):
-    def __init__(self, rule):
-        Rule.__init__(self, (rule,))
+    def init(self, rule):
+        Rule.__init__(self)
 
         self._rule = rule
+
+    def unique_key(self):
+        return self._rule
+
+    def arguments(self):
+        yield [self._rule], []
 
     @property
     def subrule(self):
@@ -80,20 +92,26 @@ class Match(Rule):
                 return conversion_func(obj)
         return obj
 
-    def __init__(self, key=None, value=None):
+    def init(self, key=None, value=None):
+        Rule.init(self)
+
         self._key = self._convert(key, self._to_atom)
         self._value = self._convert(value, self._to_atom)
 
-        arg_key = self._convert(self._key, self._from_atom)
-        arg_value = self._convert(self._value, self._from_atom)
-        if arg_key is None and arg_value is None:
-            Rule.__init__(self)
-        elif arg_key is None:
-            Rule.__init__(self, (), (("value", arg_value),))
-        elif arg_value is None:
-            Rule.__init__(self, (), (("key", arg_key),))
-        else:
-            Rule.__init__(self, (arg_key, arg_value))
+    def unique_key(self):
+        return self._key, self._value
+
+    def arguments(self):
+        key = self._convert(self._key, self._from_atom)
+        value = self._convert(self._value, self._from_atom)
+
+        if key is None and value is None:
+            return [], []
+        if key is None:
+            return [], [("value", value)]
+        if value is None:
+            return [], [("key", key)]
+        return [key, value], []
 
     @property
     def key(self):
@@ -122,11 +140,17 @@ class Fuzzy(Rule):
     def atom(self):
         return self._atom
 
-    def __init__(self, atom):
-        Rule.__init__(self, (atom,))
+    def init(self, atom):
+        Rule.__init__(self)
 
         self._atom = atom
         self._is_key_type = isinstance(atom, atoms.String)
+
+    def unique_key(self):
+        return self._atom
+
+    def arguments(self):
+        yield [self._atom], []
 
     def match_with_cache(self, event, cache):
         if self._is_key_type:

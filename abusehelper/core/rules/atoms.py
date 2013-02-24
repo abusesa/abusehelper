@@ -16,10 +16,16 @@ class Atom(core.Matcher):
 
 
 class String(Atom):
-    def __init__(self, value):
+    def init(self, value):
+        Atom.init(self)
+
         self._value = unicode(value)
 
-        Atom.__init__(self, (self._value,))
+    def unique_key(self):
+        return self._value
+
+    def arguments(self):
+        return [self._value], []
 
     @property
     def value(self):
@@ -53,26 +59,28 @@ class RegExp(Atom):
     def ignore_case(self):
         return self._regexp.flags & re.I != 0
 
-    def __init__(self, pattern, ignore_case=False):
+    def init(self, pattern, ignore_case=False):
+        Atom.init(self)
+
         flags = re.U | re.S | (re.I if ignore_case else 0)
         self._regexp = re.compile(pattern, flags)
 
-        args = (self._regexp.pattern,)
-        if not ignore_case:
-            Atom.__init__(self, args)
-        else:
-            Atom.__init__(self, args, (("ignore_case", ignore_case),))
+    def unique_key(self):
+        return self._regexp.pattern, self._regexp.flags & re.I
+
+    def arguments(self):
+        keys = []
+        if self._regexp.flags & re.I == re.I:
+            keys.append(("ignore_case", True))
+        return [self._regexp.pattern], keys
 
     def match(self, value):
         return self._regexp.search(value)
 
 
 class Star(Atom):
-    def __init__(self):
-        Atom.__init__(self)
-
-    def __unicode__(self):
-        return u"*"
+    def init(self):
+        Atom.init(self)
 
     def match(self, value):
         return True
@@ -83,16 +91,21 @@ class IP(Atom):
     def range(self):
         return self._range
 
-    def __init__(self, range, extra=None):
+    def init(self, range, extra=None):
+        Atom.init(self)
+
         if isinstance(range, iprange.IPRange):
             if extra is not None:
                 raise TypeError("unexpected second argument")
         else:
             range = iprange.IPRange.from_autodetected(range, extra)
-
-        Atom.__init__(self, (unicode(range),))
-
         self._range = range
+
+    def unique_key(self):
+        return self._range
+
+    def arguments(self):
+        return [unicode(self._range)], []
 
     def __unicode__(self):
         return unicode(self._range)
