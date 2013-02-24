@@ -16,7 +16,7 @@ class TestParserBasics(unittest.TestCase):
             )
         )
 
-        limit = sys.getrecursionlimit()
+        limit = 2 * sys.getrecursionlimit()
         string = (limit * "(") + "a" + (limit * ")")
         self.assertEqual(expr.parse(string), ('a', ''))
 

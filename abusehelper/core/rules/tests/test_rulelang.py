@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import sys
 import unittest
 
 from ..atoms import String, RegExp, Star, IP
@@ -142,3 +143,11 @@ class TestFormat(unittest.TestCase):
         # Unescaped forward slashes have to be escaped, but already escaped
         # forward slashes must be left intact.
         self.assertEqual(r'/\\\/\//', format(Fuzzy(RegExp(r'\\\//'))))
+
+    def test_allow_recursion_deeper_than_the_recursion_limit(self):
+        limit = 2 * sys.getrecursionlimit()
+
+        rule = Match("a", "b")
+        for _ in xrange(limit):
+            rule = No(rule)
+        self.assertEqual(format(rule), "no " * limit + "a=b")

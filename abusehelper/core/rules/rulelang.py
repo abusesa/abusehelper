@@ -21,12 +21,31 @@ class Formatter(object):
             return func
         return _formatter
 
-    def format(self, obj):
+    def _format_gen(self, obj):
         type_ = type(obj)
         func = self._types.get(type_)
         if func is None:
             raise TypeError("can not format objects of type " + repr(type_))
-        return func(self, obj)
+        return func(self._format_gen, obj)
+
+    def _format(self, obj):
+        stack = [self._format_gen(obj)]
+
+        while stack:
+            try:
+                value = stack[-1].next()
+            except StopIteration:
+                stack.pop()
+                continue
+
+            if not isinstance(value, basestring):
+                stack.append(iter(value))
+                continue
+
+            yield value
+
+    def format(self, obj):
+        return "".join(self._format(obj))
 
 
 formatter = Formatter()
@@ -58,7 +77,7 @@ def string_parser((string, start, end)):
 
 
 @formatter.handler(atoms.RegExp)
-def format_regexp(formatter, regexp):
+def format_regexp(format, regexp):
     escape_slash_rex = re.compile(r"((?:^|[^\\])(?:\\\\)*?)(\/)", re.U)
 
     def escape_slash(match):
@@ -70,31 +89,32 @@ def format_regexp(formatter, regexp):
     result = "/" + pattern + "/"
     if regexp.ignore_case:
         result += "i"
-    return result
+    yield result
 
 
 @formatter.handler(atoms.String)
-def format_string(formatter, string):
+def format_string(format, string):
     value = string.value
     match = unquoted_rex.match(value)
     if match and match.end() == len(value):
-        return value
-    return json.dumps(value)
+        yield value
+    else:
+        yield json.dumps(value)
 
 
 ip_parser = transform(atoms.IP, iprange.IPRange.parser)
 
 
 @formatter.handler(atoms.IP)
-def format_ip(formatter, ip):
-    return unicode(ip.range)
+def format_ip(format, ip):
+    yield unicode(ip.range)
 
 
 star_parser = seq(txt("*"), epsilon(atoms.Star()), pick=1)
 
 
 @formatter.handler(atoms.Star)
-def format_star(formatter, _):
+def format_star(format, _):
     return "*"
 
 
@@ -117,50 +137,59 @@ def regexp_parser(data, rex=re.compile(r'/((?:\\.|[^\\/])*)/(i)?')):
 
 
 @formatter.handler(rules.Fuzzy)
-def format_fuzzy(formatter, fuzzy):
-    return formatter.format(fuzzy.atom)
+def format_fuzzy(format, fuzzy):
+    yield format(fuzzy.atom)
 
 
 @formatter.handler(rules.NonMatch)
-def format_non_match(formatter, non_match):
+def format_non_match(format, non_match):
+    yield format(non_match.key)
     if isinstance(non_match.value, atoms.IP):
-        op = " not in "
+        yield " not in "
     else:
-        op = "!="
-    key = formatter.format(non_match.key)
-    value = formatter.format(non_match.value)
-    return key + op + value
+        yield "!="
+    yield format(non_match.value)
 
 
 @formatter.handler(rules.Match)
-def format_match(formatter, match):
+def format_match(format, match):
+    yield format(match.key)
     if isinstance(match.value, atoms.IP):
-        op = " in "
+        yield " in "
     else:
-        op = "="
-    return formatter.format(match.key) + op + formatter.format(match.value)
+        yield "="
+    yield format(match.value)
 
 
 @formatter.handler(rules.And)
-def format_and(formatter, rule):
-    if len(rule.subrules) == 1:
-        return formatter.format(rule.subrules[0])
-    return " and ".join("(" + formatter.format(x) + ")" for x in rule.subrules)
+def format_and(format, rule):
+    for index, subrule in enumerate(rule.subrules):
+        if index != 0:
+            yield " and "
+        yield "("
+        yield format(subrule)
+        yield ")"
 
 
 @formatter.handler(rules.Or)
-def format_or(formatter, rule):
-    if len(rule.subrules) == 1:
-        return formatter.format(rule.subrules[0])
-    return " or ".join("(" + formatter.format(x) + ")" for x in rule.subrules)
+def format_or(format, rule):
+    for index, subrule in enumerate(rule.subrules):
+        if index != 0:
+            yield " or "
+        yield "("
+        yield format(subrule)
+        yield ")"
 
 
 @formatter.handler(rules.No)
-def format_no(formatter, rule):
-    txt = formatter.format(rule.subrule)
-    if isinstance(rule.subrule, (rules.And, rules.Or)):
-        txt = "(" + txt + ")"
-    return "no " + txt
+def format_no(format, rule):
+    yield "no "
+    if not isinstance(rule.subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+        yield "("
+        yield format(rule.subrule)
+        yield ")"
+    else:
+        yield format(rule.subrule)
 
 
 # Parsing
