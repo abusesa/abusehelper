@@ -76,6 +76,8 @@ class OpenCollabReader(bot.FeedBot):
 
                     event = events.Event()
                     event.add("id:close", self.page_id(page))
+                    event.add("gwikipagename", page)
+                    event.add("collab url", self.collab_url + page)
 
                     yield idiokit.send(event)
 
