@@ -22,7 +22,7 @@ class Matcher(object):
         return None
 
     def arguments(self):
-        return ()
+        return [], []
 
     def __repr__(self):
         args, keys = self.arguments()
