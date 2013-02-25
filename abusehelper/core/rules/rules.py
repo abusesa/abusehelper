@@ -62,7 +62,7 @@ class No(Rule):
         return self._rule
 
     def arguments(self):
-        yield [self._rule], []
+        return [self._rule], []
 
     @property
     def subrule(self):
@@ -150,7 +150,7 @@ class Fuzzy(Rule):
         return self._atom
 
     def arguments(self):
-        yield [self._atom], []
+        return [self._atom], []
 
     def match_with_cache(self, event, cache):
         if self._is_key_type:
