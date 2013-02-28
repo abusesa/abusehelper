@@ -6,23 +6,37 @@ namespace.
 
 import idiokit
 from idiokit.xmpp import jid
-from abusehelper.core import bot, events
+from abusehelper.core import bot, events, taskfarm, services
 
-class ReprBot(bot.XMPPBot):
-    room = bot.Param("repr room")
-
-    @idiokit.stream
-    def main(self):
-        conn = yield self.xmpp_connect()
-        src = yield conn.muc.join(self.room, self.bot_name)
-
-        self.log.info("Joined room %r.", self.room)
-
-        repr = self.repr(src.jid) | events.events_to_elements()
-        yield repr | src | repr
+class ReprBot(bot.ServiceBot):
+    def __init__(self, *args, **keys):
+        bot.ServiceBot.__init__(self, *args, **keys)
+        self.rooms = taskfarm.TaskFarm(self.handle_room)
 
     @idiokit.stream
-    def repr(self, own_jid):
+    def session(self, _, src_room, dst_room=None, **keys):
+        if not dst_room:
+            dst_room = src_room
+
+        try:
+            yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
+        except services.Stop:
+            idiokit.stop()
+
+    @idiokit.stream
+    def handle_room(self, name):
+        self.log.info("Joining room %r", name)
+        room = yield self.xmpp.muc.join(name, self.bot_name)
+        self.log.info("Joined room %r", name)
+
+        try:
+            yield idiokit.pipe(room | self.reply(room.jid) |
+                events.events_to_elements())
+        finally:
+            self.log.info("Left room %r", name)
+
+    @idiokit.stream
+    def reply(self, own_jid):
         while True:
             element = yield idiokit.next()
 
