@@ -1,5 +1,5 @@
 from abusehelper.core import bot, events
-from accesslogbot import AccessLogBot
+from abusehelper.contrib.accesslogbot.accesslogbot import AccessLogBot
 
 class DefensicsBot(AccessLogBot):
     path = bot.Param("access_log file path")
