@@ -143,6 +143,7 @@ class TestFormat(unittest.TestCase):
         # Unescaped forward slashes have to be escaped, but already escaped
         # forward slashes must be left intact.
         self.assertEqual(r'/\\\/\//', format(Fuzzy(RegExp(r'\\\//'))))
+        self.assertEqual(r'/^http:\/\//', format(Fuzzy(RegExp(r'^http://'))))
 
     def test_allow_recursion_deeper_than_the_recursion_limit(self):
         limit = 2 * sys.getrecursionlimit()

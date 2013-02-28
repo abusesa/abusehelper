@@ -78,10 +78,10 @@ def string_parser((string, start, end)):
 
 @formatter.handler(atoms.RegExp)
 def format_regexp(format, regexp):
-    escape_slash_rex = re.compile(r"((?:^|[^\\])(?:\\\\)*?)(\/)", re.U)
+    escape_slash_rex = re.compile(r"((?:^|[^\\])(?:\\\\)*?)(/+)", re.U)
 
     def escape_slash(match):
-        return match.group(1) + "\\" + match.group(2)
+        return match.group(1) + match.group(2).replace("/", "\\/")
 
     pattern = regexp.pattern
     pattern = escape_slash_rex.sub(escape_slash, pattern)
