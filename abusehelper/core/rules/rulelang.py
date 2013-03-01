@@ -251,23 +251,35 @@ def _create_parser():
         )
     ))
 
-    and_tail = seq(
-        txt("and", ignore_case=True),
-        union(
-            parens_expr,
-            seq(ws, expr, pick=1)
-        ),
-        pick=1
-    )
+    def binary_rule_tail(name):
+        name_rule = txt(name, ignore_case=True)
 
-    or_tail = seq(
-        txt("or", ignore_case=True),
-        union(
-            parens_expr,
-            seq(ws, expr, pick=1)
-        ),
-        pick=1
-    )
+        return transform(
+            lambda (x, y): list(x) + [y],
+            seq(
+                name_rule,
+
+                repeat(
+                    seq(
+                        union(
+                            parens_expr,
+                            seq(ws, union(no_parser, basic), ws, pick=1)
+                        ),
+                        name_rule,
+                        pick=0
+                    )
+                ),
+
+                union(
+                    parens_expr,
+                    seq(ws, expr, pick=1)
+                ),
+
+                pick=[1, 2]
+            )
+        )
+    and_tail = binary_rule_tail("and")
+    or_tail = binary_rule_tail("or")
 
     expr.set(
         seq(
@@ -275,14 +287,14 @@ def _create_parser():
             union(
                 step(
                     parens_expr,
-                    (seq(maybe(ws), and_tail, pick=1), rules.And),
-                    (seq(maybe(ws), or_tail, pick=1), rules.Or),
+                    (seq(maybe(ws), and_tail, pick=1), lambda x, y: rules.And(x, *y)),
+                    (seq(maybe(ws), or_tail, pick=1), lambda x, y: rules.Or(x, *y)),
                     step_default()
                 ),
                 step(
                     union(no_parser, basic),
-                    (seq(ws, and_tail, pick=1), rules.And),
-                    (seq(ws, or_tail, pick=1), rules.Or),
+                    (seq(ws, and_tail, pick=1), lambda x, y: rules.And(x, *y)),
+                    (seq(ws, or_tail, pick=1), lambda x, y: rules.Or(x, *y)),
                     step_default()
                 )
             ),

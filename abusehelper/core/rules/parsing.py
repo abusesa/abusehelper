@@ -119,6 +119,22 @@ def maybe(data, parser, default=None):
 
 
 @parser
+def repeat(data, parser, min=0, max=None):
+    results = []
+
+    while max is None or len(results) < max:
+        match = yield parser, data
+        if not match:
+            break
+        result, data = match
+        results.append(result)
+
+    if len(results) < min:
+        yield None, None
+    yield None, (results, data)
+
+
+@parser
 def transform(data, func, parser):
     match = yield parser, data
     if not match:
