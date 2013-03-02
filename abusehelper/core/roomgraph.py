@@ -81,8 +81,10 @@ class RoomGraphBot(bot.ServiceBot):
                 log.close("Left " + msg, attrs, status="left")
 
     @idiokit.stream
-    def session(self, _, src_room, dst_room, rule=rules.ANYTHING(), **keys):
-        classifier = self.srcs.setdefault(src_room, rules.RuleClassifier())
+    def session(self, _, src_room, dst_room, rule=None, **keys):
+        rule = rules.rule(rule)
+
+        classifier = self.srcs.setdefault(src_room, rules.Classifier())
         classifier.inc(rule, dst_room)
 
         try:

@@ -48,18 +48,15 @@ class BridgeBot(bot.Bot):
         if self.xmpp_dst_password is None:
             self.xmpp_dst_password = getpass.getpass("XMPP dst password: ")
 
-    def run(self):
-        return idiokit.main_loop(self.main())
-
     @idiokit.stream
-    def _join(self, _type, jid, password,
-              ignore_cert, ca_certs, room_name):
+    def _join(self, _type, jid, password, ignore_cert, ca_certs, room_name):
         verify_cert = not ignore_cert
 
         self.log.info("Connecting to XMPP %s server with JID %r", _type, jid)
-        connection = yield xmpp.connect(jid, password,
-                                        ssl_verify_cert=verify_cert,
-                                        ssl_ca_certs=ca_certs)
+        connection = yield xmpp.connect(
+            jid, password,
+            ssl_verify_cert=verify_cert,
+            ssl_ca_certs=ca_certs)
 
         self.log.info("Connected to XMPP %s server with JID %r", _type, jid)
         connection.core.presence()
@@ -73,18 +70,25 @@ class BridgeBot(bot.Bot):
     @idiokit.stream
     def main(self):
         dst = yield self._join("dst",
-                               self.xmpp_dst_jid,
-                               self.xmpp_dst_password,
-                               self.xmpp_dst_ignore_cert,
-                               self.xmpp_dst_extra_ca_certs,
-                               self.xmpp_dst_room)
+            self.xmpp_dst_jid,
+            self.xmpp_dst_password,
+            self.xmpp_dst_ignore_cert,
+            self.xmpp_dst_extra_ca_certs,
+            self.xmpp_dst_room)
         src = yield self._join("src",
-                               self.xmpp_src_jid,
-                               self.xmpp_src_password,
-                               self.xmpp_src_ignore_cert,
-                               self.xmpp_src_extra_ca_certs,
-                               self.xmpp_src_room)
+            self.xmpp_src_jid,
+            self.xmpp_src_password,
+            self.xmpp_src_ignore_cert,
+            self.xmpp_src_extra_ca_certs,
+            self.xmpp_src_room)
+
         yield src | peel_messages() | dst | idiokit.consume()
+
+    def run(self):
+        try:
+            return idiokit.main_loop(self.main())
+        except idiokit.Signal:
+            pass
 
 if __name__ == "__main__":
     BridgeBot.from_command_line().execute()

@@ -17,11 +17,11 @@ class ZeusConfigBot(AbuseCHFeedBot):
 
     def parse_description(self, description):
         for key, value in split_description(description):
-            if key == ["status", "version"]:
+            if key in ["status", "version"]:
                 yield key, value
             elif key == "md5 hash":
                 yield "md5", value
-            elif key == "URL":
+            elif key == "url":
                 yield "url", value
                 yield host_or_ip_from_url(value)
 
