@@ -9,7 +9,7 @@ from abusehelper.core import bot
 from . import host_or_ip_from_url, split_description, AbuseCHFeedBot
 
 
-class ZeusDropzoneBot(AbuseCHFeedBot):
+class SpyEyeDropzoneBot(AbuseCHFeedBot):
     feed_malware = "SpyEye"
     feed_type = "dropzone"
 
@@ -24,4 +24,4 @@ class ZeusDropzoneBot(AbuseCHFeedBot):
                 yield host_or_ip_from_url(value)
 
 if __name__ == "__main__":
-    ZeusDropzoneBot.from_command_line().execute()
+    SpyEyeDropzoneBot.from_command_line().execute()
