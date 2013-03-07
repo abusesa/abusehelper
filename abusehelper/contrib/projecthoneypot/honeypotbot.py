@@ -4,7 +4,6 @@ Project Honeypot feed handler.
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
 
-import re
 import socket
 from abusehelper.core import bot, events
 from abusehelper.contrib.rssbot.rssbot import RSSBot
@@ -38,29 +37,25 @@ class ProjectHoneyPotBot(RSSBot):
                     'W': 'bad web host',
                     'C': 'comment spammer',
                     'R': 'rule breaker'}
-        title = keys.get("title").split(' | ')
-        types = ""
-        if len(title) > 0:
-            item = title.pop()
-            if re.match("[a-zA-Z]", item):
-                types = item
-                if types == "Se":  # Not really an abuse event (e.g. google bots).
-                    return None
-            else:
-                ip = item  # the title contains only an ip
-            if len(title) > 0:
-                ip = title.pop()
-            if self.parse_ip(ip) is None:
-                self.log.error("Malformed RSS title: %s", keys.get("title"))
-                return None
+        title = keys.get("title", None)
+        if title is None:
+            return None  # No title, no ip or types
+        pieces = title.split(" | ", 1)
+        if len(pieces) == 1:
+            ip = pieces[0]
+            types = ""
         else:
-            self.log.error("Malformed RSS title: %s", keys.get("title"))
-            return None  # events should always contain at least an ip
+            ip, types = pieces
+        if types == "Se":  # Not really an abuse event (e.g. google bots).
+            return None
+        if self.parse_ip(ip) is None:
+            self.log.error("Malformed RSS title: %s", title)
+            return None
         items = []
         for item in descriptions:
             if item in types:
                 items.append(descriptions[item])
-        if len(items) > 0:
+        if items:
             desc = "This host is most likely part of SPAM infrastructure as: " + \
                 ", ".join(items) + "."
         else:
