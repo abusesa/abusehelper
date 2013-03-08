@@ -502,7 +502,7 @@ class FeedBot(ServiceBot):
                 tail = self._stats(name) | room | idiokit.consume()
                 if self.xmpp_rate_limit is not None:
                     tail = self._output_rate_limiter() | tail
-                yield events.events_to_elements() | tail
+                yield self.augment() | events.events_to_elements() | tail
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
@@ -616,7 +616,7 @@ class PollingBot(FeedBot):
                     self._poll_dedup.pop(key, None)
                     continue
 
-                yield self.poll(*key) | self.augment() | self._distribute(key)
+                yield self.poll(*key) | self._distribute(key)
 
                 expire_time = time.time() + self.poll_interval
                 self._poll_queue.append((expire_time, key))
