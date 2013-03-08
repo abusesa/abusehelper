@@ -116,7 +116,8 @@ class LineFormatter(logging.Formatter):
 
 class Bot(object):
     bot_name = Param("name for the bot (default=%default)")
-    log_file = Param("write logs to the given path (default: log to stdout)",
+    log_file = Param(
+        "write logs to the given path (default: log to stdout)",
         default=None)
 
     @classmethod
@@ -178,7 +179,8 @@ class Bot(object):
             if param.short is not None:
                 args = ["-" + optparse_name(param.short)]
 
-            parser.add_option(*args,
+            parser.add_option(
+                *args,
                 default=defaults.get(name, None),
                 help=param.help,
                 metavar=name,
@@ -303,11 +305,14 @@ from abusehelper.core import log
 
 class XMPPBot(Bot):
     xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
-    xmpp_password = Param("the XMPP password",
+    xmpp_password = Param(
+        "the XMPP password",
         default=None)
-    xmpp_host = Param("the XMPP service host (default: autodetect)",
+    xmpp_host = Param(
+        "the XMPP service host (default: autodetect)",
         default=None)
-    xmpp_port = IntParam("the XMPP service port (default: autodetect)",
+    xmpp_port = IntParam(
+        "the XMPP service port (default: autodetect)",
         default=None)
     xmpp_extra_ca_certs = Param("""
         a PEM formatted file of CAs to be used in addition to the system CAs
@@ -334,7 +339,8 @@ class XMPPBot(Bot):
         verify_cert = not self.xmpp_ignore_cert
 
         self.log.info("Connecting to XMPP service with JID " + repr(self.xmpp_jid))
-        xmpp = yield connect(self.xmpp_jid, self.xmpp_password,
+        xmpp = yield connect(
+            self.xmpp_jid, self.xmpp_password,
             host=self.xmpp_host,
             port=self.xmpp_port,
             ssl_verify_cert=verify_cert,
@@ -526,7 +532,8 @@ class FeedBot(ServiceBot):
                     yield idiokit.sleep(sleep)
                 finally:
                     if counter.count > 0:
-                        self.log.info("Sent {0} events to room {1!r}".format(counter.count, name),
+                        self.log.info(
+                            "Sent {0} events to room {1!r}".format(counter.count, name),
                             event=events.Event({
                                 "type": "room",
                                 "service": self.bot_name,
