@@ -1,6 +1,6 @@
 import os
 import idiokit
-from abusehelper.core import events, bot
+from abusehelper.core import events, bot, utils
 
 
 def follow_file(filename):
@@ -96,15 +96,17 @@ def tail_file(filename, offset=None):
 
 class TailBot(bot.FeedBot):
     path = bot.Param("path to the followed file")
+    offset = bot.IntParam("file offset", default=None)
 
     @idiokit.stream
     def feed(self):
-        for result in tail_file(self.path):
+        for result in tail_file(self.path, self.offset):
             if result is None:
                 yield idiokit.sleep(2.0)
                 continue
 
             mtime, line = result
+            line = utils.force_decode(line)
 
             keys = self.parse(line, mtime)
             if keys is None:
