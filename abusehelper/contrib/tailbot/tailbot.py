@@ -106,8 +106,6 @@ class TailBot(bot.FeedBot):
                 continue
 
             mtime, line = result
-            line = utils.force_decode(line)
-
             keys = self.parse(line, mtime)
             if keys is None:
                 continue
@@ -122,6 +120,7 @@ class TailBot(bot.FeedBot):
         if not line:
             return
 
+        line = utils.force_decode(line)
         return {"line": line}
 
 
