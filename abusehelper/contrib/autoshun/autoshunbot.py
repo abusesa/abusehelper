@@ -17,6 +17,7 @@ CLASSIFICATION = (
     ("DHL Spambot", "type", "spam"),
     ("Spam Bot", "type", "spam"),
     ("Terminal Server", "protocol", "rdp"),
+    ("TDSS", "malware", "TDSS")
 )
 
 
@@ -54,23 +55,20 @@ class AutoshunBot(bot.PollingBot):
         while True:
             event = yield idiokit.next()
             event.add("feed", "autoshun")
-            event.add("description url", "http://www.autoshun.org/")
-            d = "This host has triggered an AutoShun alert." + \
-                " For more information please turn to " + self.feed_url
-            event.add("description", d)
+            event.add("feed url", self.feed_url)
+            event.add("description", "This host has triggered an AutoShun alert.")
             for d in event.values("info"):
                 for name, key, value in CLASSIFICATION:
                     if d.startswith(name):
                         event.add(key, value)
-                        if key == "malware":
+                        if key in ["malware", "spam"]:
                             event.add("type", "botnet drone")
                         elif key == "protocol":
                             event.add("type", "brute-force")
-                        if value == "spam":
-                            event.add("type", "botnet drone")
-            event.clear("info")
             if not event.contains("type"):
                 event.add("type", "ids alert")
+                self.log.debug("info: %r", event)
+            event.clear("info")
             times = event.values("time")
             event.clear("time")
             for time in times:
