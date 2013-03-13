@@ -1,10 +1,12 @@
 from abusehelper.core import bot, config, startup, runtime
 
+
 def iter_dots(iterable):
     for obj in iterable:
         dot = getattr(obj, "__dot__", None)
         if callable(dot):
             yield dot()
+
 
 class Dot(object):
     def __init__(self, *configs):
@@ -34,6 +36,23 @@ class Dot(object):
             sessions.add(session)
 
         return sessions
+
+
+def _id(value):
+    return u"\"" + unicode(value).replace(u"\"", u"\\\"") + u"\""
+
+
+def line(*nodes, **keys):
+    result = u"->".join(map(_id, nodes))
+
+    attrs = []
+    for key, value in keys.iteritems():
+        attrs.append(_id(key) + u"=" + _id(value))
+
+    if attrs:
+        result += u" [ " + u", ".join(attrs) + u" ]"
+    return (result + u";").encode("utf-8")
+
 
 class DotBot(bot.Bot):
     bot_name = None
@@ -65,11 +84,9 @@ class DotBot(bot.Bot):
             if session.service != "roomgraph":
                 node = "node " + session.service + " " + (src or "@") + " " + (dst or "@")
                 if missing(session.service):
-                    print '"%s" [ label="%s", shape=ellipse, fontsize=12, fontcolor=white, color=red ];' % (node, session.service)
+                    print line(node, label=session.service, shape="ellipse", fontsize=12, fontcolor="white", color="red")
                 else:
-                    print '"%s" [ label="%s", shape=ellipse, fontsize=12, style="" ];' % (node, session.service)
-
-            name = session.service
+                    print line(node, label=session.service, shape="ellipse", fontsize=12, style="")
 
             label_list = list()
             if path:
@@ -82,15 +99,15 @@ class DotBot(bot.Bot):
             color = "red" if missing(session.service) else "black"
             if src is None:
                 if node is not None and dst is not None:
-                    print '"%s"->"%s" [ label="%s", fontsize=10, color="%s" ];' % (node, dst, label, color)
+                    print line(node, dst, label=label, color=color, fontsize=10)
             else:
                 if node is not None and dst is None:
-                    print '"%s"->"%s" [ label="%s", fontsize=10, color="%s" ];' % (src, node, label, color)
+                    print line(src, node, label=label, color=color, fontsize=10)
                 elif node is None and dst is not None:
-                    print '"%s"->"%s" [ label="%s", fontsize=10, color="%s" ];' % (src, dst, label, color)
+                    print line(src, dst, label=label, color=color, fontsize=10)
                 elif node is not None and dst is not None:
-                    print '"%s"->"%s" [ label="%s", fontsize=10, color="%s" ];' % (src, node, "", color)
-                    print '"%s"->"%s" [ label="%s", fontsize=10, color="%s" ];' % (node, dst, label, color)
+                    print line(src, node, label="", color=color, fontsize=10)
+                    print line(node, dst, label=label, color=color, fontsize=10)
 
         print '}'
 
