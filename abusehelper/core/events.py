@@ -10,9 +10,11 @@ from cStringIO import StringIO
 import idiokit
 from idiokit.xmlcore import Element, Elements
 
-_NON_XML = re.compile(u"[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]", re.U)
-def _replace_non_xml_chars(unicode_obj, replacement=u"\uFFFD"):
+
+def _replace_non_xml_chars(unicode_obj, replacement=u"\ufffd"):
     return _NON_XML.sub(replacement, unicode_obj)
+_NON_XML = re.compile(u"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]", re.U)
+
 
 def _normalize(value):
     """Return the value converted to unicode. Raise a TypeError if the
@@ -46,10 +48,10 @@ def _normalize(value):
     msg = "expected a string value, got the value %r of type %s" % (value, name)
     raise TypeError(msg)
 
+
 EVENT_NS = "abusehelper#event"
 
-_UNICODE_QUOTE_CHECK = re.compile(r'[\s"\\,=]', re.U)
-_UNICODE_QUOTE = re.compile(r'["\\]', re.U)
+
 def _unicode_quote(string):
     r"""
     >>> _unicode_quote(u"a")
@@ -63,9 +65,10 @@ def _unicode_quote(string):
     if _UNICODE_QUOTE_CHECK.search(string):
         return u'"' + _UNICODE_QUOTE.sub(r'\\\g<0>', string) + u'"'
     return string
+_UNICODE_QUOTE_CHECK = re.compile(r'[\s"\\,=]', re.U)
+_UNICODE_QUOTE = re.compile(r'["\\]', re.U)
 
-_UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
-_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*', re.U)
+
 def _unicode_parse_part(string, start):
     match = _UNICODE_PART.match(string, start)
     quoted, unquoted = match.groups()
@@ -76,6 +79,9 @@ def _unicode_parse_part(string, start):
     if unquoted is not None:
         return unquoted, end
     return u"", end
+_UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
+_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*', re.U)
+
 
 class Event(object):
     __slots__ = ["_attrs"]
@@ -171,10 +177,10 @@ class Event(object):
         >>> list(Event.from_elements(element)) == [Event()]
         True
 
-        >>> event = Event({"key": "value", "\uffff": "\\x05"}) # include some forbidden XML chars
+        >>> event = Event({u"\\uffff": u"\\x05"}) # include some forbidden XML chars
         >>> element = Element("message")
         >>> element.add(event.to_elements())
-        >>> list(Event.from_elements(element)) == [event]
+        >>> list(Event.from_elements(element)) == [Event({u"\\ufffd": u"\\ufffd"})]
         True
         """
 
@@ -616,14 +622,67 @@ class Event(object):
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
+
 def stanzas_to_events():
     return idiokit.map(Event.from_elements)
+
 
 def events_to_elements():
     return idiokit.map(lambda x: (x.to_elements(),))
 
+
+def _iter_compressed_events(stringio):
+    stringio.seek(0)
+
+    gz = gzip.GzipFile(fileobj=stringio)
+    try:
+        while True:
+            try:
+                attrs = pickle.load(gz)
+            except EOFError:
+                break
+
+            event = Event(attrs)
+            pos = stringio.tell()
+            yield event
+            stringio.seek(pos)
+    finally:
+        gz.close()
+
+
 class EventCollector(object):
-    def __init__(self, compresslevel=6, data=""):
+    def __init__(self, compresslevel=6, data="", count=None):
+        """
+        A collector of Event objects, stored in memory in compressed form.
+
+        >>> collector = EventCollector()
+        >>> collector.append(Event({"a": "b"}))
+        >>> collector.append(Event({"c": "d"}))
+
+        An event collector can be frozen ("purged"), and the result
+        object can be used to iterate through the stored events,
+        decompressing them on the fly. The result also supports
+        event count and emptiness checks.
+
+        >>> two = collector.purge()
+        >>> list(two)
+        [Event({u'a': [u'b']}), Event({u'c': [u'd']})]
+        >>> len(two)
+        2
+        >>> bool(two)
+        True
+
+        Purging a collector empties it.
+
+        >>> empty = collector.purge()
+        >>> list(empty)
+        []
+        >>> len(empty)
+        0
+        >>> bool(empty)
+        False
+        """
+
         self._level = compresslevel
 
         self._stringio = StringIO()
@@ -631,20 +690,28 @@ class EventCollector(object):
 
         self._gz = gzip.GzipFile(None, "a", compresslevel, self._stringio)
 
+        # Backwards compatibility: Previously __reduce__'d instances
+        # did not contain an explicit event count.
+        if count is None:
+            count = 0
+            if data:
+                for _ in _iter_compressed_events(StringIO(data)):
+                    count += 1
+        self._count = count
+
     def __reduce__(self):
         """
+        A collector instance can be safely pickled and unpickled.
+
         >>> import pickle
 
-        >>> event = Event({"1": "2"})
-        >>> event2 = Event(x="y")
-
         >>> original = EventCollector()
-        >>> original.append(event)
-        >>> original.append(event2)
-        >>> original.append(event)
+        >>> original.append(Event({"a": "b"}))
+        >>> original.append(Event({"c": "d"}))
 
         >>> unpickled = pickle.loads(pickle.dumps(original))
-        >>> list(unpickled.purge()) == list(original.purge())
+        >>> purged = unpickled.purge()
+        >>> list(purged) == list(original.purge())
         True
         """
 
@@ -654,8 +721,8 @@ class EventCollector(object):
         data = self._stringio.getvalue()
         self._stringio.close()
 
-        self.__init__(self._level, data)
-        return self.__class__, (self._level, data)
+        self.__init__(self._level, data, self._count)
+        return self.__class__, (self._level, data, self._count)
 
     def append(self, event):
         attrs = dict()
@@ -663,51 +730,25 @@ class EventCollector(object):
             attrs.setdefault(key, list()).append(value)
         pickle.dump(attrs, self._gz, pickle.HIGHEST_PROTOCOL)
 
+        self._count += 1
+
     def purge(self):
-        """
-        >>> event = Event({"1": "2"})
-        >>> event2 = Event(x="y")
-
-        >>> collector = EventCollector()
-        >>> collector.append(event)
-        >>> collector.append(event2)
-        >>> collector.append(event)
-
-        >>> list(collector.purge()) == [event, event2, event]
-        True
-        """
-
         self._gz.flush()
         self._gz.close()
 
-        event_list = _EventList(self._stringio)
+        event_list = _EventList(self._stringio, self._count)
 
         self.__init__(self._level)
         return event_list
 
+
 class _EventList(object):
-    def __init__(self, stringio):
+    def __init__(self, stringio, count):
         self._stringio = stringio
+        self._count = count
 
     def __iter__(self):
-        if self._stringio is not None:
-            self._stringio.seek(0)
-            gz = gzip.GzipFile(fileobj=self._stringio)
-            try:
-                while True:
-                    try:
-                        attrs = pickle.load(gz)
-                    except EOFError:
-                        break
+        return _iter_compressed_events(self._stringio)
 
-                    event = Event(attrs)
-                    pos = self._stringio.tell()
-                    yield event
-                    self._stringio.seek(pos)
-            finally:
-                gz.close()
-
-    def __nonzero__(self):
-        for _ in self:
-            return True
-        return False
+    def __len__(self):
+        return self._count
