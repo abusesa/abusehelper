@@ -481,7 +481,7 @@ class FeedBot(ServiceBot):
                 self._dsts.dec(key, dst_room)
 
     def manage_feed(self, key):
-        return self.feed(*key) | self.augment() | self._distribute(key)
+        return self.feed(*key) | self._distribute(key)
 
     @idiokit.stream
     def manage_room(self, name):
