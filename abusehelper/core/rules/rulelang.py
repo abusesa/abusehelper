@@ -166,9 +166,13 @@ def format_and(format, rule):
     for index, subrule in enumerate(rule.subrules):
         if index != 0:
             yield " and "
-        yield "("
-        yield format(subrule)
-        yield ")"
+
+        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+            yield format(subrule)
+        else:
+            yield "("
+            yield format(subrule)
+            yield ")"
 
 
 @formatter.handler(rules.Or)
@@ -176,9 +180,12 @@ def format_or(format, rule):
     for index, subrule in enumerate(rule.subrules):
         if index != 0:
             yield " or "
-        yield "("
-        yield format(subrule)
-        yield ")"
+        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+            yield format(subrule)
+        else:
+            yield "("
+            yield format(subrule)
+            yield ")"
 
 
 @formatter.handler(rules.No)
