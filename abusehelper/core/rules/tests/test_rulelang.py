@@ -28,10 +28,8 @@ class TestParse(unittest.TestCase):
         self.assertEqual(And(a, And(b, c)), parse("a=a and (b=b and c=c)"))
         self.assertEqual(And(And(a, b), c), parse("(a=a and b=b) and c=c"))
 
-        ab = And(a, b)
-        self.assertEqual(ab, parse("a=a and b=b"))
-        self.assertEqual(ab, parse("(a=a) and (b=b)"))
-        self.assertEqual(ab, parse("(a=a)and(b=b)"))
+        self.assertEqual(And(a, b, c), parse("(a=a) and (b=b) and (c=c)"))
+        self.assertEqual(And(a, b, c), parse("(a=a)and(b=b)and(c=c)"))
 
         self.assertEqual(And(a, b, Or(c, And(a, b))), parse("a=a and b=b and c=c or a=a and b=b"))
 
@@ -43,10 +41,8 @@ class TestParse(unittest.TestCase):
         self.assertEqual(Or(a, Or(b, c)), parse("a=a or (b=b or c=c)"))
         self.assertEqual(Or(Or(a, b), c), parse("(a=a or b=b) or c=c"))
 
-        ab = Or(a, b)
-        self.assertEqual(ab, parse("a=a or b=b"))
-        self.assertEqual(ab, parse("(a=a) or (b=b)"))
-        self.assertEqual(ab, parse("(a=a)or(b=b)"))
+        self.assertEqual(Or(a, b, c), parse("(a=a) or (b=b) or (c=c)"))
+        self.assertEqual(Or(a, b, c), parse("(a=a)or(b=b)or(c=c)"))
 
         self.assertEqual(Or(a, b, And(c, Or(a, b))), parse("a=a or b=b or c=c and a=a or b=b"))
 

@@ -262,7 +262,7 @@ def _create_parser():
                 repeat(
                     seq(
                         union(
-                            parens_expr,
+                            seq(maybe(ws), parens_expr, maybe(ws), pick=1),
                             seq(ws, union(no_parser, basic), ws, pick=1)
                         ),
                         name_rule,
