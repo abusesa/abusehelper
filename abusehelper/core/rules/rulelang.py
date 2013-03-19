@@ -1,5 +1,6 @@
 import re
 import json
+import collections
 
 from . import atoms
 from . import rules
@@ -205,6 +206,17 @@ def _create_parser():
     expr = forward_ref()
     parens_expr = seq(txt("("), expr, txt(")"), pick=1)
 
+    def flatten(*objs):
+        objs = collections.deque(objs)
+        while objs:
+            obj = objs.popleft()
+            try:
+                obj = iter(obj)
+            except TypeError:
+                yield obj
+            else:
+                objs.extendleft(obj)
+
     @parser_singleton
     def ws((string, start, end), chars=frozenset(" \t\n\r")):
         if not start < end or string[start] not in chars:
@@ -258,35 +270,36 @@ def _create_parser():
         )
     ))
 
+    and_tail = forward_ref()
+    or_tail = forward_ref()
+
     def binary_rule_tail(name):
-        name_rule = txt(name, ignore_case=True)
-
-        return transform(
-            lambda (x, y): list(x) + [y],
+        result = forward_ref()
+        result.set(
             seq(
-                name_rule,
-
-                repeat(
-                    seq(
-                        union(
-                            seq(maybe(ws), parens_expr, maybe(ws), pick=1),
-                            seq(ws, union(no_parser, basic), ws, pick=1)
-                        ),
-                        name_rule,
-                        pick=0
+                txt(name, ignore_case=True),
+                union(
+                    step(
+                        seq(maybe(ws), parens_expr, pick=1),
+                        (seq(maybe(ws), result, pick=1), lambda x, y: (x, y)),
+                        (seq(maybe(ws), and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                        (seq(maybe(ws), or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
+                        step_default()
+                    ),
+                    step(
+                        seq(ws, union(no_parser, basic), pick=1),
+                        (seq(ws, result, pick=1), lambda x, y: (x, y)),
+                        (seq(ws, and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                        (seq(ws, or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
+                        step_default()
                     )
                 ),
-
-                union(
-                    parens_expr,
-                    seq(ws, expr, pick=1)
-                ),
-
-                pick=[1, 2]
+                pick=1
             )
         )
-    and_tail = binary_rule_tail("and")
-    or_tail = binary_rule_tail("or")
+        return result
+    and_tail.set(binary_rule_tail("and"))
+    or_tail.set(binary_rule_tail("or"))
 
     expr.set(
         seq(
@@ -294,14 +307,14 @@ def _create_parser():
             union(
                 step(
                     parens_expr,
-                    (seq(maybe(ws), and_tail, pick=1), lambda x, y: rules.And(x, *y)),
-                    (seq(maybe(ws), or_tail, pick=1), lambda x, y: rules.Or(x, *y)),
+                    (seq(maybe(ws), and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                    (seq(maybe(ws), or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
                     step_default()
                 ),
                 step(
                     union(no_parser, basic),
-                    (seq(ws, and_tail, pick=1), lambda x, y: rules.And(x, *y)),
-                    (seq(ws, or_tail, pick=1), lambda x, y: rules.Or(x, *y)),
+                    (seq(ws, and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                    (seq(ws, or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
                     step_default()
                 )
             ),
