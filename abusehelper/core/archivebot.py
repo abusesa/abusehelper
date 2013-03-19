@@ -10,7 +10,7 @@ import time
 import errno
 
 import idiokit
-from abusehelper.core import bot, taskfarm, services, events
+from abusehelper.core import bot, taskfarm, events
 
 
 def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
@@ -69,10 +69,7 @@ class ArchiveBot(bot.ServiceBot):
 
     @idiokit.stream
     def session(self, state, src_room):
-        try:
-            yield self.rooms.inc(src_room)
-        except services.Stop:
-            idiokit.stop()
+        yield self.rooms.inc(src_room)
 
     def collect(self, room_name):
         collect = self._collect(room_name)

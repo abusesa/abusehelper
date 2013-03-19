@@ -197,12 +197,9 @@ class RtirBot(CollectorBot):
 
     @idiokit.stream
     def main(self, state):
-        try:
-            while True:
-                yield (self.send_to_rtir(self.rt_write_interval)
-                       | idiokit.consume())
-        except services.Stop:
-            idiokit.stop()
+        while True:
+            yield (self.send_to_rtir(self.rt_write_interval)
+                   | idiokit.consume())
 
     @idiokit.stream
     def session(self, state, src_room,
@@ -217,8 +214,6 @@ class RtirBot(CollectorBot):
 
         try:
             yield self.rooms.inc(src_room)
-        except services.Stop:
-            idiokit.stop()
         finally:
             del self.rtirs[src_room]
             del self.events[src_room]

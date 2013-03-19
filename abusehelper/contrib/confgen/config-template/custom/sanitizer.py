@@ -1,12 +1,14 @@
 import socket
 import time as _time
 import idiokit
-from abusehelper.core import events, bot, taskfarm, services
+from abusehelper.core import events, bot, taskfarm
+
 
 def format_time(time_tuple=None):
     if time_tuple is None:
         time_tuple = _time.gmtime()
     return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
+
 
 def time(string, format="%Y-%m-%d %H:%M:%S"):
     try:
@@ -18,6 +20,7 @@ def time(string, format="%Y-%m-%d %H:%M:%S"):
         return None
     return format_time(parsed)
 
+
 def ip(string):
     try:
         socket.inet_pton(socket.AF_INET, string)
@@ -27,6 +30,7 @@ def ip(string):
         except socket.error:
             return None
     return string
+
 
 class Sanitizer(bot.ServiceBot):
     def __init__(self, **keys):
@@ -66,8 +70,6 @@ class Sanitizer(bot.ServiceBot):
         self.srcs.inc(src_room, dst_room)
         try:
             yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
-        except services.Stop:
-            idiokit.stop()
         finally:
             self.srcs.dec(src_room, dst_room)
 

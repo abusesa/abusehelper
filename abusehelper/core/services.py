@@ -304,6 +304,8 @@ class Service(object):
 
         try:
             state = yield self.errors | self.kill_sessions() | self.main(state)
+        except Stop:
+            state = None
         finally:
             self._put(None, state)
 

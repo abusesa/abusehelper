@@ -409,17 +409,11 @@ class ServiceBot(XMPPBot):
 
     @idiokit.stream
     def main(self, state):
-        try:
-            yield idiokit.consume()
-        except services.Stop:
-            pass
+        yield idiokit.consume()
 
     @idiokit.stream
     def session(self, state, **keys):
-        try:
-            yield idiokit.consume()
-        except services.Stop:
-            pass
+        yield idiokit.consume()
 
 
 from abusehelper.core import events, taskfarm
@@ -474,8 +468,6 @@ class FeedBot(ServiceBot):
 
         try:
             yield idiokit.pipe(*feeds)
-        except services.Stop:
-            pass
         finally:
             for key in feed_keys:
                 self._dsts.dec(key, dst_room)
@@ -605,23 +597,20 @@ class PollingBot(FeedBot):
 
     @idiokit.stream
     def main(self, state):
-        try:
-            while True:
-                while not self._poll_queue or self._poll_queue[0][0] > time.time():
-                    yield idiokit.sleep(1.0)
+        while True:
+            while not self._poll_queue or self._poll_queue[0][0] > time.time():
+                yield idiokit.sleep(1.0)
 
-                _, key = self._poll_queue.popleft()
-                if key in self._poll_cleanup:
-                    self._poll_cleanup.remove(key)
-                    self._poll_dedup.pop(key, None)
-                    continue
+            _, key = self._poll_queue.popleft()
+            if key in self._poll_cleanup:
+                self._poll_cleanup.remove(key)
+                self._poll_dedup.pop(key, None)
+                continue
 
-                yield self.poll(*key) | self._distribute(key)
+            yield self.poll(*key) | self._distribute(key)
 
-                expire_time = time.time() + self.poll_interval
-                self._poll_queue.append((expire_time, key))
-        except services.Stop:
-            pass
+            expire_time = time.time() + self.poll_interval
+            self._poll_queue.append((expire_time, key))
 
     @idiokit.stream
     def _distribute(self, key):
