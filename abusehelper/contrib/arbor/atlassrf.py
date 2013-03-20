@@ -140,4 +140,4 @@ class AtlasSRFBot(bot.PollingBot):
                 yield idiokit.send(cur)
 
 if __name__ == "__main__":
-    AtlasSRFBot.from_command_line().run()
+    AtlasSRFBot.from_command_line().execute()

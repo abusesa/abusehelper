@@ -57,4 +57,4 @@ class ReprBot(bot.ServiceBot):
                 break
 
 if __name__ == "__main__":
-    ReprBot.from_command_line().run()
+    ReprBot.from_command_line().execute()
