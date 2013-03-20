@@ -10,11 +10,11 @@ class Rule(core.Matcher):
     def match(self, obj, cache=None):
         if cache is None:
             cache = dict()
-        elif self in cache:
-            return cache[self]
 
-        result = self.match_with_cache(obj, cache)
-        cache[obj] = result
+        result = cache.get(self, None)
+        if result is None:
+            result = self.match_with_cache(obj, cache)
+            cache[self] = bool(result)
         return result
 
     def match_with_cache(self, obj, cache):
@@ -144,7 +144,7 @@ class Match(Rule):
         return event.contains(self._key.value, filter=self.filter)
 
     def filter(self, value):
-        return self.value is None or self.value.match(value)
+        return self._value is None or self._value.match(value)
 
     def dump(self):
         return (self._key, self._value)
@@ -156,7 +156,7 @@ class Match(Rule):
 
 class NonMatch(Match):
     def filter(self, value):
-        return not self.value.match(value)
+        return self._value is None or not self._value.match(value)
 
 
 class Fuzzy(Rule):
