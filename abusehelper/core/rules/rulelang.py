@@ -111,12 +111,7 @@ def format_ip(format, ip):
     yield unicode(ip.range)
 
 
-star_parser = seq(txt("*"), epsilon(atoms.Star()), pick=1)
-
-
-@formatter.handler(atoms.Star)
-def format_star(format, _):
-    return "*"
+star_parser = seq(txt("*"), epsilon(None), pick=1)
 
 
 @parser_singleton
@@ -143,23 +138,23 @@ def format_fuzzy(format, fuzzy):
 
 
 @formatter.handler(rules.NonMatch)
-def format_non_match(format, non_match):
-    yield format(non_match.key)
-    if isinstance(non_match.value, atoms.IP):
+def format_non_match(format, obj):
+    yield format(obj.key) if obj.key is not None else "*"
+    if isinstance(obj.value, atoms.IP):
         yield " not in "
     else:
         yield "!="
-    yield format(non_match.value)
+    yield format(obj.value) if obj.value is not None else "*"
 
 
 @formatter.handler(rules.Match)
-def format_match(format, match):
-    yield format(match.key)
-    if isinstance(match.value, atoms.IP):
+def format_match(format, obj):
+    yield format(obj.key) if obj.key is not None else "*"
+    if isinstance(obj.value, atoms.IP):
         yield " in "
     else:
         yield "="
-    yield format(match.value)
+    yield format(obj.value) if obj.value is not None else "*"
 
 
 @formatter.handler(rules.And)

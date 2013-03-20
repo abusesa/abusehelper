@@ -7,12 +7,15 @@ from . import iprange
 
 
 class Atom(core.Matcher):
-    @classmethod
-    def parser(cls):
-        return cls()
-
     def match(self, value):
         return False
+
+    def dump(self):
+        return None
+
+    @classmethod
+    def load(cls, _):
+        return cls()
 
 
 class String(Atom):
@@ -33,6 +36,13 @@ class String(Atom):
 
     def match(self, value):
         return self._value.lower() == value.lower()
+
+    def dump(self):
+        return self._value
+
+    @classmethod
+    def load(cls, value):
+        return cls(value)
 
 
 class RegExp(Atom):
@@ -66,7 +76,7 @@ class RegExp(Atom):
         self._regexp = re.compile(pattern, flags)
 
     def unique_key(self):
-        return self._regexp.pattern, self._regexp.flags & re.I
+        return self._regexp.pattern, bool(self._regexp.flags & re.I)
 
     def arguments(self):
         keys = []
@@ -77,13 +87,12 @@ class RegExp(Atom):
     def match(self, value):
         return self._regexp.search(value)
 
+    def dump(self):
+        return self._regexp.pattern, bool(self._regexp.flags & re.I)
 
-class Star(Atom):
-    def init(self):
-        Atom.init(self)
-
-    def match(self, value):
-        return True
+    @classmethod
+    def load(cls, (pattern, ignore_case)):
+        return cls(pattern, ignore_case)
 
 
 class IP(Atom):
@@ -116,3 +125,10 @@ class IP(Atom):
         except ValueError:
             return False
         return self._range.contains(range)
+
+    def dump(self):
+        return unicode(self._range)
+
+    @classmethod
+    def load(cls, value):
+        return cls(value)

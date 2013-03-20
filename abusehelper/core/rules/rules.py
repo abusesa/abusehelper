@@ -20,6 +20,13 @@ class Rule(core.Matcher):
     def match_with_cache(self, obj, cache):
         return False
 
+    def dump(self):
+        return None
+
+    @classmethod
+    def load(cls, dumped):
+        return cls()
+
 
 class And(Rule):
     def init(self, first, *rest):
@@ -42,6 +49,13 @@ class And(Rule):
             if not rule.match(obj, cache):
                 return False
         return True
+
+    def dump(self):
+        return self._rules
+
+    @classmethod
+    def load(cls, subrules):
+        return cls(*subrules)
 
 
 class Or(And):
@@ -71,20 +85,23 @@ class No(Rule):
     def match_with_cache(self, obj, cache):
         return not self._rule.match(obj, cache)
 
+    def dump(self):
+        return self._rule
+
+    @classmethod
+    def load(cls, rule):
+        return cls(rule)
+
 
 class Match(Rule):
     _to_atom = [
-        (type(None), lambda x: atoms.Star()),
         (basestring, atoms.String),
         (type(re.compile(".")), atoms.RegExp.from_re)
     ]
 
     _from_atom = [
-        (atoms.Star, lambda x: None),
         (atoms.String, lambda x: x.value)
     ]
-
-    _star = atoms.Star()
 
     def _convert(self, obj, conversions):
         for converted_type, conversion_func in conversions:
@@ -122,12 +139,19 @@ class Match(Rule):
         return self._value
 
     def match_with_cache(self, event, cache):
-        if self._key == self._star:
+        if self._key is None:
             return event.contains(filter=self.filter)
         return event.contains(self._key.value, filter=self.filter)
 
     def filter(self, value):
-        return self.value.match(value)
+        return self.value is None or self.value.match(value)
+
+    def dump(self):
+        return (self._key, self._value)
+
+    @classmethod
+    def load(cls, (key, value)):
+        return cls(key, value)
 
 
 class NonMatch(Match):
@@ -159,3 +183,11 @@ class Fuzzy(Rule):
         if event.contains(filter=self._atom.match):
             return True
         return False
+
+    def dump(self):
+        return self._atom
+
+    @classmethod
+    def load(cls, dumped):
+        return cls(dumped)
+

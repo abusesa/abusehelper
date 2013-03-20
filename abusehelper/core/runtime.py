@@ -88,7 +88,7 @@ class Session(Pipeable):
 
         for key, value in conf.items():
             try:
-                value = serialize.load(serialize.dump(value))
+                value = serialize.normalize(value)
             except serialize.UnregisteredType:
                 raise SessionError("can not serialize key {0!r} value {1!r}".format(key, value))
             conf[key] = value

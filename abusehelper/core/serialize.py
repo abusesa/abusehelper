@@ -18,7 +18,7 @@ class UnregisteredName(Exception):
     pass
 
 
-class Marshal(object):
+class Serializer(object):
     def __init__(self, register_common=True):
         self._lock = threading.Lock()
         self._types = []
@@ -26,35 +26,44 @@ class Marshal(object):
         self._cache = weakref.WeakKeyDictionary()
 
         if register_common:
-            self.register(dump_dict, load_dict, dict, "d")
-            self.register(dump_list, load_list,
-                (list, tuple, set, frozenset), "l")
-            self.register(dump_int, load_int, (int, long), "i")
-            self.register(dump_float, load_float, float, "f")
-            self.register(dump_nil, load_nil, type(None), "n")
-            self.register(dump_str, load_str, unicode, "s")
-            self.register(dump_bytes, load_bytes, str, "b")
-            self.register(dump_bool, load_bool, bool, "t")
-            self.register(dump_rule, load_rule, rules.Rule, "r")
+            self.register("d", Dict(dict))
+            self.register("l", List(list, tuple, set, frozenset))
+            self.register("i", Int(int, long))
+            self.register("f", Float(float))
+            self.register("n", Nil(type(None)))
+            self.register("s", Str(unicode))
+            self.register("b", Bytes(str))
+            self.register("t", Bool(bool))
 
-    def register(self, dump, load, types, name):
+            self.register("ra", Rule(rules.And))
+            self.register("ro", Rule(rules.Or))
+            self.register("rn", Rule(rules.No))
+            self.register("rm", Rule(rules.Match))
+            self.register("rc", Rule(rules.NonMatch))
+            self.register("rf", Rule(rules.Fuzzy))
+
+            self.register("rx", Rule(rules.RegExp))
+            self.register("rs", Rule(rules.String))
+            self.register("ri", Rule(rules.IP))
+
+    def register(self, name, serializer):
         with self._lock:
             if name in self._names:
                 raise NameAlreadyRegistered(name)
 
-            self._types.append((types, dump, name))
-            self._names[name] = load
+            self._types.append((name, serializer))
+            self._names[name] = serializer
             self._cache.clear()
 
-    def dump(self, obj):
+    def _find_serializer(self, obj):
         obj_type = type(obj)
 
         with self._lock:
             if obj_type not in self._cache:
                 info = None
-                for types, dump, name in reversed(self._types):
-                    if issubclass(obj_type, types):
-                        info = dump, name
+                for name, serializer in reversed(self._types):
+                    if serializer.isinstance(obj):
+                        info = name, serializer
                         break
                 self._cache[obj_type] = info
 
@@ -62,8 +71,15 @@ class Marshal(object):
         if info is None:
             raise UnregisteredType(obj_type)
 
-        dump, name = info
-        return dump(self.dump, name, obj)
+        return info
+
+    def dump(self, obj):
+        name, serializer = self._find_serializer(obj)
+        return serializer.dump(obj, name, self)
+
+    def normalize(self, obj):
+        _, serializer = self._find_serializer(obj)
+        return serializer.normalize(obj, self)
 
     def load(self, element):
         name = element.name
@@ -71,95 +87,158 @@ class Marshal(object):
         with self._lock:
             if name not in self._names:
                 raise UnregisteredName(name)
-            load = self._names[name]
+            serializer = self._names[name]
 
-        return load(self.load, element)
-
-
-def dump_list(dump, name, obj):
-    element = Element(name)
-    for item in obj:
-        element.add(dump(item))
-    return element
+        return serializer.load(element, self)
 
 
-def load_list(load, element):
-    return tuple(load(item) for item in element.children())
+class SubSerializer(object):
+    def __init__(self, *types):
+        self._types = types
+
+    def isinstance(self, obj):
+        return isinstance(obj, self._types)
+
+    def dump(self, obj, name, context):
+        raise NotImplementedError()
+
+    def load(self, obj, context):
+        raise NotImplementedError()
+
+    def normalize(self, obj, context):
+        return self.load(self.dump(obj, context), context)
 
 
-def dump_dict(dump, name, obj):
-    return dump_list(dump, name, list(obj.items()))
+class List(SubSerializer):
+    def dump(self, obj, name, context):
+        element = Element(name)
+        for item in obj:
+            element.add(context.dump(item))
+        return element
+
+    def load(self, element, context):
+        return tuple(load(item) for item in element.children())
+
+    def normalize(self, obj, context):
+        return tuple(context.normalize(x) for x in obj)
 
 
-def load_dict(load, element):
-    return dict(load_list(load, element))
+class Dict(SubSerializer):
+    _list = List()
+
+    def _from_dict(self, obj):
+        dumped = []
+        for key, value in obj.iteritems():
+            dumped.append(key)
+            dumped.append(value)
+        return dumped
+
+    def _to_dict(self, obj):
+        loaded = {}
+        for index in xrange(0, len(obj), 2):
+            key = obj[index]
+            value = obj[index + 1]
+            loaded[key] = value
+        return loaded
+
+    def dump(self, obj, name, context):
+        return self._list.dump(self._from_dict(obj), name, context)
+
+    def load(self, element, context):
+        return self._to_dict(self._list.load(element, context))
+
+    def normalize(self, obj):
+        return self._to_dict(self._list.normalize(self._from_dict(obj)))
 
 
-def dump_int(dump, name, obj):
-    element = Element(name)
-    element.text = unicode(obj)
-    return element
+class Int(SubSerializer):
+    def dump(self, obj, name, context):
+        return Element(name, _text=unicode(obj))
+
+    def load(self, element, context):
+        return int(element.text)
+
+    def normalize(self, obj, context):
+        return obj
 
 
-def load_int(load, element):
-    return int(element.text)
+class Float(SubSerializer):
+    def dump(self, obj, name, context):
+        return Element(name, _text=repr(obj))
+
+    def load(self, element, context):
+        return float(element.text)
+
+    def normalize(self, obj, context):
+        return obj
 
 
-def dump_float(dump, name, obj):
-    element = Element(name)
-    element.text = repr(obj)
-    return element
+class Nil(SubSerializer):
+    def dump(self, obj, name, context):
+        return Element(name)
+
+    def load(self, element, context):
+        return None
+
+    def normalize(self, obj, context):
+        return None
 
 
-def load_float(load, element):
-    return float(element.text)
+class Str(SubSerializer):
+    def dump(self, obj, name, context):
+        return Element(name, _text=b64encode(obj.encode("utf-8")))
+
+    def load(self, element, context):
+        return b64decode(element.text).decode("utf-8")
+
+    def normalize(self, obj, context):
+        return obj
 
 
-def dump_nil(dump, name, obj):
-    return Element(name)
+class Bytes(SubSerializer):
+    def dump(self, obj, name, context):
+        return Element(name, _text=b64encode(obj))
+
+    def load(self, element, context):
+        return b64decode(element.text)
+
+    def normalize(self, obj, context):
+        return obj
 
 
-def load_nil(load, element):
-    return None
+class Bool(SubSerializer):
+    def dump(self, obj, name, context):
+        return Element(name, _text=unicode(int(bool(obj))))
+
+    def load(self, element, context):
+        return bool(int(element.text))
+
+    def normalize(self, obj, context):
+        return obj
 
 
-def dump_str(dump, name, obj):
-    element = Element(name)
-    element.text = b64encode(obj.encode("utf-8"))
-    return element
+class Rule(SubSerializer):
+    def __init__(self, rule_type):
+        SubSerializer.__init__(self, rule_type)
+
+        self._rule_type = rule_type
+
+    def dump(self, obj, name, context):
+        element = Element(name)
+        element.add(context.dump(obj.dump()))
+        return element
+
+    def load(self, element, context):
+        for child in element.children():
+            return self._rule_type.load(context.load(child))
+        raise ValueError("element has no child elements")
+
+    def normalize(self, obj, context):
+        return context.normalize(obj.dump())
 
 
-def load_str(load, element):
-    return b64decode(element.text).decode("utf-8")
-
-
-def dump_bytes(dump, name, obj):
-    element = Element(name)
-    element.text = b64encode(obj)
-    return element
-
-
-def load_bytes(load, element):
-    return b64decode(element.text)
-
-
-def dump_bool(dump, name, obj):
-    return dump_int(dump, name, int(bool(obj)))
-
-
-def load_bool(load, element):
-    return bool(load_int(load, element))
-
-
-def dump_rule(dump, name, rule):
-    return dump_str(dump, name, rules.format(rule))
-
-
-def load_rule(load, element):
-    return rules.parse(load_str(load, element))
-
-
-global_marshal = Marshal()
-register = global_marshal.register
-dump = global_marshal.dump
-load = global_marshal.load
+global_serializer = Serializer()
+register = global_serializer.register
+dump = global_serializer.dump
+load = global_serializer.load
+normalize = global_serializer.normalize

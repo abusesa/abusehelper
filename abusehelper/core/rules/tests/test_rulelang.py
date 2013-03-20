@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 import sys
 import unittest
 
-from ..atoms import String, RegExp, Star, IP
+from ..atoms import String, RegExp, IP
 from ..rules import And, Or, No, Match, NonMatch, Fuzzy
 from ..rulelang import format, parse, rule
 
@@ -123,8 +123,8 @@ class TestParse(unittest.TestCase):
 
 class TestFormat(unittest.TestCase):
     def test_star(self):
-        self.assertEqual("*=*", format(Match(Star(), Star())))
-        self.assertEqual("*!=*", format(NonMatch(Star(), Star())))
+        self.assertEqual("*=*", format(Match()))
+        self.assertEqual("*!=*", format(NonMatch()))
 
     def test_string(self):
         self.assertEqual("a", format(Fuzzy(String("a"))))
