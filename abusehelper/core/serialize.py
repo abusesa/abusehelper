@@ -234,7 +234,7 @@ class Rule(SubSerializer):
         raise ValueError("element has no child elements")
 
     def normalize(self, obj, context):
-        return context.normalize(obj.dump())
+        return obj.load(context.normalize(obj.dump()))
 
 
 global_serializer = Serializer()
