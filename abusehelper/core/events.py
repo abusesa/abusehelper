@@ -700,21 +700,6 @@ class EventCollector(object):
         self._count = count
 
     def __reduce__(self):
-        """
-        A collector instance can be safely pickled and unpickled.
-
-        >>> import pickle
-
-        >>> original = EventCollector()
-        >>> original.append(Event({"a": "b"}))
-        >>> original.append(Event({"c": "d"}))
-
-        >>> unpickled = pickle.loads(pickle.dumps(original))
-        >>> purged = unpickled.purge()
-        >>> list(purged) == list(original.purge())
-        True
-        """
-
         self._gz.flush()
         self._gz.close()
 
