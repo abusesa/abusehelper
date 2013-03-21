@@ -147,8 +147,8 @@ class Dict(SubSerializer):
     def load(self, element, context):
         return self._to_dict(self._list.load(element, context))
 
-    def normalize(self, obj):
-        return self._to_dict(self._list.normalize(self._from_dict(obj)))
+    def normalize(self, obj, context):
+        return self._to_dict(self._list.normalize(self._from_dict(obj), context))
 
 
 class Int(SubSerializer):
