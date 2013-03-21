@@ -5,7 +5,7 @@ import smtplib
 import collections
 
 import idiokit
-from abusehelper.core import events, taskfarm, services, templates, bot
+from abusehelper.core import events, taskfarm, services, templates, bot, utils
 
 
 def next_time(time_string):
@@ -124,16 +124,17 @@ class ReportBot(bot.ServiceBot):
     @idiokit.stream
     def collect(self, state, **keys):
         if state is None:
-            state = events.EventCollector()
-
-        def _collect(event):
-            if event is self.REPORT_NOW:
-                yield state.purge()
-            else:
-                state.append(event)
+            state = utils.CompressedCollection()
 
         try:
-            yield idiokit.map(_collect)
+            while True:
+                event = yield idiokit.next()
+
+                if event is self.REPORT_NOW:
+                    yield state
+                    state = utils.CompressedCollection()
+                else:
+                    state.append(event)
         except services.Stop:
             idiokit.stop(state)
 
@@ -289,7 +290,7 @@ class MailerService(ReportBot):
     def __init__(self, **keys):
         super(MailerService, self).__init__(**keys)
 
-        self.mailer = Mailer(self.smtp_host, self.smtp_port, 
+        self.mailer = Mailer(self.smtp_host, self.smtp_port,
             self.smtp_auth_user, self.smtp_auth_password, self.log)
 
     @idiokit.stream

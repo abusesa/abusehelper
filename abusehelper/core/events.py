@@ -1,11 +1,8 @@
 import re
-import gzip
 import inspect
 import collections
-import cPickle as pickle
 
 from base64 import b64decode
-from cStringIO import StringIO
 
 import idiokit
 from idiokit.xmlcore import Element, Elements
@@ -591,6 +588,9 @@ class Event(object):
         body.text = _replace_non_xml_chars(unicode(self))
         return Elements(body, element)
 
+    def __reduce__(self):
+        return self.__class__, (self._attrs,)
+
     def __eq__(self, other):
         if not isinstance(other, Event):
             return NotImplemented
@@ -631,109 +631,24 @@ def events_to_elements():
     return idiokit.map(lambda x: (x.to_elements(),))
 
 
-def _iter_compressed_events(stringio):
-    stringio.seek(0)
+def EventCollector(compresslevel=6, data="", count=None):
+    # A backwards compatibility wrapper for e.g. bot state
+    # files that reference abusehelper.core.events.EventCollector.
 
-    gz = gzip.GzipFile(fileobj=stringio)
-    try:
-        while True:
-            try:
-                attrs = pickle.load(gz)
-            except EOFError:
-                break
+    import gzip
+    import cPickle as pickle
+    import cStringIO as StringIO
 
-            event = Event(attrs)
-            pos = stringio.tell()
-            yield event
-            stringio.seek(pos)
-    finally:
-        gz.close()
+    from . import utils
 
+    collector = utils.CompressedCollection()
 
-class EventCollector(object):
-    def __init__(self, compresslevel=6, data="", count=None):
-        """
-        A collector of Event objects, stored in memory in compressed form.
+    gz = gzip.GzipFile(fileobj=StringIO.StringIO(data))
+    while True:
+        try:
+            attrs = pickle.load(gz)
+        except EOFError:
+            break
+        collector.append(Event(attrs))
 
-        >>> collector = EventCollector()
-        >>> collector.append(Event({"a": "b"}))
-        >>> collector.append(Event({"c": "d"}))
-
-        An event collector can be frozen ("purged"), and the result
-        object can be used to iterate through the stored events,
-        decompressing them on the fly. The result also supports
-        event count and emptiness checks.
-
-        >>> two = collector.purge()
-        >>> list(two)
-        [Event({u'a': [u'b']}), Event({u'c': [u'd']})]
-        >>> len(two)
-        2
-        >>> bool(two)
-        True
-
-        Purging a collector empties it.
-
-        >>> empty = collector.purge()
-        >>> list(empty)
-        []
-        >>> len(empty)
-        0
-        >>> bool(empty)
-        False
-        """
-
-        self._level = compresslevel
-
-        self._stringio = StringIO()
-        self._stringio.write(data)
-
-        self._gz = gzip.GzipFile(None, "a", compresslevel, self._stringio)
-
-        # Backwards compatibility: Previously __reduce__'d instances
-        # did not contain an explicit event count.
-        if count is None:
-            count = 0
-            if data:
-                for _ in _iter_compressed_events(StringIO(data)):
-                    count += 1
-        self._count = count
-
-    def __reduce__(self):
-        self._gz.flush()
-        self._gz.close()
-
-        data = self._stringio.getvalue()
-        self._stringio.close()
-
-        self.__init__(self._level, data, self._count)
-        return self.__class__, (self._level, data, self._count)
-
-    def append(self, event):
-        attrs = dict()
-        for key, value in event.items():
-            attrs.setdefault(key, list()).append(value)
-        pickle.dump(attrs, self._gz, pickle.HIGHEST_PROTOCOL)
-
-        self._count += 1
-
-    def purge(self):
-        self._gz.flush()
-        self._gz.close()
-
-        event_list = _EventList(self._stringio, self._count)
-
-        self.__init__(self._level)
-        return event_list
-
-
-class _EventList(object):
-    def __init__(self, stringio, count):
-        self._stringio = stringio
-        self._count = count
-
-    def __iter__(self):
-        return _iter_compressed_events(self._stringio)
-
-    def __len__(self):
-        return self._count
+    return collector
