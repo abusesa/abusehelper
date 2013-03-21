@@ -185,11 +185,15 @@ class CompressedCollection(object):
         self._close()
 
         stringio = self._stringio
+
+        out_pos = stringio.tell()
         stringio.seek(0)
+        try:
+            gz = gzip.GzipFile(fileobj=stringio)
+        finally:
+            in_pos = stringio.tell()
+            stringio.seek(out_pos)
 
-        in_pos = 0
-
-        gz = gzip.GzipFile(fileobj=stringio)
         try:
             while True:
                 out_pos = stringio.tell()

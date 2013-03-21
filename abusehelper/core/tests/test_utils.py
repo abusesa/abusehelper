@@ -24,6 +24,8 @@ class TestCompressedCollection(unittest.TestCase):
         original.append("ab")
 
         unpickled = pickle.loads(pickle.dumps(original))
+        self.assertEqual(["ab"], list(unpickled))
+
         unpickled.append("cd")
         self.assertEqual(["ab", "cd"], list(unpickled))
 
