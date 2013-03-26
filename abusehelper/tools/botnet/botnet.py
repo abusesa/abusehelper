@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import sys
 import pwd
@@ -34,7 +36,8 @@ class Botnet(object):
         options, args = parser.parse_args()
 
         if not options.allow_root and self._is_root():
-            parser.error("running as root - " +
+            parser.error(
+                "running as root - " +
                 "run as a different user or specify the --allow-root " +
                 "command line option")
 
@@ -42,7 +45,8 @@ class Botnet(object):
             os.execlp(options.python, options.python, sys.argv[0], *args)
         if sys.version_info < (2, 6):
             version = platform.python_version()
-            parser.error("this tool requires python >= 2.6 " +
+            parser.error(
+                "this tool requires python >= 2.6 " +
                 "(you are running python " + version + "), " +
                 "use the option -p/--python to define a suitable python " +
                 "executable")
@@ -53,12 +57,15 @@ class Botnet(object):
         parser = OptionParser()
 
         parser.set_usage("usage: %prog [options] command [...]")
-        parser.add_option("-p", "--python",
+        parser.add_option(
+            "-p", "--python",
             dest="python",
             default=None,
-            help=("use the given python executable instead of " +
+            help=(
+                "use the given python executable instead of " +
                 repr(sys.executable)))
-        parser.add_option("--allow-root",
+        parser.add_option(
+            "--allow-root",
             action="store_true",
             dest="allow_root",
             default=False,
@@ -68,7 +75,11 @@ class Botnet(object):
         options, args = self._parse(parser)
 
         if not args:
-            parser.error("no command defined")
+            print(parser.get_usage())
+            print("Available commands are:")
+            for name in sorted(self._commands):
+                print(" " + name)
+            sys.exit(0)
 
         command = args[0]
         if command not in self._commands:
@@ -82,7 +93,7 @@ class Botnet(object):
 
         options, args = self._parse(parser)
         for line in _flatten(command_obj.run(parser, options, args[1:])):
-            print line
+            print(line)
 
     def register_commands(self, *args, **keys):
         self._commands.update(*args, **keys)
