@@ -6,6 +6,16 @@ import unittest
 from .. import atoms
 from ..rules import And, Or, Match, NonMatch
 
+from ...events import Event
+
+
+class TestRules(unittest.TestCase):
+    def test_caching(self):
+        cache = dict()
+        rule = Match("a", "a")
+        rule.match(Event(), cache)
+        self.assertFalse(cache[rule])
+
 
 class TestAnd(unittest.TestCase):
     def test_can_not_be_initialized_with_zero_arguments(self):

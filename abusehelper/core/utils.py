@@ -1,10 +1,13 @@
 import csv
 import time
+import gzip
 import socket
 import urllib2
 import httplib
 import collections
 import email.parser
+
+import cPickle as pickle
 
 import idiokit
 from abusehelper.core import events
@@ -137,3 +140,88 @@ class TimedCache(object):
         expire_time = time.time() + self.cache_time
         self.queue.append((expire_time, key))
         self.cache[key] = expire_time, value
+
+
+class CompressedCollection(object):
+    FORMAT = 1
+
+    def __init__(self, iterable=(), _state=None):
+        """
+        A collection of objects, stored in memory in a
+        pickled & compressed form.
+
+        >>> c = CompressedCollection([1, 2, 3])
+        >>> c.append("testing")
+
+        >>> list(c)
+        [1, 2, 3, 'testing']
+        >>> len(c)
+        4
+        >>> bool(c)
+        True
+        """
+
+        self._stringio = StringIO()
+        self._count = 0
+        self._gz = None
+
+        if _state:
+            _format, data, count = _state
+            self._stringio.write(data)
+            self._count = count
+
+        for obj in iterable:
+            self.append(obj)
+
+    def _close(self):
+        if self._gz is None:
+            return
+
+        self._gz.flush()
+        self._gz.close()
+        self._gz = None
+
+    def __iter__(self):
+        self._close()
+
+        stringio = self._stringio
+
+        out_pos = stringio.tell()
+        stringio.seek(0)
+        try:
+            gz = gzip.GzipFile(fileobj=stringio)
+        finally:
+            in_pos = stringio.tell()
+            stringio.seek(out_pos)
+
+        try:
+            while True:
+                out_pos = stringio.tell()
+                stringio.seek(in_pos)
+
+                try:
+                    obj = pickle.load(gz)
+                except EOFError:
+                    break
+                else:
+                    in_pos = stringio.tell()
+                finally:
+                    stringio.seek(out_pos)
+
+                yield obj
+        finally:
+            gz.close()
+
+    def __reduce__(self):
+        self._close()
+        data = self._stringio.getvalue()
+        return self.__class__, ((), (self.FORMAT, data, self._count))
+
+    def __len__(self):
+        return self._count
+
+    def append(self, obj):
+        if self._gz is None:
+            self._gz = gzip.GzipFile(None, "ab", fileobj=self._stringio)
+        self._gz.write(pickle.dumps(obj))
+        self._count += 1

@@ -5,7 +5,7 @@ import smtplib
 import collections
 
 import idiokit
-from abusehelper.core import events, taskfarm, services, templates, bot
+from abusehelper.core import events, taskfarm, services, templates, bot, utils
 
 
 def next_time(time_string):
@@ -124,16 +124,17 @@ class ReportBot(bot.ServiceBot):
     @idiokit.stream
     def collect(self, state, **keys):
         if state is None:
-            state = events.EventCollector()
-
-        def _collect(event):
-            if event is self.REPORT_NOW:
-                yield state.purge()
-            else:
-                state.append(event)
+            state = utils.CompressedCollection()
 
         try:
-            yield idiokit.map(_collect)
+            while True:
+                event = yield idiokit.next()
+
+                if event is self.REPORT_NOW:
+                    yield state
+                    state = utils.CompressedCollection()
+                else:
+                    state.append(event)
         except services.Stop:
             idiokit.stop(state)
 
@@ -180,6 +181,95 @@ class MailTemplate(templates.Template):
         return msg
 
 
+class Mailer(object):
+    TOLERATED_EXCEPTIONS = (socket.error, smtplib.SMTPException)
+
+    def __init__(self, smtp_host, smtp_port=25, user=None, password=None, log=None):
+        self.smtp_host = smtp_host
+        self.smtp_port = smtp_port
+        self.user = user
+        self.password = password
+        self.log = log
+
+        if self.user and not self.password:
+            self.password = getpass.getpass("SMTP password: ")
+        self.server = None
+
+    @idiokit.stream
+    def _ensure_connection(self):
+        if self.server is not None:
+            return
+
+        while self.server is None:
+            host, port = self.smtp_host, self.smtp_port
+            if self.log:
+                self.log.info("Connecting %r port %d", host, port)
+            try:
+                self.server = yield idiokit.thread(smtplib.SMTP, host, port)
+            except self.TOLERATED_EXCEPTIONS, exc:
+                if self.log:
+                    self.log.error("Error connecting SMTP server: %r", exc)
+            else:
+                if self.log:
+                    self.log.info("Connected to the SMTP server")
+                break
+
+            if self.log:
+                self.log.info("Retrying SMTP connection in 10 seconds")
+            yield idiokit.sleep(10.0)
+
+        yield idiokit.thread(self.server.ehlo)
+
+        if self.server.has_extn("starttls"):
+            yield idiokit.thread(self.server.starttls)
+            yield idiokit.thread(self.server.ehlo)
+
+        if (self.user is not None and self.password is not None and
+            self.server.has_extn("auth")):
+            yield idiokit.thread(self.server.login, self.user, self.password)
+
+    @idiokit.stream
+    def quit(self):
+        if self.server is not None:
+            try:
+                yield idiokit.thread(self.server.quit)
+            except self.TOLERATED_EXCEPTIONS:
+                pass
+            finally:
+                self.server = None
+
+    @idiokit.stream
+    def send(self, from_addr, to_addr, subject, msg):
+        try:
+            yield self._ensure_connection()
+
+            if self.log:
+                self.log.info("Sending message %r to %r", subject, to_addr)
+            yield idiokit.thread(self.server.sendmail, from_addr, to_addr, msg)
+        except smtplib.SMTPDataError, data_error:
+            if self.log:
+                self.log.error("Could not send message to %r: %r. " +
+                               "Dropping message from queue.",
+                               to_addr, data_error)
+            idiokit.stop(True)
+        except smtplib.SMTPRecipientsRefused, refused:
+            if self.log:
+                for recipient, reason in refused.recipients.iteritems():
+                    self.log.error("Could not send message to %r: %r. " +
+                                   "Dropping message from queue.",
+                                   recipient, reason)
+            idiokit.stop(True)
+        except self.TOLERATED_EXCEPTIONS, exc:
+            if self.log:
+                self.log.error("Could not send message to %r: %r", to_addr, exc)
+            yield self.quit()
+            idiokit.stop(False)
+
+        if self.log:
+            self.log.info("Sent message to %r", to_addr)
+        idiokit.stop(True)
+
+
 def format_addresses(addrs):
     from email.utils import getaddresses, formataddr
 
@@ -188,8 +278,6 @@ def format_addresses(addrs):
 
 
 class MailerService(ReportBot):
-    TOLERATED_EXCEPTIONS = (socket.error, smtplib.SMTPException)
-
     mail_sender = bot.Param("from whom it looks like the mails came from")
     smtp_host = bot.Param("hostname of the SMTP service used for sending mails")
     smtp_port = bot.IntParam("port of the SMTP service used for sending mails",
@@ -202,9 +290,8 @@ class MailerService(ReportBot):
     def __init__(self, **keys):
         super(MailerService, self).__init__(**keys)
 
-        if self.smtp_auth_user and not self.smtp_auth_password:
-            self.smtp_auth_password = getpass.getpass("SMTP password: ")
-        self.server = None
+        self.mailer = Mailer(self.smtp_host, self.smtp_port,
+            self.smtp_auth_user, self.smtp_auth_password, self.log)
 
     @idiokit.stream
     def build_mail(self, events, template="", to=[], cc=[], **keys):
@@ -228,76 +315,8 @@ class MailerService(ReportBot):
         try:
             result = yield ReportBot.main(self, state)
         finally:
-            if self.server is not None:
-                try:
-                    yield idiokit.thread(self.server.quit)
-                except self.TOLERATED_EXCEPTIONS:
-                    pass
-                finally:
-                    self.server = None
+            yield self.mailer.quit()
         idiokit.stop(result)
-
-    @idiokit.stream
-    def _ensure_connection(self):
-        if self.server is not None:
-            return
-
-        while self.server is None:
-            host, port = self.smtp_host, self.smtp_port
-            self.log.info("Connecting %r port %d", host, port)
-            try:
-                self.server = yield idiokit.thread(smtplib.SMTP, host, port)
-            except self.TOLERATED_EXCEPTIONS, exc:
-                self.log.error("Error connecting SMTP server: %r", exc)
-            else:
-                self.log.info("Connected to the SMTP server")
-                break
-
-            self.log.info("Retrying SMTP connection in 10 seconds")
-            yield idiokit.sleep(10.0)
-
-        yield idiokit.thread(self.server.ehlo)
-
-        if self.server.has_extn("starttls"):
-            yield idiokit.thread(self.server.starttls)
-            yield idiokit.thread(self.server.ehlo)
-
-        if (self.smtp_auth_user is not None and
-            self.smtp_auth_password is not None and
-            self.server.has_extn("auth")):
-            yield idiokit.thread(self.server.login,
-                self.smtp_auth_user, self.smtp_auth_password)
-
-    @idiokit.stream
-    def _try_to_send(self, from_addr, to_addr, subject, msg):
-        try:
-            yield self._ensure_connection()
-
-            self.log.info("Sending message %r to %r", subject, to_addr)
-            yield idiokit.thread(self.server.sendmail, from_addr, to_addr, msg)
-        except smtplib.SMTPDataError, data_error:
-            self.log.error("Could not send message to %r: %r. " +
-                           "Dropping message from queue.",
-                           to_addr, data_error)
-            idiokit.stop(True)
-        except smtplib.SMTPRecipientsRefused, refused:
-            for recipient, reason in refused.recipients.iteritems():
-                self.log.error("Could not send message to %r: %r. " +
-                               "Dropping message from queue.",
-                               recipient, reason)
-            idiokit.stop(True)
-        except self.TOLERATED_EXCEPTIONS, exc:
-            self.log.error("Could not send message to %r: %r", to_addr, exc)
-            try:
-                yield idiokit.thread(self.server.quit)
-            except self.TOLERATED_EXCEPTIONS:
-                pass
-            finally:
-                self.server = None
-            idiokit.stop(False)
-
-        self.log.info("Sent message to %r", to_addr)
-        idiokit.stop(True)
 
     @idiokit.stream
     def report(self, events, to=[], cc=[], **keys):
@@ -332,7 +351,7 @@ class MailerService(ReportBot):
 
         for address in mail_to:
             while True:
-                result = yield self._try_to_send(from_addr[1], address, subject, msg_data)
+                result = yield self.mailer.send(from_addr[1], address, subject, msg_data)
                 if result:
                     break
 

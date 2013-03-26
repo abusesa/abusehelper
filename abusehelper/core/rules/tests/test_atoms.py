@@ -3,13 +3,7 @@ from __future__ import unicode_literals
 import re
 import unittest
 
-from ..atoms import Star, String, RegExp, IP
-
-
-class TestStar(unittest.TestCase):
-    def test_matching(self):
-        self.assertTrue(Star().match(''))
-        self.assertTrue(Star().match('anything'))
+from ..atoms import String, RegExp, IP
 
 
 class TestString(unittest.TestCase):

@@ -1,5 +1,6 @@
 import re
 import json
+import collections
 
 from . import atoms
 from . import rules
@@ -110,12 +111,7 @@ def format_ip(format, ip):
     yield unicode(ip.range)
 
 
-star_parser = seq(txt("*"), epsilon(atoms.Star()), pick=1)
-
-
-@formatter.handler(atoms.Star)
-def format_star(format, _):
-    return "*"
+star_parser = seq(txt("*"), epsilon(None), pick=1)
 
 
 @parser_singleton
@@ -142,23 +138,23 @@ def format_fuzzy(format, fuzzy):
 
 
 @formatter.handler(rules.NonMatch)
-def format_non_match(format, non_match):
-    yield format(non_match.key)
-    if isinstance(non_match.value, atoms.IP):
+def format_non_match(format, obj):
+    yield format(obj.key) if obj.key is not None else "*"
+    if isinstance(obj.value, atoms.IP):
         yield " not in "
     else:
         yield "!="
-    yield format(non_match.value)
+    yield format(obj.value) if obj.value is not None else "*"
 
 
 @formatter.handler(rules.Match)
-def format_match(format, match):
-    yield format(match.key)
-    if isinstance(match.value, atoms.IP):
+def format_match(format, obj):
+    yield format(obj.key) if obj.key is not None else "*"
+    if isinstance(obj.value, atoms.IP):
         yield " in "
     else:
         yield "="
-    yield format(match.value)
+    yield format(obj.value) if obj.value is not None else "*"
 
 
 @formatter.handler(rules.And)
@@ -166,9 +162,13 @@ def format_and(format, rule):
     for index, subrule in enumerate(rule.subrules):
         if index != 0:
             yield " and "
-        yield "("
-        yield format(subrule)
-        yield ")"
+
+        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+            yield format(subrule)
+        else:
+            yield "("
+            yield format(subrule)
+            yield ")"
 
 
 @formatter.handler(rules.Or)
@@ -176,9 +176,12 @@ def format_or(format, rule):
     for index, subrule in enumerate(rule.subrules):
         if index != 0:
             yield " or "
-        yield "("
-        yield format(subrule)
-        yield ")"
+        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+            yield format(subrule)
+        else:
+            yield "("
+            yield format(subrule)
+            yield ")"
 
 
 @formatter.handler(rules.No)
@@ -197,6 +200,17 @@ def format_no(format, rule):
 def _create_parser():
     expr = forward_ref()
     parens_expr = seq(txt("("), expr, txt(")"), pick=1)
+
+    def flatten(*objs):
+        objs = collections.deque(objs)
+        while objs:
+            obj = objs.popleft()
+            try:
+                obj = iter(obj)
+            except TypeError:
+                yield obj
+            else:
+                objs.extendleft(obj)
 
     @parser_singleton
     def ws((string, start, end), chars=frozenset(" \t\n\r")):
@@ -251,35 +265,36 @@ def _create_parser():
         )
     ))
 
+    and_tail = forward_ref()
+    or_tail = forward_ref()
+
     def binary_rule_tail(name):
-        name_rule = txt(name, ignore_case=True)
-
-        return transform(
-            lambda (x, y): list(x) + [y],
+        result = forward_ref()
+        result.set(
             seq(
-                name_rule,
-
-                repeat(
-                    seq(
-                        union(
-                            parens_expr,
-                            seq(ws, union(no_parser, basic), ws, pick=1)
-                        ),
-                        name_rule,
-                        pick=0
+                txt(name, ignore_case=True),
+                union(
+                    step(
+                        seq(maybe(ws), parens_expr, pick=1),
+                        (seq(maybe(ws), result, pick=1), lambda x, y: (x, y)),
+                        (seq(maybe(ws), and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                        (seq(maybe(ws), or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
+                        step_default()
+                    ),
+                    step(
+                        seq(ws, union(no_parser, basic), pick=1),
+                        (seq(ws, result, pick=1), lambda x, y: (x, y)),
+                        (seq(ws, and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                        (seq(ws, or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
+                        step_default()
                     )
                 ),
-
-                union(
-                    parens_expr,
-                    seq(ws, expr, pick=1)
-                ),
-
-                pick=[1, 2]
+                pick=1
             )
         )
-    and_tail = binary_rule_tail("and")
-    or_tail = binary_rule_tail("or")
+        return result
+    and_tail.set(binary_rule_tail("and"))
+    or_tail.set(binary_rule_tail("or"))
 
     expr.set(
         seq(
@@ -287,14 +302,14 @@ def _create_parser():
             union(
                 step(
                     parens_expr,
-                    (seq(maybe(ws), and_tail, pick=1), lambda x, y: rules.And(x, *y)),
-                    (seq(maybe(ws), or_tail, pick=1), lambda x, y: rules.Or(x, *y)),
+                    (seq(maybe(ws), and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                    (seq(maybe(ws), or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
                     step_default()
                 ),
                 step(
                     union(no_parser, basic),
-                    (seq(ws, and_tail, pick=1), lambda x, y: rules.And(x, *y)),
-                    (seq(ws, or_tail, pick=1), lambda x, y: rules.Or(x, *y)),
+                    (seq(ws, and_tail, pick=1), lambda x, y: rules.And(*flatten(x, y))),
+                    (seq(ws, or_tail, pick=1), lambda x, y: rules.Or(*flatten(x, y))),
                     step_default()
                 )
             ),

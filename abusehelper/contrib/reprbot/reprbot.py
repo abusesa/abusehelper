@@ -6,7 +6,8 @@ namespace.
 
 import idiokit
 from idiokit.xmpp import jid
-from abusehelper.core import bot, events, taskfarm, services
+from abusehelper.core import bot, events, taskfarm
+
 
 class ReprBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
@@ -17,11 +18,7 @@ class ReprBot(bot.ServiceBot):
     def session(self, _, src_room, dst_room=None, **keys):
         if not dst_room:
             dst_room = src_room
-
-        try:
-            yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
-        except services.Stop:
-            idiokit.stop()
+        yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
 
     @idiokit.stream
     def handle_room(self, name):
@@ -30,7 +27,9 @@ class ReprBot(bot.ServiceBot):
         self.log.info("Joined room %r", name)
 
         try:
-            yield idiokit.pipe(room | self.reply(room.jid) |
+            yield idiokit.pipe(
+                room,
+                self.reply(room.jid),
                 events.events_to_elements())
         finally:
             self.log.info("Left room %r", name)
@@ -58,4 +57,4 @@ class ReprBot(bot.ServiceBot):
                 break
 
 if __name__ == "__main__":
-    ReprBot.from_command_line().run()
+    ReprBot.from_command_line().execute()

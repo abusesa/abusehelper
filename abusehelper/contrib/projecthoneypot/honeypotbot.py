@@ -88,4 +88,4 @@ class ProjectHoneyPotBot(RSSBot):
         return event
 
 if __name__ == "__main__":
-    ProjectHoneyPotBot.from_command_line().run()
+    ProjectHoneyPotBot.from_command_line().execute()

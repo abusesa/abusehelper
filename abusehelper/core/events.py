@@ -1,18 +1,17 @@
 import re
-import gzip
 import inspect
 import collections
-import cPickle as pickle
 
 from base64 import b64decode
-from cStringIO import StringIO
 
 import idiokit
 from idiokit.xmlcore import Element, Elements
 
-_NON_XML = re.compile(u"[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]", re.U)
-def _replace_non_xml_chars(unicode_obj, replacement=u"\uFFFD"):
+
+def _replace_non_xml_chars(unicode_obj, replacement=u"\ufffd"):
     return _NON_XML.sub(replacement, unicode_obj)
+_NON_XML = re.compile(u"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]", re.U)
+
 
 def _normalize(value):
     """Return the value converted to unicode. Raise a TypeError if the
@@ -46,10 +45,10 @@ def _normalize(value):
     msg = "expected a string value, got the value %r of type %s" % (value, name)
     raise TypeError(msg)
 
+
 EVENT_NS = "abusehelper#event"
 
-_UNICODE_QUOTE_CHECK = re.compile(r'[\s"\\,=]', re.U)
-_UNICODE_QUOTE = re.compile(r'["\\]', re.U)
+
 def _unicode_quote(string):
     r"""
     >>> _unicode_quote(u"a")
@@ -63,9 +62,10 @@ def _unicode_quote(string):
     if _UNICODE_QUOTE_CHECK.search(string):
         return u'"' + _UNICODE_QUOTE.sub(r'\\\g<0>', string) + u'"'
     return string
+_UNICODE_QUOTE_CHECK = re.compile(r'[\s"\\,=]', re.U)
+_UNICODE_QUOTE = re.compile(r'["\\]', re.U)
 
-_UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
-_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*', re.U)
+
 def _unicode_parse_part(string, start):
     match = _UNICODE_PART.match(string, start)
     quoted, unquoted = match.groups()
@@ -76,6 +76,9 @@ def _unicode_parse_part(string, start):
     if unquoted is not None:
         return unquoted, end
     return u"", end
+_UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
+_UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*', re.U)
+
 
 class Event(object):
     __slots__ = ["_attrs"]
@@ -171,10 +174,10 @@ class Event(object):
         >>> list(Event.from_elements(element)) == [Event()]
         True
 
-        >>> event = Event({"key": "value", "\uffff": "\\x05"}) # include some forbidden XML chars
+        >>> event = Event({u"\\uffff": u"\\x05"}) # include some forbidden XML chars
         >>> element = Element("message")
         >>> element.add(event.to_elements())
-        >>> list(Event.from_elements(element)) == [event]
+        >>> list(Event.from_elements(element)) == [Event({u"\\ufffd": u"\\ufffd"})]
         True
         """
 
@@ -585,6 +588,9 @@ class Event(object):
         body.text = _replace_non_xml_chars(unicode(self))
         return Elements(body, element)
 
+    def __reduce__(self):
+        return self.__class__, (self._attrs,)
+
     def __eq__(self, other):
         if not isinstance(other, Event):
             return NotImplemented
@@ -616,98 +622,33 @@ class Event(object):
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
 
+
 def stanzas_to_events():
     return idiokit.map(Event.from_elements)
+
 
 def events_to_elements():
     return idiokit.map(lambda x: (x.to_elements(),))
 
-class EventCollector(object):
-    def __init__(self, compresslevel=6, data=""):
-        self._level = compresslevel
 
-        self._stringio = StringIO()
-        self._stringio.write(data)
+def EventCollector(compresslevel=6, data="", count=None):
+    # A backwards compatibility wrapper for e.g. bot state
+    # files that reference abusehelper.core.events.EventCollector.
 
-        self._gz = gzip.GzipFile(None, "a", compresslevel, self._stringio)
+    import gzip
+    import cPickle as pickle
+    import cStringIO as StringIO
 
-    def __reduce__(self):
-        """
-        >>> import pickle
+    from . import utils
 
-        >>> event = Event({"1": "2"})
-        >>> event2 = Event(x="y")
+    collector = utils.CompressedCollection()
 
-        >>> original = EventCollector()
-        >>> original.append(event)
-        >>> original.append(event2)
-        >>> original.append(event)
+    gz = gzip.GzipFile(fileobj=StringIO.StringIO(data))
+    while True:
+        try:
+            attrs = pickle.load(gz)
+        except EOFError:
+            break
+        collector.append(Event(attrs))
 
-        >>> unpickled = pickle.loads(pickle.dumps(original))
-        >>> list(unpickled.purge()) == list(original.purge())
-        True
-        """
-
-        self._gz.flush()
-        self._gz.close()
-
-        data = self._stringio.getvalue()
-        self._stringio.close()
-
-        self.__init__(self._level, data)
-        return self.__class__, (self._level, data)
-
-    def append(self, event):
-        attrs = dict()
-        for key, value in event.items():
-            attrs.setdefault(key, list()).append(value)
-        pickle.dump(attrs, self._gz, pickle.HIGHEST_PROTOCOL)
-
-    def purge(self):
-        """
-        >>> event = Event({"1": "2"})
-        >>> event2 = Event(x="y")
-
-        >>> collector = EventCollector()
-        >>> collector.append(event)
-        >>> collector.append(event2)
-        >>> collector.append(event)
-
-        >>> list(collector.purge()) == [event, event2, event]
-        True
-        """
-
-        self._gz.flush()
-        self._gz.close()
-
-        event_list = _EventList(self._stringio)
-
-        self.__init__(self._level)
-        return event_list
-
-class _EventList(object):
-    def __init__(self, stringio):
-        self._stringio = stringio
-
-    def __iter__(self):
-        if self._stringio is not None:
-            self._stringio.seek(0)
-            gz = gzip.GzipFile(fileobj=self._stringio)
-            try:
-                while True:
-                    try:
-                        attrs = pickle.load(gz)
-                    except EOFError:
-                        break
-
-                    event = Event(attrs)
-                    pos = self._stringio.tell()
-                    yield event
-                    self._stringio.seek(pos)
-            finally:
-                gz.close()
-
-    def __nonzero__(self):
-        for _ in self:
-            return True
-        return False
+    return collector

@@ -1,5 +1,4 @@
 import uuid
-import string
 import random
 
 import idiokit
@@ -10,14 +9,18 @@ from abusehelper.core import serialize
 
 SERVICE_NS = "abusehelper#service"
 
+
 class SessionError(Exception):
     pass
+
 
 class Stop(Exception):
     pass
 
+
 class Unavailable(Stop):
     pass
+
 
 class Lobby(idiokit.Proxy):
     def __init__(self, xmpp, room):
@@ -80,11 +83,13 @@ class Lobby(idiokit.Proxy):
 
         try:
             result = yield self.xmpp.core.iq_set(start, to=jid)
-        except XMPPError, error:
+        except XMPPError as error:
             if error.type != "cancel":
                 raise
             if error.condition == "session-failure":
-                raise SessionError(error.text)
+                raise SessionError(
+                    "session for service " + repr(service_id) +
+                    " failed: " + error.text)
             idiokit.stop()
         except Unavailable:
             idiokit.stop()
@@ -98,7 +103,8 @@ class Lobby(idiokit.Proxy):
             sessions[session_id] = session
             idiokit.stop(session)
         else:
-            raise SessionError("No session ID received")
+            raise SessionError(
+                "no session ID for service " + repr(service_id) + "received")
 
     def _update_catalogue(self, jid, payload=None):
         previous = self.catalogue.pop(jid, set())
@@ -135,7 +141,7 @@ class Lobby(idiokit.Proxy):
         try:
             service = self.services.get(service_id, None)
             if service is None:
-                raise SessionError("Service '%s' not available" % service_id)
+                raise SessionError("service '%s' not available" % service_id)
 
             path = None
             for child in element.children("path").children():
@@ -146,7 +152,7 @@ class Lobby(idiokit.Proxy):
                 conf = serialize.load(child)
                 break
             else:
-                raise SessionError("Did not get session configuration")
+                raise SessionError("did not get session configuration")
 
             session = yield service.open_session(path, conf)
             session_id = uuid.uuid4().hex
@@ -154,13 +160,12 @@ class Lobby(idiokit.Proxy):
             sessions = self.jids.setdefault(jid, dict())
             sessions[session_id] = session
             session | self._catch(jid, session_id)
-        except SessionError, se:
+        except SessionError as se:
             msg = se.args[0]
             error = self.xmpp.core.build_error("cancel", "session-failure", msg)
             self.xmpp.core.iq_error(iq, error)
-        except BaseException, exc:
-            msg = "Session handling failed: %r" % exc
-            error = self.xmpp.core.build_error("cancel", "session-failure", msg)
+        except BaseException as exc:
+            error = self.xmpp.core.build_error("cancel", "session-failure", repr(exc))
             self.xmpp.core.iq_error(iq, error)
         else:
             result = Element("start", xmlns=SERVICE_NS, id=session_id)
@@ -236,11 +241,13 @@ import cPickle as pickle
 
 O_BINARY = getattr(os, "O_BINARY", 0)
 
+
 def open_file(filename):
     # Open file, create if necessary.
 
     fd = os.open(filename, os.O_RDWR | os.O_CREAT | O_BINARY)
     return os.fdopen(fd, "r+b")
+
 
 def lock_file_nonblocking(fileobj):
     # Use fcntl.flock instead of fcntl.lockf. lockf on pypy 1.7 seems
@@ -254,8 +261,10 @@ def lock_file_nonblocking(fileobj):
         return False
     return True
 
+
 def unlock_file(fileobj):
     fcntl.flock(fileobj, fcntl.LOCK_UN)
+
 
 class Service(object):
     def __init__(self, state_file=None):
@@ -295,6 +304,8 @@ class Service(object):
 
         try:
             state = yield self.errors | self.kill_sessions() | self.main(state)
+        except Stop:
+            state = None
         finally:
             self._put(None, state)
 
@@ -361,6 +372,7 @@ class Service(object):
     @idiokit.stream
     def session(self, state, **keys):
         yield idiokit.consume()
+
 
 @idiokit.stream
 def join_lobby(xmpp, name, nick=None):

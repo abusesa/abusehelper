@@ -78,4 +78,4 @@ class RSSBot(bot.PollingBot):
         return event
 
 if __name__ == "__main__":
-    RSSBot.from_command_line().run()
+    RSSBot.from_command_line().execute()

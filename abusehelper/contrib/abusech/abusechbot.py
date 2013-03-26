@@ -198,4 +198,4 @@ class AbuseCHBot(RSSBot):
         return event
 
 if __name__ == "__main__":
-    AbuseCHBot.from_command_line().run()
+    AbuseCHBot.from_command_line().execute()

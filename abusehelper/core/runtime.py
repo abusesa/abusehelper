@@ -1,7 +1,7 @@
 import uuid
 import idiokit
 from idiokit.xmpp import jid
-from abusehelper.core import serialize, events, config, bot, services, log
+from abusehelper.core import serialize, events, config, bot, services, log, version
 
 
 def iter_runtimes(obj):
@@ -88,7 +88,7 @@ class Session(Pipeable):
 
         for key, value in conf.items():
             try:
-                value = serialize.load(serialize.dump(value))
+                value = serialize.normalize(value)
             except serialize.UnregisteredType:
                 raise SessionError("can not serialize key {0!r} value {1!r}".format(key, value))
             conf[key] = value
@@ -178,6 +178,8 @@ class RuntimeBot(bot.XMPPBot):
 
     @idiokit.stream
     def main(self):
+        ver_str = version.version_str()
+        self.log.info("Starting bot {0!r} version {1}".format(self.bot_name, ver_str))
         xmpp = yield self.xmpp_connect()
 
         self.log.info("Joining lobby {0!r}".format(self.service_room))

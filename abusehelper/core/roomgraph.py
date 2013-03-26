@@ -1,5 +1,5 @@
 import idiokit
-from abusehelper.core import events, rules, taskfarm, bot, services
+from abusehelper.core import events, rules, taskfarm, bot
 
 
 class RoomGraphBot(bot.ServiceBot):
@@ -19,7 +19,8 @@ class RoomGraphBot(bot.ServiceBot):
             yield idiokit.sleep(interval)
 
             for room, (seen, sent) in self.stats.iteritems():
-                self.log.info("Room {0!r}: seen {1}, sent {2} events".format(room, seen, sent),
+                self.log.info(
+                    "Room {0!r}: seen {1}, sent {2} events".format(room, seen, sent),
                     event=events.Event({
                         "type": "room",
                         "service": self.bot_name,
@@ -89,8 +90,6 @@ class RoomGraphBot(bot.ServiceBot):
 
         try:
             yield self.rooms.inc(src_room) | self.rooms.inc(dst_room)
-        except services.Stop:
-            pass
         finally:
             classifier.dec(rule, dst_room)
             if classifier.is_empty():
