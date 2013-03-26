@@ -131,7 +131,7 @@ class ReportBot(bot.ServiceBot):
                 event = yield idiokit.next()
 
                 if event is self.REPORT_NOW:
-                    yield state
+                    yield idiokit.send(state)
                     state = utils.CompressedCollection()
                 else:
                     state.append(event)
