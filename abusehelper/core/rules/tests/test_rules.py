@@ -4,7 +4,7 @@ import re
 import unittest
 
 from .. import atoms
-from ..rules import And, Or, Match, NonMatch
+from ..rules import And, Or, Match, NonMatch, Fuzzy
 
 from ...events import Event
 
@@ -70,4 +70,8 @@ class TestNonMatch(unittest.TestCase):
 
 
 class TestFuzzy(unittest.TestCase):
-    pass
+    def test_base(self):
+        rule = Fuzzy(atoms.String('a'))
+        self.assertTrue(rule.match(Event({"a": "xy"})))
+        self.assertTrue(rule.match(Event({"xy": "a"})))
+

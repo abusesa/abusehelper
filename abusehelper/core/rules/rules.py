@@ -178,7 +178,7 @@ class Fuzzy(Rule):
 
     def match_with_cache(self, event, cache):
         if self._is_key_type:
-            if any(self._atom.match, event.keys()):
+            if any(self._atom.match(x) for x in event.keys()):
                 return True
         if event.contains(filter=self._atom.match):
             return True
