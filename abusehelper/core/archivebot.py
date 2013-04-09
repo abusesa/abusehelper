@@ -8,6 +8,7 @@
 import os
 import time
 import errno
+import calendar
 
 import idiokit
 from abusehelper.core import bot, taskfarm, events
@@ -26,6 +27,15 @@ def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
     return time.strftime(format, time.gmtime(seconds))
 
 
+def isoparse(timestring, format="%Y-%m-%d %H:%M:%S"):
+    """
+    >>> isoparse('1970-01-01 00:00:00')
+    0
+    """
+
+    return calendar.timegm(time.strptime(timestring, format))
+
+
 def ensure_dir(dir_name):
     """
     Ensure that the directory exists (create if necessary) and return
@@ -39,6 +49,19 @@ def ensure_dir(dir_name):
         if code != errno.EEXIST:
             raise
     return dir_name
+
+
+class ArchiveReader(object):
+    def __init__(self, fileobj):
+        self._fileobj = fileobj
+
+    def __iter__(self):
+        for line in self._fileobj:
+            pieces = line.split(" ", 2)
+            if len(pieces) < 3:
+                raise ValueError("unknown line format")
+            timestamp = isoparse(pieces[0] + " " + pieces[1])
+            yield timestamp, events.Event.from_unicode(pieces[2].decode("utf-8"))
 
 
 class ArchiveBot(bot.ServiceBot):
