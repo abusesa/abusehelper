@@ -116,7 +116,8 @@ class Instance(object):
         logfile = open(self.logpath, "a")
         try:
             yield "Starting."
-            process = popen(sys.executable,
+            process = popen(
+                sys.executable,
                 "-m", "runpy",
                 "abusehelper.core.startup", self.path,
                 self._id,
@@ -251,7 +252,8 @@ class Start(InstanceCommand):
 
 class Stop(InstanceCommand):
     def prep(self, parser):
-        parser.add_option("-k", "--kill",
+        parser.add_option(
+            "-k", "--kill",
             action="store_true",
             dest="kill",
             default=False,

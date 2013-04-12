@@ -126,29 +126,17 @@ class List(SubSerializer):
 class Dict(SubSerializer):
     _list = List()
 
-    def _from_dict(self, obj):
-        dumped = []
-        for key, value in obj.iteritems():
-            dumped.append(key)
-            dumped.append(value)
-        return dumped
-
-    def _to_dict(self, obj):
-        loaded = {}
-        for index in xrange(0, len(obj), 2):
-            key = obj[index]
-            value = obj[index + 1]
-            loaded[key] = value
-        return loaded
-
     def dump(self, obj, name, context):
-        return self._list.dump(self._from_dict(obj), name, context)
+        return self._list.dump(obj.items(), name, context)
 
     def load(self, element, context):
-        return self._to_dict(self._list.load(element, context))
+        items = self._list.load(element, context)
+        if all(isinstance(x, tuple) and len(x) == 2 for x in items):
+            return dict(items)
+        return dict(zip(items[::2], items[1::2]))
 
     def normalize(self, obj, context):
-        return self._to_dict(self._list.normalize(self._from_dict(obj), context))
+        return dict(self._list.normalize(obj.items(), context))
 
 
 class Int(SubSerializer):
