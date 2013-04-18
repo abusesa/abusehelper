@@ -198,7 +198,7 @@ class RuntimeBot(bot.XMPPBot):
 
         conf = []
         for key, value in session.conf.iteritems():
-            conf.append(key + u"=" + repr(value))
+            conf.append(repr(key) + "=" + repr(value))
 
         attrs = events.Event({
             "type": "session",
@@ -217,7 +217,7 @@ class RuntimeBot(bot.XMPPBot):
                     log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
                     break
                 else:
-                    conf_str = u", ".join(conf).encode("unicode-escape")
+                    conf_str = ", ".join(conf)
                     log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="running")
 
                 try:
