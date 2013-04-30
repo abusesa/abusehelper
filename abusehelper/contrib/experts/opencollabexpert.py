@@ -96,7 +96,7 @@ class OpenCollabExpert(Expert):
                             newkey = str(wikikey)
 
                         for value in page.values(wikikey):
-                            augment.add(newKey, value.strip("[[]]"))
+                            augment.add(newkey, value.strip("[[]]"))
 
             yield idiokit.send(eid, augment)
 
