@@ -43,7 +43,7 @@ class CryptoStartupBot(WikiStartupBot):
         for key, value in jsondata.iteritems():
             setattr(self, key, value)
 
-        super(CryptoStartupBot, self).execute()
+        super(CryptoStartupBot, self).run()
 
 if __name__ == '__main__':
     CryptoStartupBot.from_command_line().execute()
