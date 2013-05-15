@@ -3,7 +3,7 @@ Add ISO3166 country names to events, which have a two-digit
 country code. By default the expert looks for the "geoip cc"
 key, but this can be changed via the cc startup parameter.
 
-Country names have been taken from:
+Country names have been originally seeded from:
 http://userpage.chemie.fu-berlin.de/diverse/doc/ISO_3166.html
 
 Maintainer: "Lari Huttunen" <mit-code@huttu.net>
@@ -138,6 +138,7 @@ countries = {
     "LI": "LIECHTENSTEIN",
     "LT": "LITHUANIA",
     "LU": "LUXEMBOURG",
+    "ME": "MONTENEGRO",
     "MO": "MACAU",
     "MK": "MACEDONIA, THE FORMER YUGOSLAV REPUBLIC OF",
     "MG": "MADAGASCAR",
@@ -190,6 +191,7 @@ countries = {
     "QA": "QATAR",
     "RE": "REUNION",
     "RO": "ROMANIA",
+    "RS": "SERBIA",
     "RU": "RUSSIAN FEDERATION",
     "RW": "RWANDA",
     "SH": "SAINT HELENA",
@@ -269,12 +271,16 @@ class Iso3166Expert(Expert):
             augment = events.Event()
             if event.contains(self.cc):
                 cc = event.value(self.cc)
-                try:
-                    country = countries[cc]
-                except KeyError:
-                    self.log.error("Unknown country code: %s", cc)
-                augment.add("country", country)
-                yield idiokit.send(eid, augment)
+                # A1 = anonymous proxy
+                # A2 = satellite connection
+                if cc not in ["A1", "A2"]:
+                    try:
+                        country = countries[cc]
+                    except KeyError:
+                        self.log.error("Unknown country code: %s", cc)
+                    else:
+                        augment.add("country", country)
+                        yield idiokit.send(eid, augment)
 
 if __name__ == "__main__":
     Iso3166Expert.from_command_line().execute()
