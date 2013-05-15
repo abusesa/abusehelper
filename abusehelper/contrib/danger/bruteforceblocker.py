@@ -42,6 +42,8 @@ class BruteForceBlockerBot(bot.PollingBot):
         for timestamp in event.values("time"):
             event.add("source time", timestamp.replace("# ", "") + " UTC")
         event.clear("time")
+        event.add("type", "brute-force")
+        event.add("protocol", "ssh")
         event.add("feed url", url)
         event.add("feed", "bruteforceblocker")
         yield event
