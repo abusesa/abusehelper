@@ -1,3 +1,4 @@
+import urllib
 import getpass
 import hashlib
 
@@ -59,7 +60,8 @@ class OpenCollabReader(bot.FeedBot):
                     event = current.setdefault(page, events.Event())
                     event.add("id:open", self.page_id(page))
                     event.add("gwikipagename", page)
-                    event.add("collab url", self.collab_url + page)
+                    event.add("collab url", self.collab_url + \
+                        urllib.quote(page.encode("utf8")))
 
                     removed.discard(page)
 

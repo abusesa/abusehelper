@@ -81,6 +81,7 @@ class OpenCollabExpert(Expert):
     def augment(self):
         while True:
             eid, event = yield idiokit.next()
+            augment = events.Event()
 
             for pagekey in self.keys:
                 for pagename in event.values(pagekey):
@@ -95,9 +96,9 @@ class OpenCollabExpert(Expert):
                             newkey = str(wikikey)
 
                         for value in page.values(wikikey):
-                            event.add(newkey, value.strip("[[]]"))
+                            augment.add(newkey, value.strip("[[]]"))
 
-            yield idiokit.send(eid, event)
+            yield idiokit.send(eid, augment)
 
 if __name__ == "__main__":
     OpenCollabExpert.from_command_line().execute()

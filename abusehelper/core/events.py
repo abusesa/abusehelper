@@ -479,7 +479,9 @@ class Event(object):
         ...         return None
         >>> event.contains(parser=int_parse) # Any int value for any key?
         True
-        >>> event.contains("key", parser=int_parse)
+        >>> event.contains("key", parser=int_parse) # Any int value for "key"?
+        True
+        >>> event.contains(value=1, parser=int_parse) # Value 1 for any key?
         True
         >>> event = event.union(other="x")
         >>> event.contains("other", parser=int_parse)
@@ -504,11 +506,10 @@ class Event(object):
         else:
             filtered = values
 
-        if value is self._UNDEFINED:
-            for _ in filtered:
+        for filtered_value in filtered:
+            if value is self._UNDEFINED or value == filtered_value:
                 return True
-            return False
-        return value in set(values)
+        return False
 
     def items(self, parser=None, filter=None):
         """Return a tuple of key-value pairs contained by the event.
