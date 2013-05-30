@@ -247,6 +247,7 @@ class Mailer(object):
             if self.log:
                 self.log.info("Sending message %r to %r", subject, to_addrs)
             yield idiokit.thread(self.server.sendmail, from_addr, to_addrs, msg)
+            yield self.quit()
         except smtplib.SMTPDataError, data_error:
             if self.log:
                 self.log.error(
