@@ -195,19 +195,16 @@ class Mailer(object):
 
         if self.user and not self.password:
             self.password = getpass.getpass("SMTP password: ")
-        self.server = None
 
     @idiokit.stream
-    def _ensure_connection(self):
-        if self.server is not None:
-            return
-
-        while self.server is None:
+    def _connect(self):
+        server = None
+        while server is None:
             host, port = self.smtp_host, self.smtp_port
             if self.log:
                 self.log.info("Connecting %r port %d", host, port)
             try:
-                self.server = yield idiokit.thread(smtplib.SMTP, host, port)
+                server = yield idiokit.thread(smtplib.SMTP, host, port)
             except self.TOLERATED_EXCEPTIONS, exc:
                 if self.log:
                     self.log.error("Error connecting SMTP server: %r", exc)
@@ -220,40 +217,41 @@ class Mailer(object):
                 self.log.info("Retrying SMTP connection in 10 seconds")
             yield idiokit.sleep(10.0)
 
-        yield idiokit.thread(self.server.ehlo)
+        yield idiokit.thread(server.ehlo)
 
-        if self.server.has_extn("starttls"):
-            yield idiokit.thread(self.server.starttls)
-            yield idiokit.thread(self.server.ehlo)
+        if server.has_extn("starttls"):
+            yield idiokit.thread(server.starttls)
+            yield idiokit.thread(server.ehlo)
 
-        if self.user is not None and self.password is not None and self.server.has_extn("auth"):
-            yield idiokit.thread(self.server.login, self.user, self.password)
+        if self.user is not None and self.password is not None and server.has_extn("auth"):
+            yield idiokit.thread(server.login, self.user, self.password)
+
+        idiokit.stop(server)
 
     @idiokit.stream
-    def quit(self):
-        if self.server is not None:
+    def _disconnect(self, server):
+        if server:
             try:
-                yield idiokit.thread(self.server.quit)
+                yield idiokit.thread(server.quit)
             except self.TOLERATED_EXCEPTIONS:
                 pass
-            finally:
-                self.server = None
 
     @idiokit.stream
     def send(self, from_addr, to_addrs, subject, msg):
+        server = None
         try:
-            yield self._ensure_connection()
-
+            server = yield self._connect()
             if self.log:
                 self.log.info("Sending message %r to %r", subject, to_addrs)
-            yield idiokit.thread(self.server.sendmail, from_addr, to_addrs, msg)
-            yield self.quit()
+            yield idiokit.thread(server.sendmail, from_addr, to_addrs, msg)
+            yield self._disconnect(server)
         except smtplib.SMTPDataError, data_error:
             if self.log:
                 self.log.error(
                     "Could not send message to %r: %r. " +
                     "Dropping message from queue.",
                     to_addrs, data_error)
+            self._disconnect(server)
             idiokit.stop(True)
         except smtplib.SMTPRecipientsRefused, refused:
             if self.log:
@@ -262,11 +260,12 @@ class Mailer(object):
                         "Could not send message to %r: %r. " +
                         "Dropping message from queue.",
                         recipient, reason)
+            self._disconnect(server)
             idiokit.stop(True)
         except self.TOLERATED_EXCEPTIONS, exc:
             if self.log:
                 self.log.error("Could not send message to %r: %r", to_addrs, exc)
-            yield self.quit()
+            self._disconnect(server)
             idiokit.stop(False)
 
         if self.log:
@@ -326,10 +325,7 @@ class MailerService(ReportBot):
 
     @idiokit.stream
     def main(self, state):
-        try:
-            result = yield ReportBot.main(self, state)
-        finally:
-            yield self._mailer.quit()
+        result = yield ReportBot.main(self, state)
         idiokit.stop(result)
 
     @idiokit.stream
