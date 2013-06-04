@@ -28,22 +28,23 @@ class OpenCollabReader(bot.FeedBot):
         if self.collab_password is None:
             self.collab_password = getpass.getpass("Collab password: ")
 
-    def feed_keys(self, query, **keys):
-        yield (query,)
+    def feed_keys(self, query, feed_all=False, **keys):
+        yield (query, feed_all)
 
     def page_id(self, page):
         return hashlib.md5(page.encode("utf8") + self.collab_url).hexdigest()
 
     @idiokit.stream
-    def feed(self, query):
+    def feed(self, query, feed_all):
         collab = wiki.GraphingWiki(self.collab_url,
             ssl_verify_cert=not self.collab_ignore_cert,
             ssl_ca_certs=self.collab_extra_ca_certs)
         yield idiokit.thread(collab.authenticate, self.collab_user, self.collab_password)
 
+        yield idiokit.sleep(5)
+
         token = None
         current = dict()
-        yield idiokit.sleep(5)
         while True:
             try:
                 result = yield idiokit.thread(collab.request, "IncGetMeta", query, token)
@@ -71,7 +72,9 @@ class OpenCollabReader(bot.FeedBot):
 
                         for value in map(normalize, added):
                             event.add(key, value)
-                    yield idiokit.send(event)
+
+                    if not feed_all:
+                        yield idiokit.send(event)
 
                 for page in removed:
                     current.pop(page, None)
@@ -82,6 +85,10 @@ class OpenCollabReader(bot.FeedBot):
                     event.add("collab url", self.collab_url + page)
 
                     yield idiokit.send(event)
+
+                if feed_all:
+                    for page in current:
+                        yield idiokit.send(current[page])
 
             yield idiokit.sleep(self.poll_interval)
 
