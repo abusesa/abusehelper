@@ -1,3 +1,4 @@
+import time
 import hashlib
 import logging
 
@@ -11,8 +12,11 @@ class RoomHandler(logging.Handler):
 
         self.room = room
 
-        formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s",
-                                      "%Y-%m-%d %H:%M:%S")
+        formatter = logging.Formatter(
+            "%(asctime)s %(levelname)s %(message)s",
+            "%Y-%m-%d %H:%M:%SZ")
+        formatter.converter = time.gmtime
+
         self.setFormatter(formatter)
 
     def emit(self, record):
@@ -86,7 +90,11 @@ class EventLogger(object):
         return self._log(level, msg, **keys)
 
     def _log(self, level, msg, event=()):
-        event = events.Event(event).union(logmsg=msg, loglevel=logging.getLevelName(level))
+        event = events.Event(event).union({
+            "logtime": time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime()),
+            "logmsg": msg,
+            "loglevel": logging.getLevelName(level)
+        })
         return self._logger.log(level, msg, **{"extra": {"event": event}})
 
     def stateful(self, *ids):

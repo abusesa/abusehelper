@@ -93,9 +93,12 @@ def optparse_callback(option, opt_str, value, parser, callback, parsed):
 
 class LineFormatter(logging.Formatter):
     def __init__(self):
-        format = "%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s"
-        date_format = "%Y-%m-%d %H:%M:%S"
-        logging.Formatter.__init__(self, format, date_format)
+        logging.Formatter.__init__(
+            self,
+            "%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s",
+            "%Y-%m-%d %H:%M:%SZ")
+
+        self.converter = time.gmtime
 
     def format(self, record):
         lines = list()
