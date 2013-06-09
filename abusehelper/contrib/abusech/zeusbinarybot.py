@@ -10,7 +10,7 @@ from . import sanitize_url, host_or_ip_from_url, split_description, AbuseCHFeedB
 
 
 class ZeusBinaryBot(AbuseCHFeedBot):
-    feed_malware = "ZeuS"
+    feed_malware = "zeus"
     feed_type = "malware"
 
     feeds = bot.ListParam(default=["https://zeustracker.abuse.ch/monitor.php?urlfeed=binaries"])
@@ -20,9 +20,11 @@ class ZeusBinaryBot(AbuseCHFeedBot):
             if key == "url":
                 yield "url", sanitize_url(value)
                 yield host_or_ip_from_url(value)
-            if key in ["virustotal", "status"]:
-                yield key, value
-            if key == "md5 hash":
+            elif key == "virustotal" and value.lower() != "n/a":
+                yield "virustotal", value
+            elif key == "status":
+                yield "status", value
+            elif key == "md5 hash":
                 yield "md5", value
 
 if __name__ == "__main__":

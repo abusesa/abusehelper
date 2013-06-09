@@ -10,7 +10,7 @@ from . import host_or_ip_from_url, split_description, AbuseCHFeedBot
 
 
 class SpyEyeConfigBot(AbuseCHFeedBot):
-    feed_malware = "SpyEye"
+    feed_malware = "spyeye"
     feed_type = "malware configuration"
 
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=configurls"])

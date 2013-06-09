@@ -11,7 +11,7 @@ from . import host_or_ip, resolve_level, split_description, AbuseCHFeedBot
 
 
 class ZeusCcBot(AbuseCHFeedBot):
-    feed_malware = "ZeuS"
+    feed_malware = "zeus"
     feed_type = "c&c"
 
     feeds = bot.ListParam(default=["https://zeustracker.abuse.ch/rss.php"])

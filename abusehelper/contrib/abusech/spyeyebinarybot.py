@@ -10,7 +10,7 @@ from . import sanitize_url, host_or_ip_from_url, split_description, AbuseCHFeedB
 
 
 class SpyEyeBinaryBot(AbuseCHFeedBot):
-    feed_malware = "SpyEye"
+    feed_malware = "spyeye"
     feed_type = "malware"
 
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=binaryurls"])
@@ -20,8 +20,10 @@ class SpyEyeBinaryBot(AbuseCHFeedBot):
             if key == "spyeye binaryurl":
                 yield "url", sanitize_url(value)
                 yield host_or_ip_from_url(value)
-            elif key in ["virustotal", "status"]:
-                yield key, value
+            elif key == "virustotal" and value.lower() != "n/a":
+                yield "virustotal", value
+            elif key == "status":
+                yield "status", value
             elif key == "md5 hash":
                 yield "md5", value
 
