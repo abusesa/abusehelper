@@ -57,9 +57,9 @@ class AutoshunBot(bot.PollingBot):
             event.add("feed", "autoshun")
             event.add("feed url", self.feed_url)
             event.add("description", "This host has triggered an AutoShun alert.")
-            for d in event.values("anecdotal information"):
+            for info in event.values("anecdotal information"):
                 for name, key, value in CLASSIFICATION:
-                    if d.startswith(name):
+                    if info.startswith(name):
                         event.add(key, value)
                         if key in ["malware", "spam"]:
                             event.add("type", "botnet drone")
