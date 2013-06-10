@@ -22,7 +22,7 @@ CLASSIFICATION = (
 
 
 class AutoshunBot(bot.PollingBot):
-    COLUMNS = ["ip", "time", "anecdotal information"]
+    COLUMNS = ["ip", "time", "info"]
 
     feed_url = bot.Param(default=AUTOSHUN_CSV_URL)
     use_cymru_whois = bot.BoolParam()
@@ -57,7 +57,7 @@ class AutoshunBot(bot.PollingBot):
             event.add("feed", "autoshun")
             event.add("feed url", self.feed_url)
             event.add("description", "This host has triggered an AutoShun alert.")
-            for info in event.values("anecdotal information"):
+            for info in event.values("info"):
                 for name, key, value in CLASSIFICATION:
                     if info.startswith(name):
                         event.add(key, value)
@@ -65,12 +65,14 @@ class AutoshunBot(bot.PollingBot):
                             event.add("type", "botnet drone")
                         elif key == "protocol":
                             event.add("type", "brute-force")
+                event.add("anecdotal information", info)
+            event.clear("info")
             if not event.contains("type"):
                 event.add("type", "ids alert")
             times = event.values("time")
-            event.clear("time")
             for time in times:
                 event.add("source time", self._normalize_time(time))
+            event.clear("time")
             yield idiokit.send(event)
 
     def _normalize_time(self, time):
