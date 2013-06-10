@@ -7,7 +7,7 @@ AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
 # Based on analysis in VSRoom for the most common types.
 CLASSIFICATION = (
-    ("ZeroAccess", "malware", "ZeroAccess"),
+    ("ZeroAccess", "malware", "zeroaccess"),
     ("Sipvicious", "protocol", "sip"),
     ("SSH", "protocol", "ssh"),
     ("Tomcat", "protocol", "http"),
@@ -16,13 +16,13 @@ CLASSIFICATION = (
     ("Wordpress", "protocol", "http"),
     ("DHL Spambot", "type", "spam"),
     ("Spam Bot", "type", "spam"),
-    ("Terminal Server", "protocol", "rdp"),
-    ("TDSS", "malware", "TDSS")
+    ("Teminal Server", "protocol", "rdp"),
+    ("TDSS", "malware", "tdss")
 )
 
 
 class AutoshunBot(bot.PollingBot):
-    COLUMNS = ["ip", "time", "info"]
+    COLUMNS = ["ip", "time", "anecdotal information"]
 
     feed_url = bot.Param(default=AUTOSHUN_CSV_URL)
     use_cymru_whois = bot.BoolParam()
@@ -57,7 +57,7 @@ class AutoshunBot(bot.PollingBot):
             event.add("feed", "autoshun")
             event.add("feed url", self.feed_url)
             event.add("description", "This host has triggered an AutoShun alert.")
-            for d in event.values("info"):
+            for d in event.values("anecdotal information"):
                 for name, key, value in CLASSIFICATION:
                     if d.startswith(name):
                         event.add(key, value)
@@ -67,8 +67,6 @@ class AutoshunBot(bot.PollingBot):
                             event.add("type", "brute-force")
             if not event.contains("type"):
                 event.add("type", "ids alert")
-                self.log.debug("info: %r", event)
-            event.clear("info")
             times = event.values("time")
             event.clear("time")
             for time in times:
