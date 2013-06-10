@@ -2,8 +2,8 @@
 # files into the given archive directory, one file per channel and
 # named after the channel. Each event takes one line, and the format
 # is as follows:
-# 2010-12-09 15:11:34 a=1,b=2,b=3
-# 2010-12-09 17:12:32 a=4,a=5,b=6
+# 2010-12-09 15:11:34Z a=1,b=2,b=3
+# 2010-12-09 17:12:32Z a=4,a=5,b=6
 
 import os
 import time
@@ -14,26 +14,38 @@ import idiokit
 from abusehelper.core import bot, taskfarm, events
 
 
-def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%S"):
+def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%SZ"):
     """
     Return the ISO 8601 formatted timestamp based on the time
     expressed in seconds since the epoch. Use time.time() if seconds
     is not given or None.
 
     >>> isoformat(0)
-    '1970-01-01 00:00:00'
+    '1970-01-01 00:00:00Z'
     """
 
     return time.strftime(format, time.gmtime(seconds))
 
 
-def isoparse(timestring, format="%Y-%m-%d %H:%M:%S"):
+def isoparse(timestring, formats=("%Y-%m-%d %H:%M:%SZ", "%Y-%m-%d %H:%M:%S")):
     """
+    >>> isoparse('1970-01-01 00:00:00Z')
+    0
+
+    Also support backwards compatible timestamp format:
+
     >>> isoparse('1970-01-01 00:00:00')
     0
     """
 
-    return calendar.timegm(time.strptime(timestring, format))
+    for format in formats:
+        try:
+            time_tuple = time.strptime(timestring, format)
+        except ValueError:
+            continue
+        else:
+            return calendar.timegm(time_tuple)
+    return None
 
 
 def ensure_dir(dir_name):
