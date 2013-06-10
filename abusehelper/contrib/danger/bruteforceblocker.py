@@ -9,6 +9,7 @@ import re
 import idiokit
 from abusehelper.core import utils, cymruwhois, bot
 
+
 class BruteForceBlockerBot(bot.PollingBot):
     # Ignore the last column ("id").
     COLUMNS = ["ip", "time", "count", None]
@@ -33,18 +34,18 @@ class BruteForceBlockerBot(bot.PollingBot):
         filtered = (x for x in fileobj if x.strip() and not x.startswith("#"))
         lines = (re.sub("\t+", "\t", x) for x in filtered)
 
-        yield (utils.csv_to_events(lines,
-                            delimiter="\t",
-                            columns=self.COLUMNS,
-                            charset=info.get_param("charset"))
-                | idiokit.map(self._normalize, url))
+        yield (utils.csv_to_events(lines, delimiter="\t", columns=self.COLUMNS,
+                                   charset=info.get_param("charset")) |
+               idiokit.map(self._normalize, url))
 
     def _normalize(self, event, url):
         for timestamp in event.values("time"):
-            event.add("last seen", timestamp.replace("# ", "") + " UTC")
+            event.add("source time", timestamp.replace("# ", "") + " UTC")
         event.clear("time")
-
-        event.add("description url", url)
+        event.add("type", "brute-force")
+        event.add("protocol", "ssh")
+        event.add("feed url", url)
+        event.add("feed", "bruteforceblocker")
         yield event
 
 if __name__ == "__main__":

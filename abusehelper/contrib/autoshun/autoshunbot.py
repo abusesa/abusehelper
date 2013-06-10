@@ -7,7 +7,7 @@ AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
 # Based on analysis in VSRoom for the most common types.
 CLASSIFICATION = (
-    ("ZeroAccess", "malware", "ZeroAccess"),
+    ("ZeroAccess", "malware", "zeroaccess"),
     ("Sipvicious", "protocol", "sip"),
     ("SSH", "protocol", "ssh"),
     ("Tomcat", "protocol", "http"),
@@ -16,7 +16,8 @@ CLASSIFICATION = (
     ("Wordpress", "protocol", "http"),
     ("DHL Spambot", "type", "spam"),
     ("Spam Bot", "type", "spam"),
-    ("Terminal Server", "protocol", "rdp"),
+    ("Teminal Server", "protocol", "rdp"),
+    ("TDSS", "malware", "tdss")
 )
 
 
@@ -54,27 +55,24 @@ class AutoshunBot(bot.PollingBot):
         while True:
             event = yield idiokit.next()
             event.add("feed", "autoshun")
-            event.add("description url", "http://www.autoshun.org/")
-            d = "This host has triggered an AutoShun alert." + \
-                " For more information please turn to " + self.feed_url
-            event.add("description", d)
-            for d in event.values("info"):
+            event.add("feed url", self.feed_url)
+            event.add("description", "This host has triggered an AutoShun alert.")
+            for info in event.values("info"):
                 for name, key, value in CLASSIFICATION:
-                    if d.startswith(name):
+                    if info.startswith(name):
                         event.add(key, value)
-                        if key == "malware":
+                        if key in ["malware", "spam"]:
                             event.add("type", "botnet drone")
                         elif key == "protocol":
                             event.add("type", "brute-force")
-                        if value == "spam":
-                            event.add("type", "botnet drone")
+                event.add("anecdotal information", info)
             event.clear("info")
             if not event.contains("type"):
                 event.add("type", "ids alert")
             times = event.values("time")
-            event.clear("time")
             for time in times:
                 event.add("source time", self._normalize_time(time))
+            event.clear("time")
             yield idiokit.send(event)
 
     def _normalize_time(self, time):
