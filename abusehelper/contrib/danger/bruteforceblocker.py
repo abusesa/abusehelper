@@ -43,6 +43,7 @@ class BruteForceBlockerBot(bot.PollingBot):
             event.add("source time", timestamp.replace("# ", "") + " UTC")
         event.clear("time")
         event.add("type", "brute-force")
+        event.add("description", "This host is most likely performing SSH brute-force attacks.")
         event.add("protocol", "ssh")
         event.add("feed url", url)
         event.add("feed", "bruteforceblocker")
