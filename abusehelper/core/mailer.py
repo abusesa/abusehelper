@@ -343,8 +343,9 @@ class MailerService(ReportBot):
         # FIXME: Use encoding after getaddresses
         from_addr = getaddresses([self.mail_sender])[0]
 
-        del msg["From"]
-        msg["From"] = formataddr(from_addr)
+        if "From" not in msg:
+            msg["From"] = formataddr(from_addr)
+
         msg["Date"] = formatdate()
         msg["Message-ID"] = make_msgid()
         subject = msg.get("Subject", "")

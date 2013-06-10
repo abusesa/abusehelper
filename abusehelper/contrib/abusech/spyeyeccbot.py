@@ -11,7 +11,7 @@ from . import host_or_ip, split_description, resolve_level, AbuseCHFeedBot
 
 
 class SpyEyeCcBot(AbuseCHFeedBot):
-    feed_malware = "SpyEye"
+    feed_malware = "spyeye"
     feed_type = "c&c"
 
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=tracker"])

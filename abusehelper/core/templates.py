@@ -7,23 +7,34 @@ from email.mime.text import MIMEText
 from .utils import force_decode
 
 
+class TemplateError(Exception):
+    pass
+
+
 class Formatter(object):
+    def check(self, *args):
+        pass
+
     def format(self, result, events, *args):
         raise NotImplementedError()
 
 
-class Const(object):
+class Const(Formatter):
     def __init__(self, value):
         self.value = value
 
-    def format(self, obj, events):
+    def format(self, obj, events, *args):
         return self.value
 
 
-class AttachAndEmbedUnicode(object):
+class AttachAndEmbedUnicode(Formatter):
     def __init__(self, formatter, subtype="plain"):
         self.formatter = formatter
         self.subtype = subtype
+
+    def check(self, filename=None, *args):
+        if filename is None:
+            raise TemplateError("filename parameter required")
 
     def format(self, parts, events, filename, *args):
         data = self.formatter.format(parts, events, *args)
@@ -54,7 +65,7 @@ class _EventDict(object):
         return self.encoder(value)
 
 
-class CSVFormatter(object):
+class CSVFormatter(Formatter):
     def __init__(self, keys=True):
         self.keys = keys
 
@@ -72,6 +83,12 @@ class CSVFormatter(object):
             else:
                 yield tuple(split)
 
+    def check(self, delimiter=None, *fields):
+        if delimiter is None:
+            raise TemplateError("delimiter parameter required")
+        if len(delimiter) != 1:
+            raise TemplateError("delimiter must be a single character")
+
     def format(self, obj, events, delimiter, *fields):
         stringio = StringIO()
         fields = list(self.parse_fields(fields))
@@ -88,24 +105,55 @@ class CSVFormatter(object):
 
 
 class Template(object):
-    class _Formatter(object):
-        def __init__(self, obj, events, formatters):
-            self.obj = obj
-            self.events = events
-            self.formatters = formatters
+    class _Null(object):
+        def format(self, name, *args):
+            return ""
 
         def __getitem__(self, key):
             for row in csv.reader([key], skipinitialspace=True):
                 if not row:
                     return u""
                 row = [x.strip() for x in row]
-                formatter = self.formatters[row[0]]
-                return formatter.format(self.obj, self.events, *row[1:])
+                return self.format(*row)
             return u""
+
+    class _Checker(_Null):
+        def __init__(self, formatters):
+            self.formatters = formatters
+
+        def format(self, name, *args):
+            if name not in self.formatters:
+                raise TemplateError("unknown formatter " + repr(name))
+
+            formatter = self.formatters[name]
+            try:
+                formatter.check(*args)
+            except TemplateError as err:
+                raise TemplateError("invalid formatter " + repr(name) + ": " + err.message)
+            return u""
+
+    class _Formatter(_Null):
+        def __init__(self, obj, events, formatters):
+            self.obj = obj
+            self.events = events
+            self.formatters = formatters
+
+        def format(self, name, *args):
+            formatter = self.formatters[name]
+            return formatter.format(self.obj, self.events, *args)
 
     def __init__(self, data, **formatters):
         self.data = force_decode(data)
         self.formatters = formatters
+
+        try:
+            self.data % self._Null()
+        except ValueError:
+            raise TemplateError("invalid format")
+        except TypeError as type_error:
+            raise TemplateError(type_error.message)
+
+        self.data % self._Checker(self.formatters)
 
     def format(self, obj, events):
         formatter = self._Formatter(obj, events, self.formatters)

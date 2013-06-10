@@ -10,7 +10,7 @@ from . import host_or_ip_from_url, split_description, AbuseCHFeedBot
 
 
 class SpyEyeDropzoneBot(AbuseCHFeedBot):
-    feed_malware = "SpyEye"
+    feed_malware = "spyeye"
     feed_type = "dropzone"
 
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=dropurls"])
