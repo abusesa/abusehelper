@@ -45,7 +45,7 @@ class ReprBot(bot.ServiceBot):
 
             for body in element.named("message").children("body"):
                 text = body.text.strip()
-                if not text.startswith("/repr "):
+                if not text.startswith("/repr ") or not text.startswith("!repr "):
                     continue
 
                 try:
