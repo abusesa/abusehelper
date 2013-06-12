@@ -306,6 +306,15 @@ class MailerService(ReportBot):
             self.log)
 
     @idiokit.stream
+    def session(self, state, **keys):
+        # Try to build a mail for quick feedback that the templates etc. are
+        # at least somewhat valid.
+        yield self.build_mail([], **keys)
+
+        result = yield ReportBot.session(self, state, **keys)
+        idiokit.stop(result)
+
+    @idiokit.stream
     def build_mail(self, events, template="", to=[], cc=[], **keys):
         """
         Return a mail object produced based on collected events and
