@@ -98,7 +98,8 @@ class OpenCollabExpert(Expert):
                         for value in page.values(wikikey):
                             augment.add(newkey, value.strip("[[]]"))
 
-            yield idiokit.send(eid, augment)
+            if augment.contains():
+                yield idiokit.send(eid, augment)
 
 if __name__ == "__main__":
     OpenCollabExpert.from_command_line().execute()
