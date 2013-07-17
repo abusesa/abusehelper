@@ -291,6 +291,9 @@ class MailerService(ReportBot):
     smtp_auth_password = bot.Param(
         "password for the authenticated SMTP " +
         "service", default=None)
+    max_retries = bot.IntParam(
+        "how many times sending is retried before moving mail " + 
+        "to the end of the buffer", default=None)
 
     def __init__(self, **keys):
         ReportBot.__init__(self, **keys)
@@ -364,10 +367,18 @@ class MailerService(ReportBot):
         msg_data = msg.as_string()
         del msg
 
+        retries = 0
         while True:
             result = yield self._mailer.send(from_addr[1], to_addrs, subject, msg_data)
             if result:
                 break
+
+            if self.max_retries is not None:
+                retries += 1
+
+                if retries > self.max_retries:
+                    self.log.error("Sending mail failed")
+                    idiokit.stop(False)
 
             self.log.info("Retrying sending in 10 seconds")
             yield idiokit.sleep(10.0)
