@@ -1,0 +1,20 @@
+Startup config:
+============================================
+
+    def configs():
+        yield basic("logcollector", "abusehelper.contrib.logcollector.logcollectorbot", logcollector_ip='127.0.0.1', logcollector_port=5000)  
+
+
+
+Runtime config:
+============================================
+
+    sources_room = room_prefix + ".sources"
+
+    def consumer(name, src_room, **attrs):
+        yield Session(name,
+            src_room = src_room,
+            **attrs)
+
+    def configs():
+        yield consumer("logcollector", src_room=sources_room)
