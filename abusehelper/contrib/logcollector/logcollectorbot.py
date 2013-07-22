@@ -1,24 +1,29 @@
 """
 A simple bot for getting events from AbuseHelper to a Log Collector (Splunk, Logstash, etc..).
 
-Contributors: "Mauro Silva (CERT.PT)" <mauro.silva@fccn.pt>, "Tomas Lima (CERT.PT)" <tomas.lima@fccn.pt>
+Contributors:
+"Mauro Silva (CERT.PT)" <mauro.silva@fccn.pt>,
+"Tomas Lima (CERT.PT)" <tomas.lima@fccn.pt>,
+"Sebastian Turpeinen (Codenomicon Oy)" <ecode@codenomicon.com>
 """
 
-import socket
-import time as _time
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
 import idiokit
+from idiokit import socket
 from abusehelper.core import events, bot, taskfarm
 
 class LogCollector(bot.ServiceBot):
 
-    logcollector_ip = bot.Param("127.0.0.1")
-    logcollector_port = bot.Param("5000")
+    logcollector_ip = bot.Param(default="127.0.0.1")
+    logcollector_port = bot.IntParam(default=5000)
 
     def __init__(self, **keys):
         bot.ServiceBot.__init__(self, **keys)
         self.rooms = taskfarm.TaskFarm(self.handle_room)
-        self.srcs = taskfarm.Counter()
-
 
     @idiokit.stream
     def handle_room(self, name):
@@ -26,51 +31,55 @@ class LogCollector(bot.ServiceBot):
         room = yield self.xmpp.muc.join(name, self.bot_name)
         self.log.info("Joined room %r", name)
         try:
-            yield idiokit.pipe(events.events_to_elements(),
-                               room,
+            yield idiokit.pipe(room,
                                events.stanzas_to_events(),
                                self.distribute(name))
         finally:
             self.log.info("Left room %r", name)
 
-
     @idiokit.stream
     def distribute(self, name):
-        self.connect()
+        yield self.connect()
+
         while True:
             event = yield idiokit.next()
 
-            import json
             event_text = ''
             for key, value in event.items():
                 event_text += key + '=' + json.dumps(value) + ' '   
-            self.send_data(event_text)
 
+            yield self.send_data(event_text)
 
     @idiokit.stream
-    def session(self, _, src_room, **keys):
-        self.srcs.inc(src_room)
-        try:
-            yield self.rooms.inc(src_room)
-        finally:
-            self.srcs.dec(src_room)
+    def session(self, state, src_room):
+        yield self.rooms.inc(src_room)
 
-
+    @idiokit.stream
     def connect(self):
-        self.con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.con.connect((self.logcollector_ip, self.logcollector_port))
+        address = (self.logcollector_ip, self.logcollector_port)
+        self.conn = socket.Socket(socket.AF_INET, socket.SOCK_STREAM)
 
-
-    def send_data(self, data):
-        i = 0
-        while i < 2:
+        while True:
             try:
-                self.con.send(data + "\n")
-                self.con.sendall( "" )
-                return
-            except:
-                i += 1
-                self.connect()
+                yield self.conn.connect(address)
+                break
+            except socket.SocketError, e:
+                self.log.error(e.args[1] + ". Retrying in 10 seconds.")
+                yield idiokit.sleep(10)
+
+        self.log.info("Connected successfully to %s:%i", address[0], address[1])
+
+    @idiokit.stream
+    def send_data(self, data):
+        while True:
+            try:
+                yield self.conn.send(unicode(data + "\n").encode("utf-8"))
+                yield self.conn.sendall("")
+                break
+            except socket.SocketError, e:
+                self.log.error(e.args[1] + ". Reconnecting..")
+                yield self.conn.close()
+                yield self.connect()
 
 
 if __name__ == "__main__":
