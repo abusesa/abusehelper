@@ -329,8 +329,8 @@ class MailerService(ReportBot):
             attach_and_embed_csv=templates.AttachAndEmbedUnicode(csv),
             to=templates.Const(format_addresses(to)),
             cc=templates.Const(format_addresses(cc)))
-        yield idiokit.sleep(0.0)
-        idiokit.stop(template.format(events))
+        msg = yield idiokit.thread(template.format, events)
+        idiokit.stop(msg)
 
     @idiokit.stream
     def report(self, events, to=[], cc=[], **keys):
