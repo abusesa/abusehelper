@@ -1,3 +1,4 @@
+import socket
 import idiokit
 from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
@@ -13,14 +14,15 @@ class OpenCollabExpert(Expert):
     cache_query = bot.Param()
     page_keys = bot.ListParam("pagekey=wikikey[,pagekey=wikikey]")
     disable_join_keys = bot.BoolParam("Disable pagekey and wikikey joining on events")
-    poll_interval = bot.IntParam("wait at least the given amount of seconds " +
-                                 "before polling the collab again " +
-                                 "(default: %default seconds)", default=600)
+    poll_interval = bot.IntParam("""
+        wait at least the given amount of seconds before polling the collab again
+        (default: %default seconds)
+        """, default=600)
 
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
-        self.cache = dict()
 
+        self.cache = dict()
         self.keys = dict()
 
         for pair in self.page_keys:
@@ -49,8 +51,8 @@ class OpenCollabExpert(Expert):
         while True:
             try:
                 result = yield idiokit.thread(self.collab.request, "IncGetMeta", query, token)
-            except Exception, exc:
-                self.log.error("IncGetMeta failed: %s" % exc)
+            except (socket.error, wiki.WikiFailure) as exc:
+                self.log.error("IncGetMeta failed: {0}".format(exc))
             else:
                 incremental, token, (removed, updates) = result
                 removed = set(removed)
@@ -74,7 +76,10 @@ class OpenCollabExpert(Expert):
                 for page in removed:
                     self.cache.pop(page, None)
 
-            self.log.info("%i pages in cache", len(self.cache))
+                if removed or updates:
+                    self.log.info("Updated {0} pages and removed {1} pages ({2} pages in cache)".format(
+                        len(updates), len(removed), len(self.cache)))
+
             yield idiokit.sleep(self.poll_interval)
 
     @idiokit.stream
