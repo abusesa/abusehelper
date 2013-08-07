@@ -588,7 +588,7 @@ class PollingBot(FeedBot):
     @idiokit.stream
     def manage_feed(self, key):
         if key not in self._poll_cleanup:
-            self._poll_queue.queue(0.0, key)
+            yield self._poll_queue.queue(0.0, key)
         else:
             self._poll_cleanup.discard(key)
 
@@ -607,7 +607,7 @@ class PollingBot(FeedBot):
                 continue
 
             yield self.poll(*key) | self._distribute(key)
-            self._poll_queue.queue(self.poll_interval, key)
+            yield self._poll_queue.queue(self.poll_interval, key)
 
     @idiokit.stream
     def _distribute(self, key):
