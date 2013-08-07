@@ -83,6 +83,8 @@ class RoomGraphBot(bot.ServiceBot):
 
     @idiokit.stream
     def session(self, _, src_room, dst_room, rule=None, **keys):
+        if rule is None:
+            rule = rules.Anything()
         rule = rules.rule(rule)
 
         classifier = self.srcs.setdefault(src_room, rules.Classifier())

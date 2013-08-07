@@ -41,6 +41,7 @@ class Serializer(object):
             self.register("rm", Rule(rules.Match))
             self.register("rc", Rule(rules.NonMatch))
             self.register("rf", Rule(rules.Fuzzy))
+            self.register("ry", Rule(rules.Anything))
 
             self.register("rx", Rule(rules.RegExp))
             self.register("rs", Rule(rules.String))

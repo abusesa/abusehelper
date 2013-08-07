@@ -132,6 +132,11 @@ def regexp_parser(data, rex=re.compile(r'/((?:\\.|[^\\/])*)/(i)?')):
     yield None, (regexp, (string, match.end(), end))
 
 
+@formatter.handler(rules.Anything)
+def format_fuzzy(format, anything):
+    yield "*"
+
+
 @formatter.handler(rules.Fuzzy)
 def format_fuzzy(format, fuzzy):
     yield format(fuzzy.atom)
@@ -163,7 +168,7 @@ def format_and(format, rule):
         if index != 0:
             yield " and "
 
-        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy, rules.Anything)):
             yield format(subrule)
         else:
             yield "("
@@ -176,7 +181,7 @@ def format_or(format, rule):
     for index, subrule in enumerate(rule.subrules):
         if index != 0:
             yield " or "
-        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+        if isinstance(subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy, rules.Anything)):
             yield format(subrule)
         else:
             yield "("
@@ -187,7 +192,7 @@ def format_or(format, rule):
 @formatter.handler(rules.No)
 def format_no(format, rule):
     yield "no "
-    if not isinstance(rule.subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy)):
+    if not isinstance(rule.subrule, (rules.No, rules.Match, rules.NonMatch, rules.Fuzzy, rules.Anything)):
         yield "("
         yield format(rule.subrule)
         yield ")"
@@ -236,7 +241,8 @@ def _create_parser():
         step(
             star_parser,
             (match_tail, rules.Match),
-            (non_match_tail, rules.NonMatch)
+            (non_match_tail, rules.NonMatch),
+            step_default(lambda x: rules.Anything())
         ),
 
         transform(

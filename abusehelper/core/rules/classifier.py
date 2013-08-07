@@ -30,7 +30,7 @@ class Classifier(object):
             if result.issuperset(classes):
                 continue
 
-            if rule is None or rule.match(obj, cache):
+            if rule.match(obj, cache):
                 result.update(classes)
 
         return result

@@ -31,11 +31,3 @@ class TestClassifier(unittest.TestCase):
         c.dec(rules.Match("a", "b"), "Y")
         self.assertEqual([], sorted(c.classify(Event(a="b"))))
         self.assertTrue(c.is_empty())
-
-    def test_None_rule(self):
-        c = classifier.Classifier()
-        c.inc(None, "X")
-        c.inc(None, "Y")
-        c.inc(rules.Match("a", "b"), "Z")
-        self.assertEqual(["X", "Y", "Z"], sorted(c.classify(Event(a="b"))))
-        self.assertEqual(["X", "Y"], sorted(c.classify(Event(a="c"))))

@@ -93,6 +93,11 @@ class No(Rule):
         return cls(rule)
 
 
+class Anything(Rule):
+    def match_with_cache(self, obj, cache):
+        return True
+
+
 class Match(Rule):
     _to_atom = [
         (basestring, atoms.String),

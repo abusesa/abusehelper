@@ -4,7 +4,7 @@ import sys
 import unittest
 
 from ..atoms import String, RegExp, IP
-from ..rules import And, Or, No, Match, NonMatch, Fuzzy
+from ..rules import And, Or, No, Match, NonMatch, Fuzzy, Anything
 from ..rulelang import format, parse, rule
 
 
@@ -103,9 +103,6 @@ class TestParse(unittest.TestCase):
         self.assertEqual(parse('" a "'), Fuzzy(String(' a ')))
         self.assertEqual(parse('/a/'), Fuzzy(RegExp('a')))
 
-        # Star is not a valid fuzzy matcher.
-        self.assertRaises(ValueError, parse, "*")
-
     def test_string(self):
         self.assertEqual(
             parse('"\\" \\/ \\r \\n \\b \\f \\uffff"'),
@@ -120,9 +117,13 @@ class TestParse(unittest.TestCase):
         self.assertEqual(parse('/a/i'), Fuzzy(RegExp('a', ignore_case=True)))
         self.assertEqual(parse(r'/\//'), Fuzzy(RegExp(r'\/')))
 
+    def test_anything(self):
+        self.assertEqual(parse('*'), Anything())
+
 
 class TestFormat(unittest.TestCase):
     def test_star(self):
+        self.assertEqual("*", format(Anything()))
         self.assertEqual("*=*", format(Match()))
         self.assertEqual("*!=*", format(NonMatch()))
 
