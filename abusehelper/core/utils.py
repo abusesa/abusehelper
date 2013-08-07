@@ -10,6 +10,7 @@ import email.parser
 import cPickle as pickle
 
 import idiokit
+from idiokit import heap
 from abusehelper.core import events
 from cStringIO import StringIO
 
@@ -140,6 +141,72 @@ class TimedCache(object):
         expire_time = time.time() + self.cache_time
         self.queue.append((expire_time, key))
         self.cache[key] = expire_time, value
+
+
+class WaitQueue(object):
+    class WakeUp(Exception):
+        pass
+
+    def __init__(self):
+        self._heap = heap.Heap()
+        self._time = time.time()
+        self._waiter = idiokit.Event()
+
+    def _now(self):
+        now = time.time()
+        if self._time < now:
+            return now
+        self._time = now
+        return now
+
+    @idiokit.stream
+    def queue(self, delay, obj):
+        yield idiokit.sleep(0.0)
+
+        timestamp = self._now() + delay
+        if not self._heap or timestamp < self._heap.peek()[0]:
+            self._waiter.throw(self.WakeUp())
+
+        node = self._heap.push((timestamp, obj))
+        idiokit.stop(node)
+
+    @idiokit.stream
+    def cancel(self, node):
+        yield idiokit.sleep(0.0)
+
+        try:
+            timestamp, _ = self._heap.pop(node)
+        except heap.HeapError:
+            idiokit.stop(False)
+        idiokit.stop(True)
+
+    @idiokit.stream
+    def wait(self):
+        while True:
+            if not self._heap:
+                timeout = None
+            else:
+                timestamp, _ = self._heap.peek()
+                timeout = max(0.0, timestamp - self._now())
+
+            waiter = self._waiter
+            try:
+                if timeout is not None:
+                    yield waiter | idiokit.sleep(timeout)
+                else:
+                    yield waiter
+            except self.WakeUp:
+                pass
+            finally:
+                if waiter is self._waiter:
+                    self._waiter = idiokit.Event()
+
+            while self._heap:
+                timestamp, obj = self._heap.peek()
+                if timestamp > self._now():
+                    break
+                self._heap.pop()
+                idiokit.stop(obj)
 
 
 class CompressedCollection(object):

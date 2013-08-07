@@ -299,7 +299,6 @@ class Bot(object):
 
 import time
 import getpass
-import collections
 
 import idiokit
 from idiokit.xmpp import connect
@@ -419,7 +418,7 @@ class ServiceBot(XMPPBot):
         yield idiokit.consume()
 
 
-from abusehelper.core import events, taskfarm
+from abusehelper.core import events, taskfarm, utils
 
 
 class FeedBot(ServiceBot):
@@ -575,7 +574,7 @@ class PollingBot(FeedBot):
     def __init__(self, *args, **keys):
         FeedBot.__init__(self, *args, **keys)
 
-        self._poll_queue = collections.deque()
+        self._poll_queue = utils.WaitQueue()
         self._poll_dedup = dict()
         self._poll_cleanup = set()
 
@@ -589,7 +588,7 @@ class PollingBot(FeedBot):
     @idiokit.stream
     def manage_feed(self, key):
         if key not in self._poll_cleanup:
-            self._poll_queue.appendleft((time.time(), key))
+            self._poll_queue.queue(0.0, key)
         else:
             self._poll_cleanup.discard(key)
 
@@ -601,19 +600,14 @@ class PollingBot(FeedBot):
     @idiokit.stream
     def main(self, state):
         while True:
-            while not self._poll_queue or self._poll_queue[0][0] > time.time():
-                yield idiokit.sleep(1.0)
-
-            _, key = self._poll_queue.popleft()
+            key = yield self._poll_queue.wait()
             if key in self._poll_cleanup:
                 self._poll_cleanup.remove(key)
                 self._poll_dedup.pop(key, None)
                 continue
 
             yield self.poll(*key) | self._distribute(key)
-
-            expire_time = time.time() + self.poll_interval
-            self._poll_queue.append((expire_time, key))
+            self._poll_queue.queue(self.poll_interval, key)
 
     @idiokit.stream
     def _distribute(self, key):
