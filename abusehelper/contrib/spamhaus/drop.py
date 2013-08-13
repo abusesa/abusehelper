@@ -5,19 +5,24 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 """
 
 import idiokit
+import urllib2
 from abusehelper.core import utils, cymruwhois, bot, events
 
 
 class SpamhausDropBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam()
-    http_headers = bot.ListParam("a list of http header (k,v) tuples", default=[])
+    http_headers = bot.ListParam("a list of http header (k, v) tuples", default=[])
 
     @idiokit.stream
     def poll(self, url="http://www.spamhaus.org/drop/drop.lasso"):
+        request = urllib2.Request(url)
+        for key, value in self.http_headers:
+            request.add_header(key, value)
+
         self.log.info("Downloading %s" % url)
         try:
-            info, fileobj = yield utils.fetch_url(url, headers=self.http_headers)
-        except utils.FetchUrlFailed, fuf:
+            info, fileobj = yield utils.fetch_url(request)
+        except utils.FetchUrlFailed as fuf:
             self.log.error("Download failed: %r", fuf)
             idiokit.stop(False)
         self.log.info("Downloaded")

@@ -1,4 +1,5 @@
 import idiokit
+import urllib2
 import xml.etree.cElementTree as etree
 from abusehelper.core import bot, cymruwhois, events, utils
 
@@ -23,10 +24,14 @@ class RSSBot(bot.PollingBot):
 
     @idiokit.stream
     def _poll(self, url):
+        request = urllib2.Request(url)
+        for key, value in self.http_headers:
+            request.add_header(key, value)
+
         try:
             self.log.info('Downloading feed from: "%s"', url)
-            _, fileobj = yield utils.fetch_url(url, headers=self.http_headers)
-        except utils.FetchUrlFailed, e:
+            _, fileobj = yield utils.fetch_url(request)
+        except utils.FetchUrlFailed as e:
             self.log.error('Failed to download feed "%s": %r', url, e)
             idiokit.stop(False)
 
@@ -47,7 +52,7 @@ class RSSBot(bot.PollingBot):
                             if id:
                                 new_events.add(id)
                             yield idiokit.send(event)
-            except SyntaxError, e:
+            except SyntaxError as e:
                 self.log.error('Invalid format on feed: "%s", "%r"', url, e)
 
         for id in self.past_events:
@@ -77,6 +82,7 @@ class RSSBot(bot.PollingBot):
             if value:
                 event.add(key, value)
         return event
+
 
 if __name__ == "__main__":
     RSSBot.from_command_line().execute()
