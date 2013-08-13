@@ -6,6 +6,7 @@ from abusehelper.core import bot, cymruwhois, events, utils
 class RSSBot(bot.PollingBot):
     feeds = bot.ListParam("a list of RSS feed URLs")
     use_cymru_whois = bot.BoolParam()
+    http_headers = bot.ListParam("a list of http header (k,v) tuples", default=[])
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
@@ -24,7 +25,7 @@ class RSSBot(bot.PollingBot):
     def _poll(self, url):
         try:
             self.log.info('Downloading feed from: "%s"', url)
-            _, fileobj = yield utils.fetch_url(url)
+            _, fileobj = yield utils.fetch_url(url, headers=self.http_headers)
         except utils.FetchUrlFailed, e:
             self.log.error('Failed to download feed "%s": %r', url, e)
             idiokit.stop(False)
