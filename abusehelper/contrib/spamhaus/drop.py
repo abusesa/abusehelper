@@ -10,12 +10,13 @@ from abusehelper.core import utils, cymruwhois, bot, events
 
 class SpamhausDropBot(bot.PollingBot):
     use_cymru_whois = bot.BoolParam()
+    http_headers = bot.ListParam("a list of http header (k,v) tuples", default=[])
 
     @idiokit.stream
     def poll(self, url="http://www.spamhaus.org/drop/drop.lasso"):
         self.log.info("Downloading %s" % url)
         try:
-            info, fileobj = yield utils.fetch_url(url)
+            info, fileobj = yield utils.fetch_url(url, headers=self.http_headers)
         except utils.FetchUrlFailed, fuf:
             self.log.error("Download failed: %r", fuf)
             idiokit.stop(False)

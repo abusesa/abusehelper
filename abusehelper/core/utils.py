@@ -37,9 +37,13 @@ class HTTPError(FetchUrlFailed):
 
 
 @idiokit.stream
-def fetch_url(url, opener=None, timeout=60.0, chunk_size=16384):
+def fetch_url(url, opener=None, timeout=60.0, chunk_size=16384, headers=[]):
+
     if opener is None:
         opener = urllib2.build_opener()
+
+    if headers:
+        opener.addheaders = dict(opener.addheaders, **dict(headers)).items()
 
     try:
         output = StringIO()
