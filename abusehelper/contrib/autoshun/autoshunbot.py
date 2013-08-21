@@ -43,8 +43,10 @@ class AutoshunBot(bot.PollingBot):
             idiokit.stop()
         self.log.info("Downloaded")
 
-        # Skip first line
-        fileobj.readline()
+        # Grab time offset from first line of the CSV
+        header = fileobj.readline()
+        offset = -1 * int(header[-6::].strip()) / 100  # ex: -0500 to 5
+        self.time_offset = offset if -12 <= offset <= 12 else 5
 
         yield utils.csv_to_events(fileobj,
                                   columns=self.COLUMNS,
@@ -71,16 +73,23 @@ class AutoshunBot(bot.PollingBot):
                 event.add("type", "ids alert")
             times = event.values("time")
             for time in times:
-                event.add("source time", self._normalize_time(time))
+                try:
+                    event.add("source time", self._normalize_time(time))
+                except ValueError:
+                    event.add("source time", self._normalize_date(time))
             event.clear("time")
             yield idiokit.send(event)
 
     def _normalize_time(self, time):
         parsed = _time.strptime(time, "%Y-%m-%d %H:%M:%S")
         seconds = calendar.timegm(parsed)
-        seconds += 5 * 3600  # UTC-5 to UTC
+        seconds += self.time_offset * 3600  # UTC-5 to UTC
         time_tuple = _time.gmtime(seconds)
         return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
+
+    def _normalize_date(self, time):
+        parsed = _time.strptime(time, "%Y-%m-%d")
+        return _time.strftime("%Y-%m-%d", parsed)  # No UTC-5 to UTC conversion
 
 if __name__ == "__main__":
     AutoshunBot.from_command_line().execute()
