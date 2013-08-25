@@ -5,8 +5,7 @@ Maintainer: Sauli Pahlman <sauli@codenomicon.com>
 """
 
 import idiokit
-from abusehelper.core import cymruwhois, bot, events
-
+from abusehelper.core import bot, events
 
 class SpamhausXblBot(bot.PollingBot):
     xbl_filepath = bot.Param("Filename of Spamhaus XBL file")
