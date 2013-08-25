@@ -15,6 +15,7 @@ class SpamhausXblBot(bot.PollingBot):
     def poll(self):
         skip_chars = ["#", ":", "$"]
         self.log.info("Opening %s" % self.xbl_filepath)
+        count = 0
 
         try:
             with open(self.xbl_filepath, "r") as f:
@@ -27,7 +28,9 @@ class SpamhausXblBot(bot.PollingBot):
                     event.add("ip", line)
                     event.add("description url", "http://www.spamhaus.org/query/bl?ip=" + line)
                     yield idiokit.send(event)
+                    count += 1
 
+                self.log.info("Sent %d events" % count)
         except IOError, ioe:
             self.log.error("Could not open %s: %s" % (self.xbl_filepath, ioe))
 
