@@ -134,7 +134,7 @@ class StartupBot(bot.Bot):
         env = dict(os.environ)
         env["ABUSEHELPER_CONF_FROM_STDIN"] = "1"
         try:
-            process = subprocess.Popen(args, cwd=conf.workdir, env=env, stdin=subprocess.PIPE)
+            process = subprocess.Popen(args, cwd=conf.workdir, env=env, stdin=subprocess.PIPE, close_fds=True)
         except OSError, ose:
             self.log.error("Failed launching bot %r: %r", conf.name, ose)
             return None
