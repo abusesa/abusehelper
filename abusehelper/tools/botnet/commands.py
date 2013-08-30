@@ -17,7 +17,8 @@ def popen(*args, **keys):
     defaults = {
         "stdout": subprocess.PIPE,
         "stderr": subprocess.PIPE,
-        "stdin": subprocess.PIPE
+        "stdin": subprocess.PIPE,
+        "close_fds": True
     }
     defaults.update(keys)
     return subprocess.Popen(args, **defaults)
@@ -122,8 +123,7 @@ class Instance(object):
                 "abusehelper.core.startup", self.path,
                 self._id,
                 stdout=logfile,
-                stderr=logfile,
-                close_fds=True)
+                stderr=logfile)
         finally:
             logfile.close()
 
