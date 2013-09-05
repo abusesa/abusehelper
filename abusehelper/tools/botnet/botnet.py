@@ -53,10 +53,17 @@ class Botnet(object):
 
         return options, args
 
+    def _get_commands(self):
+        command_string = ("Available commands are:\n")
+        for name in sorted(self._commands):
+            command_string += name + "\n"
+        return command_string.rstrip("\n")
+
     def run(self):
         parser = OptionParser()
 
-        parser.set_usage("usage: %prog [options] command [...]")
+        usage = "usage: %prog [options] command [...]\n\n" + self._get_commands()
+        parser.set_usage(usage)
         parser.add_option(
             "-p", "--python",
             dest="python",
@@ -75,10 +82,7 @@ class Botnet(object):
         options, args = self._parse(parser)
 
         if not args:
-            print(parser.get_usage())
-            print("Available commands are:")
-            for name in sorted(self._commands):
-                print(" " + name)
+            parser.print_usage()
             sys.exit(0)
 
         command = args[0]
