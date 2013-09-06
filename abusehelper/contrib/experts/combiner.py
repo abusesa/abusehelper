@@ -30,24 +30,9 @@ class RoomBot(bot.ServiceBot):
 
 
 import time
-import codecs
 import collections
 from hashlib import sha1
 from abusehelper.core import events
-
-_encoder = codecs.getencoder("utf-8")
-
-
-def event_id(event):
-    result = list()
-
-    for key, value in sorted(event.items()):
-        key = _encoder(key)[0]
-        value = _encoder(value)[0]
-        result.append(key)
-        result.append(value)
-
-    return sha1("\xc0".join(result)).hexdigest()
 
 
 AUGMENT_KEY = "augment sha-1"
@@ -66,7 +51,7 @@ def ignore_augmentations(ignore):
 def create_eids():
     while True:
         event = yield idiokit.next()
-        yield idiokit.send(event_id(event), event)
+        yield idiokit.send(events.hexdigest(event, sha1), event)
 
 
 @idiokit.stream
@@ -132,7 +117,7 @@ class Combiner(RoomBot):
         while True:
             event = yield idiokit.next()
 
-            eid = event_id(event)
+            eid = events.hexdigest(event, sha1)
             unique, event_set, augment_set = self._add(ids, queue, time_window, eid)
             event_set[unique] = event.union(*augment_set.values())
 

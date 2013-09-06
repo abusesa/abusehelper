@@ -1,4 +1,5 @@
 import re
+import hashlib
 import inspect
 import collections
 
@@ -622,6 +623,55 @@ class Event(object):
         for key, value in self.items():
             attrs.setdefault(key, list()).append(value)
         return self.__class__.__name__ + "(" + repr(attrs) + ")"
+
+
+def hexdigest(event, func=hashlib.sha1):
+    """Return a hexadecimal digest string created by from the given event's
+    key-value pairs.
+
+    The result is guaranteed to be the same for two events e1 and e2 when
+    e1 == e2. Key-value insertion order does not affect the result.
+
+    >>> e1 = Event()
+    >>> e1.add("a", "b")
+    >>> e1.add("x", "y")
+    >>>
+    >>> e2 = Event()
+    >>> e2.add("x", "y")
+    >>> e2.add("a", "b")
+    >>>
+    >>> hexdigest(e1) == hexdigest(e2)
+    True
+
+    The result is not guaranteed to be different for two events e1 and e2
+    when e1 != e2. However such a collision is usually exceedingly unlikely
+    when a good hashing algorithm is used. SHA1 is the default, but can be
+    changed by passing in an algorihm implementation with a compatible
+    interface. For example, algorithms defined in the standard 'hashlib'
+    library are compatible.
+
+    >>> import hashlib
+    >>> hexdigest(Event(a="b"), hashlib.md5)
+    '51a8ca876645d37e29419694f6396fbc'
+
+    The default hashing algorithm is NOT guaranteed to be SHA1 forever. If you
+    want to guarantee that the hexdigest is always created using e.g. SHA1,
+    pass the hash function explicitly as the second parameter:
+
+    >>> import hashlib
+    >>> hexdigest(Event(a="b"), hashlib.sha1)
+    'edf6294fc1d3f9fe8be4a2d5626788bcfde05e62'
+    """
+
+    result = func()
+
+    for key, value in sorted(event.items()):
+        result.update(key.encode("utf-8"))
+        result.update("\xc0")
+        result.update(value.encode("utf-8"))
+        result.update("\xc0")
+
+    return result.hexdigest()
 
 
 def stanzas_to_events():

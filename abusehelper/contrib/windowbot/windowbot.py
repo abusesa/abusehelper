@@ -30,22 +30,8 @@ class RoomBot(bot.ServiceBot):
 
 
 import time
-import hashlib
 import collections
 from abusehelper.core import events
-
-
-def event_id(event):
-    result = list()
-
-    for key in sorted(event.keys()):
-        key = key.encode("utf-8")
-        for value in sorted(event.values(key)):
-            value = value.encode("utf-8")
-            result.append(key)
-            result.append(value)
-
-    return hashlib.md5("\xc0".join(result)).hexdigest()
 
 
 class WindowBot(RoomBot):
@@ -57,7 +43,7 @@ class WindowBot(RoomBot):
             current_time = time.time()
             expire_time = current_time + window_time
 
-            eid = event_id(event)
+            eid = events.hexdigest(event)
 
             event.add("id", eid)
             yield idiokit.send(event)

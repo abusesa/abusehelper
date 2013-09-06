@@ -418,6 +418,7 @@ class ServiceBot(XMPPBot):
         yield idiokit.consume()
 
 
+import hashlib
 from abusehelper.core import events, taskfarm, utils
 
 
@@ -545,20 +546,6 @@ class FeedBot(ServiceBot):
         return idiokit.map(lambda x: (x,))
 
 
-import codecs
-from hashlib import md5
-
-_utf8encoder = codecs.getencoder("utf-8")
-
-
-def event_hash(event):
-    result = list()
-    for key, value in sorted(event.items()):
-        result.append(_utf8encoder(key)[0])
-        result.append(_utf8encoder(value)[0])
-    return md5("\xc0".join(result)).digest()
-
-
 class PollingBot(FeedBot):
     poll_interval = IntParam("""
         wait at least the given amount of seconds before polling
@@ -617,7 +604,7 @@ class PollingBot(FeedBot):
 
         while True:
             event = yield idiokit.next()
-            event_key = event_hash(event)
+            event_key = int(events.hexdigest(event, hashlib.md5), 16)
 
             for name in tuple(self._dsts.get(key)):
                 room = self._rooms.get(name)
