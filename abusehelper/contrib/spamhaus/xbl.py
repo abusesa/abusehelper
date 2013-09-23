@@ -26,6 +26,7 @@ class SpamhausXblBot(bot.PollingBot):
                     event = events.Event()
                     event.add("ip", line)
                     event.add("description url", "http://www.spamhaus.org/query/bl?ip=" + line)
+                    event.add("feed", "spamhaus XBL list")
                     yield idiokit.send(event)
                     count += 1
 
