@@ -134,15 +134,17 @@ class PhishTankBot(bot.PollingBot):
         status = entry.find("status")
         if status is None:
             return
+
         online = status.find("online")
         if online is None or online.text != "yes":
             return
 
-        target = entry.find("target")
-
         details = entry.find("details")
         if details is None:
             return
+
+        target = entry.find("target")
+
         for detail in details.findall("detail"):
             ip = detail.find("ip_address")
             if ip is None:
@@ -168,10 +170,13 @@ class PhishTankBot(bot.PollingBot):
             event.add("host", host)
             event.add("ip", ip)
             event.add("asn", announcer)
+
             if ts:
                 event.add("source time", ts)
-            if target is not None:
+
+            if target is not None and target.text is not None:
                 event.add("target", target.text)
+
             yield idiokit.send(event)
 
     @idiokit.stream
