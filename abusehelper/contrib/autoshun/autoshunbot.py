@@ -58,7 +58,8 @@ class AutoshunBot(bot.PollingBot):
             event = yield idiokit.next()
             event.add("feed", "autoshun")
             event.add("feed url", self.feed_url)
-            event.add("description", "This host has triggered an AutoShun alert.")
+            event.add("description", "This host has triggered an IDS alert.")
+
             for info in event.values("info"):
                 for name, key, value in CLASSIFICATION:
                     if info.startswith(name):
