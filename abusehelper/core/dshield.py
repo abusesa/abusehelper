@@ -19,22 +19,22 @@ class DShieldBot(bot.PollingBot):
 
     @idiokit.stream
     def _poll(self, asn, url="http://dshield.org/asdetailsascii.html"):
-        url += "?as=%s" % asn
+        url += "?as={0}".format(asn)
 
-        self.log.info("ASN%s: downloading", asn)
+        self.log.info("ASN{0}: downloading".format(asn))
         try:
             info, fileobj = yield utils.fetch_url(url)
-        except utils.FetchUrlFailed, fuf:
-            self.log.error("ASN%s: downloading failed: %r", asn, fuf)
-            return
-        self.log.info("ASN%s: downloaded", asn)
+        except utils.FetchUrlFailed as fuf:
+            raise bot.PollSkipped("downloading ASN{0} data failed ({1})".format(asn, fuf))
+        self.log.info("ASN{0}: downloaded".format(asn))
 
         charset = info.get_param("charset")
         filtered = (x for x in fileobj if x.strip() and not x.startswith("#"))
-        yield utils.csv_to_events(filtered,
-                                  delimiter="\t",
-                                  columns=self.COLUMNS,
-                                  charset=charset)
+        yield utils.csv_to_events(
+            filtered,
+            delimiter="\t",
+            columns=self.COLUMNS,
+            charset=charset)
 
     @idiokit.stream
     def normalize(self, asn):
