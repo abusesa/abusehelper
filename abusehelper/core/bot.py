@@ -527,6 +527,15 @@ class FeedBot(ServiceBot):
         return idiokit.map(lambda x: (x,))
 
 
+class PollSkipped(Exception):
+    def __init__(self, reason):
+        Exception.__init__(self, reason)
+
+    @property
+    def reason(self):
+        return self.args[0]
+
+
 class PollingBot(FeedBot):
     poll_interval = IntParam("""
         wait at least the given amount of seconds before polling
@@ -590,6 +599,8 @@ class PollingBot(FeedBot):
 
                 try:
                     yield self.poll(*key) | self._dedup(key)
+                except PollSkipped as skip:
+                    self.log.info("Poll skipped: {0.reason}".format(skip))
                 finally:
                     result.succeed()
 
