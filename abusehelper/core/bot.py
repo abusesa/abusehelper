@@ -560,7 +560,7 @@ class PollingBot(FeedBot):
         yield idiokit.sleep(0.0)
 
     @idiokit.stream
-    def _dedup(self, key):
+    def dedup(self, key):
         initial_poll = key not in self._poll_dedup
 
         old_filter = self._poll_dedup.setdefault(key, set())
@@ -573,7 +573,7 @@ class PollingBot(FeedBot):
                 self._poll_dedup[key] = new_filter
                 raise
 
-            event_key = events.hexdigest(event, hashlib.md5)
+            event_key = int(events.hexdigest(event, hashlib.md5), 16)
             if event_key not in old_filter:
                 if not initial_poll or not self.ignore_initial_poll:
                     yield idiokit.send(event)
@@ -598,7 +598,7 @@ class PollingBot(FeedBot):
                     yield self._poll_queue.cancel(node)
 
                 try:
-                    yield self.poll(*key) | self._dedup(key)
+                    yield self.poll(*key) | self.dedup(key)
                 except PollSkipped as skip:
                     self.log.info("Poll skipped: {0.reason}".format(skip))
                 finally:
