@@ -431,16 +431,24 @@ class FeedBot(ServiceBot):
     def __init__(self, *args, **keys):
         ServiceBot.__init__(self, *args, **keys)
 
-        self._feeds = taskfarm.TaskFarm(self.manage_feed)
+        self._feeds = taskfarm.TaskFarm(self.feed)
         self._rooms = taskfarm.TaskFarm(self.manage_room)
-        self._dsts = taskfarm.Counter()
+        self._connections = taskfarm.TaskFarm(self.manage_connection, grace_period=0.0)
 
         self._last_output = float("-inf")
+
+    def feed_keys(self, *args, **keys):
+        yield ()
+
+    @idiokit.stream
+    def feed(self, *args, **keys):
+        while True:
+            yield idiokit.next()
 
     @idiokit.stream
     def _output_rate_limiter(self):
         while self.xmpp_rate_limit <= 0.0:
-            yield idiokit.sleep(1.0)
+            yield idiokit.sleep(60.0)
 
         while True:
             delta = max(time.time() - self._last_output, 0)
@@ -452,31 +460,16 @@ class FeedBot(ServiceBot):
             msg = yield idiokit.next()
             yield idiokit.send(msg)
 
-    def feed_keys(self, *args, **keys):
-        yield ()
-
-    @idiokit.stream
-    def feed(self, *args, **keys):
-        while True:
-            yield idiokit.next()
-
     @idiokit.stream
     def session(self, state, dst_room, **keys):
-        feeds = [self._rooms.inc(dst_room)]
-        feed_keys = set(self.feed_keys(dst_room=dst_room, **keys))
+        connections = []
+        for feed_key in self.feed_keys(dst_room=dst_room, **keys):
+            connections.append(self._connections.inc(feed_key, dst_room))
 
-        for key in feed_keys:
-            self._dsts.inc(key, dst_room)
-            feeds.append(self._feeds.inc(key))
-
-        try:
-            yield idiokit.pipe(*feeds)
-        finally:
-            for key in feed_keys:
-                self._dsts.dec(key, dst_room)
-
-    def manage_feed(self, key):
-        return self.feed(*key) | self._distribute(key)
+        if connections:
+            yield idiokit.pipe(*connections)
+        else:
+            yield idiokit.consume()
 
     @idiokit.stream
     def manage_room(self, name):
@@ -501,16 +494,8 @@ class FeedBot(ServiceBot):
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
-    @idiokit.stream
-    def _distribute(self, key):
-        while True:
-            event = yield idiokit.next()
-
-            for name in tuple(self._dsts.get(key)):
-                room = self._rooms.get(name)
-                if room is None:
-                    continue
-                yield room.send(event)
+    def manage_connection(self, feed_key, room_name):
+        return self._feeds.inc(*feed_key) | self._rooms.inc(room_name)
 
     def _stats(self, name, interval=60.0):
         def counter(event):
@@ -520,11 +505,9 @@ class FeedBot(ServiceBot):
 
         @idiokit.stream
         def logger():
-            sleep = interval / 2.0
-
             while True:
                 try:
-                    yield idiokit.sleep(sleep)
+                    yield idiokit.sleep(interval)
                 finally:
                     if counter.count > 0:
                         self.log.info(
@@ -535,8 +518,6 @@ class FeedBot(ServiceBot):
                                 "sent events": unicode(counter.count),
                                 "room": name}))
                         counter.count = 0
-
-                sleep = interval
 
         result = idiokit.map(counter)
         idiokit.pipe(logger(), result)
@@ -553,9 +534,9 @@ class PollingBot(FeedBot):
         """, default=3600)
     ignore_initial_poll = BoolParam("""
         don't send out events collected during the first poll,
-        just use them for deduplication (WARNING: this is an
-        experimental flag that may change or be removed without
-        prior notice)
+        just use them to populate the deduplication filter
+        (WARNING: this is an experimental flag that may change
+        or be removed without prior notice)
         """)
 
     def __init__(self, *args, **keys):
@@ -563,65 +544,84 @@ class PollingBot(FeedBot):
 
         self._poll_queue = utils.WaitQueue()
         self._poll_dedup = dict()
-        self._poll_cleanup = set()
+        self._poll_cleanup = dict()
 
     @idiokit.stream
-    def poll(self, *args, **keys):
+    def poll(self, *key):
         yield idiokit.sleep(0.0)
 
-    def feed_keys(self, *args, **keys):
-        yield ()
+    @idiokit.stream
+    def _dedup(self, key):
+        initial_poll = key not in self._poll_dedup
+
+        old_filter = self._poll_dedup.setdefault(key, set())
+        new_filter = set()
+
+        while True:
+            try:
+                event = yield idiokit.next()
+            except StopIteration:
+                self._poll_dedup[key] = new_filter
+                raise
+
+            event_key = events.hexdigest(event, hashlib.md5)
+            if event_key not in old_filter:
+                if not initial_poll or not self.ignore_initial_poll:
+                    yield idiokit.send(event)
+            old_filter.add(event_key)
+            new_filter.add(event_key)
 
     @idiokit.stream
-    def manage_feed(self, key):
-        if key not in self._poll_cleanup:
-            yield self._poll_queue.queue(0.0, key)
-        else:
-            self._poll_cleanup.discard(key)
+    def feed(self, *key):
+        if key in self._poll_cleanup:
+            node = self._poll_cleanup.pop(key)
+            yield self._poll_queue.cancel(node)
 
         try:
-            yield idiokit.consume()
+            waiter = idiokit.Event()
+            result = idiokit.Event()
+            node = yield self._poll_queue.queue(0.0, (False, (waiter, result)))
+
+            while True:
+                try:
+                    yield waiter
+                finally:
+                    yield self._poll_queue.cancel(node)
+
+                try:
+                    yield self.poll(*key) | self._dedup(key)
+                finally:
+                    result.succeed()
+
+                waiter = idiokit.Event()
+                result = idiokit.Event()
+                node = yield self._poll_queue.queue(self.poll_interval, (False, (waiter, result)))
         finally:
-            self._poll_cleanup.add(key)
+            node = yield self._poll_queue.queue(self.poll_interval, (True, key))
+            self._poll_cleanup[key] = node
 
     @idiokit.stream
     def main(self, state):
-        while True:
-            key = yield self._poll_queue.wait()
-            if key in self._poll_cleanup:
-                self._poll_cleanup.remove(key)
-                self._poll_dedup.pop(key, None)
-                continue
+        if state is None:
+            state = dict()
+        self._poll_dedup = state
 
-            yield self.poll(*key) | self._distribute(key)
-            yield self._poll_queue.queue(self.poll_interval, key)
+        if self.ignore_initial_poll:
+            self.log.info("Ignoring initial polls")
 
-    @idiokit.stream
-    def _distribute(self, key):
-        old_dedups = self._poll_dedup.get(key, dict())
-        new_dedups = self._poll_dedup[key] = dict()
-        initial_poll = True
+        try:
+            for key in self._poll_dedup:
+                node = yield self._poll_queue.queue(self.poll_interval, (True, key))
+                self._poll_cleanup[key] = node
 
-        while True:
-            event = yield idiokit.next()
-            event_key = int(events.hexdigest(event, hashlib.md5), 16)
-
-            for name in tuple(self._dsts.get(key)):
-                room = self._rooms.get(name)
-                if room is None:
-                    continue
-
-                if event_key in new_dedups.get(room, ()):
-                    continue
-                new_dedups.setdefault(room, set()).add(event_key)
-
-                old_keys = old_dedups.get(room, None)
-                if self.ignore_initial_poll and old_keys is None:
-                    if initial_poll:
-                        initial_poll = False
-                        self.log.info("Ignoring initial poll")
-                    continue
-                if old_keys is not None and event_key in old_keys:
-                    continue
-
-                yield room.send(event)
+            while True:
+                cleanup, arg = yield self._poll_queue.wait()
+                if cleanup:
+                    self._poll_dedup.pop(arg, None)
+                    self._poll_cleanup.pop(arg, None)
+                else:
+                    waiter, result = arg
+                    waiter.succeed()
+                    yield result
+        except services.Stop:
+            idiokit.stop(self._poll_dedup)
