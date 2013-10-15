@@ -104,8 +104,8 @@ class PhishTankBot(bot.PollingBot):
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
-        self.fileobj = None
-        self.etag = None
+
+        self._etag = None
 
     @idiokit.stream
     def _handle_entry(self, entry, sites):
@@ -182,21 +182,23 @@ class PhishTankBot(bot.PollingBot):
     @idiokit.stream
     def poll(self):
         url = self.feed_url % self.application_key
+
         try:
-            self.log.info("Checking if %r has new data" % url)
+            self.log.info("Checking if {0!r} has new data".format(url))
             info, _ = yield utils.fetch_url(HeadRequest(url))
 
             etag = info.get("etag", None)
-            if etag is None or self.etag != etag:
-                self.log.info("Downloading new data from %r", url)
-                _, self.fileobj = yield utils.fetch_url(url)
-            self.etag = etag
-        except utils.FetchUrlFailed, error:
-            self.log.error("Failed to download %r: %r", url, error)
-            return
+            if etag is not None and self._etag == etag:
+                raise bot.PollSkipped("no new data detected (ETag stayed the same)")
 
-        self.fileobj.seek(0)
-        reader = BZ2Reader(self.fileobj)
+            self.log.info("Downloading data from {0!r}".format(url))
+            _, fileobj = yield utils.fetch_url(url)
+        except utils.FetchUrlFailed as error:
+            raise bot.PollSkipped("failed to download {0!r} ({1})".format(url, error))
+
+        self.log.info("Downloaded data from {0!r}".format(url))
+
+        reader = BZ2Reader(fileobj)
         try:
             depth = 0
             sites = dict()
@@ -211,8 +213,23 @@ class PhishTankBot(bot.PollingBot):
 
                 if event == "end" and depth == 0:
                     element.clear()
-        except SyntaxError, error:
-            self.log.error("Syntax error in report %r: %r", url, error)
+        except SyntaxError as error:
+            raise bot.PollSkipped("syntax error in report {0!r} ({1})".format(url, error))
+        else:
+            self._etag = etag
+
+    def main(self, state):
+        if state is None:
+            state = None, None
+        self._etag, wrapped_state = state
+
+        return bot.PollingBot.main(self, wrapped_state) | self._add_etag_to_result()
+
+    @idiokit.stream
+    def _add_etag_to_result(self):
+        state = yield idiokit.consume()
+        idiokit.stop(self._etag, state)
+
 
 if __name__ == "__main__":
     PhishTankBot.from_command_line().execute()
