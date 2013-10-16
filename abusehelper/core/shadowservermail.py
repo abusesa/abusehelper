@@ -37,9 +37,11 @@ class ShadowServerMail(imapbot.IMAPBot):
         return fileobj
 
     @idiokit.stream
-    def normalize(self, groupdict):
+    def normalize(self, subject, groupdict):
         while True:
             event = yield idiokit.next()
+            if subject is not None:
+                event.add("report_subject", subject)
 
             for key in event.keys():
                 event.discard(key, "")
@@ -53,15 +55,16 @@ class ShadowServerMail(imapbot.IMAPBot):
             yield idiokit.send(event)
 
     @idiokit.stream
-    def parse_csv(self, filename, fileobj):
+    def parse_csv(self, headers, filename, fileobj):
         match = re.match(self.filename_rex, filename)
         if match is None:
             self.log.error("Filename {0!r} did not match".format(filename))
             idiokit.stop(False)
 
+        subject = imapbot.get_header(headers[0], "Subject", None)
         yield idiokit.pipe(
             utils.csv_to_events(fileobj),
-            self.normalize(match.groupdict()))
+            self.normalize(subject, match.groupdict()))
         idiokit.stop(True)
 
     def handle(self, parts):
@@ -86,7 +89,7 @@ class ShadowServerMail(imapbot.IMAPBot):
         filename = headers[-1].get_filename(None)
         if filename is not None:
             self.log.info("Parsing CSV data from an attachment")
-            result = yield self.parse_csv(filename, fileobj)
+            result = yield self.parse_csv(headers, filename, fileobj)
             idiokit.stop(result)
 
         for match in re.findall(self.url_rex, fileobj.read()):
@@ -103,7 +106,7 @@ class ShadowServerMail(imapbot.IMAPBot):
                 continue
 
             self.log.info("Parsing CSV data from the URL")
-            result = yield self.parse_csv(filename, fileobj)
+            result = yield self.parse_csv(headers, filename, fileobj)
             idiokit.stop(result)
 
     @idiokit.stream
@@ -115,7 +118,7 @@ class ShadowServerMail(imapbot.IMAPBot):
 
         self.log.info("Parsing CSV data from an attachment")
         fileobj = self._decode(headers, fileobj)
-        result = yield self.parse_csv(filename, fileobj)
+        result = yield self.parse_csv(headers, filename, fileobj)
         idiokit.stop(result)
 
     @idiokit.stream
@@ -132,7 +135,7 @@ class ShadowServerMail(imapbot.IMAPBot):
             csv_data = StringIO(zip.read(filename))
 
             self.log.info("Parsing CSV data from the ZIP attachment")
-            result = yield self.parse_csv(filename, csv_data)
+            result = yield self.parse_csv(headers, filename, csv_data)
             idiokit.stop(result)
 
     def handle_application_octet__stream(self, headers, fileobj):
