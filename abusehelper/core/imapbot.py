@@ -3,21 +3,25 @@ import socket
 import getpass
 import imaplib
 import email.parser
+import email.header
 
 import idiokit
 from cStringIO import StringIO
 from abusehelper.core import bot
 
 
-@idiokit.stream
-def collect():
-    collection = list()
-    try:
-        while True:
-            item = yield idiokit.next()
-            collection.append(item)
-    except StopIteration:
-        idiokit.stop(collection)
+def get_header(headers, key, default=None):
+    value = headers.get(key, None)
+    if value is None:
+        return default
+
+    bites = []
+    for string, encoding in email.header.decode_header(value):
+        if encoding is not None:
+            string = string.decode(encoding, "replace")
+        bites.append(string)
+
+    return u" ".join(bites)
 
 
 class IMAPBot(bot.FeedBot):
@@ -76,12 +80,12 @@ class IMAPBot(bot.FeedBot):
                     while mailbox is None:
                         try:
                             mailbox = yield idiokit.thread(self.connect)
-                        except (imaplib.IMAP4.abort, socket.error), error:
-                            self.log.error("Failed IMAP connection: %r", error)
+                        except (imaplib.IMAP4.abort, socket.error) as error:
+                            self.log.error("Failed IMAP connection ({0})".format(error))
                         else:
                             break
 
-                        self.log.info("Retrying connection in %.02f seconds", delay)
+                        self.log.info("Retrying connection in {0:.2f} seconds".format(delay))
                         yield idiokit.sleep(delay)
                         delay = min(2 * delay, max_delay)
 
@@ -92,11 +96,11 @@ class IMAPBot(bot.FeedBot):
                     try:
                         method = getattr(mailbox, name)
                         result = yield idiokit.thread(method, *args, **keys)
-                    except (imaplib.IMAP4.abort, socket.error), error:
+                    except (imaplib.IMAP4.abort, socket.error) as error:
                         yield idiokit.thread(self.disconnect, mailbox)
-                        self.log.error("Lost IMAP connection: %r", error)
+                        self.log.error("Lost IMAP connection ({0})".format(error))
                         mailbox = None
-                    except imaplib.IMAP4.error, error:
+                    except imaplib.IMAP4.error as error:
                         event.fail(type(error), error, None)
                         break
                     else:
@@ -107,8 +111,8 @@ class IMAPBot(bot.FeedBot):
                 yield idiokit.thread(self.disconnect, mailbox)
 
     def connect(self):
-        self.log.info("Connecting to IMAP server %r port %d",
-                      self.mail_server, self.mail_port)
+        self.log.info("Connecting to IMAP server {0!r} port {1}".format(
+            self.mail_server, self.mail_port))
 
         if self.mail_disable_ssl:
             mail_class = imaplib.IMAP4
@@ -116,8 +120,8 @@ class IMAPBot(bot.FeedBot):
             mail_class = imaplib.IMAP4_SSL
         mailbox = mail_class(self.mail_server, self.mail_port)
 
-        self.log.info("Logging in to IMAP server %s port %d",
-                      self.mail_server, self.mail_port)
+        self.log.info("Logging in to IMAP server {0!r} port {1}".format(
+            self.mail_server, self.mail_port))
         mailbox.login(self.mail_user, self.mail_password)
         try:
             status, msgs = mailbox.select(self.mail_box, readonly=False)
@@ -129,8 +133,8 @@ class IMAPBot(bot.FeedBot):
             mailbox.logout()
             raise
 
-        self.log.info("Logged in to IMAP server %s port %d",
-                      self.mail_server, self.mail_port)
+        self.log.info("Logged in to IMAP server {0!r} port {1}".format(
+            self.mail_server, self.mail_port))
         return mailbox
 
     def disconnect(self, mailbox):
@@ -167,10 +171,10 @@ class IMAPBot(bot.FeedBot):
 
     @idiokit.stream
     def get_header(self, uid, section):
-        body_rex_str = r"\s*\d+\s+\(UID %s\s+BODY\[%s\]\s+" % (uid, section)
+        body_rex_str = r"\s*\d+\s+\(UID {0}\s+BODY\[{1}\]\s+".format(uid, section)
         body_rex = re.compile(body_rex_str, re.I)
 
-        fetch = "(UID BODY.PEEK[%s])" % section
+        fetch = "(UID BODY.PEEK[{0}])".format(section)
         result, data = yield self.call("uid", "FETCH", uid, fetch)
 
         # Filter away parts that don't closely enough resemble tuple
@@ -187,7 +191,7 @@ class IMAPBot(bot.FeedBot):
     def fetcher(self, uid, path):
         @idiokit.stream
         def fetch():
-            fetch = "(BODY.PEEK[%s])" % path
+            fetch = "(BODY.PEEK[{0}])".format(path)
             result, data = yield self.call("uid", "FETCH", uid, fetch)
 
             for parts in data:
@@ -228,7 +232,8 @@ class IMAPBot(bot.FeedBot):
             return
 
         for uid in data[0].split():
-            collected = yield self.walk_mail(uid) | collect()
+            collected = []
+            yield self.walk_mail(uid) | idiokit.map(collected.append)
 
             parts = list()
             for path, headers in collected:
@@ -236,11 +241,12 @@ class IMAPBot(bot.FeedBot):
 
             if parts:
                 top_header = parts[0][0][0]
-                subject = top_header["Subject"] or "<no subject>"
-                sender = top_header["From"] or "<unknown sender>"
-                self.log.info("Handling mail %r from %r", subject, sender)
+                subject = get_header(top_header, "Subject", "<no subject>")
+                sender = get_header(top_header, "From", "<unknown sender>")
+
+                self.log.info("Handling mail {0!r} from {1!r}".format(subject, sender))
                 yield self.handle(parts)
-                self.log.info("Done with mail %r from %r", subject, sender)
+                self.log.info("Done with mail {0!r} from {1!r}".format(subject, sender))
 
             # UID STORE command flags have to be in parentheses, otherwise
             # imaplib quotes them, which is not allowed.
