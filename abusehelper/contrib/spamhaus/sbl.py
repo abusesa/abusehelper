@@ -8,8 +8,8 @@ class SpamhausSblBot(bot.PollingBot):
 
     def _event(self, spamhaus_id):
         event = events.Event()
-        event.add("feed", "spamhaus block list")
-        event.add("type", "spammer ip/network")
+        event.add("feed", "spamhaus sbl")
+        event.add("type", "spam")
         if spamhaus_id:
             spamhaus_id = "SBL" + str(int(spamhaus_id.replace("$", ""), base=10))
             event.add("sbl id", spamhaus_id)
