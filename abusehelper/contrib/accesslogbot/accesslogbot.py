@@ -13,11 +13,11 @@ DATE_REX = re.compile(
 def convert_date(datestring, to_format="%Y-%m-%d %H:%M:%SZ"):
     """
     >>> convert_date('01/Jan/1970:00:00:00 +0000')
-    '1970-01-01 00:00:00 UTC'
+    '1970-01-01 00:00:00Z'
     >>> convert_date('01/Jan/1970:00:00:00 -0100')
-    '1970-01-01 01:00:00 UTC'
+    '1970-01-01 01:00:00Z'
     >>> convert_date('01/Jan/1970:01:00:00 +0100')
-    '1970-01-01 00:00:00 UTC'
+    '1970-01-01 00:00:00Z'
 
     >>> convert_date('half past midnight')
     'half past midnight'

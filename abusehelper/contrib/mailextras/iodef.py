@@ -25,7 +25,7 @@ HEADER = """<?xml version=\"1.0\" ?>
 def format_time(time_tuple=None):
     if time_tuple is None:
         time_tuple = time.gmtime()
-    return time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
+    return time.strftime("%Y-%m-%d %H:%M:%SZ", time_tuple)
 
 class XMLFormatter(templates.Formatter):
     def __init__(self, **kw):

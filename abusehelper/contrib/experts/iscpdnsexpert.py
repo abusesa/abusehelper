@@ -13,7 +13,7 @@ from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 import abusehelper.core.utils as utils
 
-FORMAT = "%Y-%m-%d %H:%M:%S UTC"
+FORMAT = "%Y-%m-%d %H:%M:%SZ"
 
 from time import strftime, gmtime
 

@@ -21,15 +21,15 @@ def parse_title(title):
     ZeuS Tracker and SpyEye Tracker styles:
 
     >>> list(parse_title("1.2.3.4/badness.php (2012-01-01)"))
-    [('time', '2012-01-01 00:00:00 UTC')]
+    [('time', '2012-01-01 00:00:00Z')]
 
     >>> list(parse_title("1.2.3.4/badness.php (2012-01-01 01:02:03)"))
-    [('time', '2012-01-01 01:02:03 UTC')]
+    [('time', '2012-01-01 01:02:03Z')]
 
     Palevo tracker style:
 
     >>> list(parse_title("1.2.3.4/badness.php 2012-01-01"))
-    [('time', '2012-01-01 00:00:00 UTC')]
+    [('time', '2012-01-01 00:00:00Z')]
 
     Ignore if can't be parsed:
 
