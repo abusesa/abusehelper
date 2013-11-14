@@ -29,7 +29,7 @@ def parse(string, base_time):
         ts = time.mktime((base_time[0],) + ts[1:])
 
     result = dict()
-    result["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(ts))
+    result["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(ts))
     result["server"] = bites[3]
 
     match = PARSE_REX.search(bites[5])

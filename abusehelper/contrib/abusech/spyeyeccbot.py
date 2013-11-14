@@ -24,7 +24,7 @@ class SpyEyeCcBot(AbuseCHFeedBot):
         if len(pieces) > 1:
             date = pieces[1]
             date = re.sub("[()]", "", date)
-            yield "source time", date + " UTC"
+            yield "source time", date + "Z"
 
     def parse_description(self, description):
         for key, value in split_description(description):

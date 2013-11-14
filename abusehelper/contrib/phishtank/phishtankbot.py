@@ -127,7 +127,7 @@ class PhishTankBot(bot.PollingBot):
         if ts != None and ts.text:
             try:
                 ts = datetime.strptime(ts.text, "%Y-%m-%dT%H:%M:%S+00:00")
-                ts = ts.strftime("%Y-%m-%d %H:%M:%S UTC")
+                ts = ts.strftime("%Y-%m-%d %H:%M:%SZ")
             except ValueError:
                 ts = None
 

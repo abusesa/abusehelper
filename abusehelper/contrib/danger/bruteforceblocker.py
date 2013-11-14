@@ -40,7 +40,7 @@ class BruteForceBlockerBot(bot.PollingBot):
 
     def _normalize(self, event, url):
         for timestamp in event.values("time"):
-            event.add("source time", timestamp.replace("# ", "") + " UTC")
+            event.add("source time", timestamp.replace("# ", "") + "Z")
         event.clear("time")
         event.add("type", "brute-force")
         event.add("description", "This host is most likely performing SSH brute-force attacks.")

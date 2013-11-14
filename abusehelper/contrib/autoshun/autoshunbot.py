@@ -90,7 +90,7 @@ class AutoshunBot(bot.PollingBot):
         seconds = calendar.timegm(parsed)
         seconds += self.time_offset * 3600  # UTC-5 to UTC
         time_tuple = _time.gmtime(seconds)
-        return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
+        return _time.strftime("%Y-%m-%d %H:%M:%SZ", time_tuple)
 
     def _normalize_date(self, time):
         parsed = _time.strptime(time, "%Y-%m-%d")

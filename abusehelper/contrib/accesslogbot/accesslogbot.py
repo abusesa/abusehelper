@@ -10,7 +10,7 @@ DATE_REX = re.compile(
     r"^(\d{1,2}/.+?/\d{4}:\d{1,2}:\d{1,2}:\d{1,2})\s+([+-]\d{4})$")
 
 
-def convert_date(datestring, to_format="%Y-%m-%d %H:%M:%S UTC"):
+def convert_date(datestring, to_format="%Y-%m-%d %H:%M:%SZ"):
     """
     >>> convert_date('01/Jan/1970:00:00:00 +0000')
     '1970-01-01 00:00:00 UTC'

@@ -17,7 +17,7 @@ class ObserverExpert(Expert):
     def format_time(self, time_tuple=None):
         if time_tuple is None:
             time_tuple = _time.gmtime()
-        return _time.strftime("%Y-%m-%d %H:%M:%S UTC", time_tuple)
+        return _time.strftime("%Y-%m-%d %H:%M:%SZ", time_tuple)
 
     def time(self, string, format="%Y-%m-%d %H:%M:%S"):
         try:

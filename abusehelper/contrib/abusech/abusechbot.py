@@ -47,7 +47,7 @@ def parse_title(title):
             timestamp = time.strptime(timestamp, format)
         except ValueError:
             continue
-        yield "time", time.strftime("%Y-%m-%d %H:%M:%S UTC", timestamp)
+        yield "time", time.strftime("%Y-%m-%d %H:%M:%SZ", timestamp)
         break
 
 

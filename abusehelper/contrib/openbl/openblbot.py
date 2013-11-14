@@ -8,7 +8,7 @@ OPENBL_FEED_URL = "https://www.openbl.org/lists/date_all.txt"
 
 def normalize_time(time):
     seconds = int(time) - 1 * 3600  # UTC+1 to UTC
-    return _time.strftime("%Y-%m-%d %H:%M:%S UTC", _time.gmtime(seconds))
+    return _time.strftime("%Y-%m-%d %H:%M:%SZ", _time.gmtime(seconds))
 
 
 class OpenBLBot(bot.PollingBot):
