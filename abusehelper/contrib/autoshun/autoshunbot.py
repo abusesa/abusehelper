@@ -68,7 +68,7 @@ class AutoshunBot(bot.PollingBot):
                             event.add("type", "botnet drone")
                         elif key == "protocol":
                             event.add("type", "brute-force")
-                event.add("anecdotal information", info)
+                event.add("additional information", info)
             event.clear("info")
             if not event.contains("type"):
                 event.add("type", "ids alert")
