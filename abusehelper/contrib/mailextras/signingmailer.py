@@ -194,6 +194,11 @@ class Mailer(mailer.MailerService):
         # etc. are at least somewhat valid.
         yield self.build_mail([], 0, **keys)
 
+        # Test that we can write to the sent directory
+        fname = os.path.join(self.sent_dir, '.placeholder')
+        testfile = file(fname, "a")
+        testfile.close()
+                    
         result = yield mailer.ReportBot.session(self, state, **keys)
         idiokit.stop(result)
 
