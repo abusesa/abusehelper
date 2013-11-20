@@ -27,8 +27,7 @@ class OpenBLBot(bot.PollingBot):
         try:
             info, fileobj = yield utils.fetch_url(url)
         except utils.FetchUrlFailed, fuf:
-            self.log.error("Download failed: %r", fuf)
-            idiokit.stop()
+            raise bot.PollSkipped("failed to download {0!r} ({1})".format(url, fuf))
         self.log.info("Downloaded")
 
         for line in fileobj:
