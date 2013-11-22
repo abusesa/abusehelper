@@ -322,14 +322,14 @@ class MailerService(ReportBot):
         """
 
         csv = templates.CSVFormatter()
-        template = mailer.MailTemplate(
+        template = MailTemplate(
             template,
             csv=csv,
             attach_csv=templates.AttachUnicode(csv),
             attach_and_embed_csv=templates.AttachAndEmbedUnicode(csv),
             attach_zip=templates.AttachZip(csv),
-            to=templates.Const(mailer.format_addresses(to)),
-            cc=templates.Const(mailer.format_addresses(cc)))
+            to=templates.Const(format_addresses(to)),
+            cc=templates.Const(format_addresses(cc)))
         msg = yield idiokit.thread(template.format, events)
         idiokit.stop(msg)
 
