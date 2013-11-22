@@ -1,8 +1,12 @@
 from __future__ import absolute_import
 
 import csv
+import zipfile
+
 from cStringIO import StringIO
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email.encoders import encode_base64
 
 from .utils import force_decode
 
@@ -47,6 +51,38 @@ class AttachAndEmbedUnicode(Formatter):
 
         parts.append(part)
         return data
+
+
+class AttachZip(Formatter):
+
+    def __init__(self, formatter):
+        self.formatter = formatter
+
+    def check(self, filename=None, *args):
+        if filename is None:
+            raise TemplateError("filename parameter required")
+
+    def format(self, parts, events, filename, *args):
+        if filename.endswith(".zip"):
+            filename = filename[:-4]
+
+        data = self.formatter.format(parts, events, *args)
+        memfile = StringIO()
+        zipped = zipfile.ZipFile(memfile, 'w', zipfile.ZIP_DEFLATED)
+        zipped.writestr(filename+".csv", data.encode("utf-8"))
+        zipped.close()
+        memfile.flush()
+        memfile.seek(0)
+
+        part = MIMEBase("application", "zip")
+        part.set_payload(memfile.read())
+        encode_base64(part)
+        part.add_header("Content-Disposition",
+                        "attachment",
+                        filename=filename+".zip")
+        parts.append(part)
+
+        return u""
 
 
 class AttachUnicode(AttachAndEmbedUnicode):
