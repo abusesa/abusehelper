@@ -103,6 +103,11 @@ class Mailer(mailer.MailerService):
         bot.Param("A possible ticketing header, eg. CERT in [CERT #1]",
                   default='')
 
+    def __init__(self, **keys):
+        mailer.MailerService.__init__(self, **keys)
+
+        with tempfile.NamedTemporaryFile(dir=self.sent_dir):
+            pass
 
     def get_random_ticket_no(self, **kw):
         number = unicode(randrange(80000, 100000))
@@ -194,11 +199,6 @@ class Mailer(mailer.MailerService):
         # etc. are at least somewhat valid.
         yield self.build_mail([], 0, **keys)
 
-        # Test that we can write to the sent directory
-        fname = os.path.join(self.sent_dir, '.placeholder')
-        testfile = file(fname, "a")
-        testfile.close()
-                    
         result = yield mailer.ReportBot.session(self, state, **keys)
         idiokit.stop(result)
 
