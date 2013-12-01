@@ -2,6 +2,7 @@ import re
 import os
 import urllib
 import httplib
+import tempfile
 
 import pyme.core
 try:
