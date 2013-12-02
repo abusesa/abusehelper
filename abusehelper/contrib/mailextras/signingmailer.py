@@ -2,6 +2,7 @@ import re
 import os
 import urllib
 import httplib
+import tempfile
 
 import pyme.core
 try:
@@ -103,6 +104,11 @@ class Mailer(mailer.MailerService):
         bot.Param("A possible ticketing header, eg. CERT in [CERT #1]",
                   default='')
 
+    def __init__(self, **keys):
+        mailer.MailerService.__init__(self, **keys)
+
+        with tempfile.NamedTemporaryFile(dir=self.sent_dir):
+            pass
 
     def get_random_ticket_no(self, **kw):
         number = unicode(randrange(80000, 100000))
