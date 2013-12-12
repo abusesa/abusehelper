@@ -2,37 +2,10 @@ import os
 import sys
 import imp
 import time
-import hashlib
-import warnings
 import contextlib
 import collections
 
 import idiokit
-
-
-def relative_path(*path):
-    warnings.warn("relative_path is deprecated",
-        DeprecationWarning, stacklevel=2)
-
-    return os.path.abspath(os.path.join(os.getcwd(), *path))
-
-
-def load_module(module_name):
-    warnings.warn("load_module is deprecated, " +
-        "use regular importing instead",
-        DeprecationWarning, stacklevel=2)
-
-    path, name = os.path.split(module_name)
-    if not path:
-        found = imp.find_module(name)
-        sys.modules.pop(name, None)
-        return imp.load_module(name, *found)
-
-    module_name = os.path.join(os.getcwd(), module_name)
-    with open(module_name, "r") as module_file:
-        name = hashlib.md5(module_name).hexdigest()
-        sys.modules.pop(name, None)
-        return imp.load_source(name, module_name, module_file)
 
 
 class HashableFrozenDict(collections.Mapping, collections.Hashable):
