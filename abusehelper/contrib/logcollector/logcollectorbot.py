@@ -46,7 +46,7 @@ class LogCollector(bot.ServiceBot):
 
             event_text = ''
             for key, value in event.items():
-                event_text += key + '=' + json.dumps(value) + ' '   
+                event_text += key.replace(' ','_') + '=' + json.dumps(value) + ' '
 
             yield self.send_data(event_text)
 
