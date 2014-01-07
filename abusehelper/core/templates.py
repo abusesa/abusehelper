@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import os
 import csv
 import zipfile
 
@@ -44,17 +45,13 @@ class AttachAndEmbedUnicode(Formatter):
         data = self.formatter.format(parts, events, *args)
 
         part = MIMEText(data.encode("utf-8"), self.subtype, "utf-8")
-        part.add_header(
-            "Content-Disposition",
-            "attachment",
-            filename=filename)
+        part.add_header("Content-Disposition", "attachment", filename=filename)
 
         parts.append(part)
         return data
 
 
 class AttachZip(Formatter):
-
     def __init__(self, formatter):
         self.formatter = formatter
 
@@ -63,13 +60,18 @@ class AttachZip(Formatter):
             raise TemplateError("filename parameter required")
 
     def format(self, parts, events, filename, *args):
-        if filename.endswith(".zip"):
-            filename = filename[:-4]
+        prefix, ext = os.path.splitext(filename)
+        if ext.lower() == ".zip":
+            zip_name = filename
+            raw_name = prefix
+        else:
+            zip_name = filename + ".zip"
+            raw_name = filename
 
         data = self.formatter.format(parts, events, *args)
         memfile = StringIO()
         zipped = zipfile.ZipFile(memfile, 'w', zipfile.ZIP_DEFLATED)
-        zipped.writestr(filename+".csv", data.encode("utf-8"))
+        zipped.writestr(raw_name, data.encode("utf-8"))
         zipped.close()
         memfile.flush()
         memfile.seek(0)
@@ -77,9 +79,7 @@ class AttachZip(Formatter):
         part = MIMEBase("application", "zip")
         part.set_payload(memfile.read())
         encode_base64(part)
-        part.add_header("Content-Disposition",
-                        "attachment",
-                        filename=filename+".zip")
+        part.add_header("Content-Disposition", "attachment", filename=zip_name)
         parts.append(part)
 
         return u""

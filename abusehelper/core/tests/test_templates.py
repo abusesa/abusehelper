@@ -32,6 +32,30 @@ class TemplateTests(unittest.TestCase):
         self.assertRaises(templates.TemplateError, templates.Template, '%(csv)s', csv=templates.CSVFormatter())
         self.assertRaises(templates.TemplateError, templates.Template, '%(csv, abc)s', csv=templates.CSVFormatter())
 
+    def test_attach_zip_filenames(self):
+        # Automatically add the .zip extension unless .zip extension is there already.
+        # This logic is case-insensitive.
+
+        formatter = templates.AttachZip(templates.CSVFormatter())
+
+        template = templates.Template("%(attach_zip, events.csv, |)s", attach_zip=formatter)
+        parts = []
+        template.format(parts, [])
+        self.assertEqual(len(parts), 1)
+        self.assertEqual(parts[0].get_filename(), "events.csv.zip")
+
+        template = templates.Template("%(attach_zip, events.csv.zip, |)s", attach_zip=formatter)
+        parts = []
+        template.format(parts, [])
+        self.assertEqual(len(parts), 1)
+        self.assertEqual(parts[0].get_filename(), "events.csv.zip")
+
+        template = templates.Template("%(attach_zip, events.csv.ZIP, |)s", attach_zip=formatter)
+        parts = []
+        template.format(parts, [])
+        self.assertEqual(len(parts), 1)
+        self.assertEqual(parts[0].get_filename(), "events.csv.ZIP")
+
 
 class TemplateRegressionTests(unittest.TestCase):
     def test_csv_formatter_must_accept_comma_separator(self):
