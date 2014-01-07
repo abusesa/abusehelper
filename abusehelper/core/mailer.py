@@ -309,7 +309,7 @@ class MailerService(ReportBot):
     def session(self, state, **keys):
         # Try to build a mail for quick feedback that the templates etc. are
         # at least somewhat valid.
-        yield self.build_mail([], **keys)
+        yield self.build_mail(None, **keys)
 
         result = yield ReportBot.session(self, state, **keys)
         idiokit.stop(result)
@@ -317,9 +317,11 @@ class MailerService(ReportBot):
     @idiokit.stream
     def build_mail(self, events, to=[], cc=[], template="", template_values={}, **keys):
         """
-        Return a mail object produced based on collected events and
-        session parameters.
+        Return a mail object produced based on collected events and session parameters.
+        The "events" parameter is None when we just want to test building a mail.
         """
+        if events is None:
+            events = []
 
         csv = templates.CSVFormatter()
         template_keys = {
