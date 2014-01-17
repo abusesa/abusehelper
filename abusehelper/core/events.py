@@ -646,7 +646,7 @@ def hexdigest(event, func=hashlib.sha1):
     The result is not guaranteed to be different for two events e1 and e2
     when e1 != e2. However such a collision is usually exceedingly unlikely
     when a good hashing algorithm is used. SHA1 is the default, but can be
-    changed by passing in an algorihm implementation with a compatible
+    changed by passing in an algorithm implementation with a compatible
     interface. For example, algorithms defined in the standard 'hashlib'
     library are compatible.
 
