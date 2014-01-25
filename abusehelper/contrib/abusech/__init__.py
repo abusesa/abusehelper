@@ -64,6 +64,14 @@ class AbuseCHFeedBot(RSSBot):
     feed_malware = []
     feed_type = []
 
+    def create_descriptions(self, event):
+        types = "/".join(event.values("type"))
+        if not types:
+            return
+
+        malwares = "/".join(event.values("malware") or [u"malware"])
+        yield u"This host is most likely hosting a {0} {1}".format(malwares, types)
+
     def parse_link(self, link):
         yield "description url", link
 
@@ -89,8 +97,6 @@ class AbuseCHFeedBot(RSSBot):
             "feed": self.feed_name,
             "malware": self.feed_malware,
             "type": self.feed_type,
-            "description": "This host is most likely hosting a " + \
-                self.feed_malware + " " + self.feed_type + ".",
             "feed url": source
         })
 
@@ -101,4 +107,6 @@ class AbuseCHFeedBot(RSSBot):
                 else:
                     event.update(output_key, output_value)
 
+        if not event.contains("description"):
+            event = event.union(description=self.create_descriptions(event))
         return event
