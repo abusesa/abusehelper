@@ -41,7 +41,7 @@ def configs():
     # Launch a nice source bot from the contrib. Remember to explicitly
     # define the bot module name, as this is not a core bot!
 
-    yield basic("abusech", "abusehelper.contrib.abusech.abusechbot")
+    yield basic("malwaredomainlist", "abusehelper.contrib.malwaredomainlist.updates")
 
     # Find and launch modules named custom/*.sanitizer.py
 

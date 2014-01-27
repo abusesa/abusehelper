@@ -61,7 +61,7 @@ def configs():
     yield source("dshield",
         asns=[0, 1, 2, 3])
 
-    yield source("abusech")
+    yield source("malwaredomainlist")
 
     # Customer definitions
 
