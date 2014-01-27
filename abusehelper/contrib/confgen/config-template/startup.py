@@ -16,7 +16,11 @@ def basic(name, *args, **attrs):
         ## Uncomment the following lines, and the bots will keep
         ## persistent state and log to files, respectively.
         # bot_state_file=os.path.join("state", name + ".state"),
-        # log_file=os.path.join("log", name + ".log")
+        # log_file=os.path.join("log", name + ".log"),
+
+        # Modify or uncomment the value following value to
+        # increase, decrease or disable the feed bot rate limiting.
+        xmpp_rate_limit=1
     )
     return template(name, *args, **attrs)
 
