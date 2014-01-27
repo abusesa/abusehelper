@@ -18,8 +18,10 @@ def basic(name, *args, **attrs):
         # bot_state_file=os.path.join("state", name + ".state"),
         # log_file=os.path.join("log", name + ".log"),
 
-        # Modify or uncomment the value following value to
-        # increase, decrease or disable the feed bot rate limiting.
+        # xmpp_rate_limit signifies how many events each feed bot
+        # should send per second at maximum. As an example
+        # xmpp_rate_limit=10 would set the limit to 10 events per second.
+        # The option can also be set to None to disable limiting.
         xmpp_rate_limit=1
     )
     return template(name, *args, **attrs)
