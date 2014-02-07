@@ -55,6 +55,7 @@ class TestIP(unittest.TestCase):
         self.assertRaises(ValueError, IP, "2001:db8::-192.0.2.0")
 
     def test_equality(self):
+        self.assertEqual(IP("192.0.2.1-192.0.2.2"), IP("192.0.2.2-192.0.2.1"))
         self.assertEqual(IP("192.0.2.0"), IP("192.0.2.0-192.0.2.0"))
         self.assertEqual(IP("192.0.2.0"), IP("192.0.2.0/32"))
 

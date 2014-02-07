@@ -166,7 +166,7 @@ class IPRange(object):
         first_ver, first_num = cls._parse_ip(first)
         last_ver, last_num = cls._parse_ip(last)
         if first_ver == last_ver:
-            return cls(first_ver, first_num, last_num)
+            return cls(first_ver, *sorted([first_num, last_num]))
 
         raise ValueError(
             "mismatching IP addresses ({0!r} and {1!r})".format(first, last))
