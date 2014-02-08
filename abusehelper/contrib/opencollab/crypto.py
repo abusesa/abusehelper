@@ -195,6 +195,9 @@ if __name__ == "__main__":
             while not password:
                 password = getpass.getpass("Password: ")
 
+            if options.decrypt:
+                return password
+
             if password == getpass.getpass("Confirm password: "):
                 return password
 
