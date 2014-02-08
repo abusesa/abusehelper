@@ -194,15 +194,6 @@ class Mailer(mailer.MailerService):
                 return u""
             return u"-1"
 
-    @idiokit.stream
-    def session(self, state, **keys):
-        # Try to build a mail for quick feedback that the templates
-        # etc. are at least somewhat valid.
-        yield self.build_mail([], 0, **keys)
-
-        result = yield mailer.ReportBot.session(self, state, **keys)
-        idiokit.stop(result)
-
     def build_mail(self, *args, **keys):
         return idiokit.thread(self._build_mail, *args, **keys)
 
@@ -211,6 +202,9 @@ class Mailer(mailer.MailerService):
                     template="", to=[],
                     cc=[], keywords=(),
                     **keys):
+        if events is None:
+            events = []
+
         kws = dict(keywords)
         xml = XMLFormatter(**kws)
         csv = templates.CSVFormatter(keys=False)

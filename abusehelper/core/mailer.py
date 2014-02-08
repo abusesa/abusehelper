@@ -292,7 +292,7 @@ class MailerService(ReportBot):
         "password for the authenticated SMTP " +
         "service", default=None)
     max_retries = bot.IntParam(
-        "how many times sending is retried before moving mail " + 
+        "how many times sending is retried before moving mail " +
         "to the end of the buffer", default=None)
 
     def __init__(self, **keys):
@@ -309,27 +309,34 @@ class MailerService(ReportBot):
     def session(self, state, **keys):
         # Try to build a mail for quick feedback that the templates etc. are
         # at least somewhat valid.
-        yield self.build_mail([], **keys)
+        yield self.build_mail(None, **keys)
 
         result = yield ReportBot.session(self, state, **keys)
         idiokit.stop(result)
 
     @idiokit.stream
-    def build_mail(self, events, template="", to=[], cc=[], **keys):
+    def build_mail(self, events, to=[], cc=[], template="", template_values={}, **keys):
         """
-        Return a mail object produced based on collected events and
-        session parameters.
+        Return a mail object produced based on collected events and session parameters.
+        The "events" parameter is None when we just want to test building a mail.
         """
+        if events is None:
+            events = []
 
         csv = templates.CSVFormatter()
-        template = MailTemplate(
-            template,
-            csv=csv,
-            attach_csv=templates.AttachUnicode(csv),
-            attach_and_embed_csv=templates.AttachAndEmbedUnicode(csv),
-            to=templates.Const(format_addresses(to)),
-            cc=templates.Const(format_addresses(cc)))
-        msg = yield idiokit.thread(template.format, events)
+        template_keys = {
+            "csv": csv,
+            "attach_csv": templates.AttachUnicode(csv),
+            "attach_and_embed_csv": templates.AttachAndEmbedUnicode(csv),
+            "attach_zip": templates.AttachZip(csv),
+            "to": templates.Const(format_addresses(to)),
+            "cc": templates.Const(format_addresses(cc))
+        }
+        for key, value in dict(template_values).iteritems():
+            template_keys[key] = templates.Const(value)
+
+        mail_template = MailTemplate(template, **template_keys)
+        msg = yield idiokit.thread(mail_template.format, events)
         idiokit.stop(msg)
 
     @idiokit.stream

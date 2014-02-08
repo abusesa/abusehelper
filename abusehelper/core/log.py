@@ -81,8 +81,10 @@ class EventLogger(object):
     debug = _level(logging.DEBUG)
     info = _level(logging.INFO)
     warning = _level(logging.WARNING)
+    warn = warning
     error = _level(logging.ERROR)
     critical = _level(logging.CRITICAL)
+    fatal = critical
 
     def log(self, level, msg, *args, **keys):
         if args:
