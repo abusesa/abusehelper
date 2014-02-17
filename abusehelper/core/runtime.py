@@ -158,6 +158,7 @@ class RuntimeBot(bot.XMPPBot):
 
     @idiokit.stream
     def _handle_updates(self, lobby, errors):
+        queues = dict()
         sessions = dict()
 
         try:
@@ -171,7 +172,7 @@ class RuntimeBot(bot.XMPPBot):
                     stream.throw(Cancel())
 
                 for session in added - set(sessions):
-                    sessions[session] = self.session(lobby, session) | self._catch(errors)
+                    sessions[session] = self._session(lobby, session, queues) | self._catch(errors)
         finally:
             for stream in sessions.values():
                 stream.throw(Cancel())
@@ -191,7 +192,7 @@ class RuntimeBot(bot.XMPPBot):
         yield errors | self.configs() | self._handle_updates(lobby, errors) | lobby
 
     @idiokit.stream
-    def session(self, lobby, session):
+    def _session(self, lobby, session, queues):
         name = session.service
         if session.path:
             name += u"(" + ".".join(session.path) + ")"
@@ -210,15 +211,34 @@ class RuntimeBot(bot.XMPPBot):
         session_id = session.path or [uuid.uuid4().hex]
         with self.log.stateful(attrs.value("service").encode("utf-8"), *session_id) as log:
             while True:
-                log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
-                try:
-                    stream = yield lobby.session(session.service, *session.path, **session.conf)
-                except Cancel:
-                    log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
-                    break
+                if session.service in queues:
+                    waiter = queues.pop(session.service)
                 else:
+                    waiter = idiokit.sleep(0.0)
+
+                event = idiokit.Event()
+                queues[session.service] = event
+
+                try:
+                    while waiter is not None:
+                        try:
+                            waiter = yield waiter.fork()
+                        except Cancel:
+                            return
+
+                    log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
+                    try:
+                        stream = yield lobby.session(session.service, *session.path, **session.conf)
+                    except Cancel:
+                        log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
+                        return
+
                     conf_str = ", ".join(conf)
                     log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="running")
+                finally:
+                    if queues.get(session.service, None) is event:
+                        queues.pop(session.service)
+                    event.succeed(waiter)
 
                 try:
                     yield stream
@@ -226,7 +246,7 @@ class RuntimeBot(bot.XMPPBot):
                     log.open("Lost connection to {0!r}".format(name), attrs, status="lost")
                 except Cancel:
                     log.close("Ended connection to {0!r}".format(name), attrs, status="removed")
-                    break
+                    return
 
     def run(self):
         try:
