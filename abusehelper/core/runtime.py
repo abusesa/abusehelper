@@ -1,5 +1,6 @@
 import uuid
 import idiokit
+from idiokit import timer
 from idiokit.xmpp import jid
 from abusehelper.core import serialize, events, config, bot, services, log, version
 
@@ -226,12 +227,18 @@ class RuntimeBot(bot.XMPPBot):
                         except Cancel:
                             return
 
-                    log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
+                    get_session = lobby.session(session.service, *session.path, **session.conf)
                     try:
-                        stream = yield lobby.session(session.service, *session.path, **session.conf)
+                        stream = yield timer.timeout(1.0, get_session.fork())
                     except Cancel:
-                        log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
                         return
+                    except timer.Timeout:
+                        log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
+                        try:
+                            stream = yield get_session
+                        except Cancel:
+                            log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
+                            return
 
                     conf_str = ", ".join(conf)
                     log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="running")
