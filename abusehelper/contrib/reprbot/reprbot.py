@@ -9,6 +9,32 @@ from idiokit.xmpp import jid
 from abusehelper.core import bot, events, taskfarm
 
 
+def _collect_text(element):
+    yield element.text
+
+    for child in element.children():
+        for text in _collect_text(child):
+            yield text
+
+    yield element.tail
+
+
+def get_message_text(message):
+    html = message.children(
+        "html", ns="http://jabber.org/protocol/xhtml-im"
+    ).children(
+        "body", ns="http://www.w3.org/1999/xhtml"
+    )
+    for body in html:
+        pieces = list(_collect_text(body))
+        return u"".join(pieces)
+
+    for body in message.children("body"):
+        return body.text
+
+    return None
+
+
 class ReprBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
@@ -43,18 +69,22 @@ class ReprBot(bot.ServiceBot):
             if sender == own_jid:
                 continue
 
-            for body in element.named("message").children("body"):
-                text = body.text.strip()
-                if not text.startswith("/repr ") and not text.startswith("!repr "):
+            for message in element.named("message"):
+                text = get_message_text(message)
+                if text is None:
+                    continue
+
+                pieces = text.split(None, 1)
+                if len(pieces) < 2 or pieces[0].lower() not in (u"/repr", u"!repr"):
                     continue
 
                 try:
-                    event = events.Event.from_unicode(text[5:])
+                    event = events.Event.from_unicode(pieces[1].strip())
                 except ValueError:
                     continue
 
                 yield idiokit.send(event)
-                break
+
 
 if __name__ == "__main__":
     ReprBot.from_command_line().execute()
