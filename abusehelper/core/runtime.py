@@ -193,6 +193,20 @@ class RuntimeBot(bot.XMPPBot):
         yield errors | self.configs() | self._handle_updates(lobby, errors) | lobby
 
     @idiokit.stream
+    def _delayed_log(self, log, name, attrs, delay=1.0):
+        try:
+            result = yield timer.timeout(delay, idiokit.consume())
+        except timer.Timeout:
+            log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
+            try:
+                result = yield idiokit.consume()
+            except Cancel:
+                log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
+                raise
+
+        idiokit.stop(result)
+
+    @idiokit.stream
     def _session(self, lobby, session, queues):
         name = session.service
         if session.path:
@@ -212,45 +226,31 @@ class RuntimeBot(bot.XMPPBot):
         session_id = session.path or [uuid.uuid4().hex]
         with self.log.stateful(attrs.value("service").encode("utf-8"), *session_id) as log:
             while True:
-                if session.service in queues:
-                    waiter = queues.pop(session.service)
-                else:
-                    waiter = idiokit.sleep(0.0)
-
+                waiter = queues.pop(session.service, None)
                 event = idiokit.Event()
                 queues[session.service] = event
 
                 try:
                     while waiter is not None:
-                        try:
-                            waiter = yield waiter.fork()
-                        except Cancel:
-                            return
+                        waiter = yield waiter.fork()
 
-                    get_session = lobby.session(session.service, *session.path, **session.conf)
-                    try:
-                        stream = yield timer.timeout(1.0, get_session.fork())
-                    except Cancel:
-                        return
-                    except timer.Timeout:
-                        log.open("Waiting for {0!r}".format(name), attrs, status="waiting")
-                        try:
-                            stream = yield get_session
-                        except Cancel:
-                            log.close("Stopped waiting for {0!r}".format(name), attrs, status="removed")
-                            return
-
-                    conf_str = ", ".join(conf)
-                    log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="running")
+                    stream = yield idiokit.pipe(
+                        lobby.session(session.service, *session.path, **session.conf),
+                        self._delayed_log(log, name, attrs))
+                except Cancel:
+                    return
                 finally:
                     if queues.get(session.service, None) is event:
                         queues.pop(session.service)
                     event.succeed(waiter)
 
+                conf_str = ", ".join(conf)
+                log.open("Sent {0!r} conf {1}".format(name, conf_str), attrs, status="running")
+
                 try:
                     yield stream
                 except services.Stop:
-                    log.open("Lost connection to {0!r}".format(name), attrs, status="lost")
+                    log.close("Lost connection to {0!r}".format(name), attrs, status="lost")
                 except Cancel:
                     log.close("Ended connection to {0!r}".format(name), attrs, status="removed")
                     return
