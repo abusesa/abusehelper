@@ -6,6 +6,7 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 
 import re
 import bz2
+import socket
 import urllib2
 import urlparse
 import collections
@@ -107,6 +108,16 @@ class PhishTankBot(bot.PollingBot):
 
         self._etag = None
 
+    def i_am_a_name(self, string):
+        for addr_type in (socket.AF_INET, socket.AF_INET6):
+            try:
+                socket.inet_ntop(addr_type, socket.inet_pton(addr_type, string))
+            except (ValueError, socket.error):
+                pass
+            else:
+                return False
+        return True
+
     @idiokit.stream
     def _handle_entry(self, entry, sites):
         url = entry.find("url")
@@ -167,7 +178,8 @@ class PhishTankBot(bot.PollingBot):
             event.add("url", url)
             parsed = urlparse.urlparse(url)
             host = parsed.netloc
-            event.add("host", host)
+            if self.i_am_a_name(host):
+                event.add("domain name", host)
             event.add("ip", ip)
             event.add("asn", announcer)
 

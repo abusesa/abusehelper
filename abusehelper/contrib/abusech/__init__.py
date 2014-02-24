@@ -18,7 +18,7 @@ def parse_ip(string):
 def host_or_ip(host):
     ip = parse_ip(host)
     if ip is None:
-        return "host", host
+        return "domain name", host
     else:
         return "ip", ip
 
