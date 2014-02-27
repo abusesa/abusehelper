@@ -30,7 +30,7 @@ def ipv6_addr_reverse(ipv6):
 
 class ISCPDNSExpert(Expert):
     server = bot.Param("Passive DNS server URL",
-                       default="https://dnsdb-api.isc.org")
+                       default="https://api.dnsdb.info")
     apikey = bot.Param("Service API key")
 
     def __init__(self, *args, **keys):
@@ -102,41 +102,47 @@ class ISCPDNSExpert(Expert):
         yield (keys.get("resolve", ("host",)))
 
     @idiokit.stream
-    def augment(self, key):
+    def augment(self, *keys):
         while True:
             eid, event = yield idiokit.next()
 
-            qkey = key
-            if qkey != 'ip':
-                qkey = 'name'
+            for key in keys:
+                qkey = key
+                if qkey != 'ip':
+                    qkey = 'name'
 
-            for item in event.values(key):
-                # Network ranges
-                if key in ['ip', 'network'] and '/' in item:
-                    item = item.replace('/', ',')
+                for item in event.values(key):
+                    # Network ranges
+                    if key in ['ip', 'network'] and '/' in item:
+                        item = item.replace('/', ',')
 
-                data = self.cache.get(item, None)
+                    data = self.cache.get(item, None)
 
-                if not data:
-                    url = "%s/lookup/rdata/%s/%s" % (self.server, qkey, item)
-                    req = urllib2.Request(url)
-                    req.add_header('Accept', 'application/json')
-                    req.add_header('X-Api-Key', self.apikey)
+                    if not data:
+                        url = "%s/lookup/rdata/%s/%s" % (self.server, 
+                                                         qkey, item)
+                        req = urllib2.Request(url)
+                        req.add_header('Accept', 'application/json')
+                        req.add_header('X-Api-Key', self.apikey)
 
-                    info, fileobj = yield utils.fetch_url(req)
-                    data = fileobj.read()
-                    self.cache.set(item, data)
-                    fileobj.close()
+                        try:
+                            info, fileobj = yield utils.fetch_url(req)
+                            data = fileobj.read()
+                            self.cache.set(item, data)
+                            fileobj.close()
+                        except utils.HTTPError as he:
+                            self.log.info("%r", he)
+                            data = ''
 
-                for line in data.split('\n'):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    report = json.loads(line)
-                    new = self.json_to_event(report, item, qkey)
+                    for line in data.split('\n'):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        report = json.loads(line)
+                        new = self.json_to_event(report, item, qkey)
 
-                    if new:
-                        yield idiokit.send(eid, new)
+                        if new:
+                            yield idiokit.send(eid, new)
 
 if __name__ == "__main__":
     ISCPDNSExpert.from_command_line().execute()
