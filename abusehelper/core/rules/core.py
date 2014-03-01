@@ -31,3 +31,10 @@ class Matcher(object):
         arg_info.extend(repr(x) for x in args)
         arg_info.extend(key + "=" + repr(value) for key, value in keys)
         return self.__class__.__name__ + "(" + ", ".join(arg_info) + ")"
+
+    def dump(self):
+        return None
+
+    @classmethod
+    def load(cls, dumped):
+        return cls()

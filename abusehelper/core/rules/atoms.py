@@ -10,13 +10,6 @@ class Atom(core.Matcher):
     def match(self, value):
         return False
 
-    def dump(self):
-        return None
-
-    @classmethod
-    def load(cls, _):
-        return cls()
-
 
 class String(Atom):
     def init(self, value):

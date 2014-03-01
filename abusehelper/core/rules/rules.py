@@ -20,13 +20,6 @@ class Rule(core.Matcher):
     def match_with_cache(self, obj, cache):
         return False
 
-    def dump(self):
-        return None
-
-    @classmethod
-    def load(cls, dumped):
-        return cls()
-
 
 class And(Rule):
     def init(self, first, *rest):
@@ -68,7 +61,7 @@ class Or(And):
 
 class No(Rule):
     def init(self, rule):
-        Rule.__init__(self)
+        Rule.init(self)
 
         self._rule = rule
 
@@ -170,7 +163,7 @@ class Fuzzy(Rule):
         return self._atom
 
     def init(self, atom):
-        Rule.__init__(self)
+        Rule.init(self)
 
         self._atom = atom
         self._is_key_type = isinstance(atom, atoms.String)
