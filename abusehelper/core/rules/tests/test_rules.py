@@ -1,10 +1,11 @@
 from __future__ import unicode_literals
 
 import re
+import pickle
 import unittest
 
 from .. import atoms
-from ..rules import And, Or, Match, NonMatch, Fuzzy
+from ..rules import And, Or, No, Match, NonMatch, Fuzzy
 
 from ...events import Event
 
@@ -30,6 +31,10 @@ class TestAnd(unittest.TestCase):
         a = Match("a", "a")
         self.assertEqual(And(a, a), And(a))
 
+    def test_pickling_and_unpickling(self):
+        a = And(Match("a"), Match("b"))
+        self.assertEqual(a, pickle.loads(pickle.dumps(a)))
+
 
 class TestOr(unittest.TestCase):
     def test_can_not_be_initialized_with_zero_arguments(self):
@@ -44,34 +49,70 @@ class TestOr(unittest.TestCase):
         a = Match("a", "a")
         self.assertEqual(Or(a, a), Or(a))
 
+    def test_pickling_and_unpickling(self):
+        a = Or(Match("a"), Match("b"))
+        self.assertEqual(a, pickle.loads(pickle.dumps(a)))
+
 
 class TestNo(unittest.TestCase):
-    pass
+    def test_pickling_and_unpickling(self):
+        a = No(Match("a"))
+        self.assertEqual(a, pickle.loads(pickle.dumps(a)))
 
 
 class TestMatch(unittest.TestCase):
     def test_init_conversions(self):
         self.assertEqual(
-            Match('a', 'b'),
-            Match('a', atoms.String('b')))
+            Match("a", "b"),
+            Match("a", atoms.String("b")))
         self.assertEqual(
-            Match('a', re.compile('b')),
-            Match('a', atoms.RegExp('b')))
+            Match("a", re.compile("b")),
+            Match("a", atoms.RegExp("b")))
+
+    def test_pickling_and_unpickling(self):
+        options = [
+            Match(),
+            Match("a", "b"),
+            Match("a", re.compile("b"))
+        ]
+        for option in options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
 
 
 class TestNonMatch(unittest.TestCase):
     def test_init_conversions(self):
         self.assertEqual(
-            NonMatch('a', 'b'),
-            NonMatch('a', atoms.String('b')))
+            NonMatch("a", "b"),
+            NonMatch("a", atoms.String("b")))
         self.assertEqual(
-            NonMatch('a', re.compile('b')),
-            NonMatch('a', atoms.RegExp('b')))
+            NonMatch("a", re.compile("b")),
+            NonMatch("a", atoms.RegExp("b")))
+
+    def test_pickling_and_unpickling(self):
+        options = [
+            NonMatch(),
+            NonMatch("a", "b"),
+            NonMatch("a", re.compile("b"))
+        ]
+        for option in options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
 
 
 class TestFuzzy(unittest.TestCase):
     def test_base(self):
-        rule = Fuzzy(atoms.String('a'))
+        rule = Fuzzy(atoms.String("a"))
         self.assertTrue(rule.match(Event({"a": "xy"})))
         self.assertTrue(rule.match(Event({"xy": "a"})))
+
+        rule = Fuzzy(atoms.RegExp("a"))
+        self.assertFalse(rule.match(Event({"a": "xy"})))
+        self.assertTrue(rule.match(Event({"xy": "a"})))
+
+    def test_pickling_and_unpickling(self):
+        options = [
+            Fuzzy(atoms.String("a")),
+            Fuzzy(atoms.RegExp("a"))
+        ]
+        for option in options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
 
