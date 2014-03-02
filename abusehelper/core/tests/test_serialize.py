@@ -66,5 +66,9 @@ class TestSerialize(unittest.TestCase):
         self.assertEqual(serialize.load(element), {"a": "b"})
 
     def test_rule_roundtrip(self):
-        rule = rules.And(rules.Match(u"a", u"a"), rules.Match(u"b", u"b"))
+        rule = rules.And(
+            rules.Match(u"a", rules.String(u"a")),
+            rules.Match(u"b", rules.RegExp(u"b")),
+            rules.Match(u"c", rules.IP(u"192.0.2.0"))
+        )
         self.assertEqual(serialize.load(serialize.dump(rule)), rule)
