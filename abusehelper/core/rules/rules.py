@@ -30,8 +30,8 @@ class And(Rule):
     def unique_key(self):
         return self._rules
 
-    def arguments(self):
-        return self._rules, []
+    def __repr__(self):
+        return Rule.__repr__(self, *self._rules)
 
     @property
     def subrules(self):
@@ -68,8 +68,8 @@ class No(Rule):
     def unique_key(self):
         return self._rule
 
-    def arguments(self):
-        return [self._rule], []
+    def __repr__(self):
+        return Rule.__repr__(self, self._rule)
 
     @property
     def subrule(self):
@@ -116,17 +116,17 @@ class Match(Rule):
     def unique_key(self):
         return self._key, self._value
 
-    def arguments(self):
+    def __repr__(self):
         key = self._convert(self._key, self._from_atom)
         value = self._convert(self._value, self._from_atom)
 
         if key is None and value is None:
-            return [], []
+            return Rule.__repr__(self)
         if key is None:
-            return [], [("value", value)]
+            return Rule.__repr__(self, value=value)
         if value is None:
-            return [], [("key", key)]
-        return [key, value], []
+            return Rule.__repr__(self, key=key)
+        return Rule.__repr__(self, key, value)
 
     @property
     def key(self):
@@ -171,8 +171,8 @@ class Fuzzy(Rule):
     def unique_key(self):
         return self._atom
 
-    def arguments(self):
-        return [self._atom], []
+    def __repr__(self):
+        return Rule.__repr__(self, self._atom)
 
     def match_with_cache(self, event, cache):
         if self._is_key_type:
