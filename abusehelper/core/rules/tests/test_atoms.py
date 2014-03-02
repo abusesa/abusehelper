@@ -12,9 +12,17 @@ class TestString(unittest.TestCase):
         self.assertTrue(String("atom").match("atom"))
         self.assertTrue(String("atom").match("ATOM"))
 
+    _options = [
+        String("atom")
+    ]
+
     def test_pickling_and_unpickling(self):
-        a = String("atom")
-        self.assertEqual(a, pickle.loads(pickle.dumps(a)))
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
 
 
 class TestRegExp(unittest.TestCase):
@@ -43,13 +51,18 @@ class TestRegExp(unittest.TestCase):
         self.assertFalse(RegExp("a").match("A"))
         self.assertTrue(RegExp("a", ignore_case=True).match("A"))
 
+    _options = [
+        RegExp("a"),
+        RegExp("a", ignore_case=True)
+    ]
+
     def test_pickling_and_unpickling(self):
-        options = [
-            RegExp("a"),
-            RegExp("a", ignore_case=True)
-        ]
-        for option in options:
+        for option in self._options:
             self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
 
 
 class TestIP(unittest.TestCase):
@@ -76,14 +89,19 @@ class TestIP(unittest.TestCase):
         self.assertEqual(IP("192.0.2.0-192.0.2.255"), IP("192.0.2.0", "192.0.2.255"))
         self.assertEqual(IP("192.0.2.0/24"), IP("192.0.2.0-192.0.2.255"))
 
+    _options = [
+        IP("192.0.2.0"),
+        IP("192.0.2.0/24"),
+        IP("192.0.2.0-192.0.2.1"),
+        IP("2001:db8::"),
+        IP("2001:db8::/24"),
+        IP("2001:db8::-2001:db8::1")
+    ]
+
     def test_pickling_and_unpickling(self):
-        options = [
-            IP("192.0.2.0"),
-            IP("192.0.2.0/24"),
-            IP("192.0.2.0-192.0.2.1"),
-            IP("2001:db8::"),
-            IP("2001:db8::/24"),
-            IP("2001:db8::-2001:db8::1")
-        ]
-        for option in options:
+        for option in self._options:
             self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
