@@ -81,13 +81,16 @@ class TestIP(unittest.TestCase):
         self.assertRaises(ValueError, IP, "2001:db8::-192.0.2.0")
 
     def test_equality(self):
-        self.assertEqual(IP("192.0.2.1-192.0.2.2"), IP("192.0.2.2-192.0.2.1"))
         self.assertEqual(IP("192.0.2.0"), IP("192.0.2.0-192.0.2.0"))
         self.assertEqual(IP("192.0.2.0"), IP("192.0.2.0/32"))
 
         self.assertEqual(IP("192.0.2.0/24"), IP("192.0.2.0", 24))
         self.assertEqual(IP("192.0.2.0-192.0.2.255"), IP("192.0.2.0", "192.0.2.255"))
         self.assertEqual(IP("192.0.2.0/24"), IP("192.0.2.0-192.0.2.255"))
+
+    def test_range_constructor_accepts_reverse_ranges(self):
+        self.assertEqual(IP("192.0.2.255 - 192.0.2.0"), IP("192.0.2.0 - 192.0.2.255"))
+        self.assertEqual(IP("2001:db8::ffff - 2001:db8::"), IP("2001:db8:: - 2001:db8::ffff"))
 
     _options = [
         IP("192.0.2.0"),
