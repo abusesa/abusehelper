@@ -198,7 +198,7 @@ class Mailer(mailer.MailerService):
         return idiokit.thread(self._build_mail, *args, **keys)
 
     def _build_mail(self,
-                    events, number,
+                    events, number=0,
                     template="", to=[],
                     cc=[], keywords=(),
                     **keys):
