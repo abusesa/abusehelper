@@ -2,6 +2,10 @@ import weakref
 import threading
 
 
+def load_reduced(cls, dumped):
+    return cls.load(dumped)
+
+
 class Matcher(object):
     _lock = threading.Lock()
     _refs = weakref.WeakValueDictionary()
@@ -21,13 +25,18 @@ class Matcher(object):
     def unique_key(self):
         return None
 
-    def arguments(self):
-        return [], []
-
-    def __repr__(self):
-        args, keys = self.arguments()
-
+    def __repr__(self, *args, **keys):
         arg_info = []
         arg_info.extend(repr(x) for x in args)
-        arg_info.extend(key + "=" + repr(value) for key, value in keys)
+        arg_info.extend(key + "=" + repr(value) for key, value in keys.iteritems())
         return self.__class__.__name__ + "(" + ", ".join(arg_info) + ")"
+
+    def dump(self):
+        return None
+
+    @classmethod
+    def load(cls, dumped):
+        return cls()
+
+    def __reduce__(self):
+        return load_reduced, (type(self), self.dump())

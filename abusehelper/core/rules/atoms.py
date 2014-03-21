@@ -10,13 +10,6 @@ class Atom(core.Matcher):
     def match(self, value):
         return False
 
-    def dump(self):
-        return None
-
-    @classmethod
-    def load(cls, _):
-        return cls()
-
 
 class String(Atom):
     def init(self, value):
@@ -27,8 +20,8 @@ class String(Atom):
     def unique_key(self):
         return self._value
 
-    def arguments(self):
-        return [self._value], []
+    def __repr__(self):
+        return Atom.__repr__(self, self._value)
 
     @property
     def value(self):
@@ -78,11 +71,11 @@ class RegExp(Atom):
     def unique_key(self):
         return self._regexp.pattern, bool(self._regexp.flags & re.I)
 
-    def arguments(self):
-        keys = []
+    def __repr__(self):
+        pattern = self._regexp.pattern
         if self._regexp.flags & re.I == re.I:
-            keys.append(("ignore_case", True))
-        return [self._regexp.pattern], keys
+            return Atom.__repr__(self, pattern, ignore_case=True)
+        return Atom.__repr__(self, pattern)
 
     def match(self, value):
         return self._regexp.search(value)
@@ -113,8 +106,8 @@ class IP(Atom):
     def unique_key(self):
         return self._range
 
-    def arguments(self):
-        return [unicode(self._range)], []
+    def __repr__(self):
+        return Atom.__repr__(self, unicode(self._range))
 
     def __unicode__(self):
         return unicode(self._range)

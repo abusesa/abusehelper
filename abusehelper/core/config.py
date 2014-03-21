@@ -14,9 +14,11 @@ class HashableFrozenDict(collections.Mapping, collections.Hashable):
     @classmethod
     def _hashable_item(cls, item):
         key, value = item
-        if isinstance(value, collections.Hashable):
-            return key, value
-        return key, cls._HASHABLE
+        try:
+            hash(value)
+        except TypeError:
+            return key, cls._HASHABLE
+        return key, value
 
     def __init__(self, *args, **keys):
         self._dict = dict(*args, **keys)

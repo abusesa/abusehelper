@@ -1,10 +1,11 @@
 from __future__ import unicode_literals
 
 import re
+import pickle
 import unittest
 
-from .. import atoms
-from ..rules import And, Or, Match, NonMatch, Fuzzy
+from ..atoms import String, RegExp, IP
+from ..rules import And, Or, No, Match, NonMatch, Fuzzy
 
 from ...events import Event
 
@@ -30,6 +31,18 @@ class TestAnd(unittest.TestCase):
         a = Match("a", "a")
         self.assertEqual(And(a, a), And(a))
 
+    _options = [
+        And(Match("a"), Match("b"))
+    ]
+
+    def test_pickling_and_unpickling(self):
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
+
 
 class TestOr(unittest.TestCase):
     def test_can_not_be_initialized_with_zero_arguments(self):
@@ -44,34 +57,103 @@ class TestOr(unittest.TestCase):
         a = Match("a", "a")
         self.assertEqual(Or(a, a), Or(a))
 
+    _options = [
+        Or(Match("a"), Match("b"))
+    ]
+
+    def test_pickling_and_unpickling(self):
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
+
 
 class TestNo(unittest.TestCase):
-    pass
+    _options = [
+        No(Match("a"))
+    ]
+
+    def test_pickling_and_unpickling(self):
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
 
 
 class TestMatch(unittest.TestCase):
     def test_init_conversions(self):
         self.assertEqual(
-            Match('a', 'b'),
-            Match('a', atoms.String('b')))
+            Match("a", "b"),
+            Match("a", String("b")))
         self.assertEqual(
-            Match('a', re.compile('b')),
-            Match('a', atoms.RegExp('b')))
+            Match("a", re.compile("b")),
+            Match("a", RegExp("b")))
+
+    _options = [
+        Match(),
+        Match("a", String("b")),
+        Match("a", RegExp("b")),
+        Match("a", IP("192.0.2.0"))
+    ]
+
+    def test_pickling_and_unpickling(self):
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
 
 
 class TestNonMatch(unittest.TestCase):
     def test_init_conversions(self):
         self.assertEqual(
-            NonMatch('a', 'b'),
-            NonMatch('a', atoms.String('b')))
+            NonMatch("a", "b"),
+            NonMatch("a", String("b")))
         self.assertEqual(
-            NonMatch('a', re.compile('b')),
-            NonMatch('a', atoms.RegExp('b')))
+            NonMatch("a", re.compile("b")),
+            NonMatch("a", RegExp("b")))
+
+    _options = [
+        NonMatch(),
+        NonMatch("a", String("b")),
+        NonMatch("a", RegExp("b")),
+        NonMatch("a", IP("192.0.2.0"))
+    ]
+
+    def test_pickling_and_unpickling(self):
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
 
 
 class TestFuzzy(unittest.TestCase):
     def test_base(self):
-        rule = Fuzzy(atoms.String('a'))
+        rule = Fuzzy(String("a"))
         self.assertTrue(rule.match(Event({"a": "xy"})))
         self.assertTrue(rule.match(Event({"xy": "a"})))
 
+        rule = Fuzzy(RegExp("a"))
+        self.assertFalse(rule.match(Event({"a": "xy"})))
+        self.assertTrue(rule.match(Event({"xy": "a"})))
+
+    _options = [
+        Fuzzy(String("a")),
+        Fuzzy(RegExp("a")),
+        Fuzzy(IP("192.0.2.0"))
+    ]
+
+    def test_pickling_and_unpickling(self):
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
