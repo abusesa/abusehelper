@@ -45,7 +45,12 @@ class AutoshunBot(bot.PollingBot):
 
         # Grab time offset from first line of the CSV
         header = fileobj.readline()
-        offset = -1 * int(header[-6::].strip()) / 100  # ex: -0500 to 5
+
+        if len(header) > 6: # Source file header row may sometimes be empty
+            offset = -1 * int(header[-6::].strip()) / 100  # ex: -0500 to 5
+        else:
+            offset = 5
+
         self.time_offset = offset if -12 <= offset <= 12 else 5
 
         yield utils.csv_to_events(fileobj,
