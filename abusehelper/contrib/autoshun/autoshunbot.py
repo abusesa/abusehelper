@@ -23,9 +23,11 @@ CLASSIFICATION = (
 
 class AutoshunBot(bot.PollingBot):
     COLUMNS = ["ip", "time", "info"]
+    time_offset = 5
 
     feed_url = bot.Param(default=AUTOSHUN_CSV_URL)
     use_cymru_whois = bot.BoolParam()
+
 
     def poll(self):
         pipe = self._poll(url=self.feed_url)
@@ -46,12 +48,9 @@ class AutoshunBot(bot.PollingBot):
         # Grab time offset from first line of the CSV
         header = fileobj.readline()
 
-        if len(header) > 6: # Source file header row may sometimes be empty
-            offset = -1 * int(header[-6::].strip()) / 100  # ex: -0500 to 5
-        else:
-            offset = 5
-
-        self.time_offset = offset if -12 <= offset <= 12 else 5
+        if len(header) > 0: # Source file header row may sometimes be empty
+            offset = -1 * int(header[-5:]) / 100  # ex: -0500 to 5
+            self.time_offset = offset if -12 <= offset <= 12 else 5
 
         yield utils.csv_to_events(fileobj,
                                   columns=self.COLUMNS,
