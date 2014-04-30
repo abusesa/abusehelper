@@ -66,7 +66,7 @@ def ps():
 
 class Instance(object):
     def __init__(self, instance):
-        instance = os.path.abspath(instance)
+        instance = os.path.realpath(instance)
         if os.path.isdir(instance):
             instance = os.path.join(instance, "startup.py")
         self._instance = instance
