@@ -43,9 +43,9 @@ def _split(txt_results, keys):
         if not item_list:
             continue
 
-        results.add(tuple(sorted(item_list)))
+        results.add(frozenset(item_list))
 
-    idiokit.stop(tuple(results))
+    return tuple(tuple(x) for x in results)
 
 
 class ASNameLookup(object):
