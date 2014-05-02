@@ -49,7 +49,7 @@ def _split(txt_results, keys):
 
 
 class ASNameLookup(object):
-    _keys = (None, None, None, None, "as name")
+    _keys = (None, None, None, "as allocated", "as name")
 
     def __init__(self, resolver=None, cache_time=4 * 60 * 60):
         self._resolver = resolver
@@ -79,7 +79,7 @@ class ASNameLookup(object):
 
 
 class OriginLookup(object):
-    _keys = ("asn", "bgp prefix", "cc", "registry", "allocated")
+    _keys = ("asn", "bgp prefix", "cc", "registry", "bgp prefix allocated")
 
     def __init__(self, resolver=None, cache_time=4 * 60 * 60):
         self._resolver = resolver
