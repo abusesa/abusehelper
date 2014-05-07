@@ -110,19 +110,19 @@ class ReportBot(bot.ServiceBot):
                     continue
 
                 _, args, keys = heapq.heappop(self._queue)
+
                 self._current = args, keys
                 try:
                     result = yield self.report(*args, **keys)
-                finally:
+                except:
+                    self.queue(0.0, *args, **keys)
+                    raise
+                else:
                     self._current = None
 
                 if not result and result is not None:
                     self.queue(60.0, *args, **keys)
         except services.Stop:
-            if self._current is not None:
-                args, keys = self._current
-                self.queue(0.0, *args, **keys)
-
             now = time.time()
             dumped = [(max(x - now, 0.0), y, z) for (x, y, z) in self._queue]
             idiokit.stop(_ReportBotState(dumped))
@@ -319,8 +319,8 @@ class MailerService(ReportBot):
         "password for the authenticated SMTP " +
         "service", default=None)
     max_retries = bot.IntParam(
-        "how many times sending is retried before moving mail " +
-        "to the end of the buffer", default=None)
+        "how many times sending is retried before dropping mail " +
+        "from the send queue", default=0)
 
     def __init__(self, **keys):
         ReportBot.__init__(self, **keys)
@@ -367,7 +367,9 @@ class MailerService(ReportBot):
         idiokit.stop(msg)
 
     @idiokit.stream
-    def report(self, events, to=[], cc=[], **keys):
+    def report(self, events, retries=None, to=[], cc=[], **keys):
+        if retries is None:
+            retries = self.max_retries
         msg = yield self.build_mail(events, to=to, cc=cc, **keys)
 
         if "To" not in msg:
@@ -391,32 +393,27 @@ class MailerService(ReportBot):
 
         if not to_addrs:
             self.log.info("Skipped message %r (no recipients)", subject)
-            idiokit.stop(True)
+            return
 
         if not events:
             self.log.info("Skipped message %r to %r (no events)", subject, to_addrs)
-            idiokit.stop(True)
+            return
 
         # No need to keep both the mail object and mail data in memory.
         msg_data = msg.as_string()
         del msg
 
-        retries = 0
-        while True:
-            result = yield self._mailer.send(from_addr[1], to_addrs, subject, msg_data)
-            if result:
-                break
+        result = yield self._mailer.send(from_addr[1], to_addrs, subject, msg_data)
+        if result:
+            return
 
-            if self.max_retries is not None:
-                retries += 1
+        if retries >= 1:
+            self.log.info("Retrying sending in 60 seconds")
+            self.requeue(60.0, retries=retries-1)
+            return
 
-                if retries > self.max_retries:
-                    self.log.error("Sending mail failed")
-                    idiokit.stop(False)
+        self.log.error("Failed all retries, dropping the mail from the queue")
 
-            self.log.info("Retrying sending in 10 seconds")
-            yield idiokit.sleep(10.0)
-        idiokit.stop(True)
 
 if __name__ == "__main__":
     MailerService.from_command_line().execute()
