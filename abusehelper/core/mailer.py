@@ -1,4 +1,5 @@
 import time
+import heapq
 import socket
 import getpass
 import smtplib
@@ -38,18 +39,47 @@ def alert(*times):
         yield idiokit.send()
 
 
+class _ReportBotState(object):
+    def __init__(self, queue=[], version_and_args=(1, None)):
+        self._queue = tuple(queue)
+
+    def __iter__(self):
+        return iter(self._queue)
+
+    def __reduce__(self):
+        return self.__class__, (self._queue, (1, None))
+
+
 class ReportBot(bot.ServiceBot):
     REPORT_NOW = object()
 
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
 
-        self.rooms = taskfarm.TaskFarm(self.handle_room)
-        self.collectors = dict()
-        self.queue = collections.deque()
+        self._rooms = taskfarm.TaskFarm(self._handle_room)
+        self._queue = []
+        self._current = None
+
+    def queue(self, _delay, *args, **keys):
+        expires = time.time() + _delay
+        heapq.heappush(self._queue, (expires, args, keys))
+
+    def requeue(self, _delay, *args_diff, **keys_diff):
+        if self._current is None:
+            raise RuntimeError("no current report")
+
+        args, keys = self._current
+
+        args = list(args)
+        args[:len(args_diff)] = args_diff
+
+        keys = dict(keys)
+        keys.update(keys_diff)
+
+        self.queue(_delay, *args, **keys)
 
     @idiokit.stream
-    def handle_room(self, name):
+    def _handle_room(self, name):
         msg = "room {0!r}".format(name)
         attrs = events.Event(type="room", service=self.bot_name, room=name)
 
@@ -59,62 +89,60 @@ class ReportBot(bot.ServiceBot):
 
             log.open("Joined " + msg, attrs, status="joined")
             try:
-                yield room | events.stanzas_to_events() | self.distribute(name)
+                yield idiokit.pipe(room, events.stanzas_to_events())
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
     @idiokit.stream
-    def distribute(self, name):
-        while True:
-            event = yield idiokit.next()
-
-            collectors = self.collectors.get(name, ())
-            for collector in tuple(collectors):
-                try:
-                    yield collector.send(event)
-                except idiokit.BrokenPipe:
-                    pass
-
-    @idiokit.stream
-    def main(self, queue):
-        if queue:
-            self.queue.extendleft(queue)
+    def main(self, state):
+        if isinstance(state, collections.deque):
+            for item, keys in state:
+                self.queue(0.0, item, **keys)
+        elif state is not None:
+            for delay, args, keys in state:
+                self.queue(delay, *args, **keys)
 
         try:
             while True:
-                while self.queue:
-                    item, keys = self.queue.popleft()
-                    success = yield self.report(item, **keys)
-                    if not success:
-                        self.queue.append((item, keys))
+                now = time.time()
+                if not self._queue or self._queue[0][0] > now:
+                    yield idiokit.sleep(1.0)
+                    continue
 
-                yield idiokit.sleep(1.0)
+                _, args, keys = heapq.heappop(self._queue)
+                self._current = args, keys
+                try:
+                    result = yield self.report(*args, **keys)
+                finally:
+                    self._current = None
+
+                if not result and result is not None:
+                    self.queue(60.0, *args, **keys)
         except services.Stop:
-            idiokit.stop(self.queue)
+            if self._current is not None:
+                args, keys = self._current
+                self.queue(0.0, *args, **keys)
+
+            now = time.time()
+            dumped = [(max(x - now, 0.0), y, z) for (x, y, z) in self._queue]
+            idiokit.stop(_ReportBotState(dumped))
 
     @idiokit.stream
     def session(self, state, src_room, **keys):
-        keys = dict(keys)
         keys["src_room"] = src_room
 
         def _alert(_):
             yield self.REPORT_NOW
 
-        def _collect(item):
-            self.queue.append((item, keys))
+        @idiokit.stream
+        def _collect():
+            while True:
+                item = yield idiokit.next()
+                self.queue(0.0, item, **keys)
 
-        collector = self.collect(state, **keys) | idiokit.map(_collect)
+        collector = idiokit.pipe(self.collect(state, **keys), _collect())
         idiokit.pipe(self.alert(**keys), idiokit.map(_alert), collector)
-        self.collectors.setdefault(src_room, set()).add(collector)
-
-        try:
-            result = yield collector | self.rooms.inc(src_room)
-        finally:
-            collectors = self.collectors.get(src_room, set())
-            collectors.discard(collector)
-            if not collectors:
-                self.collectors.pop(src_room, None)
-
+        result = yield idiokit.pipe(self._rooms.inc(src_room), collector)
         idiokit.stop(result)
 
     @idiokit.stream
@@ -141,7 +169,6 @@ class ReportBot(bot.ServiceBot):
     @idiokit.stream
     def report(self, collected):
         yield idiokit.sleep(0.0)
-        idiokit.stop(True)
 
 
 from email import message_from_string
