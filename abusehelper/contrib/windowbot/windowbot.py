@@ -44,11 +44,13 @@ class WindowBot(RoomBot):
             expire_time = current_time + window_time
 
             eid = events.hexdigest(event)
+            count, items = ids.get(eid, (0, event.items()))
+            ids[eid] = count + 1, items
 
-            event.add("id", eid)
-            yield idiokit.send(event)
-
-            ids[eid] = expire_time
+            if count == 0:
+                yield idiokit.send(event.union({
+                    "id:open": eid
+                }))
             queue.append((expire_time, eid))
 
     @idiokit.stream
@@ -60,14 +62,14 @@ class WindowBot(RoomBot):
 
             while queue and queue[0][0] <= current_time:
                 expire_time, eid = queue.popleft()
-                if ids.get(eid, None) != expire_time:
-                    continue
 
-                del ids[eid]
-
-                event = events.Event()
-                event.add("id", eid)
-                yield idiokit.send(event)
+                count, items = ids.pop(eid)
+                if count > 1:
+                    ids[eid] = count - 1, items
+                else:
+                    yield idiokit.send(events.Event(items).union({
+                        "id:close": eid
+                    }))
 
     @idiokit.stream
     def session(self, state, src_room, dst_room, window_time=60.0):
