@@ -57,7 +57,7 @@ class OpenCollabExpert(Expert):
                 incremental, token, (removed, updates) = result
                 removed = set(removed)
                 if not incremental:
-                    removed.update(self.cache)
+                    removed.update(self.cache.keys())
                     self.cache.clear()
 
                 for page, keys in updates.iteritems():
@@ -78,7 +78,7 @@ class OpenCollabExpert(Expert):
 
                 if removed or updates:
                     self.log.info("Updated {0} pages and removed {1} pages ({2} pages in cache)".format(
-                        len(updates), len(removed), len(self.cache)))
+                        len(updates), len(removed), len(self.cache.keys())))
 
             yield idiokit.sleep(self.poll_interval)
 
