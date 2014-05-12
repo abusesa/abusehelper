@@ -175,7 +175,7 @@ from email import message_from_string
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.charset import Charset, QP
-from email.utils import formatdate, make_msgid, getaddresses, formataddr
+from email.utils import getaddresses, formataddr
 
 
 class MailTemplate(templates.Template):
@@ -305,22 +305,29 @@ def format_addresses(addrs):
 
 
 class MailerService(ReportBot):
-    mail_sender = bot.Param(
-        "from whom it looks like the mails came from")
-    smtp_host = bot.Param(
-        "hostname of the SMTP service used for sending mails")
-    smtp_port = bot.IntParam(
-        "port of the SMTP service used for sending mails",
-        default=25)
-    smtp_auth_user = bot.Param(
-        "username for the authenticated SMTP service",
-        default=None)
-    smtp_auth_password = bot.Param(
-        "password for the authenticated SMTP " +
-        "service", default=None)
-    max_retries = bot.IntParam(
-        "how many times sending is retried before dropping mail " +
-        "from the send queue", default=0)
+    mail_sender = bot.Param("""
+        from whom it looks like the mails came from
+        """)
+    mail_receiver_override = bot.ListParam("""
+        override the mail recipient list, sending all mails
+        to these given address(es) instead of the original recipients
+        """, default=None)
+    smtp_host = bot.Param("""
+        hostname of the SMTP service used for sending mails
+        """)
+    smtp_port = bot.IntParam("""
+        port of the SMTP service used for sending mails
+        """, default=25)
+    smtp_auth_user = bot.Param("""
+        username for the authenticated SMTP service
+        """, default=None)
+    smtp_auth_password = bot.Param("""
+        password for the authenticated SMTP service
+        """, default=None)
+    max_retries = bot.IntParam("""
+        how many times sending is retried before dropping mail
+        from the send queue
+        """, default=0)
 
     def __init__(self, **keys):
         ReportBot.__init__(self, **keys)
@@ -387,7 +394,10 @@ class MailerService(ReportBot):
 
         subject = msg.get("subject", "")
 
-        to_addrs = msg.get_all("to", []) + msg.get_all("cc", []) + msg.get_all("bcc", [])
+        if self.mail_receiver_override is not None:
+            to_addrs = list(self.mail_receiver_override)
+        else:
+            to_addrs = msg.get_all("to", []) + msg.get_all("cc", []) + msg.get_all("bcc", [])
         to_addrs = [addr for (name, addr) in getaddresses(to_addrs)]
         to_addrs = filter(None, [x.strip() for x in to_addrs])
 
