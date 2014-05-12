@@ -342,7 +342,7 @@ class MailerService(ReportBot):
         idiokit.stop(result)
 
     @idiokit.stream
-    def build_mail(self, events, to=[], cc=[], template="", template_values={}, **keys):
+    def build_mail(self, events, to=[], cc=[], bcc=[], template="", template_values={}, **keys):
         """
         Return a mail object produced based on collected events and session parameters.
         The "events" parameter is None when we just want to test building a mail.
@@ -357,7 +357,8 @@ class MailerService(ReportBot):
             "attach_and_embed_csv": templates.AttachAndEmbedUnicode(csv),
             "attach_zip": templates.AttachZip(csv),
             "to": templates.Const(format_addresses(to)),
-            "cc": templates.Const(format_addresses(cc))
+            "cc": templates.Const(format_addresses(cc)),
+            "bcc": templates.Const(format_addresses(bcc))
         }
         for key, value in dict(template_values).iteritems():
             template_keys[key] = templates.Const(value)
@@ -367,27 +368,26 @@ class MailerService(ReportBot):
         idiokit.stop(msg)
 
     @idiokit.stream
-    def report(self, events, retries=None, to=[], cc=[], **keys):
+    def report(self, events, retries=None, to=[], cc=[], bcc=[], **keys):
         if retries is None:
             retries = self.max_retries
-        msg = yield self.build_mail(events, to=to, cc=cc, **keys)
+        msg = yield self.build_mail(events, to=to, cc=cc, bcc=bcc, **keys)
 
-        if "To" not in msg:
-            msg["To"] = format_addresses(to)
-        if "Cc" not in msg:
-            msg["Cc"] = format_addresses(cc)
+        if "to" not in msg:
+            msg["to"] = format_addresses(to)
+        if "cc" not in msg:
+            msg["cc"] = format_addresses(cc)
+        if "bcc" not in msg:
+            msg["bcc"] = format_addresses(bcc)
 
         # FIXME: Use encoding after getaddresses
         from_addr = getaddresses([self.mail_sender])[0]
+        if "from" not in msg:
+            msg["from"] = formataddr(from_addr)
 
-        if "From" not in msg:
-            msg["From"] = formataddr(from_addr)
+        subject = msg.get("subject", "")
 
-        msg["Date"] = formatdate()
-        msg["Message-ID"] = make_msgid()
-        subject = msg.get("Subject", "")
-
-        to_addrs = msg.get_all("To", list()) + msg.get_all("Cc", list())
+        to_addrs = msg.get_all("to", []) + msg.get_all("cc", []) + msg.get_all("bcc", [])
         to_addrs = [addr for (name, addr) in getaddresses(to_addrs)]
         to_addrs = filter(None, [x.strip() for x in to_addrs])
 
