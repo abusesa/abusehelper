@@ -175,6 +175,7 @@ from email import message_from_string
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.charset import Charset, QP
+from email.header import decode_header
 from email.utils import getaddresses, formataddr
 
 
@@ -230,19 +231,19 @@ class Mailer(object):
         while server is None:
             host, port = self.smtp_host, self.smtp_port
             if self.log:
-                self.log.info("Connecting %r port %d", host, port)
+                self.log.info(u"Connecting to SMTP server {0!r} port {1}".format(host, port))
             try:
                 server = yield idiokit.thread(smtplib.SMTP, host, port)
             except self.TOLERATED_EXCEPTIONS as exc:
                 if self.log:
-                    self.log.error("Error connecting SMTP server: %r", exc)
+                    self.log.error(u"Failed connecting to SMTP server: {0!r}".format(exc))
             else:
                 if self.log:
-                    self.log.info("Connected to the SMTP server")
+                    self.log.info(u"Connected to the SMTP server")
                 break
 
             if self.log:
-                self.log.info("Retrying SMTP connection in 10 seconds")
+                self.log.info(u"Retrying SMTP connection in 10 seconds")
             yield idiokit.sleep(10.0)
 
         try:
@@ -268,32 +269,28 @@ class Mailer(object):
         server = yield self._connect()
         try:
             if self.log:
-                self.log.info("Sending message %r to %r", subject, to_addrs)
+                self.log.info(u"Sending message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)))
             yield idiokit.thread(server.sendmail, from_addr, to_addrs, msg)
         except smtplib.SMTPDataError as data_error:
             if self.log:
-                self.log.error(
-                    "Could not send message to %r: %r. " +
-                    "Dropping message from queue.",
-                    to_addrs, data_error)
+                self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
+                    join_addresses(to_addrs), data_error))
             idiokit.stop(True)
         except smtplib.SMTPRecipientsRefused as refused:
             if self.log:
                 for recipient, reason in refused.recipients.iteritems():
-                    self.log.error(
-                        "Could not send message to %r: %r. " +
-                        "Dropping message from queue.",
-                        recipient, reason)
+                    self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
+                        join_addresses(to_addrs), reason))
             idiokit.stop(True)
         except self.TOLERATED_EXCEPTIONS as exc:
             if self.log:
-                self.log.error("Could not send message to %r: %r", to_addrs, exc)
+                self.log.error(u"Could not send message to {0}: {1!r}".format(join_addresses(to_addrs), exc))
             idiokit.stop(False)
         finally:
             self._disconnect(server)
 
         if self.log:
-            self.log.info("Sent message to %r", to_addrs)
+            self.log.info(u"Sent message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)))
         idiokit.stop(True)
 
 
@@ -302,6 +299,25 @@ def format_addresses(addrs):
         addrs = [addrs]
     # FIXME: Use encoding after getaddresses
     return ", ".join(map(formataddr, getaddresses(addrs)))
+
+
+def join_addresses(addrs):
+    if not addrs:
+        return u""
+    if len(addrs) == 1:
+        return addrs[0]
+    return u", ".join(addrs[:-1]) + u" and " + addrs[-1]
+
+
+def decode_subject(subject):
+    pieces = []
+
+    for piece, charset in decode_header(subject):
+        if charset is None:
+            charset = "ascii"
+        pieces.append(piece.decode(charset, "replace"))
+
+    return "".join(pieces)
 
 
 class MailerService(ReportBot):
@@ -392,7 +408,7 @@ class MailerService(ReportBot):
         if "from" not in msg:
             msg["from"] = formataddr(from_addr)
 
-        subject = msg.get("subject", "")
+        subject = decode_subject(msg.get("subject", ""))
 
         if self.mail_receiver_override is not None:
             to_addrs = list(self.mail_receiver_override)
@@ -402,11 +418,11 @@ class MailerService(ReportBot):
         to_addrs = filter(None, [x.strip() for x in to_addrs])
 
         if not to_addrs:
-            self.log.info("Skipped message %r (no recipients)", subject)
+            self.log.info(u"Skipped message \"{0}\" (no recipients)".format(subject))
             return
 
         if not events:
-            self.log.info("Skipped message %r to %r (no events)", subject, to_addrs)
+            self.log.info(u"Skipped message \"{0}\" to {1} (no events)".format(subject, join_addresses(to_addrs)))
             return
 
         # No need to keep both the mail object and mail data in memory.
@@ -418,11 +434,11 @@ class MailerService(ReportBot):
             return
 
         if retries >= 1:
-            self.log.info("Retrying sending in 60 seconds")
+            self.log.info(u"Retrying sending in 60 seconds")
             self.requeue(60.0, retries=retries-1)
             return
 
-        self.log.error("Failed all retries, dropping the mail from the queue")
+        self.log.error(u"Failed all retries, dropping the mail from the queue")
 
 
 if __name__ == "__main__":
