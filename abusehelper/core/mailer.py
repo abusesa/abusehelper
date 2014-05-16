@@ -359,7 +359,14 @@ class MailerService(ReportBot):
     def session(self, state, **keys):
         # Try to build a mail for quick feedback that the templates etc. are
         # at least somewhat valid.
-        yield self.build_mail(None, **keys)
+        try:
+            yield self.build_mail(None, **keys)
+        except templates.TemplateError as te:
+            self.log.error(u"Mail template was not valid ({0}), pausing session".format(te))
+            try:
+                yield idiokit.consume()
+            except services.Stop:
+                idiokit.stop(state)
 
         result = yield ReportBot.session(self, state, **keys)
         idiokit.stop(result)
