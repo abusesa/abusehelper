@@ -1,6 +1,12 @@
-import idiokit
 import urllib2
 import xml.etree.cElementTree as etree
+
+try:
+    from xml.etree.cElementTree import ParseError
+except ImportError:
+    ParseError = SyntaxError
+
+import idiokit
 from abusehelper.core import bot, cymruwhois, events, utils
 
 
@@ -11,7 +17,6 @@ class RSSBot(bot.PollingBot):
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)
-        self.past_events = set()
 
     def feed_keys(self, **_):
         for feed in self.feeds:
@@ -36,7 +41,6 @@ class RSSBot(bot.PollingBot):
             idiokit.stop(False)
 
         self.log.info("Finished downloading the feed.")
-        new_events = set()
 
         byte = fileobj.read(1)
         while byte and byte != "<":
@@ -48,19 +52,9 @@ class RSSBot(bot.PollingBot):
                 for _, elem in etree.iterparse(fileobj):
                     for event in self._parse(elem, url):
                         if event:
-                            id = event.value("id", None)
-                            if id:
-                                new_events.add(id)
                             yield idiokit.send(event)
-            except SyntaxError as e:
+            except ParseError as e:
                 self.log.error('Invalid format on feed: "%s", "%r"', url, e)
-
-        for id in self.past_events:
-            if id not in new_events:
-                event = events.Event()
-                event.add("id", id)
-                yield idiokit.send(event)
-        self.past_events = new_events
 
     def _parse(self, elem, url):
         items = elem.findall("item")
