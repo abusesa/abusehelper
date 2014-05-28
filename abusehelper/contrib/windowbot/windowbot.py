@@ -36,6 +36,13 @@ from abusehelper.core import events
 
 class WindowBot(RoomBot):
     @idiokit.stream
+    def match(self, rule):
+        while True:
+            event = yield idiokit.next()
+            if rule.match(event):
+                yield idiokit.send(event)
+
+    @idiokit.stream
     def process(self, ids, queue, window_time):
         while True:
             event = yield idiokit.next()
@@ -72,7 +79,11 @@ class WindowBot(RoomBot):
                     }))
 
     @idiokit.stream
-    def session(self, state, src_room, dst_room, window_time=60.0):
+    def session(self, state, src_room, dst_room, window_time=60.0, rule=None):
+        if rule is None:
+            rule = rules.Anything()
+        rule = rules.rule(rule)
+
         queue = collections.deque()
         ids = dict()
 
@@ -83,6 +94,7 @@ class WindowBot(RoomBot):
 
         yield (self.from_room(src_room)
                | events.stanzas_to_events()
+               | self.match(rule)
                | self.process(ids, queue, window_time)
                | events.events_to_elements()
                | to)
