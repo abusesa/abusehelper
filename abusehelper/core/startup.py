@@ -31,9 +31,9 @@ class Bot(object):
     _defaults = dict()
 
     @classmethod
-    def template(cls, **attrs):
+    def template(cls, *args, **keys):
         defaults = dict(cls._defaults)
-        defaults.update(attrs)
+        defaults.update(*args, **keys)
 
         class BotTemplate(cls):
             _defaults = defaults
