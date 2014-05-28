@@ -230,20 +230,16 @@ class Mailer(object):
 
         while server is None:
             host, port = self.smtp_host, self.smtp_port
-            if self.log:
-                self.log.info(u"Connecting to SMTP server {0!r} port {1}".format(host, port))
+            self.log.info(u"Connecting to SMTP server {0!r} port {1}".format(host, port))
             try:
                 server = yield idiokit.thread(smtplib.SMTP, host, port)
             except self.TOLERATED_EXCEPTIONS as exc:
-                if self.log:
-                    self.log.error(u"Failed connecting to SMTP server: {0!r}".format(exc))
+                self.log.error(u"Failed connecting to SMTP server: {0!r}".format(exc))
             else:
-                if self.log:
-                    self.log.info(u"Connected to the SMTP server")
+                self.log.info(u"Connected to the SMTP server")
                 break
 
-            if self.log:
-                self.log.info(u"Retrying SMTP connection in 10 seconds")
+            self.log.info(u"Retrying SMTP connection in 10 seconds")
             yield idiokit.sleep(10.0)
 
         try:
@@ -268,29 +264,24 @@ class Mailer(object):
     def send(self, from_addr, to_addrs, subject, msg):
         server = yield self._connect()
         try:
-            if self.log:
-                self.log.info(u"Sending message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)))
+            self.log.info(u"Sending message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)))
             yield idiokit.thread(server.sendmail, from_addr, to_addrs, msg)
         except smtplib.SMTPDataError as data_error:
-            if self.log:
-                self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
-                    join_addresses(to_addrs), data_error))
+            self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
+                join_addresses(to_addrs), data_error))
             idiokit.stop(True)
         except smtplib.SMTPRecipientsRefused as refused:
-            if self.log:
-                for recipient, reason in refused.recipients.iteritems():
-                    self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
-                        join_addresses(to_addrs), reason))
+            for recipient, reason in refused.recipients.iteritems():
+                self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
+                    join_addresses(to_addrs), reason))
             idiokit.stop(True)
         except self.TOLERATED_EXCEPTIONS as exc:
-            if self.log:
-                self.log.error(u"Could not send message to {0}: {1!r}".format(join_addresses(to_addrs), exc))
+            self.log.error(u"Could not send message to {0}: {1!r}".format(join_addresses(to_addrs), exc))
             idiokit.stop(False)
         finally:
             self._disconnect(server)
 
-        if self.log:
-            self.log.info(u"Sent message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)))
+        self.log.info(u"Sent message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)))
         idiokit.stop(True)
 
 
