@@ -6,19 +6,42 @@ from abusehelper.core import utils, cymruwhois, bot
 AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
 # Based on analysis in VSRoom for the most common types.
-CLASSIFICATION = (
-    ("ZeroAccess", "malware", "zeroaccess"),
-    ("Sipvicious", "protocol", "sip"),
-    ("SSH", "protocol", "ssh"),
-    ("Tomcat", "protocol", "http"),
-    ("WEB Proxy", "protocol", "http"),
-    ("Double HTTP", "protocol", "http"),
-    ("Wordpress", "protocol", "http"),
-    ("DHL Spambot", "type", "spam"),
-    ("Spam Bot", "type", "spam"),
-    ("Teminal Server", "protocol", "rdp"),
-    ("TDSS", "malware", "tdss")
-)
+CLASSIFICATION = {
+    "TDSS": [("type", "botnet drone"), ("malware", "tdss")],
+    "ZeroAccess": [("type", "botnet drone"), ("malware", "zeroaccess")],
+    
+    "Malware Distribution": [("type","malware")],
+
+    "Double HTTP": [("type", "brute-force"), ("protocol", "http")],
+    "Sipvicious": [("type", "brute-force"), ("protocol", "sip")],
+    "SSH": [("type", "brute-force"), ("protocol", "ssh")],
+    "Teminal Server": [("type", "brute-force"), ("protocol", "rdp")],
+    "Tomcat": [("type", "brute-force"), ("protocol", "http")],
+    "TomCat Auth": [("type", "brute-force"), ("protocol","http")],
+    "WEB Proxy": [("type", "brute-force"), ("protocol", "http")],
+    "Wordpress": [("type", "brute-force"), ("protocol", "http")],
+    
+    "DHL Spambot": [("type", "spam")],
+    "Spam Bot": [("type", "spam")],
+    
+    "Remax Phish": [("type", "phishing")],
+
+    "Core-Project": [("type", "exploit")],
+    "Dell Kace backdoor": [("type", "exploit"), ("protocol", "http")],
+    "dfind SK": [("type", "exploit")],
+    "FTP Administrator": [("type", "exploit"), ("protocol", "ftp")],
+    "g01pack": [("type", "exploit"), ("malware", "g01pack")],
+    "Heartblead": [("type", "exploit"), ("protocol", "ssl/tls")],
+    "HTTP Get with Title": [("exploit", "scanner"), ("protocol", "http")],
+    "Malicious 8x8": [("type", "exploit"), ("protocol", "http")],    
+    "Muieblackcat": [("type","exploit"),("protocol","http")],
+    "Oracle SQL Injection": [("type", "exploit"), ("protocol", "http")],
+    "php injection": [("type", "exploit"), ("protocol", "http")],
+    "PHP-cgi vulnerability": [("type","exploit"),("protocol","http")],
+    "ZmEu": [("type","exploit"), ("protocol","http")],
+
+    "Morfeus F": [("type", "scanner")],
+}
 
 
 class AutoshunBot(bot.PollingBot):
@@ -65,14 +88,11 @@ class AutoshunBot(bot.PollingBot):
             event.add("description", "This host has triggered an IDS alert.")
 
             for info in event.values("info"):
-                for name, key, value in CLASSIFICATION:
+                for name, tuples in CLASSIFICATION.items():
                     if info.startswith(name):
-                        event.add(key, value)
-                        if key in ["malware", "spam"]:
-                            event.add("type", "botnet drone")
-                        elif key == "protocol":
-                            event.add("type", "brute-force")
-                event.add("additional information", info)
+                        for pair in tuples: 
+                            event.add(pair[0], pair[1])
+                event.add("Autoshun classification", info)
             event.clear("info")
             if not event.contains("type"):
                 event.add("type", "ids alert")
