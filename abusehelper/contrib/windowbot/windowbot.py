@@ -1,5 +1,5 @@
 import idiokit
-from abusehelper.core import bot, taskfarm
+from abusehelper.core import bot, taskfarm, rules
 
 
 class RoomBot(bot.ServiceBot):
