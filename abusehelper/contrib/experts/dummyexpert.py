@@ -6,7 +6,7 @@ class DummyExpert(Expert):
     @idiokit.stream
     def augment(self):
         counter = 0
-
+        
         while True:
             eid, event = yield idiokit.next()
 
