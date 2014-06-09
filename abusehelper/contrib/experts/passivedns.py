@@ -65,6 +65,7 @@ class PassiveDNSExpert(Expert):
         lines = "".join(all_data).splitlines()
         # there will be duplicates
         lines = set(lines)
+        eventlist = list()
         for line in lines:
             event = events.Event()
             for key, value in zip(keys, line.split("\t")):
@@ -76,7 +77,8 @@ class PassiveDNSExpert(Expert):
                             key = 'ns'
                 event.add(key, value)
             event.add("expert", "passivedns")
-            yield idiokit.send(eid, event)
+            eventlist.append(event)
+        idiokit.stop(eventlist) 
 
     @idiokit.stream
     def augment(self, *args):
@@ -89,8 +91,9 @@ class PassiveDNSExpert(Expert):
 
             for name in values:
                 self.log.info("Querying %r", name)
-                answer = self.lookup(self.host, self.port, eid, name)
-                yield answer
+                answers = yield self.lookup(self.host, self.port, eid, name)
+                for answer in answers:
+                    yield idiokit.send(eid, answer)
 
 if __name__ == "__main__":
     PassiveDNSExpert.from_command_line().execute()
