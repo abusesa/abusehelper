@@ -1,6 +1,6 @@
 import socket
 import idiokit
-import urlparse 
+import urlparse
 from abusehelper.core import utils, bot, events
 
 FEED_URL = "http://vxvault.siri-urz.net/URL_List.php"
@@ -26,17 +26,13 @@ def parseURL(line):
 class VxVaultBot(bot.PollingBot):
     feed_url = bot.Param(default=FEED_URL)
 
-    def poll(self):
-        pipe = self._poll(url=self.feed_url)
-        return pipe
-
     @idiokit.stream
-    def _poll(self, url):
-        self.log.info("Downloading %s" % url)
+    def poll(self):
+        self.log.info("Downloading %s" % self.feed_url)
         try:
-            info, fileobj = yield utils.fetch_url(url)
+            info, fileobj = yield utils.fetch_url(self.feed_url)
         except utils.FetchUrlFailed, fuf:
-            raise bot.PollSkipped("failed to download {0!r} ({1})".format(url, fuf))
+            raise bot.PollSkipped("failed to download {0!r} ({1})".format(self.feed_url, fuf))
         self.log.info("Downloaded")
 
         for line in fileobj:
@@ -52,7 +48,7 @@ class VxVaultBot(bot.PollingBot):
             event.add("feed", "vxvault")
             event.add("feed url", self.feed_url)
             event.add("type", "malware")
-            event.add("description", "This host is most likely hosting a malware URL.") 
+            event.add("description", "This host is most likely hosting a malware URL.")
             yield idiokit.send(event)
 
 if __name__ == "__main__":
