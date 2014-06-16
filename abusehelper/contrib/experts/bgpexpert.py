@@ -1,25 +1,31 @@
 """
-An expert to perform offline Cymru whois service from offline files,
-for situations where whois server access is not available. 
+An expert to work as a Cymru whois service from files, for situations
+where whois server access is not available.
 
-The bot assumes the following files to be given to it as parameters:
+The bot assumes the following files to be downloaded, and their
+filesystem paths to be given to it as parameters:
 
 http://bgp.potaroo.net/as2.0/asnames.txt
 http://bgp.potaroo.net/as2.0/bgptable.txt
 
+Optionally, you can include IANA address space assignments in the same
+manner:
+
+http://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.csv
+
 FIXME: Uses a lot of memory as it stores the routing table in-memory.
 FIXME: Lookups are far from optimal.
 FIXME: IPv6 support.
-FIXME: Does not include data on country code or allocation date due to
-a lack of known good data feeds on this.
-FIXME: Could include registrar data from 
-http://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.txt
+FIXME: Does not include data on country code or allocation date on
+more fine-grained subnets due to a lack of known good data feeds on
+this.
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
 """
 import struct
 import sys
 import socket
+import csv
 
 import idiokit
 
@@ -30,8 +36,9 @@ class SubnetException(Exception):
     pass
 
 class BgpExpert(Expert):
-    bgptable = bot.Param("Path to bgptable.txt", default="bgptable.txt")
-    asnames = bot.Param("Path to asnames.txt", default="asnames.txt")
+    bgptable = bot.Param("Path to BGP table file", default="bgptable.txt")
+    asnames = bot.Param("Path to AS name file", default="asnames.txt")
+    assignments = bot.Param("Path to IANA route assignment file", default="")
     allroutes = bot.BoolParam("Give all routes instead of the most specific")
     ip_key = bot.Param("key which has IP address as value " +
                        "(default: %default)", default="ip")
@@ -46,8 +53,8 @@ class BgpExpert(Expert):
 
         ip_num, = struct.unpack("!I", socket.inet_aton(ip))
 
-        ip_start = ip_num & (((1 << 32) - 1) ^ \
-                                 ((1 << (32-original_bits)) - 1))
+        ip_start = ip_num & (((1 << 32) - 1) ^ 
+                             ((1 << (32-original_bits)) - 1))
         ip_end = ip_start + (1 << (32 - original_bits))
 
         return ip_start, ip_end
@@ -67,6 +74,7 @@ class BgpExpert(Expert):
         return start < ip_num < end
 
     def initialize(self):
+        self.log.info("Reading asnames.")
         data = file(self.asnames, 'r')
         self.asnames = dict()
 
@@ -74,6 +82,28 @@ class BgpExpert(Expert):
             asn = line.split()[0].lstrip('AS')
             self.asnames[asn] = ' '.join(line.split()[1:])
 
+        self.log.info("Asnames read.")
+
+        self.assign_data = dict()
+        self.log.info("Reading assignment data.")
+        if not self.assignments:
+            self.log.info("Assignment data unavailable.")
+        else:
+            d = csv.reader(file(self.assignments, 'r'))
+
+            # Skip header
+            d.next()
+
+            for line in d:
+                if not line[3]:
+                    continue
+                net = str(int(line[0].split('/')[0])) + '.0.0.0/8'
+                net = self.make_subnet(net)
+                self.assign_data[net] = (line[2], line[3].split('.')[1])
+
+            self.log.info("Assignment data read.")
+
+        self.log.info("Reading route data.")
         self.routes = dict()
 
         data = file(self.bgptable, 'r')
@@ -98,12 +128,18 @@ class BgpExpert(Expert):
                 self.log.info("Illegal route: %r", (line))
                 pass
 
+        self.log.info("Route data read.")
+
     def make_result(self, result):
         augmentation = events.Event()
-        asn, route, asname = result
+        asn, route, asname, date, reg = result
         augmentation.add('asn', asn)
         augmentation.add('bgp prefix', route)
         augmentation.add('as name', asname)
+        if date:
+            augmentation.add('allocated', date)
+        if reg:
+            augmentation.add('registry', reg)
         return augmentation
 
     def lookup(self, event):
@@ -119,9 +155,17 @@ class BgpExpert(Expert):
             for route in self.routes:
                 start, end = route
                 if start < ip_num < end:
+                    date, reg = '', ''
+
+                    for topblock in self.assign_data:
+                        start, end = topblock
+                        if start < ip_num < end:
+                            date, reg = self.assign_data[topblock]
+                            break
+
                     route, asn = list(self.routes[route])[0]
-                    asname = self.asnames[asn]
-                    results.append((asn, route, asname))
+                    asname = self.asnames.get(asn, '')
+                    results.append((asn, route, asname, date, reg))
                     mask = int(route.split('/')[1])
                     if mask > smallest[0]:
                         smallest = (mask, len(results)-1)
