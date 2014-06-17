@@ -35,11 +35,9 @@ from abusehelper.contrib.experts.combiner import Expert
 class SubnetException(Exception):
     pass
 
-class BgpExpert(Expert):
-    bgptable = bot.Param("Path to BGP table file", default="bgptable.txt")
+class BgpBaseExpert(Expert):
     asnames = bot.Param("Path to AS name file", default="asnames.txt")
     assignments = bot.Param("Path to IANA route assignment file", default="")
-    allroutes = bot.BoolParam("Give all routes instead of the most specific")
     ip_key = bot.Param("key which has IP address as value " +
                        "(default: %default)", default="ip")
 
@@ -74,15 +72,18 @@ class BgpExpert(Expert):
         return start < ip_num < end
 
     def initialize(self):
+        self.asnamedata = dict()
         self.log.info("Reading asnames.")
-        data = file(self.asnames, 'r')
-        self.asnames = dict()
+        if self.asnames:
+            data = file(self.asnames, 'r')
 
-        for line in data.xreadlines():
-            asn = line.split()[0].lstrip('AS')
-            self.asnames[asn] = ' '.join(line.split()[1:])
+            for line in data.xreadlines():
+                asn = line.split()[0].lstrip('AS')
+                self.asnamedata[asn] = ' '.join(line.split()[1:])
 
-        self.log.info("Asnames read.")
+            self.log.info("Asnames read.")
+        else:
+            self.log.info("Asname data unavailable.")
 
         self.assign_data = dict()
         self.log.info("Reading assignment data.")
@@ -103,6 +104,15 @@ class BgpExpert(Expert):
 
             self.log.info("Assignment data read.")
 
+class BgpExpert(BgpBaseExpert):
+    bgptable = bot.Param("Path to BGP table file", default="bgptable.txt")
+    allroutes = bot.BoolParam("Give all routes instead of the most specific")
+
+    def __init__(self, *args, **keys):
+        BgpBaseExpert.__init__(self, *args, **keys)
+        self.initialize()
+
+    def initialize(self):
         self.log.info("Reading route data.")
         self.routes = dict()
 
@@ -164,7 +174,7 @@ class BgpExpert(Expert):
                             break
 
                     route, asn = list(self.routes[route])[0]
-                    asname = self.asnames.get(asn, '')
+                    asname = self.asnamedata.get(asn, '')
                     results.append((asn, route, asname, date, reg))
                     mask = int(route.split('/')[1])
                     if mask > smallest[0]:

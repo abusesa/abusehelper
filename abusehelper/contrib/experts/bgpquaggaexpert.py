@@ -7,6 +7,7 @@ and give their filesystem parts as parameters
 http://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.csv
 http://bgp.potaroo.net/as2.0/asnames.txt
 
+FIXME: IPv6 support.
 FIXME: Does not include data on country code or allocation date on
 more fine-grained subnets due to a lack of known good data feeds on
 this.
@@ -24,84 +25,21 @@ import idiokit
 from idiokit import threadpool
 
 from abusehelper.core import bot, events, utils
-from abusehelper.contrib.experts.bgpexpert import BgpExpert
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.contrib.experts.bgpexpert import BgpBaseExpert
 
 def run_command(cmd):
     p = Popen(cmd, stdout=PIPE, stderr=STDOUT,
               shell=True, close_fds=True)
     return p.stdout.read(), p.returncode
 
-def parse_bgpquery(data):
-    paths = set()
-    ipasns = set()
-    lines = data.split('\n')
-
-    head, lines = lines[0], lines[1:]
-    cidr = head.split()[-1]
-    ipasns.add(cidr)
-
-    for line in lines:
-        if not len(line) > 2:
-            continue
-
-        spaces, path = line[:2], line[2:]
-        if not path[0].isdigit():
-            continue
-
-        paths.add((cidr, path))
-        ipasns.update('AS%s' % x for x in path.split())
-
-    return paths, ipasns
-
-
-class SubnetException(Exception):
-    pass
-
-class BgpQuaggaExpert(BgpExpert):
-    bgptable = ''
-    allroutes = ''
+class BgpQuaggaExpert(BgpBaseExpert):
     asnames = bot.Param("Path to AS name file", default="")
     assignments = bot.Param("Path to IANA route assignment file", default="")
     ip_key = bot.Param("key which has IP address as value " +
                        "(default: %default)", default="ip")
 
     def __init__(self, *args, **keys):
-        Expert.__init__(self, *args, **keys)
-        self.initialize()
-
-    def initialize(self):
-        self.asnamedata = dict()
-        self.log.info("Reading asnames.")
-        if self.asnames:
-            data = file(self.asnames, 'r')
-
-            for line in data.xreadlines():
-                asn = line.split()[0].lstrip('AS')
-                self.asnamedata[asn] = ' '.join(line.split()[1:])
-
-            self.log.info("Asnames read.")
-        else:
-            self.log.info("Asname data unavailable.")
-
-        self.assign_data = dict()
-        self.log.info("Reading assignment data.")
-        if not self.assignments:
-            self.log.info("Assignment data unavailable.")
-        else:
-            d = csv.reader(file(self.assignments, 'r'))
-
-            # Skip header
-            d.next()
-
-            for line in d:
-                if not line[3]:
-                    continue
-                net = str(int(line[0].split('/')[0])) + '.0.0.0/8'
-                net = self.make_subnet(net)
-                self.assign_data[net] = (line[2], line[3].split('.')[1])
-
-            self.log.info("Assignment data read.")
+        BgpBaseExpert.__init__(self, *args, **keys)
 
     def make_result(self, result):
         augmentation = events.Event()
