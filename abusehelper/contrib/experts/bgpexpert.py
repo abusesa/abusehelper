@@ -16,12 +16,12 @@ http://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.csv
 FIXME: Uses a lot of memory as it stores the routing table in-memory.
 FIXME: Lookups are far from optimal.
 FIXME: IPv6 support.
-FIXME: Does not include data on country code or allocation date on
-more fine-grained subnets due to a lack of known good data feeds on
-this.
+FIXME: Does not include data about allocation date on more
+fine-grained subnets due to a lack of known good data feeds on this.
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
 """
+import os
 import struct
 import sys
 import socket
@@ -36,7 +36,7 @@ class SubnetException(Exception):
     pass
 
 class BgpBaseExpert(Expert):
-    asnames = bot.Param("Path to AS name file", default="asnames.txt")
+    asnames = bot.Param("Path to AS name file", default="")
     assignments = bot.Param("Path to IANA route assignment file", default="")
     ip_key = bot.Param("key which has IP address as value " +
                        "(default: %default)", default="ip")
@@ -74,12 +74,18 @@ class BgpBaseExpert(Expert):
     def initialize(self):
         self.asnamedata = dict()
         self.log.info("Reading asnames.")
-        if self.asnames:
+        if self.asnames and os.path.isfile(self.asnames):
             data = file(self.asnames, 'r')
 
             for line in data.xreadlines():
                 asn = line.split()[0].lstrip('AS')
-                self.asnamedata[asn] = ' '.join(line.split()[1:])
+                asname = ' '.join(line.split()[1:])
+                if not ',' in line:
+                    country = ''
+                else:
+                    asname = ','.join(asname.split(',')[:-1])
+                    country = line.split(',')[-1]
+                self.asnamedata[asn] = (asname, country)
 
             self.log.info("Asnames read.")
         else:
@@ -87,7 +93,7 @@ class BgpBaseExpert(Expert):
 
         self.assign_data = dict()
         self.log.info("Reading assignment data.")
-        if not self.assignments:
+        if not self.assignments or not os.path.isfile(self.assignments):
             self.log.info("Assignment data unavailable.")
         else:
             d = csv.reader(file(self.assignments, 'r'))
@@ -110,9 +116,9 @@ class BgpExpert(BgpBaseExpert):
 
     def __init__(self, *args, **keys):
         BgpBaseExpert.__init__(self, *args, **keys)
-        self.initialize()
+        self.initialize_routes()
 
-    def initialize(self):
+    def initialize_routes(self):
         self.log.info("Reading route data.")
         self.routes = dict()
 
@@ -145,7 +151,10 @@ class BgpExpert(BgpBaseExpert):
         asn, route, asname, date, reg = result
         augmentation.add('asn', asn)
         augmentation.add('bgp prefix', route)
-        augmentation.add('as name', asname)
+        if asname[0]:
+            augmentation.add('as name', asname[0])
+        if asname[1]:
+            augmentation.add('cc', asname[1])
         if date:
             augmentation.add('allocated', date)
         if reg:
@@ -174,7 +183,7 @@ class BgpExpert(BgpBaseExpert):
                             break
 
                     route, asn = list(self.routes[route])[0]
-                    asname = self.asnamedata.get(asn, '')
+                    asname = self.asnamedata.get(asn, ('', ''))
                     results.append((asn, route, asname, date, reg))
                     mask = int(route.split('/')[1])
                     if mask > smallest[0]:

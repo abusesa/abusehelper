@@ -8,9 +8,8 @@ http://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.csv
 http://bgp.potaroo.net/as2.0/asnames.txt
 
 FIXME: IPv6 support.
-FIXME: Does not include data on country code or allocation date on
-more fine-grained subnets due to a lack of known good data feeds on
-this.
+FIXME: Does not include data about allocation date on more
+fine-grained subnets due to a lack of known good data feeds on this.
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
 """
@@ -33,11 +32,6 @@ def run_command(cmd):
     return p.stdout.read(), p.returncode
 
 class BgpQuaggaExpert(BgpBaseExpert):
-    asnames = bot.Param("Path to AS name file", default="")
-    assignments = bot.Param("Path to IANA route assignment file", default="")
-    ip_key = bot.Param("key which has IP address as value " +
-                       "(default: %default)", default="ip")
-
     def __init__(self, *args, **keys):
         BgpBaseExpert.__init__(self, *args, **keys)
 
@@ -47,9 +41,11 @@ class BgpQuaggaExpert(BgpBaseExpert):
             augmentation.update('asn', result[route]['asn'])
             augmentation.add('bgp prefix', route)
             for asn in result[route]['asn']:
-                asname = self.asnamedata.get(asn, '')
-                if asname:
-                    augmentation.add('as name', asname)
+                asname = self.asnamedata.get(asn, ('', ''))
+                if asname[0]:
+                    augmentation.add('as name', asname[0])
+                if asname[1]:
+                    augmentation.add('cc', asname[1])
             if result[route].get('date', ''):
                 augmentation.add('allocated', 
                                  result[route]['date'])
