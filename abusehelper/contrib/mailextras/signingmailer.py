@@ -84,6 +84,9 @@ class AugmentingIterator(object):
     def __nonzero__(self):
         return not not self._events
 
+    def __len__(self):
+        return len(self._keys)
+
 class Mailer(mailer.MailerService):
     sign_keys = bot.ListParam("PGP signing key ids", default=None)
     passphrase = bot.Param("PGP signing key passphrase", default=None)
