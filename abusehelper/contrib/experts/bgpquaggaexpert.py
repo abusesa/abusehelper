@@ -21,7 +21,6 @@ import csv
 from subprocess import Popen, PIPE, STDOUT
 
 import idiokit
-from idiokit import threadpool
 
 from abusehelper.core import bot, events, utils
 from abusehelper.contrib.experts.bgpexpert import BgpBaseExpert
@@ -78,7 +77,7 @@ class BgpQuaggaExpert(BgpBaseExpert):
 
     @idiokit.stream
     def _run_command(self, cmd, *args):
-        out, s = yield threadpool.thread(run_command, cmd % args)
+        out, s = yield idiokit.thread(run_command, cmd % args)
         if s:
             self.log.error(out)
             raise Continue()
