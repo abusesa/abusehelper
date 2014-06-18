@@ -94,7 +94,7 @@ class BgpQuaggaExpert(BgpBaseExpert):
             elif len(q) == 2:
                 int(q[1])
         except (socket.error, ValueError):
-            print >>sys.stderr, "Not a valid ip/cidr: %s" % (query)
+            self.log.info("Not a valid ip/cidr: %r", query)
             idiokit.stop()
 
         data = yield self._run_command('vtysh -c "sh ip bgp %s"', (query))
