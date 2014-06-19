@@ -8,7 +8,6 @@ import urllib
 import httplib
 
 import idiokit
-from idiokit import threadpool
 
 from abusehelper.core import events, bot
 from combiner import Expert
@@ -20,9 +19,9 @@ class RTExpert(Expert):
     rt_queue = bot.Param("RT queue to create tickets to")
     ticket_subject = bot.Param("Subject text to use for the tickets")
     ticket_owner = bot.Param("RT ticket owner", default="")
-    subject_key = bot.Param("Event key to use as ticket subject", 
+    subject_key = bot.Param("Event key to use as ticket subject",
                             default="")
-    content_key = bot.Param("Event key to use as ticket content", 
+    content_key = bot.Param("Event key to use as ticket content",
                             default="")
 
     def rt_ticket(self, **kw):
@@ -37,7 +36,7 @@ class RTExpert(Expert):
         owner = self.ticket_owner
         if not owner:
             owner = self.rt_user
- 
+
         params = urllib.urlencode({'user': user, 'pass': passwd}) + "&"
         text = kw.get('ticket_text', '')
         subject = kw.get('ticket_subject', '')
@@ -82,13 +81,13 @@ class RTExpert(Expert):
                     subj = event.value(self.subject_key)
             if not subj and self.ticket_subject:
                 subj = self.ticket_subject
-                    
+
             kw['ticket_subject'] = subj
             if self.content_key:
                 if event.contains(self.content_key):
                     kw['ticket_text'] = event.value(self.content_key)
 
-            nro = yield threadpool.thread(self.rt_ticket, **kw)
+            nro = yield idiokit.thread(self.rt_ticket, **kw)
             if nro:
                 augment = events.Event()
                 augment.add('ticket id', nro)

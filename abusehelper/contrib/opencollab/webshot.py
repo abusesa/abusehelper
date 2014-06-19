@@ -11,7 +11,6 @@ import socket
 import idiokit
 import simplejson as json
 
-from idiokit import threadpool
 from abusehelper.core import bot, events, taskfarm
 from abusehelper.contrib.experts.combiner import Expert
 
@@ -52,8 +51,8 @@ class WebshotExpert(Expert):
         tmp_fileno, tmp_name = mkstemp('.png')
 
         # The used script must exit, otherwise this call will block!
-        p = Popen("%s %s %s %s %s" % (self.phantomjs_binary, self.phantomjs_script, 
-                                      url, tmp_name, choice(self.user_agent)), 
+        p = Popen("%s %s %s %s %s" % (self.phantomjs_binary, self.phantomjs_script,
+                                      url, tmp_name, choice(self.user_agent)),
                   shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
         (_in, _out) = (p.stdin, p.stdout)
         _in.close()
@@ -97,7 +96,7 @@ class WebshotExpert(Expert):
             if not entry['request']['url'].rstrip('/') == check_url:
                 continue
 
-            grab_epoch = timegm(strptime(entry['startedDateTime'].split('.')[0], 
+            grab_epoch = timegm(strptime(entry['startedDateTime'].split('.')[0],
                                          "%Y-%m-%dT%H:%M:%S"))
 
             metas["creator"] = ["%s %s" % (data['log']['creator']['name'],
@@ -133,7 +132,7 @@ class WebshotExpert(Expert):
             if not data:
                 continue
             try:
-                self.log.info("Uploading file: %r (data %r...)", 
+                self.log.info("Uploading file: %r (data %r...)",
                               fname, repr(data[:10]))
                 status = uploadFile(self.collab, page, '', fname, data=data)
             except (IOError, TypeError, RuntimeError), msg:
@@ -151,7 +150,7 @@ class WebshotExpert(Expert):
                 new = events.Event()
 
                 self.log.info("Taking a webshot of %r", url)
-                success = yield threadpool.thread(self.jsongrab, url)
+                success = yield idiokit.thread(self.jsongrab, url)
 
                 if success:
                     new.add("webshot", success)
