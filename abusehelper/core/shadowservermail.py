@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import re
 import base64
 import quopri
@@ -5,7 +7,7 @@ import zipfile
 from cStringIO import StringIO
 
 import idiokit
-from abusehelper.core import utils, bot, imapbot
+from . import utils, bot, imapbot
 
 
 class ShadowServerMail(imapbot.IMAPBot):

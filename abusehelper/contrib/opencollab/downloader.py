@@ -11,7 +11,6 @@ import urllib2
 import httplib
 import email
 
-from idiokit import threadpool
 from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 import abusehelper.core.utils as utils
@@ -36,8 +35,8 @@ class RedirectLogger(urllib2.HTTPRedirectHandler):
         self.headers[path] = headers
         self.redirect_chain[self.previous] = path
         self.previous = path
-        return urllib2.HTTPRedirectHandler.redirect_request(self, req, fp, 
-                                                            code, msg, 
+        return urllib2.HTTPRedirectHandler.redirect_request(self, req, fp,
+                                                            code, msg,
                                                             headers, newurl)
 
 def make_dict(attr_list):
@@ -56,11 +55,11 @@ def fetch_url(url, opener=None, chunk_size=16384):
     try:
         output = StringIO()
 
-        fileobj = yield threadpool.thread(opener.open, url)
+        fileobj = yield idiokit.thread(opener.open, url)
         result_url = str()
         try:
             while True:
-                data = yield threadpool.thread(fileobj.read, chunk_size)
+                data = yield idiokit.thread(fileobj.read, chunk_size)
                 if not data:
                     break
                 output.write(data)
@@ -135,7 +134,7 @@ class DownloadExpert(Expert):
             if not data:
                 continue
             try:
-                self.log.info("Uploading file: %r (data %r...)", 
+                self.log.info("Uploading file: %r (data %r...)",
                               fname, repr(data[:10]))
                 status = uploadFile(self.collab, page, '', fname, data=data)
             except (IOError, TypeError, RuntimeError), msg:
@@ -173,7 +172,7 @@ class DownloadExpert(Expert):
                     info, fileobj, r_url = yield fetch_url(url, opener=opener)
                     data = fileobj.read()
                     md5sum = md5(data).hexdigest()
-                    success = yield threadpool.thread(self.upload_headers, logger, 
+                    success = yield idiokit.thread(self.upload_headers, logger,
                                                       md5sum, info, data, r_url)
                     new.add("md5", md5sum)
                 except utils.FetchUrlFailed, fuf:

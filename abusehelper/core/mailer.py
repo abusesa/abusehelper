@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import time
 import heapq
 import socket
@@ -6,7 +8,7 @@ import smtplib
 import collections
 
 import idiokit
-from abusehelper.core import events, taskfarm, services, templates, bot, utils
+from . import events, taskfarm, services, templates, bot, utils
 
 
 def next_time(time_string):

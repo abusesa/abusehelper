@@ -20,7 +20,6 @@ import socket
 import urlparse
 
 import idiokit
-from idiokit import threadpool
 from abusehelper.core import imapbot, events, cymruwhois
 
 def get_hosts(url_lines):
@@ -64,7 +63,7 @@ class URLListMailBot(imapbot.IMAPBot):
 
         for url, host in get_hosts(url_lines):
             try:
-                addrinfo = yield threadpool.thread(socket.getaddrinfo, host, None)
+                addrinfo = yield idiokit.thread(socket.getaddrinfo, host, None)
             except socket.error, error:
                 self.log.info("Could not resolve host %r: %r", host, error)
                 continue

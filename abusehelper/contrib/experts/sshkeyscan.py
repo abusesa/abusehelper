@@ -10,7 +10,6 @@ import socket
 from subprocess import Popen, PIPE, STDOUT
 
 import idiokit
-from idiokit import threadpool
 
 from abusehelper.core import events
 from abusehelper.contrib.experts.combiner import Expert
@@ -43,7 +42,7 @@ except ImportError:
     pass
 
 def _keyscan(hostname, port, keytype):
-    p = Popen("ssh-keyscan -vv -p %s -t %s %s" % 
+    p = Popen("ssh-keyscan -vv -p %s -t %s %s" %
               (port, keytype, hostname), shell=True,
               stdout=PIPE, stderr=STDOUT, close_fds=True)
     return p.stdout.read()
@@ -54,9 +53,9 @@ class SSHKeyScanExpert(Expert):
 
     @idiokit.stream
     def ssh_keyscan(self, hostname, port=22, keytypes=["ssh-rsa"]):
-        item = yield threadpool.thread(_keyscan, hostname, port, keytypes[0])
+        item = yield idiokit.thread(_keyscan, hostname, port, keytypes[0])
         if not item:
-            return 
+            return
 
         methods = list()
         gather_methods = False
@@ -79,10 +78,10 @@ class SSHKeyScanExpert(Expert):
         key = tuple(key.split())
         idiokit.stop(methods, banner, key)
 
-    def ssh_keyscan_paramiko(self, hostname, port=22, 
+    def ssh_keyscan_paramiko(self, hostname, port=22,
                              keytypes='ssh-rsa', timeout=10):
         for (family, socktype, proto, canonname, sockaddr) in \
-                socket.getaddrinfo(hostname, port, 
+                socket.getaddrinfo(hostname, port,
                                    socket.AF_UNSPEC, socket.SOCK_STREAM):
             if socktype == socket.SOCK_STREAM:
                 af = family
@@ -90,7 +89,7 @@ class SSHKeyScanExpert(Expert):
                 break
             else:
                 af, _, _, _, addr = \
-                    socket.getaddrinfo(hostname, port, 
+                    socket.getaddrinfo(hostname, port,
                                        socket.AF_UNSPEC, socket.SOCK_STREAM)
 
         sock = socket.socket(af, socket.SOCK_STREAM)
@@ -133,7 +132,7 @@ class SSHKeyScanExpert(Expert):
 
                     if has_paramiko:
                         kt, banner, sshkey = \
-                            self.ssh_keyscan_paramiko(host, port=port, 
+                            self.ssh_keyscan_paramiko(host, port=port,
                                                       keytypes=[q_keytypes])
                     else:
                         kt, banner, sshkey = \
@@ -154,7 +153,7 @@ class SSHKeyScanExpert(Expert):
                         q_keytypes = list(kt - got_keytypes)[0]
                     else:
                         break
-                    
+
 
 if __name__ == "__main__":
     SSHKeyScanExpert.from_command_line().execute()

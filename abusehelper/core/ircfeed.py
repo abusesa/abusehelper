@@ -1,9 +1,10 @@
-import re
+from __future__ import absolute_import
 
+import re
 import idiokit
 from idiokit.irc import connect
 
-from abusehelper.core import events, utils, bot
+from . import events, utils, bot
 
 
 class IRCFeedBot(bot.FeedBot):

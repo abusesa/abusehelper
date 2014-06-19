@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import os
 import sys
 import time
@@ -7,7 +9,7 @@ import subprocess
 import cPickle as pickle
 
 import idiokit
-from abusehelper.core import bot, config
+from . import bot, config
 
 
 def iter_startups(iterable):

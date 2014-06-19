@@ -5,7 +5,6 @@ import urlparse
 import xml.etree.cElementTree as etree
 
 import idiokit
-from idiokit import threadpool
 from abusehelper.core import utils, bot, events, cymruwhois
 
 TABLE_REX = re.compile("</h3>\s*(<table>.*?</table>)", re.I | re.S)
@@ -31,7 +30,7 @@ class AtlasSRFBot(bot.PollingBot):
             self.log.error("Fetching failed for report %r", url)
             idiokit.stop(list())
 
-        data = yield threadpool.thread(fileobj.read)
+        data = yield idiokit.thread(fileobj.read)
         match = TABLE_REX.search(data)
         if match is None:
             self.log.error("Data table not found in report %r", url)

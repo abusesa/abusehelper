@@ -1,6 +1,6 @@
 import re
 import unittest
-from abusehelper.core.events import Event
+from ...events import Event
 
 from ..compat import MATCHError, MATCH, AND, OR, NETBLOCK, ANYTHING
 

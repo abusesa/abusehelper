@@ -680,26 +680,3 @@ def stanzas_to_events():
 
 def events_to_elements():
     return idiokit.map(lambda x: (x.to_elements(),))
-
-
-def EventCollector(compresslevel=6, data="", count=None):
-    # A backwards compatibility wrapper for e.g. bot state
-    # files that reference abusehelper.core.events.EventCollector.
-
-    import gzip
-    import cPickle as pickle
-    import cStringIO as StringIO
-
-    from . import utils
-
-    collector = utils.CompressedCollection()
-
-    gz = gzip.GzipFile(fileobj=StringIO.StringIO(data))
-    while True:
-        try:
-            attrs = pickle.load(gz)
-        except EOFError:
-            break
-        collector.append(Event(attrs))
-
-    return collector

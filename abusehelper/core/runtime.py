@@ -1,8 +1,10 @@
+from __future__ import absolute_import
+
 import uuid
 import idiokit
 from idiokit import timer
 from idiokit.xmpp import jid
-from abusehelper.core import serialize, events, config, bot, services, log, version
+from . import serialize, events, config, bot, services, log, version
 
 
 def iter_runtimes(obj):

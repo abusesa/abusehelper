@@ -1,9 +1,11 @@
+from __future__ import absolute_import
+
 import time
 import hashlib
 import logging
 
-from abusehelper.core import events
 from idiokit.xmlcore import Element
+from . import events
 
 
 class RoomHandler(logging.Handler):

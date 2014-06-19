@@ -1,5 +1,7 @@
+from __future__ import absolute_import
+
 import idiokit
-from abusehelper.core import events, rules, taskfarm, bot
+from . import events, rules, taskfarm, bot
 
 
 class RoomGraphBot(bot.ServiceBot):
