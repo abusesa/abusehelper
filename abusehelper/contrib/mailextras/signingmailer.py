@@ -359,12 +359,12 @@ class Mailer(mailer.MailerService):
 
         events = AugmentingIterator(_events, case=number)
 
-        success = yield mailer.MailerService.report(self, events,
+        result = yield mailer.MailerService.report(self, events,
                                                     number=number,
                                                     keywords=keywords,
                                                     **keys)
 
-        if success:
+        if result is None:
             fdate = strftime("%Y%m%d-%H%M%S")
             fname = os.path.join(self.sent_dir, 'abuh-%s.csv' % fdate)
             self.log.info("Writing events to log file %r" % fname)
