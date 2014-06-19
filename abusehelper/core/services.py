@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import uuid
 import random
 
@@ -5,7 +7,7 @@ import idiokit
 from idiokit.xmpp.core import XMPPError
 from idiokit.xmpp.jid import JID
 from idiokit.xmlcore import Element
-from abusehelper.core import serialize
+from . import serialize
 
 SERVICE_NS = "abusehelper#service"
 

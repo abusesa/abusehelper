@@ -2,7 +2,7 @@ import pickle
 import doctest
 import unittest
 
-from abusehelper.core import events
+from .. import events
 
 
 def load_tests(loader, tests, ignore):

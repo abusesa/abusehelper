@@ -5,13 +5,15 @@
 # 2010-12-09 15:11:34Z a=1,b=2,b=3
 # 2010-12-09 17:12:32Z a=4,a=5,b=6
 
+from __future__ import absolute_import
+
 import os
 import time
 import errno
 import calendar
 
 import idiokit
-from abusehelper.core import bot, taskfarm, events
+from . import bot, taskfarm, events
 
 
 def isoformat(seconds=None, format="%Y-%m-%d %H:%M:%SZ"):

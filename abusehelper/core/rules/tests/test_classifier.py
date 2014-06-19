@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 
 import unittest
-from abusehelper.core.events import Event
+from ...events import Event
 
 from .. import rules
 from .. import classifier

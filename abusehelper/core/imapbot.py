@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import re
 import socket
 import getpass
@@ -7,7 +9,7 @@ import email.header
 
 import idiokit
 from cStringIO import StringIO
-from abusehelper.core import bot
+from . import bot
 
 
 def get_header(headers, key, default=None):

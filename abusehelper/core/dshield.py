@@ -1,5 +1,7 @@
+from __future__ import absolute_import
+
 import idiokit
-from abusehelper.core import utils, cymruwhois, bot
+from . import utils, cymruwhois, bot
 
 
 class DShieldBot(bot.PollingBot):

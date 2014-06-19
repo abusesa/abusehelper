@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import os
 import csv
 import sys
@@ -302,7 +304,7 @@ import getpass
 
 import idiokit
 from idiokit.xmpp import connect
-from abusehelper.core import log
+from . import log
 
 
 class XMPPBot(Bot):
@@ -351,7 +353,7 @@ class XMPPBot(Bot):
         idiokit.stop(xmpp)
 
 
-from abusehelper.core import services, version
+from . import services, version
 
 
 class _Service(services.Service):
@@ -419,7 +421,7 @@ class ServiceBot(XMPPBot):
 
 
 import hashlib
-from abusehelper.core import events, taskfarm, utils
+from . import events, taskfarm, utils
 
 
 class FeedBot(ServiceBot):

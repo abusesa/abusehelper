@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import csv
 import time
 import gzip
@@ -11,8 +13,8 @@ import cPickle as pickle
 
 import idiokit
 from idiokit import heap
-from abusehelper.core import events
 from cStringIO import StringIO
+from . import events
 
 
 class FetchUrlFailed(Exception):
