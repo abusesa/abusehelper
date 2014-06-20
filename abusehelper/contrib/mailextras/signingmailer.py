@@ -385,7 +385,7 @@ class Mailer(mailer.MailerService):
             else:
                 self.log.info("Not closing manual ticket %s" % number)
 
-        idiokit.stop(success)
+        idiokit.stop(result)
 
     @idiokit.stream
     def _try_to_send(self, from_addr, to_addr, subject, msg):
