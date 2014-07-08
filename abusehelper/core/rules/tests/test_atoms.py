@@ -10,7 +10,7 @@ from ..atoms import String, RegExp, IP
 class TestString(unittest.TestCase):
     def test_matching(self):
         self.assertTrue(String("atom").match("atom"))
-        self.assertTrue(String("atom").match("ATOM"))
+        self.assertFalse(String("atom").match("ATOM"))
 
     _options = [
         String("atom")
@@ -26,6 +26,14 @@ class TestString(unittest.TestCase):
 
 
 class TestRegExp(unittest.TestCase):
+    def test_from_string(self):
+        self.assertEqual(
+            RegExp.from_string("www.example.com", ignore_case=False),
+            RegExp("www\\.example\\.com", ignore_case=False))
+        self.assertEqual(
+            RegExp.from_string("www.example.com", ignore_case=True),
+            RegExp("www\\.example\\.com", ignore_case=True))
+
     def test_from_re(self):
         # re.U and re.S flags are implicitly set
         self.assertEqual(RegExp.from_re(re.compile("a", re.U)), RegExp("a"))
