@@ -91,26 +91,30 @@ class Event(object):
         result = dict()
 
         for obj in args + (keys,):
-            if isinstance(obj, cls):
+            if type(obj) == Event:
                 for key, values in obj._attrs.iteritems():
                     if key not in result:
-                        result[key] = set()
-                    result[key].update(values)
+                        result[key] = values.copy()
+                    else:
+                        result[key].update(values)
                 continue
 
-            if hasattr(obj, "items"):
+            if hasattr(obj, "iteritems"):
+                obj = obj.iteritems()
+            elif hasattr(obj, "items"):
                 obj = obj.items()
 
             for key, values in obj:
                 if isinstance(values, basestring):
-                    values = (values,)
-                elif not values:
-                    continue
+                    values = (_normalize(values),)
+                else:
+                    values = (_normalize(x) for x in values)
 
                 key = _normalize(key)
                 if key not in result:
-                    result[key] = set()
-                result[key].update(_normalize(x) for x in values)
+                    result[key] = set(values)
+                else:
+                    result[key].update(values)
 
         return result
 
