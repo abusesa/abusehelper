@@ -277,10 +277,11 @@ class Iso3166Expert(Expert):
                     try:
                         country = countries[cc]
                     except KeyError:
-                        self.log.error("Unknown country code: %s", cc)
+                        augment.add("missing data", "Unknown country code: {0}".format(cc))
                     else:
                         augment.add("country", country)
-                        yield idiokit.send(eid, augment)
+                    yield idiokit.send(eid, augment)
 
 if __name__ == "__main__":
     Iso3166Expert.from_command_line().execute()
+
