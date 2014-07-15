@@ -107,7 +107,7 @@ countries = {
     "GT": "Guatemala",
     "GU": "Guam",
     "GW": "Guinea-Bissau",
-    "GY": "GUYANA",
+    "GY": "Guyana",
     "HK": "Hong Kong",
     "HM": "Heard Island and McDonald Islands",
     "HN": "Honduras",
