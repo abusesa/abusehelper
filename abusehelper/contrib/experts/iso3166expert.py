@@ -66,7 +66,7 @@ countries = {
     "CR": "Costa Rica",
     "CU": "Cuba",
     "CV": "Cabo Verde",
-    "CW": "Curaçao",
+    "CW": u"Cura\u00e7ao",
     "CX": "Christmas Island",
     "CY": "Cyprus",
     "CZ": "Czech Republic",
