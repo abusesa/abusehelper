@@ -8,10 +8,12 @@ http://en.wikipedia.org/wiki/ISO_3166-2
 
 Maintainer: "Lari Huttunen" <mit-code@huttu.net>
 """
+
 import idiokit
 from combiner import Expert
 from abusehelper.core import bot
 from abusehelper.core import events
+
 
 countries = {
     "AD": "Andorra",
@@ -267,9 +269,9 @@ countries = {
 
 
 class Iso3166Expert(Expert):
-
-    cc = bot.Param("Country code key, defaults to geoip cc.",
-                   default="geoip cc")
+    cc = bot.Param(
+        "Country code key, defaults to geoip cc",
+        default="geoip cc")
 
     @idiokit.stream
     def augment(self):
@@ -288,6 +290,7 @@ class Iso3166Expert(Expert):
                     else:
                         augment.add("country", country)
                     yield idiokit.send(eid, augment)
+
 
 if __name__ == "__main__":
     Iso3166Expert.from_command_line().execute()
