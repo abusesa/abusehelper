@@ -270,7 +270,7 @@ countries = {
 
 class Iso3166Expert(Expert):
     cc = bot.Param(
-        "Country code key, defaults to geoip cc",
+        "country code key (default: %default)",
         default="geoip cc")
 
     @idiokit.stream
