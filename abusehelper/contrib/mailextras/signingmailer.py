@@ -301,7 +301,7 @@ class Mailer(mailer.MailerService):
         return msg
 
     def _log_events(self, events, logfile):
-        sdate = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+        sdate = strftime("%Y-%m-%d %H:%M:%SZ", gmtime())
         for event in events:
             data = list()
             data.append(event.value('asn', ''))
@@ -310,11 +310,11 @@ class Mailer(mailer.MailerService):
             data.append(event.value('ptr', ''))
             data.append(event.value('cc', ''))
             data.append(event.value('type', ''))
-            data.append(event.value('case', ''))
+            data.append(event.value('ticket id', ''))
             data.append(event.value('info', ''))
             data.append(sdate)
-            data.append(event.value('_received', ''))
-            data.append(event.value('feed', ''))
+            data.append(event.value('observation time', ''))
+            data.append(event.value('feed code', ''))
             logfile.write("%s\n" % (' | '.join(data).encode('utf-8')))
 
     @idiokit.stream
@@ -357,7 +357,7 @@ class Mailer(mailer.MailerService):
         if manual:
             self.log.info("No valid recipients, manual ticket: %s" % number)
 
-        events = AugmentingIterator(_events, case=number)
+        events = AugmentingIterator(_events, **{"ticket id": number})
 
         result = yield mailer.MailerService.report(self, events,
                                                     number=number,
