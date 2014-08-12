@@ -139,10 +139,24 @@ class TestFuzzy(unittest.TestCase):
         rule = Fuzzy(String("a"))
         self.assertTrue(rule.match(Event({"a": "xy"})))
         self.assertTrue(rule.match(Event({"xy": "a"})))
+        self.assertTrue(rule.match(Event({"ba": "xy"})))
+        self.assertTrue(rule.match(Event({"xy": "ba"})))
+        self.assertFalse(rule.match(Event({"xy": "xy"})))
+
+        # Fuzzy String matching is case-insensitive
+        self.assertTrue(rule.match(Event({"A": "xy"})))
+        self.assertTrue(rule.match(Event({"xy": "A"})))
 
         rule = Fuzzy(RegExp("a"))
-        self.assertFalse(rule.match(Event({"a": "xy"})))
+        self.assertTrue(rule.match(Event({"a": "xy"})))
         self.assertTrue(rule.match(Event({"xy": "a"})))
+        self.assertTrue(rule.match(Event({"ba": "xy"})))
+        self.assertTrue(rule.match(Event({"xy": "ba"})))
+        self.assertFalse(rule.match(Event({"xy": "xy"})))
+
+        # Fuzzy RegExp matching is not case-insensitive by default
+        self.assertFalse(rule.match(Event({"A": "xy"})))
+        self.assertFalse(rule.match(Event({"xy": "A"})))
 
     _options = [
         Fuzzy(String("a")),

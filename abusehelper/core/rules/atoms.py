@@ -28,7 +28,7 @@ class String(Atom):
         return self._value
 
     def match(self, value):
-        return self._value.lower() == value.lower()
+        return self._value == value
 
     def dump(self):
         return self._value
@@ -44,6 +44,10 @@ class RegExp(Atom):
         (re.M, "re.M / re.MULTILINE"),
         (re.L, "re.L / re.LOCALE")
     ]
+
+    @classmethod
+    def from_string(cls, string, ignore_case=False):
+        return cls(re.escape(string), ignore_case=ignore_case)
 
     @classmethod
     def from_re(cls, re_obj):

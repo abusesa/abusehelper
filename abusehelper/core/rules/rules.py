@@ -166,7 +166,11 @@ class Fuzzy(Rule):
         Rule.init(self)
 
         self._atom = atom
-        self._is_key_type = isinstance(atom, atoms.String)
+
+        if isinstance(atom, atoms.String):
+            self._matcher = atoms.RegExp.from_string(atom.value, ignore_case=True)
+        else:
+            self._matcher = atom
 
     def unique_key(self):
         return self._atom
@@ -175,10 +179,9 @@ class Fuzzy(Rule):
         return Rule.__repr__(self, self._atom)
 
     def match_with_cache(self, event, cache):
-        if self._is_key_type:
-            if any(self._atom.match(x) for x in event.keys()):
-                return True
-        if event.contains(filter=self._atom.match):
+        if any(self._matcher.match(x) for x in event.keys()):
+            return True
+        if event.contains(filter=self._matcher.match):
             return True
         return False
 

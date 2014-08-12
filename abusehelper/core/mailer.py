@@ -213,11 +213,16 @@ class MailTemplate(templates.Template):
         return msg
 
 
-def format_addresses(addrs):
+def format_addresses(addrs, remove_empty=False):
     if isinstance(addrs, basestring):
         addrs = [addrs]
+
+    pairs = getaddresses(addrs)
+    if remove_empty:
+        pairs = [(x, y) for (x, y) in pairs if x or y]
+
     # FIXME: Use encoding after getaddresses
-    return ", ".join(map(formataddr, getaddresses(addrs)))
+    return ", ".join(map(formataddr, pairs))
 
 
 def join_addresses(addrs):
@@ -237,6 +242,18 @@ def decode_subject(subject):
         pieces.append(piece.decode(charset, "replace"))
 
     return "".join(pieces)
+
+
+def prep_recipient_header(msg, name, fallback_addresses):
+    if name in msg:
+        addrs = msg.get_all(name, [])
+        del msg[name]
+    else:
+        addrs = fallback_addresses
+
+    value = format_addresses(addrs, remove_empty=True)
+    if value:
+        msg[name] = value
 
 
 class MailerService(ReportBot):
@@ -348,12 +365,9 @@ class MailerService(ReportBot):
             retries = self.max_retries
         msg = yield self.build_mail(eventlist, to=to, cc=cc, bcc=bcc, **keys)
 
-        if "to" not in msg:
-            msg["to"] = format_addresses(to)
-        if "cc" not in msg:
-            msg["cc"] = format_addresses(cc)
-        if "bcc" not in msg:
-            msg["bcc"] = format_addresses(bcc)
+        prep_recipient_header(msg, "to", to)
+        prep_recipient_header(msg, "cc", cc)
+        prep_recipient_header(msg, "bcc", bcc)
 
         # FIXME: Use encoding after getaddresses
         from_addr = getaddresses([self.mail_sender])[0]
