@@ -398,6 +398,8 @@ class MailerService(ReportBot):
             "event count": unicode(len(eventlist))
         })
 
+        sent = False
+
         if not to_addrs:
             self.log.info(u"Skipped message \"{0}\" (no recipients)".format(subject),
                 event=event.union(status="skipped (no recipients)"))
@@ -427,10 +429,13 @@ class MailerService(ReportBot):
                     else:
                         self.log.error(u"Failed all retries, dropping the mail from the queue")
                 else:
+                    sent = True
                     self.log.info(u"Sent message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)),
                         event=event.union(status="sent"))
             finally:
                 yield idiokit.thread(server.quit)
+
+        idiokit.stop(sent)
 
 
 if __name__ == "__main__":
