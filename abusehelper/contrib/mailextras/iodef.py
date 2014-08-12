@@ -78,22 +78,22 @@ class XMLFormatter(templates.Formatter):
             # Hardcoded purpose string, for now
             inc_tag = Element('Incident', purpose='mitigation')
 
-            if not inc.contains('case'):
+            if not inc.contains('ticket id'):
                 t_id = hashlib.md5("".join(repr((k, v))
                                            for k in sorted(inc.keys()) for v in
                                            sorted(inc.values(k)))).hexdigest()
                 node_id_and_text(inc_tag, 'IncidentID',
                                  t_id, name=kw.get("irt_website", ''))
             else:
-                for ticket in inc.values('case'):
+                for ticket in inc.values('ticket id'):
                     node_id_and_text(inc_tag, 'IncidentID',
                                      ticket, name=kw.get("irt_website", ''))
 
-            if not inc.contains('time'):
+            if not inc.contains('source time'):
                 node_id_and_text(inc_tag, 'ReportTime',
                                  ts_to_xml(format_time()))
             else:
-                for ts in inc.values('time'):
+                for ts in inc.values('source time'):
                     node_id_and_text(inc_tag, 'ReportTime',
                                      ts_to_xml(ts))
 
@@ -130,10 +130,10 @@ class XMLFormatter(templates.Formatter):
             system = node_id_and_text(event, 'System',
                                       category=cat)
             # Only show node if data exists
-            if (inc.contains("ptr") or inc.contains("ip") or
+            if (inc.contains("domain name") or inc.contains("ip") or
                 inc.contains("asn")):
                 node = node_id_and_text(system, 'Node')
-            for value in inc.values("ptr"):
+            for value in inc.values("domain name"):
                 node_id_and_text(node, 'NodeName', value)
             for value in inc.values("ip"):
                 node_id_and_text(node, 'Address', value,

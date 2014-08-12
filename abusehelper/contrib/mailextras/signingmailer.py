@@ -103,9 +103,15 @@ class Mailer(mailer.MailerService):
     debug = bot.Param("Do not send, only debug how the mail would be sent",
                   default='')
     sent_dir = bot.Param("Directory for logs on sent data", default='')
+    sent_fields = bot.ListParam("Keys to be included in the sent data logs",
+                                default=['asn', 'ip', 'source time', 
+                                         'report dns', 'cc', 'type', 
+                                         'ticket id', 'info', 'sent time', 
+                                         'observation time', 'feed code'])
     ticket_preamble = \
         bot.Param("A possible ticketing header, eg. CERT in [CERT #1]",
                   default='')
+
 
     def __init__(self, **keys):
         mailer.MailerService.__init__(self, **keys)
@@ -301,20 +307,14 @@ class Mailer(mailer.MailerService):
         return msg
 
     def _log_events(self, events, logfile):
-        sdate = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+        sdate = strftime("%Y-%m-%d %H:%M:%SZ", gmtime())
         for event in events:
             data = list()
-            data.append(event.value('asn', ''))
-            data.append(event.value('ip', ''))
-            data.append(event.value('time', ''))
-            data.append(event.value('ptr', ''))
-            data.append(event.value('cc', ''))
-            data.append(event.value('type', ''))
-            data.append(event.value('case', ''))
-            data.append(event.value('info', ''))
-            data.append(sdate)
-            data.append(event.value('_received', ''))
-            data.append(event.value('feed', ''))
+            for key in self.sent_fields:
+                if key.endswith('time'):
+                    data.append(event.value(key, sdate))
+                else:
+                    data.append(event.value(key, ''))
             logfile.write("%s\n" % (' | '.join(data).encode('utf-8')))
 
     @idiokit.stream
@@ -357,7 +357,7 @@ class Mailer(mailer.MailerService):
         if manual:
             self.log.info("No valid recipients, manual ticket: %s" % number)
 
-        events = AugmentingIterator(_events, case=number)
+        events = AugmentingIterator(_events, **{"ticket id": number})
 
         success = yield mailer.MailerService.report(self, events,
                                                     number=number,
