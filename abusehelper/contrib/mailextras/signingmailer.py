@@ -359,12 +359,12 @@ class Mailer(mailer.MailerService):
 
         events = AugmentingIterator(_events, **{"ticket id": number})
 
-        result = yield mailer.MailerService.report(self, events,
+        success = yield mailer.MailerService.report(self, events,
                                                     number=number,
                                                     keywords=keywords,
                                                     **keys)
 
-        if result is None:
+        if success:
             fdate = strftime("%Y%m%d-%H%M%S")
             fname = os.path.join(self.sent_dir, 'abuh-%s.csv' % fdate)
             self.log.info("Writing events to log file %r" % fname)
@@ -385,7 +385,7 @@ class Mailer(mailer.MailerService):
             else:
                 self.log.info("Not closing manual ticket %s" % number)
 
-        idiokit.stop(result)
+        idiokit.stop(success)
 
     @idiokit.stream
     def _try_to_send(self, from_addr, to_addr, subject, msg):
