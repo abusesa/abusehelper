@@ -1,7 +1,7 @@
 import os
+import time
 import idiokit
 from abusehelper.core import events, bot, utils
-
 
 def follow_file(filename):
     prev_inode = None
@@ -93,14 +93,44 @@ def tail_file(filename, offset=None):
 
         yield None
 
+def tail_fifo(filename, offset=None):
+    buffer = []
+    fd = os.open(filename, os.O_RDONLY | os.O_NONBLOCK)
+
+    while True:
+        data = os.read(fd, 4096)
+        if not data:
+            yield None
+            continue
+
+        lines = data.split("\n")
+        if len(lines) <= 1:
+            buffer.extend(lines)
+            continue
+
+        lines[0] = "".join(buffer) + lines[0]
+        for line in lines[:-1]:
+            if line.endswith("\r"):
+                line = line[:-1]
+            yield int(time.time()), line
+
+        if not lines[-1]:
+            buffer = []
+        else:
+            buffer = lines[-1:]
+
+    yield None
+
 
 class TailBot(bot.FeedBot):
     path = bot.Param("path to the followed file")
     offset = bot.IntParam("file offset", default=None)
+    is_named_pipe = bot.BoolParam("followed file is named pipe")
 
     @idiokit.stream
     def feed(self):
-        for result in tail_file(self.path, self.offset):
+        tail_func = tail_fifo if self.is_named_pipe else tail_file
+        for result in tail_func(self.path, self.offset):
             if result is None:
                 yield idiokit.sleep(2.0)
                 continue
