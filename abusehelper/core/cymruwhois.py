@@ -96,8 +96,16 @@ class OriginLookup(object):
         except dns.DNSError:
             idiokit.stop(())
 
-        results = _split(txt_results, self._keys)
-        self._cache.set(cache_key, results)
+        results = []
+        for result in _split(txt_results, self._keys):
+            result_dict = dict(result)
+            for asn in result_dict.get("asn", "").split():
+                if not asn:
+                    continue
+                result_dict["asn"] = asn
+                results.append(tuple(result_dict.iteritems()))
+
+        self._cache.set(cache_key, tuple(results))
         idiokit.stop(results)
 
     @idiokit.stream
