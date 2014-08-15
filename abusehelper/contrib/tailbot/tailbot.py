@@ -1,4 +1,5 @@
 import os
+import stat
 import time
 import idiokit
 from abusehelper.core import events, bot, utils
@@ -125,11 +126,12 @@ def tail_fifo(filename, offset=None):
 class TailBot(bot.FeedBot):
     path = bot.Param("path to the followed file")
     offset = bot.IntParam("file offset", default=None)
-    is_named_pipe = bot.BoolParam("followed file is named pipe")
 
     @idiokit.stream
     def feed(self):
-        tail_func = tail_fifo if self.is_named_pipe else tail_file
+        st_mode = os.stat(self.path).st_mode
+        tail_func = tail_fifo if stat.S_ISFIFO(st_mode) else tail_file
+
         for result in tail_func(self.path, self.offset):
             if result is None:
                 yield idiokit.sleep(2.0)
