@@ -1,50 +1,58 @@
 import os
-import stat
 import time
+import errno
 import idiokit
 from abusehelper.core import events, bot, utils
 
-def follow_file(filename):
-    prev_inode = None
-    prev_size = None
-    prev_mtime = None
-    opened = None
 
+def read(fd, amount=4096):
+    try:
+        data = os.read(fd, amount)
+    except OSError as ose:
+        if ose.args[0] != errno.EAGAIN:
+            raise
+        data = ""
+    return data
+
+
+def try_seek(fd, offset):
+    try:
+        if offset is None:
+            os.lseek(fd, 0, os.SEEK_END)
+        elif offset >= 0:
+            os.lseek(fd, offset)
+        else:
+            os.lseek(fd, offset, os.SEEK_END)
+    except OSError as ose:
+        if ose.args[0] != errno.ESPIPE:
+            raise
+
+
+def follow_file(filename):
     while True:
         try:
-            stat = os.stat(filename)
+            fd = os.open(filename, os.O_RDONLY | os.O_NONBLOCK)
         except OSError:
-            if opened is not None:
-                opened.close()
-                opened = None
             yield None
-            prev_inode = prev_size = prev_mtime = None
             continue
 
-        inode, size, mtime = stat[1], stat[6], stat[8]
+        try:
+            inode = os.fstat(fd).st_ino
+            first = True
 
-        if inode != prev_inode:
-            prev_inode = prev_size = prev_mtime = None
-            if opened is not None:
-                opened.close()
-                opened = None
+            while True:
+                try:
+                    stat = os.stat(filename)
+                except OSError:
+                    stat = None
 
-            try:
-                opened = open(filename, "rb")
-            except IOError:
-                yield None
-                prev_inode = prev_size = prev_mtime = None
-                continue
-            yield True, mtime, opened
-        elif prev_size != size and prev_mtime != mtime:
-            opened.seek(opened.tell())
-            yield False, mtime, opened
-        else:
-            yield None
+                yield first, time.time(), fd
+                if stat is None or inode != stat.st_ino:
+                    break
 
-        prev_size = size
-        prev_mtime = mtime
-        prev_inode = inode
+                first = False
+        finally:
+            os.close(fd)
 
 
 def tail_file(filename, offset=None):
@@ -53,26 +61,20 @@ def tail_file(filename, offset=None):
 
     for result in follow_file(filename):
         if first and result is not None:
-            _, _, opened = result
-
-            if offset is None:
-                opened.seek(0, os.SEEK_END)
-            elif offset >= 0:
-                opened.seek(offset)
-            else:
-                opened.seek(offset, os.SEEK_END)
+            _, _, fd = result
+            try_seek(fd, offset)
         first = False
 
         if result is None:
             yield None
             continue
 
-        flush, mtime, opened = result
+        flush, mtime, fd = result
         if flush and buffer:
             buffer = []
 
         while True:
-            data = opened.read(4096)
+            data = read(fd)
             if not data:
                 break
 
@@ -94,34 +96,6 @@ def tail_file(filename, offset=None):
 
         yield None
 
-def tail_fifo(filename, offset=None):
-    buffer = []
-    fd = os.open(filename, os.O_RDONLY | os.O_NONBLOCK)
-
-    while True:
-        data = os.read(fd, 4096)
-        if not data:
-            yield None
-            continue
-
-        lines = data.split("\n")
-        if len(lines) <= 1:
-            buffer.extend(lines)
-            continue
-
-        lines[0] = "".join(buffer) + lines[0]
-        for line in lines[:-1]:
-            if line.endswith("\r"):
-                line = line[:-1]
-            yield int(time.time()), line
-
-        if not lines[-1]:
-            buffer = []
-        else:
-            buffer = lines[-1:]
-
-    yield None
-
 
 class TailBot(bot.FeedBot):
     path = bot.Param("path to the followed file")
@@ -129,10 +103,7 @@ class TailBot(bot.FeedBot):
 
     @idiokit.stream
     def feed(self):
-        st_mode = os.stat(self.path).st_mode
-        tail_func = tail_fifo if stat.S_ISFIFO(st_mode) else tail_file
-
-        for result in tail_func(self.path, self.offset):
+        for result in tail_file(self.path, self.offset):
             if result is None:
                 yield idiokit.sleep(2.0)
                 continue
@@ -158,4 +129,3 @@ class TailBot(bot.FeedBot):
 
 if __name__ == "__main__":
     TailBot.from_command_line().execute()
-
