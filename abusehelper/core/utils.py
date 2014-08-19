@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import csv
+import ssl
 import time
 import gzip
 import socket
@@ -38,6 +39,23 @@ class HTTPError(FetchUrlFailed):
         return "HTTP Error {0}: {1}".format(self.code, self.msg)
 
 
+def _is_timeout(reason):
+    if isinstance(reason, socket.timeout):
+        return True
+
+    # Workaround for (at least) CPython2.x where timeouts in SSL sockets
+    # raise a generic ssl.SSLError instead of e.g. socket.timeout.
+    # Recognizing specific errors by their message strings is not usually
+    # the preferred option, but in this case it seems to be about the only way.
+    if (isinstance(reason, ssl.SSLError) and
+            reason.args and
+            isinstance(reason.args[0], str) and
+            reason.args[0].endswith(" operation timed out")):
+        return True
+
+    return False
+
+
 @idiokit.stream
 def fetch_url(url, opener=None, timeout=60.0, chunk_size=16384):
     if opener is None:
@@ -65,10 +83,14 @@ def fetch_url(url, opener=None, timeout=60.0, chunk_size=16384):
     except urllib2.HTTPError as he:
         raise HTTPError(he.code, he.msg, he.hdrs, he.fp)
     except urllib2.URLError as error:
-        if isinstance(error.reason, socket.timeout):
+        if _is_timeout(error.reason):
             raise FetchUrlTimeout("fetching URL timed out")
         raise FetchUrlFailed(str(error))
-    except (httplib.HTTPException, socket.error) as error:
+    except socket.error as error:
+        if _is_timeout(error):
+            raise FetchUrlTimeout("fetching URL timed out")
+        raise FetchUrlFailed(str(error))
+    except httplib.HTTPException as error:
         raise FetchUrlFailed(str(error))
 
 
