@@ -121,9 +121,6 @@ class ReportBot(bot.ServiceBot):
                     raise
                 else:
                     self._current = None
-
-                if not result and result is not None:
-                    self.queue(60.0, *args, **keys)
         except services.Stop:
             now = time.time()
             dumped = [(max(x - now, 0.0), y, z) for (x, y, z) in self._queue]
