@@ -21,6 +21,9 @@ class BridgeBot(bot.Bot):
     xmpp_src_host = bot.Param(
         "the XMPP src service host (default: autodetect)",
         default=None)
+    xmpp_src_port = bot.IntParam(
+        "the XMPP src service port (default: autodetect)",
+        default=None)
     xmpp_src_ignore_cert = bot.BoolParam("""
         do not perform any verification for
         the XMPP service's SSL certificate
@@ -35,6 +38,9 @@ class BridgeBot(bot.Bot):
         default=None)
     xmpp_dst_host = bot.Param(
         "the XMPP dst service host (default: autodetect)",
+        default=None)
+    xmpp_dst_port = bot.IntParam(
+        "the XMPP dst service port (default: autodetect)",
         default=None)
     xmpp_dst_room = bot.Param("the XMPP dst room")
     xmpp_dst_ignore_cert = bot.BoolParam("""
@@ -55,13 +61,14 @@ class BridgeBot(bot.Bot):
             self.xmpp_dst_password = getpass.getpass("XMPP dst password: ")
 
     @idiokit.stream
-    def _join(self, _type, jid, password, host, ignore_cert, ca_certs, room_name):
+    def _join(self, _type, jid, password, host, port, ignore_cert, ca_certs, room_name):
         verify_cert = not ignore_cert
 
         self.log.info("Connecting to XMPP %s server with JID %r", _type, jid)
         connection = yield xmpp.connect(
             jid, password,
             host=host, 
+            port=port,
             ssl_verify_cert=verify_cert,
             ssl_ca_certs=ca_certs)
 
@@ -80,6 +87,7 @@ class BridgeBot(bot.Bot):
             self.xmpp_dst_jid,
             self.xmpp_dst_password,
             self.xmpp_dst_host,
+            self.xmpp_dst_port,
             self.xmpp_dst_ignore_cert,
             self.xmpp_dst_extra_ca_certs,
             self.xmpp_dst_room)
@@ -87,6 +95,7 @@ class BridgeBot(bot.Bot):
             self.xmpp_src_jid,
             self.xmpp_src_password,
             self.xmpp_src_host,
+            self.xmpp_src_port,
             self.xmpp_src_ignore_cert,
             self.xmpp_src_extra_ca_certs,
             self.xmpp_src_room)
