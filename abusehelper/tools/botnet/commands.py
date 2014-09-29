@@ -45,7 +45,7 @@ def name_for_signal(signum, default=None):
 
 
 def ps():
-    process = popen("ps", "-wweo", "pid=,ppid=,command=")
+    process = popen("ps", "-wwAo", "pid=,ppid=,command=")
     stdout, stderr = process.communicate()
     if process.returncode != 0:
         sys.stderr.write(stderr)
