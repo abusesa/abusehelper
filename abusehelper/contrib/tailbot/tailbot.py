@@ -20,7 +20,7 @@ def try_seek(fd, offset):
         if offset is None:
             os.lseek(fd, 0, os.SEEK_END)
         elif offset >= 0:
-            os.lseek(fd, offset)
+            os.lseek(fd, offset, os.SEEK_SET)
         else:
             os.lseek(fd, offset, os.SEEK_END)
     except OSError as ose:
