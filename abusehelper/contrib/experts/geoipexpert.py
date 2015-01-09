@@ -15,6 +15,38 @@ import idiokit
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts.combiner import Expert
 
+def load_geodb(path, log=None):
+    reader, fun = None, None
+
+    try:
+        import geoip2.database
+        from maxminddb.errors import InvalidDatabaseError
+
+        try:
+            reader = geoip2.database.Reader(path)
+        except InvalidDatabaseError:
+            raise ImportError
+
+        fun = geoip
+        if log:
+            log.info("GeoIP2 initiated")
+    except ImportError:
+        import pygeoip
+
+        reader = pygeoip.GeoIP(path)
+        fun = legacy_geoip
+
+        if log:
+            log.info("Legacy GeoIP initiated")
+
+    if not reader or not fun:
+        return
+
+    def geoip_reader(ip):
+        return fun(reader, ip)        
+        
+    return geoip_reader
+
 
 def geoip(reader, ip):
     try:
@@ -25,9 +57,9 @@ def geoip(reader, ip):
     if record is None:
         return {}
 
-    return {"geoip cc": record.country.iso_code,
-            "latitude": unicode(record.location.latitude),
-            "longitude": unicode(record.location.longitude)}
+    return {"geoip cc": [record.country.iso_code],
+            "latitude": [unicode(record.location.latitude)],
+            "longitude": [unicode(record.location.longitude)]}
 
 
 def legacy_geoip(reader, ip):
@@ -46,15 +78,13 @@ def legacy_geoip(reader, ip):
 
     geoip_cc = record.get("country_code", None)
     if geoip_cc:
-        result["geoip cc"] = geoip_cc
+        result["geoip cc"] = [geoip_cc]
 
     latitude = record.get("latitude", None)
-    if latitude:
-        result["latitude"] = unicode(latitude)
-
     longitude = record.get("longitude", None)
-    if longitude:
-        result["longitude"] = unicode(longitude)
+    if latitude and longitude:
+        result["latitude"] = [unicode(latitude)]
+        result["longitude"] = [unicode(longitude)]
 
     return result
 
@@ -74,28 +104,11 @@ class GeoIPExpert(Expert):
 
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
-
-        try:
-            import geoip2.database
-            from maxminddb.errors import InvalidDatabaseError
-
-            try:
-                self.reader = geoip2.database.Reader(self.geoip_db)
-            except InvalidDatabaseError:
-                raise ImportError
-
-            self.geoip = geoip
-            self.log.info("GeoIP2 initiated")
-        except ImportError:
-            import pygeoip
-
-            self.reader = pygeoip.GeoIP(self.geoip_db)
-            self.geoip = legacy_geoip
-            self.log.info("Legacy GeoIP initiated")
+        self.geoip = load_geodb(self.geoip_db, self.log)
 
     def geomap(self, event, key):
         for ip in event.values(key):
-            result = self.geoip(self.reader, ip)
+            result = self.geoip(ip)
             if not result:
                 continue
 
