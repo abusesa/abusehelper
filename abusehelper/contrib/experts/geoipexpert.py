@@ -11,10 +11,52 @@ Pygeoip can currently use only the IPv4 version of the DB.
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
 import socket
-import pygeoip
 import idiokit
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts.combiner import Expert
+
+
+def geoip(reader, ip):
+    try:
+        record = reader.city(ip)
+    except geoip2.errors.AddressNotFoundError:
+        return {}
+
+    if record is None:
+        return {}
+
+    return {"geoip cc": record.country.iso_code,
+            "latitude": unicode(record.location.latitude),
+            "longitude": unicode(record.location.longitude)}
+
+
+def legacy_geoip(reader, ip):
+    if not is_ipv4(ip):
+        return {}
+
+    try:
+        record = reader.record_by_addr(ip)
+    except pygeoip.GeoIPError:
+        return {}
+
+    if record is None:
+        return {}
+
+    result = {}
+
+    geoip_cc = record.get("country_code", None)
+    if geoip_cc:
+        result["geoip cc"] = geoip_cc
+
+    latitude = record.get("latitude", None)
+    if latitude:
+        result["latitude"] = unicode(latitude)
+
+    longitude = record.get("longitude", None)
+    if longitude:
+        result["longitude"] = unicode(longitude)
+
+    return result
 
 
 def is_ipv4(ip):
@@ -33,37 +75,31 @@ class GeoIPExpert(Expert):
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
 
-        self.geoip = pygeoip.GeoIP(self.geoip_db)
-        self.log.info("GeoIP initiated")
+        try:
+            import geoip2.database
+            from maxminddb.errors import InvalidDatabaseError
+
+            try:
+                self.reader = geoip2.database.Reader(self.geoip_db)
+            except InvalidDatabaseError:
+                raise ImportError
+
+            self.geoip = geoip
+            self.log.info("GeoIP2 initiated")
+        except ImportError:
+            import pygeoip
+
+            self.reader = pygeoip.GeoIP(self.geoip_db)
+            self.geoip = legacy_geoip
+            self.log.info("Legacy GeoIP initiated")
 
     def geomap(self, event, key):
-        for ip in event.values(key, filter=is_ipv4):
-            try:
-                record = self.geoip.record_by_addr(ip)
-            except pygeoip.GeoIPError, e:
-                self.log.error("GeoIP fetch failed: %s", repr(e))
+        for ip in event.values(key):
+            result = self.geoip(self.reader, ip)
+            if not result:
                 continue
 
-            if not record:
-                continue
-
-            augmentation = events.Event()
-
-            cc = record.get("country_code", None)
-            if cc:
-                augmentation.add("geoip cc", cc)
-
-            latitude = record.get("latitude", None)
-            if latitude:
-                augmentation.add("latitude", unicode(latitude))
-
-            longitude = record.get("longitude", None)
-            if longitude:
-                augmentation.add("longitude", unicode(longitude))
-
-            if not augmentation.contains():
-                continue
-
+            augmentation = events.Event(result)
             augmentation.add(key, ip)
             yield augmentation
 
