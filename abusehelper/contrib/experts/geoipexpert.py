@@ -15,51 +15,54 @@ import idiokit
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts.combiner import Expert
 
+use_legacy = False
+try:
+    from geoip2.database import Reader as GeoIP
+    from geoip2.errors import AddressNotFoundError
+except ImportError:
+    from pygeoip import GeoIP, GeoIPError
+    use_legacy = True
+
 def load_geodb(path, log=None):
-    reader, fun = None, None
+    reader = GeoIP(path)
 
-    try:
-        import geoip2.database
-        from maxminddb.errors import InvalidDatabaseError
-
-        try:
-            reader = geoip2.database.Reader(path)
-        except InvalidDatabaseError:
-            raise ImportError
-
+    if use_legacy:
+        fun = legacy_geoip
+        if log:
+            log.info("Legacy GeoIP initiated")
+    else:
         fun = geoip
         if log:
             log.info("GeoIP2 initiated")
-    except ImportError:
-        import pygeoip
-
-        reader = pygeoip.GeoIP(path)
-        fun = legacy_geoip
-
-        if log:
-            log.info("Legacy GeoIP initiated")
-
-    if not reader or not fun:
-        return
 
     def geoip_reader(ip):
-        return fun(reader, ip)        
-        
+        return fun(reader, ip)
+
     return geoip_reader
 
 
 def geoip(reader, ip):
     try:
         record = reader.city(ip)
-    except geoip2.errors.AddressNotFoundError:
+    except AddressNotFoundError:
         return {}
 
     if record is None:
         return {}
 
-    return {"geoip cc": [record.country.iso_code],
-            "latitude": [unicode(record.location.latitude)],
-            "longitude": [unicode(record.location.longitude)]}
+    result = {}
+
+    geoip_cc = record.country.iso_code
+    if geoip_cc:
+        result["geoip cc"] = [geoip_cc]
+
+    latitude = record.location.latitude
+    longitude = record.location.longitude
+    if latitude and longitude:
+        result["latitude"] = [unicode(latitude)]
+        result["longitude"] = [unicode(longitude)]
+
+    return result
 
 
 def legacy_geoip(reader, ip):
@@ -68,7 +71,7 @@ def legacy_geoip(reader, ip):
 
     try:
         record = reader.record_by_addr(ip)
-    except pygeoip.GeoIPError:
+    except GeoIPError:
         return {}
 
     if record is None:
