@@ -15,82 +15,6 @@ import idiokit
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts.combiner import Expert
 
-use_legacy = False
-try:
-    from geoip2.database import Reader as GeoIP
-    from geoip2.errors import AddressNotFoundError
-except ImportError:
-    from pygeoip import GeoIP, GeoIPError
-    use_legacy = True
-
-def load_geodb(path, log=None):
-    reader = GeoIP(path)
-
-    if use_legacy:
-        fun = legacy_geoip
-        if log:
-            log.info("Legacy GeoIP initiated")
-    else:
-        fun = geoip
-        if log:
-            log.info("GeoIP2 initiated")
-
-    def geoip_reader(ip):
-        return fun(reader, ip)
-
-    return geoip_reader
-
-
-def geoip(reader, ip):
-    try:
-        record = reader.city(ip)
-    except AddressNotFoundError:
-        return {}
-
-    if record is None:
-        return {}
-
-    result = {}
-
-    geoip_cc = record.country.iso_code
-    if geoip_cc:
-        result["geoip cc"] = [geoip_cc]
-
-    latitude = record.location.latitude
-    longitude = record.location.longitude
-    if latitude and longitude:
-        result["latitude"] = [unicode(latitude)]
-        result["longitude"] = [unicode(longitude)]
-
-    return result
-
-
-def legacy_geoip(reader, ip):
-    if not is_ipv4(ip):
-        return {}
-
-    try:
-        record = reader.record_by_addr(ip)
-    except GeoIPError:
-        return {}
-
-    if record is None:
-        return {}
-
-    result = {}
-
-    geoip_cc = record.get("country_code", None)
-    if geoip_cc:
-        result["geoip cc"] = [geoip_cc]
-
-    latitude = record.get("latitude", None)
-    longitude = record.get("longitude", None)
-    if latitude and longitude:
-        result["latitude"] = [unicode(latitude)]
-        result["longitude"] = [unicode(longitude)]
-
-    return result
-
 
 def is_ipv4(ip):
     try:
@@ -98,6 +22,84 @@ def is_ipv4(ip):
     except (ValueError, socket.error):
         return False
     return True
+
+
+def load_geodb(path, log=None):
+    def geoip(reader, ip):
+        try:
+            record = reader.city(ip)
+        except AddressNotFoundError:
+            return {}
+
+        if record is None:
+            return {}
+
+        result = {}
+        geoip_cc = record.country.iso_code
+        if geoip_cc:
+            result["geoip cc"] = [geoip_cc]
+
+        latitude = record.location.latitude
+        longitude = record.location.longitude
+        if latitude and longitude:
+            result["latitude"] = [unicode(latitude)]
+            result["longitude"] = [unicode(longitude)]
+
+        return result
+
+
+    def legacy_geoip(reader, ip):
+        if not is_ipv4(ip):
+            return {}
+
+        try:
+            record = reader.record_by_addr(ip)
+        except GeoIPError:
+            return {}
+ 
+        if record is None:
+            return {}
+ 
+        result = {}
+        geoip_cc = record.get("country_code", None)
+        if geoip_cc:
+            result["geoip cc"] = [geoip_cc]
+
+        latitude = record.get("latitude", None)
+        longitude = record.get("longitude", None)
+        if latitude and longitude:
+            result["latitude"] = [unicode(latitude)]
+            result["longitude"] = [unicode(longitude)]
+
+        return result
+
+    try:
+        from geoip2.database import Reader
+        from maxminddb.errors import InvalidDatabaseError
+        from geoip2.errors import AddressNotFoundError
+
+        try:
+            reader = Reader(path)
+            fun = geoip
+        except InvalidDatabaseError:
+            raise ImportError
+
+        if log:
+            log.info("GeoIP2 initiated")
+
+    except ImportError:
+        from pygeoip import GeoIP, GeoIPError
+
+        reader = GeoIP(path)
+        fun = legacy_geoip
+
+        if log:
+            log.info("Legacy GeoIP initiated")
+
+    def geoip_reader(ip):
+        return fun(reader, ip)
+
+    return geoip_reader
 
 
 class GeoIPExpert(Expert):
