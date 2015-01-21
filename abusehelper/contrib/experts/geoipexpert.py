@@ -28,7 +28,7 @@ def load_geodb(path, log=None):
     def geoip(reader, ip):
         try:
             record = reader.city(ip)
-        except AddressNotFoundError:
+        except (AddressNotFoundError, ValueError):
             return {}
 
         if record is None:
