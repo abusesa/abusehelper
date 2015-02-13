@@ -9,21 +9,21 @@ AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 CLASSIFICATION = {
     "TDSS": [("type", "botnet drone"), ("malware", "tdss")],
     "ZeroAccess": [("type", "botnet drone"), ("malware", "zeroaccess")],
-    
-    "Malware Distribution": [("type","malware")],
+
+    "Malware Distribution": [("type", "malware")],
 
     "Double HTTP": [("type", "brute-force"), ("protocol", "http")],
     "Sipvicious": [("type", "brute-force"), ("protocol", "sip")],
     "SSH": [("type", "brute-force"), ("protocol", "ssh")],
-    "Teminal Server": [("type", "brute-force"), ("protocol", "rdp"),("additional information","Terminal Server")],
+    "Teminal Server": [("type", "brute-force"), ("protocol", "rdp"), ("additional information", "Terminal Server")],
     "Tomcat": [("type", "brute-force"), ("protocol", "http")],
-    "TomCat Auth": [("type", "brute-force"), ("protocol","http")],
+    "TomCat Auth": [("type", "brute-force"), ("protocol", "http")],
     "WEB Proxy": [("type", "brute-force"), ("protocol", "http")],
     "Wordpress": [("type", "brute-force"), ("protocol", "http")],
-    
+
     "DHL Spambot": [("type", "spam")],
     "Spam Bot": [("type", "spam")],
-    
+
     "Remax Phish": [("type", "phishing")],
 
     "Core-Project": [("type", "exploit")],
@@ -31,14 +31,14 @@ CLASSIFICATION = {
     "dfind SK": [("type", "exploit")],
     "FTP Administrator": [("type", "exploit"), ("protocol", "ftp")],
     "g01pack": [("type", "exploit"), ("malware", "g01pack")],
-    "Heartblead": [("type", "exploit"), ("protocol", "ssl/tls"),("additional information","Heartbleed")],
+    "Heartblead": [("type", "exploit"), ("protocol", "ssl/tls"), ("additional information", "Heartbleed")],
     "HTTP Get with Title": [("exploit", "scanner"), ("protocol", "http")],
-    "Malicious 8x8": [("type", "exploit"), ("protocol", "http")],    
-    "Muieblackcat": [("type","exploit"),("protocol","http")],
+    "Malicious 8x8": [("type", "exploit"), ("protocol", "http")],
+    "Muieblackcat": [("type", "exploit"), ("protocol", "http")],
     "Oracle SQL Injection": [("type", "exploit"), ("protocol", "http")],
     "php injection": [("type", "exploit"), ("protocol", "http")],
-    "PHP-cgi vulnerability": [("type","exploit"),("protocol","http")],
-    "ZmEu": [("type","exploit"), ("protocol","http")],
+    "PHP-cgi vulnerability": [("type", "exploit"), ("protocol", "http")],
+    "ZmEu": [("type", "exploit"), ("protocol", "http")],
 
     "Morfeus F": [("type", "scanner")],
 }
@@ -50,7 +50,6 @@ class AutoshunBot(bot.PollingBot):
 
     feed_url = bot.Param(default=AUTOSHUN_CSV_URL)
     use_cymru_whois = bot.BoolParam()
-
 
     def poll(self):
         pipe = self._poll(url=self.feed_url)
@@ -70,8 +69,8 @@ class AutoshunBot(bot.PollingBot):
 
         # Grab time offset from first line of the CSV
         header = fileobj.readline()
-
-        if header.startswith("Shunlist as of"): # Source file header row may sometimes be empty
+        # Source file header row may sometimes be empty
+        if header.startswith("Shunlist as of"):
             offset = -1 * int(header[-5:]) / 100  # ex: -0500 to 5
             self.time_offset = offset if -12 <= offset <= 12 else 5
 
@@ -90,9 +89,9 @@ class AutoshunBot(bot.PollingBot):
             for info in event.values("info"):
                 for name, tuples in CLASSIFICATION.items():
                     if info.startswith(name):
-                        for pair in tuples: 
+                        for pair in tuples:
                             event.add(pair[0], pair[1])
-                event.add("Autoshun classification", info)
+                event.add("autoshun classification", info)
             event.clear("info")
             if not event.contains("type"):
                 event.add("type", "ids alert")
