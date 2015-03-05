@@ -1,3 +1,9 @@
+"""
+Arbor Atlas SRF bot.
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 import re
 import cgi
 import urllib2

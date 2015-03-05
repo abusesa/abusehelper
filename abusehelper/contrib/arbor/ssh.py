@@ -1,3 +1,9 @@
+"""
+Arbor SSH Attackers feed bot.
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 import idiokit
 from abusehelper.core import utils, cymruwhois, bot, events
 
