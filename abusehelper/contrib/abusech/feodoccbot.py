@@ -1,3 +1,9 @@
+"""
+abuse.ch Feodo RSS feed bot.
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 from abusehelper.core import bot
 
 from . import host_or_ip, split_description, AbuseCHFeedBot
