@@ -1,3 +1,11 @@
+"""
+Autoshun Shun List bot
+http://autoshun.org/
+
+Maintainer: Codenomicon <clarified@codenomicon.com
+"""
+
+
 import idiokit
 import time as _time
 import calendar
