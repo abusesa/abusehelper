@@ -4,6 +4,13 @@
 # yield Source("cleanmxbot", csv_url="http://support.clean-mx.de/clean-mx/xmlphishing?response=alive&format=csv&domain=")
 # yield Source("cleanmxbot", csv_url="http://support.clean-mx.de/clean-mx/xmlviruses?response=alive&format=csv&domain=", csv_name="xmlvirii")
 
+"""
+CleanMX bot
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
+
 import re
 import idiokit
 import urlparse
