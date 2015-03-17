@@ -1,3 +1,9 @@
+"""
+Bot for VxVault feed.
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 import socket
 import idiokit
 import urlparse
