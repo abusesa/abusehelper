@@ -1,3 +1,9 @@
+"""
+Dragon research group bot (SSH)
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 from . import DragonBot
 
 

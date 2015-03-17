@@ -1,3 +1,9 @@
+"""
+Dragon research group bot (VNC)
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 from . import DragonBot
 
 

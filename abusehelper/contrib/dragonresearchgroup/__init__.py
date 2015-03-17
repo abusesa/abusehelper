@@ -1,3 +1,9 @@
+"""
+Base for dragon research group bot
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 import idiokit
 from abusehelper.core import utils, cymruwhois, bot
 
