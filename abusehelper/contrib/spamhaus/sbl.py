@@ -1,3 +1,9 @@
+"""
+Spamhaus sbl feed bot
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 import idiokit
 from abusehelper.core import cymruwhois, bot, events
 
