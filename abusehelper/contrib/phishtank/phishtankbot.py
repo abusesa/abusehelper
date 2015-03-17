@@ -1,7 +1,7 @@
 """
 PhishTank feed handler. Requires a PhishTank application key.
 
-Maintainer: Jussi Eronen <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 
 import re

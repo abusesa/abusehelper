@@ -1,7 +1,7 @@
 """
 Spamhaus DROP list handler.
 
-Maintainer: Jussi Eronen <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 
 import idiokit
