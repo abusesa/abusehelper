@@ -1,3 +1,9 @@
+"""
+OpenBL bot
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 import idiokit
 import time as _time
 
