@@ -4,7 +4,7 @@ resulting screenshot, server headers and HAR file of the grab to wiki.
 
 Tested with PhantomJS 1.6.2.
 
-Maintainer: "Juhani Eronen" <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 import os
 import socket

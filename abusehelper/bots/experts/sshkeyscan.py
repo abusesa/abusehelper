@@ -3,7 +3,7 @@ An expert to do SSH key scanning. Uses Paramiko when around (in
 Ubuntu, it's the package python-paramiko), defaults to ssh-keyscan
 otherwise.
 
-Maintainer: "Juhani Eronen" <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 import socket
 

@@ -3,7 +3,7 @@ Bot that supposedly talks to RTIR. Originally written by Harri
 Sylvander, hastily converted to i3k by Jussi. If anyone wants to
 maintain this code, please feel free to do so in my stead.
 
-Maintainer: Jussi Eronen <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 
 from collections import defaultdict

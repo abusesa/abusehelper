@@ -6,7 +6,7 @@ An example bot for controlling a VirtualBox-based sandbox. Assumptions:
  * There is a clean state which the sandbox is reverted at exit
  * Sandbox generates outout which you can analyze with a script/executable
 
-Maintainer: "Juhani Eronen" <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 
 import os

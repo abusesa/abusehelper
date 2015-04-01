@@ -1,7 +1,7 @@
 """
 An expert to augment IPs with passive DNS data.
 
-Maintainer: "Juhani Eronen" <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 import idiokit
 import socket as _socket

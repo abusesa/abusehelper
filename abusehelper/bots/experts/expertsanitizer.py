@@ -1,7 +1,7 @@
 """
 A sanitizer to remove augmentation keys.
 
-Maintainer: "Jussi Eronen" <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 import sanitizer
 from abusehelper.bots.experts.combiner import AUGMENT_KEY

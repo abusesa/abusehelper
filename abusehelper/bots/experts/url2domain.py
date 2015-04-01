@@ -1,7 +1,7 @@
 """
 A simple expert to parse a domain name from a URL.
 
-Maintainer: "Juhani Eronen" <exec@iki.fi>
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 import socket
 import idiokit
