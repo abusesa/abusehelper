@@ -8,7 +8,7 @@ Maintainer: Codenomicon <clarified@codenomicon.com>
 
 from collections import defaultdict
 import idiokit
-from abusehelper.core import events, taskfarm, services, bot
+from abusehelper.core import events, taskfarm, bot
 from abusehelper.bots.rtirbot import rt
 
 

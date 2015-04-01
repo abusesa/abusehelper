@@ -7,11 +7,10 @@ Tested with PhantomJS 1.6.2.
 Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 import os
-import socket
 import idiokit
 import simplejson as json
 
-from abusehelper.core import bot, events, taskfarm
+from abusehelper.core import bot, events
 from abusehelper.bots.experts.combiner import Expert
 
 from tempfile import mkstemp

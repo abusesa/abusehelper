@@ -1,6 +1,3 @@
-import json
-from opencollab import wiki
-
 from abusehelper.core import bot
 from abusehelper.core.runtime import RuntimeBot, Session
 

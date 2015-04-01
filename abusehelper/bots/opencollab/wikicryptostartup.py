@@ -3,7 +3,7 @@ import getpass
 import os
 import sys
 
-from abusehelper.core import bot, config
+from abusehelper.core import bot
 from abusehelper.bots.opencollab.crypto import decrypt, DecryptionError
 from abusehelper.bots.opencollab.wikistartup import WikiStartupBot
 
