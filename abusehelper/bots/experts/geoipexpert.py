@@ -13,7 +13,7 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 import socket
 import idiokit
 from abusehelper.core import events, bot
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 
 
 def is_ipv4(ip):

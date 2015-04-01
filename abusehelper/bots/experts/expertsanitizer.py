@@ -4,7 +4,7 @@ A sanitizer to remove augmentation keys.
 Maintainer: "Jussi Eronen" <exec@iki.fi>
 """
 import sanitizer
-from abusehelper.contrib.experts.combiner import AUGMENT_KEY
+from abusehelper.bots.experts.combiner import AUGMENT_KEY
 
 
 class ExpertSanitizer(sanitizer.Sanitizer):

@@ -1,7 +1,7 @@
 import socket
 import idiokit
 from abusehelper.core import bot, events
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 from opencollab import wiki
 
 

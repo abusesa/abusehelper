@@ -12,7 +12,7 @@ import idiokit
 import simplejson as json
 
 from abusehelper.core import bot, events, taskfarm
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 
 from tempfile import mkstemp
 from subprocess import Popen, PIPE, STDOUT

@@ -1,5 +1,5 @@
 from abusehelper.core import bot, events
-from abusehelper.contrib.tailbot.tailbot import TailBot
+from abusehelper.bots.tailbot.tailbot import TailBot
 
 import re
 import time

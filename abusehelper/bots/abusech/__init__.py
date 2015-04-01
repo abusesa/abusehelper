@@ -3,7 +3,7 @@ import socket
 import urlparse
 
 from abusehelper.core import events
-from abusehelper.contrib.rssbot.rssbot import RSSBot
+from abusehelper.bots.rssbot.rssbot import RSSBot
 
 
 def parse_ip(string):

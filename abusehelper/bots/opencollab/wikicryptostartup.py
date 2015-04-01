@@ -4,8 +4,8 @@ import os
 import sys
 
 from abusehelper.core import bot, config
-from abusehelper.contrib.opencollab.crypto import decrypt, DecryptionError
-from abusehelper.contrib.opencollab.wikistartup import WikiStartupBot
+from abusehelper.bots.opencollab.crypto import decrypt, DecryptionError
+from abusehelper.bots.opencollab.wikistartup import WikiStartupBot
 
 def redirected(func, *args, **keys):
     oldStdout = sys.stdout

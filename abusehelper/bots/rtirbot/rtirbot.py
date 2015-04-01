@@ -9,7 +9,7 @@ Maintainer: Jussi Eronen <exec@iki.fi>
 from collections import defaultdict
 import idiokit
 from abusehelper.core import events, taskfarm, services, bot
-from abusehelper.contrib.rtirbot import rt
+from abusehelper.bots.rtirbot import rt
 
 
 class CollectorBot(bot.ServiceBot):

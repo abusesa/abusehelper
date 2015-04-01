@@ -23,7 +23,7 @@ from subprocess import Popen, PIPE, STDOUT
 import idiokit
 
 from abusehelper.core import bot, events, utils
-from abusehelper.contrib.experts.bgpexpert import BgpBaseExpert
+from abusehelper.bots.experts.bgpexpert import BgpBaseExpert
 
 def run_command(cmd):
     p = Popen(cmd, stdout=PIPE, stderr=STDOUT,

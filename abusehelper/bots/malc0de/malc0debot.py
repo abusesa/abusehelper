@@ -5,7 +5,7 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
 import socket
 from abusehelper.core import bot, events
-from abusehelper.contrib.rssbot.rssbot import RSSBot
+from abusehelper.bots.rssbot.rssbot import RSSBot
 
 
 class Malc0deBot(RSSBot):

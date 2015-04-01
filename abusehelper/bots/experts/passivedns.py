@@ -7,7 +7,7 @@ import idiokit
 import socket as _socket
 from idiokit import socket
 from abusehelper.core import bot, events, utils
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 
 DEFAULT_KEYS = ("host", "ip", "first seen", "last seen")
 

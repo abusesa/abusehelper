@@ -30,7 +30,7 @@ import csv
 import idiokit
 
 from abusehelper.core import bot, events, utils
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 
 class SubnetException(Exception):
     pass

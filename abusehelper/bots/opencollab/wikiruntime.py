@@ -4,7 +4,7 @@ from opencollab import wiki
 from abusehelper.core import bot
 from abusehelper.core.runtime import RuntimeBot, Session
 
-from abusehelper.contrib.opencollab.wikistartup import WikiConfigInterface, rmlink, TYPES
+from abusehelper.bots.opencollab.wikistartup import WikiConfigInterface, rmlink, TYPES
 
 class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
     collab_url = bot.Param("Collab url")

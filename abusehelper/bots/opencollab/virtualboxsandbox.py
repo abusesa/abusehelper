@@ -15,7 +15,7 @@ import idiokit
 from subprocess import Popen, PIPE, STDOUT
 
 from abusehelper.core import bot, events
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 
 from opencollab.wiki import GraphingWiki
 from opencollab.util.file import uploadFile

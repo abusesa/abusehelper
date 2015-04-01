@@ -12,7 +12,7 @@ import httplib
 import email
 
 from abusehelper.core import bot, events
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 import abusehelper.core.utils as utils
 
 from random import choice

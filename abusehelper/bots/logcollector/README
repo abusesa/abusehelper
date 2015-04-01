@@ -2,7 +2,7 @@ Startup config:
 ============================================
 
     def configs():
-        yield basic("logcollector", "abusehelper.contrib.logcollector.logcollectorbot", logcollector_ip='127.0.0.1', logcollector_port=5000)  
+        yield basic("logcollector", "abusehelper.bots.logcollector.logcollectorbot", logcollector_ip='127.0.0.1', logcollector_port=5000)  
 
 
 

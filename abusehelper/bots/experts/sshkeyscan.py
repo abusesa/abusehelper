@@ -12,7 +12,7 @@ from subprocess import Popen, PIPE, STDOUT
 import idiokit
 
 from abusehelper.core import events
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.experts.combiner import Expert
 
 has_paramiko = False
 try:

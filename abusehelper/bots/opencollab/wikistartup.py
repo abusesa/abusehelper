@@ -9,7 +9,7 @@ from opencollab import wiki
 import idiokit
 from abusehelper.core import bot, rules
 from abusehelper.core.startup import Bot, StartupBot
-from abusehelper.contrib.opencollab.crypto import decrypt, DecryptionError
+from abusehelper.bots.opencollab.crypto import decrypt, DecryptionError
 
 TYPES = {"True":True, "true":True, "False":False, "false":False, "None":None,
          "none":None}

@@ -6,8 +6,8 @@ Maintainer: "Juhani Eronen" <exec@iki.fi>
 import socket
 import idiokit
 from abusehelper.core import events
-from abusehelper.contrib.urllistmailbot.urllistmailbot import get_hosts
-from abusehelper.contrib.experts.combiner import Expert
+from abusehelper.bots.urllistmailbot.urllistmailbot import get_hosts
+from abusehelper.bots.experts.combiner import Expert
 
 
 def is_ipv4(ip):

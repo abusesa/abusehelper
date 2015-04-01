@@ -46,7 +46,7 @@ def parse(string, base_time):
 
     return result
 
-from abusehelper.contrib.tailbot.tailbot import TailBot
+from abusehelper.bots.tailbot.tailbot import TailBot
 
 class SSHLogBot(TailBot):
 

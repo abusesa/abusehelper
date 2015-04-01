@@ -1,7 +1,7 @@
 from idiokit import threado
-from abusehelper.contrib.whois import iptools
+from abusehelper.bots.whois import iptools
 from abusehelper.core import events, bot
-from abusehelper.contrib.experts import combiner
+from abusehelper.bots.experts import combiner
 
 class WhoisBot(combiner.Expert):
     __iptools = None
