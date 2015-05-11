@@ -56,7 +56,7 @@ install_other("idiokit")
 
 packages = dict()
 packages.update(collect_package("abusehelper"))
-packages.update(collect_package("abusehelper.contrib"))
+packages.update(collect_package("abusehelper.bots"))
 
 setup(
     name="abusehelper",
@@ -64,8 +64,8 @@ setup(
     packages=packages,
     package_dir=packages,
     package_data={
-        "abusehelper.contrib.confgen":
-            collect_package_data("abusehelper/contrib/confgen", "config-template")
+        "abusehelper.bots.confgen":
+            collect_package_data("abusehelper/bots/confgen", "config-template")
     },
     scripts=[
         "scripts/botnet",
