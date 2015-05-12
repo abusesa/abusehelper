@@ -8,4 +8,5 @@ Everything is licensed under MIT license
 The contrib package in Abusehelper will be migrated under abusehelper.bots package during Q2 2015. This will require developers to change all references of abusehelper.contrib package to abusehelper.bots. All internal references within Abusehelper have been updated in its own branch 'contrib-migration' and developers can already test their environments by deploying that spesific branch.
 
     hg update contrib-migration
+
     python setup.py install
