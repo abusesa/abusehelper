@@ -2,6 +2,16 @@
 A simple bot for getting ticket ID numbers from a Request Tracker server.
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
+
+
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
 """
 import re
 import urllib
@@ -23,6 +33,10 @@ class RTExpert(Expert):
                             default="")
     content_key = bot.Param("Event key to use as ticket content",
                             default="")
+
+    def __init__(self, *args, **keys):
+        Expert.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
     def rt_ticket(self, **kw):
         headers = {"Content-type": "application/x-www-form-urlencoded",

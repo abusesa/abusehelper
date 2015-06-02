@@ -12,6 +12,16 @@ FIXME: Does not include data about allocation date on more
 fine-grained subnets due to a lack of known good data feeds on this.
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
+
+
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
 """
 import struct
 import sys
@@ -25,6 +35,7 @@ import idiokit
 from abusehelper.core import bot, events, utils
 from abusehelper.contrib.experts.bgpexpert import BgpBaseExpert
 
+
 def run_command(cmd):
     p = Popen(cmd, stdout=PIPE, stderr=STDOUT,
               shell=True, close_fds=True)
@@ -33,6 +44,7 @@ def run_command(cmd):
 class BgpQuaggaExpert(BgpBaseExpert):
     def __init__(self, *args, **keys):
         BgpBaseExpert.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
     def make_result(self, result):
         augmentation = events.Event()

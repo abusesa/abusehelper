@@ -4,6 +4,17 @@ from idiokit.xmpp import jid
 from abusehelper.core import events, bot
 from abusehelper.contrib.experts import combiner
 
+"""
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
+
 def parse(text):
     # Expected format
     # ASN,Rank,Matched BL,Highest Malicious Ranking,Current Position
@@ -58,6 +69,10 @@ class BGPRankingBot(combiner.Expert):
     bgp_jid = bot.Param()
     bgp_pwd = bot.Param()
     bgp_ejid = bot.Param()
+
+    def __init__(self, *args, **keys):
+        combiner.Expert.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
     @idiokit.stream
     def main(self, *args, **keys):

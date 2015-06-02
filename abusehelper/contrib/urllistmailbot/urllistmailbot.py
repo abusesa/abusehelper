@@ -16,6 +16,17 @@
 #      https://badly-indented-url.example.com
 # Sincerely, Albert Urlfeed
 
+"""
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
+
 import socket
 import urlparse
 
@@ -52,6 +63,11 @@ def get_hosts(url_lines):
             yield line, parsed.hostname
 
 class URLListMailBot(imapbot.IMAPBot):
+
+    def __init__(self, *args, **keys):
+        imapbot.IMAPBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
+
     @idiokit.stream
     def get_resolved_hosts(self, url_lines):
         r"""

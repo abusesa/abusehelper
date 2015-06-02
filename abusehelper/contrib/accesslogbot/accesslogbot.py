@@ -5,6 +5,16 @@ import re
 import time
 from calendar import timegm
 
+"""
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
 
 DATE_REX = re.compile(
     r"^(\d{1,2}/.+?/\d{4}:\d{1,2}:\d{1,2}:\d{1,2})\s+([+-]\d{4})$")
@@ -132,6 +142,10 @@ def parse_user_agent(user_agent):
 
 class AccessLogBot(TailBot):
     path = bot.Param("access_log file path")
+
+    def __init__(self, *args, **keys):
+        TailBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
     def parse(self, line, _):
         line = line.strip()

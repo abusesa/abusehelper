@@ -50,6 +50,10 @@ from abusehelper.contrib.tailbot.tailbot import TailBot
 
 class SSHLogBot(TailBot):
 
+    def __init__(self, *args, **keys):
+        TailBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
+
     def parse(self, line, mtime):
         return parse(line, time.gmtime(mtime))
 

@@ -20,6 +20,16 @@ FIXME: Does not include data about allocation date on more
 fine-grained subnets due to a lack of known good data feeds on this.
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
+
+
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
 """
 import os
 import struct
@@ -31,6 +41,7 @@ import idiokit
 
 from abusehelper.core import bot, events, utils
 from abusehelper.contrib.experts.combiner import Expert
+
 
 class SubnetException(Exception):
     pass
@@ -44,6 +55,7 @@ class BgpBaseExpert(Expert):
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
         self.initialize()
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
     def subnets(self, ip, original_bits):
         if not 0 <= original_bits <= 32:
