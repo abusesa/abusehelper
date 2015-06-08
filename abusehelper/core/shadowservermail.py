@@ -112,6 +112,8 @@ class ShadowServerMail(imapbot.IMAPBot):
                     else:
                         self.log.error("Fetching URL {0!r} failed ({1}), retrying in {2:.02f} seconds".format(match, fail, self.retry_interval))
                         yield idiokit.sleep(self.retry_interval)
+                else:
+                    break
 
             filename = info.get_filename(None)
             if filename is None:
