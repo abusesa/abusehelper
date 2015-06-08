@@ -18,6 +18,9 @@ class ShadowServerMail(imapbot.IMAPBot):
     # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
     filename_rex = bot.Param(default=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>[^-]*).*\..*")
 
+    retry_count = bot.IntParam(default=5)
+    retry_interval = bot.FloatParam(default=600)
+
     def _decode(self, headers, fileobj):
         encoding = headers[-1].get_all("content-transfer-encoding", ["7bit"])[0]
         encoding = encoding.lower()
@@ -95,12 +98,20 @@ class ShadowServerMail(imapbot.IMAPBot):
             idiokit.stop(result)
 
         for match in re.findall(self.url_rex, fileobj.read()):
-            self.log.info("Fetching URL {0!r}".format(match))
-            try:
-                info, fileobj = yield utils.fetch_url(match)
-            except utils.FetchUrlFailed as fail:
-                self.log.error("Fetching URL {0!r} failed ({1})".format(match, fail))
-                return
+            for try_num in xrange(max(self.retry_count, 0) + 1):
+                self.log.info("Fetching URL {0!r}".format(match))
+                try:
+                    info, fileobj = yield utils.fetch_url(match)
+                except utils.FetchUrlFailed as fail:
+                    if self.retry_count <= 0:
+                        self.log.error("Fetching URL {0!r} failed ({1}), giving up".format(match, fail))
+                        idiokit.stop(False)
+                    elif try_num == self.retry_count:
+                        self.log.error("Fetching URL {0!r} failed ({1}) after {2} retries, giving up".format(match, fail, self.retry_count))
+                        idiokit.stop(False)
+                    else:
+                        self.log.error("Fetching URL {0!r} failed ({1}), retrying in {2:.02f} seconds".format(match, fail, self.retry_interval))
+                        yield idiokit.sleep(self.retry_interval)
 
             filename = info.get_filename(None)
             if filename is None:
