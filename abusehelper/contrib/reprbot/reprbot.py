@@ -8,7 +8,7 @@ version exists now permanently under abusehelper.bots package.
 
 abusehelper.contrib package will be removed after 2016-01-01.
 During the migration period, you can already update your 
-references the bot.
+references to the bot.
 """
 
 
