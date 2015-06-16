@@ -2,7 +2,7 @@ import idiokit
 from idiokit import xmlcore, xmpp
 from idiokit.xmpp import jid
 from abusehelper.core import events, bot
-from abusehelper.contrib.experts import combiner
+from abusehelper.bots.experts import combiner
 
 """
 Important notice:
