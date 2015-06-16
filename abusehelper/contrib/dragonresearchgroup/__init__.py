@@ -15,5 +15,5 @@ references the bot.
 class DragonBot(dragonresearchgroup.DragonBot):
     
     def __init__(self, *args, **keys):
+        dragonresearchgroup.DragonBot.__init__(self, *args, **keys)
         self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
-        dragonresearchgroup.DragonBot.__init__(self, *args, **keys)    
