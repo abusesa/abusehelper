@@ -7,7 +7,7 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 import urlparse
 from abusehelper.core import bot
 
-from . import host_or_ip, split_description, AbuseCHFeedBot
+from abusehelper.bots.abusech import host_or_ip, split_description, AbuseCHFeedBot
 
 
 class PalevoCcBot(AbuseCHFeedBot):

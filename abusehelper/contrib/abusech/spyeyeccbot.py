@@ -7,7 +7,7 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 import re
 from abusehelper.core import bot
 
-from . import host_or_ip, split_description, resolve_level, AbuseCHFeedBot
+from abusehelper.bots.abusech import host_or_ip, split_description, resolve_level, AbuseCHFeedBot
 
 
 class SpyEyeCcBot(AbuseCHFeedBot):
