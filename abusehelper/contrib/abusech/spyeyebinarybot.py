@@ -6,7 +6,8 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 
 from abusehelper.core import bot
 
-from abusehelper.bots.abusech import sanitize_url, host_or_ip_from_url, split_description, AbuseCHFeedBot
+from . import AbuseCHFeedBot
+from abusehelper.bots.abusech import sanitize_url, host_or_ip_from_url, split_description
 
 
 class SpyEyeBinaryBot(AbuseCHFeedBot):

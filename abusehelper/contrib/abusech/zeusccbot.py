@@ -7,7 +7,8 @@ Maintainer: Lari Huttunen <mit-code@huttu.net>
 import re
 from abusehelper.core import bot
 
-from abusehelper.bots.abusech import host_or_ip, resolve_level, split_description, AbuseCHFeedBot
+from . import AbuseCHFeedBot
+from abusehelper.bots.abusech import host_or_ip, resolve_level, split_description
 
 
 class ZeusCcBot(AbuseCHFeedBot):
