@@ -362,6 +362,48 @@ class Event(object):
 
         return values
 
+    def pop(self, key=_UNDEFINED, parser=None, filter=None):
+        """Pop value(s) of a key and clear them.
+        >>> event = Event()
+        >>> event.add("key", "y", "x", "1.2.3.4")
+        >>> sorted(event.pop("key"))
+        [u'1.2.3.4', u'x', u'y']
+
+        Perform parsing, validation and filtering by passing in
+        parsing and filtering functions. Only values that match
+        are cleared from the event. Values that do not match
+        are preserved.
+
+        >>> import socket
+        >>> def ipv4(string):
+        ...     try:
+        ...         return unicode(socket.inet_ntoa(socket.inet_aton(string)))
+        ...     except socket.error:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "y", "x", "1.2.3.4")
+        >>> sorted(event.pop("key", parser=ipv4))
+        [u'1.2.3.4']
+        >>> sorted(event.values("key"))
+        [u'x', u'y']
+        """
+
+        if key is self._UNDEFINED:
+            raise KeyError("no value available")
+
+        key = _normalize(key)
+        if key not in self._attrs:
+            return
+
+        values = tuple(self._iter(key, parser, filter))
+        valueset = self._attrs[key]
+        valueset.difference_update(_normalize(value) for value in values)
+
+        if not valueset:
+            del self._attrs[key]
+
+        return values
+
     def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return a tuple of event values (for a specific key, if
         given).
