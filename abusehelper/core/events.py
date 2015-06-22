@@ -368,6 +368,8 @@ class Event(object):
         >>> event.add("key", "y", "x", "1.2.3.4")
         >>> sorted(event.pop("key"))
         [u'1.2.3.4', u'x', u'y']
+        >>> event.contains("key")
+        False
 
         Perform parsing, validation and filtering by passing in
         parsing and filtering functions. Only values that match
