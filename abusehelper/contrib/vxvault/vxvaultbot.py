@@ -27,7 +27,7 @@ def i_am_a_name(string):
 def parseURL(line):
     parsed = urlparse.urlparse(line)
     if parsed.scheme and parsed.netloc:
-        return line, parsed.netloc
+        return line.strip(), parsed.netloc
     else:
         return None, None
 
