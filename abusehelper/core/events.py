@@ -391,7 +391,6 @@ class Event(object):
 
         key = _normalize(key)
         values = tuple(self._attrs.get(key, ()))
-        parsed = None
 
         if parser is not None:
             parsed = ((parser(x), x) for x in values)
