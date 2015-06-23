@@ -362,7 +362,7 @@ class Event(object):
 
         return values
 
-    def pop(self, key=_UNDEFINED, parser=None, filter=None):
+    def pop(self, key, parser=None, filter=None):
         """Pop value(s) of a key and clear them.
         >>> event = Event()
         >>> event.add("key", "y", "x", "1.2.3.4")
@@ -388,23 +388,41 @@ class Event(object):
         [u'1.2.3.4']
         >>> sorted(event.values("key"))
         [u'x', u'y']
+
+        >>> def int_parse(string):
+        ...     try:
+        ...         return int(string)
+        ...     except ValueError:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "1", "a")
+        >>> sorted(event.pop("key", parser=int_parse))
+        [1]
+        >>> sorted(event.values("key"))
+        [u'a']
         """
 
-        if key is self._UNDEFINED:
-            raise KeyError("no value available")
-
         key = _normalize(key)
-        if key not in self._attrs:
-            return
+        values = tuple(self._attrs.get(key, ()))
+        parsed = None
 
-        values = tuple(self._iter(key, parser, filter))
-        valueset = self._attrs[key]
-        valueset.difference_update(_normalize(value) for value in values)
+        if parser is not None:
+            parsed = ((parser(x), x) for x in values)
+        else:
+            parsed = ((x, x) for x in values)
+            
+        if filter is not None:
+            filtered = ((x, y) for (x, y) in parsed if filter(x))
+        else:
+            filtered = ((x, y) for (x, y) in parsed if x is not None)
+            
+        results = []
 
-        if not valueset:
-            del self._attrs[key]
+        for x, y in filtered:
+            self.discard(key, y)
+            results.append(x)
 
-        return values
+        return tuple(results)
 
     def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return a tuple of event values (for a specific key, if
