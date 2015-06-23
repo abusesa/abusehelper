@@ -376,19 +376,6 @@ class Event(object):
         are cleared from the event. Values that do not match
         are preserved.
 
-        >>> import socket
-        >>> def ipv4(string):
-        ...     try:
-        ...         return unicode(socket.inet_ntoa(socket.inet_aton(string)))
-        ...     except socket.error:
-        ...         return None
-        >>> event = Event()
-        >>> event.add("key", "y", "x", "1.2.3.4")
-        >>> sorted(event.pop("key", parser=ipv4))
-        [u'1.2.3.4']
-        >>> sorted(event.values("key"))
-        [u'x', u'y']
-
         >>> def int_parse(string):
         ...     try:
         ...         return int(string)
