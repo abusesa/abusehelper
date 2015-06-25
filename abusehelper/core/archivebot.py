@@ -85,13 +85,13 @@ class ArchiveBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         super(ArchiveBot, self).__init__(*args, **keys)
 
-        self.rooms = taskfarm.TaskFarm(self.handle_room)
+        self.rooms = taskfarm.TaskFarm(self.handle_room, grace_period=0.0)
         self.archive_dir = ensure_dir(self.archive_dir)
 
     @idiokit.stream
     def handle_room(self, name):
         msg = "room {0!r}".format(name)
-        attrs = events.Event(type="room", service=self.bot_name, room=name)
+        attrs = events.Event(type="room", service=self.bot_name, room=unicode(name))
 
         with self.log.stateful(repr(self.xmpp.jid), "room", repr(name)) as log:
             log.open("Joining " + msg, attrs, status="joining")
@@ -106,7 +106,8 @@ class ArchiveBot(bot.ServiceBot):
 
     @idiokit.stream
     def session(self, state, src_room):
-        yield self.rooms.inc(src_room)
+        src_jid = yield self.xmpp.muc.get_full_room_jid(src_room)
+        yield self.rooms.inc(src_jid.bare())
 
     def collect(self, room_name):
         collect = self._collect(room_name)
