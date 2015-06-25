@@ -67,7 +67,9 @@ class CleanMXBot(bot.PollingBot):
                 "time": "source time",
                 "id": "cleanmx id",
                 "phishtank": "phishtank id",
-                "line": None
+                "line": None,
+                "firsttime": "first seen",
+                "lasttime": "last seen"
             }
 
             new = events.Event()
