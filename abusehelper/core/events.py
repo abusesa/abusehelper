@@ -362,6 +362,54 @@ class Event(object):
 
         return values
 
+    def pop(self, key, parser=None, filter=None):
+        """Pop value(s) of a key and clear them.
+        >>> event = Event()
+        >>> event.add("key", "y", "x", "1.2.3.4")
+        >>> sorted(event.pop("key"))
+        [u'1.2.3.4', u'x', u'y']
+        >>> event.contains("key")
+        False
+
+        Perform parsing, validation and filtering by passing in
+        parsing and filtering functions. Only values that match
+        are cleared from the event. Values that do not match
+        are preserved.
+
+        >>> def int_parse(string):
+        ...     try:
+        ...         return int(string)
+        ...     except ValueError:
+        ...         return None
+        >>> event = Event()
+        >>> event.add("key", "1", "a")
+        >>> sorted(event.pop("key", parser=int_parse))
+        [1]
+        >>> sorted(event.values("key"))
+        [u'a']
+        """
+
+        key = _normalize(key)
+        values = tuple(self._attrs.get(key, ()))
+
+        if parser is not None:
+            parsed = ((parser(x), x) for x in values)
+        else:
+            parsed = ((x, x) for x in values)
+            
+        if filter is not None:
+            filtered = ((x, y) for (x, y) in parsed if filter(x))
+        else:
+            filtered = ((x, y) for (x, y) in parsed if x is not None)
+            
+        results = []
+
+        for x, y in filtered:
+            self.discard(key, y)
+            results.append(x)
+
+        return tuple(results)
+
     def values(self, key=_UNDEFINED, parser=None, filter=None):
         """Return a tuple of event values (for a specific key, if
         given).
