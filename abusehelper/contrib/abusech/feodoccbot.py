@@ -4,8 +4,9 @@ abuse.ch Feodo RSS feed bot.
 Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 
-from abusehelper.core import bot
+import re
 
+from abusehelper.core import bot
 from . import host_or_ip, split_description, AbuseCHFeedBot
 
 
@@ -14,9 +15,15 @@ class FeodoCcBot(AbuseCHFeedBot):
 
     feeds = bot.ListParam(default=["https://feodotracker.abuse.ch/feodotracker.rss"])
 
-    # The timestamp in the title appears to be the firstseen timestamp,
-    # skip including it as the "source time".
-    parse_title = None
+    def parse_title(self, title):
+        pieces = title.split(None, 1)
+
+        yield host_or_ip(pieces[0])
+
+        if len(pieces) > 1:
+            date = pieces[1]
+            date = re.sub("[()]", "", date)
+            yield "additional information", "first seen: " + date + "Z"
 
     def parse_description(self, description):
         got_version = False
