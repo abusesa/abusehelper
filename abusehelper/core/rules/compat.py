@@ -2,16 +2,14 @@ from __future__ import absolute_import
 
 from . import atoms
 from . import rules
-from . import classifier
 
 
-__all__ = ["AND", "OR", "NOT", "MATCH", "ANYTHING", "MATCHError", "NETBLOCK", "NETBLOCKError", "RuleClassifier"]
+__all__ = ["AND", "OR", "NOT", "MATCH", "ANYTHING", "MATCHError", "NETBLOCK", "NETBLOCKError"]
 
 
 AND = rules.And
 OR = rules.Or
 NOT = rules.No
-RuleClassifier = classifier.Classifier
 
 
 MATCHError = ValueError

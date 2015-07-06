@@ -3,12 +3,12 @@ from .rules import Rule, And, Or, No, Match, NonMatch, Fuzzy, Anything
 from .classifier import Classifier
 from .rulelang import rule, parse, format
 
-from .compat import AND, OR, NOT, MATCH, ANYTHING, MATCHError, NETBLOCK, NETBLOCKError, RuleClassifier
+from .compat import AND, OR, NOT, MATCH, ANYTHING, MATCHError, NETBLOCK, NETBLOCKError
 
 __all__ = [
     "String", "RegExp", "IP",
     "Rule", "And", "Or", "No", "Match", "NonMatch", "Fuzzy", "Anything",
     "Classifier",
     "rule", "parse", "format",
-    "AND", "OR", "NOT", "MATCH", "ANYTHING", "MATCHError", "NETBLOCK", "NETBLOCKError", "RuleClassifier"
+    "AND", "OR", "NOT", "MATCH", "ANYTHING", "MATCHError", "NETBLOCK", "NETBLOCKError"
 ]
