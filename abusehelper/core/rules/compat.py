@@ -4,19 +4,14 @@ from . import atoms
 from . import rules
 
 
-__all__ = ["AND", "OR", "NOT", "MATCH", "ANYTHING", "MATCHError", "NETBLOCK", "NETBLOCKError"]
+__all__ = ["AND", "OR", "NOT", "MATCH", "ANYTHING", "NETBLOCK"]
 
 
 AND = rules.And
 OR = rules.Or
 NOT = rules.No
-
-
-MATCHError = ValueError
 MATCH = rules.Match
-
-
-NETBLOCKError = ValueError
+ANYTHING = rules.Anything
 
 
 def NETBLOCK(ip_or_range, bits_or_end=None, keys=None):
@@ -24,7 +19,3 @@ def NETBLOCK(ip_or_range, bits_or_end=None, keys=None):
     if keys:
         return rules.Or(*[rules.Match(x, atom) for x in set(keys)])
     return rules.Match(value=atom)
-
-
-def ANYTHING():
-    return rules.Anything()

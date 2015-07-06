@@ -2,7 +2,7 @@ import re
 import unittest
 from ...events import Event
 
-from ..compat import MATCHError, MATCH, AND, OR, NETBLOCK, ANYTHING
+from ..compat import MATCH, AND, OR, NETBLOCK, ANYTHING
 
 
 class TestANYTHING(unittest.TestCase):
@@ -14,7 +14,7 @@ class TestANYTHING(unittest.TestCase):
 
 class TestMATCH(unittest.TestCase):
     def test_init(self):
-        self.assertRaises(MATCHError, MATCH, "key", re.compile(".", re.L))
+        self.assertRaises(ValueError, MATCH, "key", re.compile(".", re.L))
 
     def test_match(self):
         rule = MATCH()
