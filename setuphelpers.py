@@ -7,12 +7,14 @@ from distutils.dir_util import remove_tree
 from distutils.util import convert_path
 from distutils.command.install import install as _install
 
+
 def rmtree(path):
     try:
         remove_tree(convert_path(path))
     except OSError, err:
         if err.errno != errno.ENOENT:
             raise
+
 
 def install_other(subdir):
     cwd = os.getcwd()
@@ -32,11 +34,13 @@ def install_other(subdir):
     finally:
         os.chdir(cwd)
 
+
 def setup(*args, **keys):
     keys = dict(keys)
     cmdclass = dict(keys.pop("cmdclass", dict()))
 
     install_base = cmdclass.get("install", _install)
+
     class install(install_base):
         def run(self):
             self.distribution.run_command("clean")
