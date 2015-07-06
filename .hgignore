@@ -2,4 +2,5 @@ syntax: glob
 
 build/
 *.pyc
+*.orig
 abusehelper/core/_version.py
