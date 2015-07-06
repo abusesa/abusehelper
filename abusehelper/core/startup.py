@@ -260,7 +260,8 @@ class StartupBot(bot.Bot):
         finally:
             self._poll()
             if self._processes:
-                info = ", ".join("%r[%d]" % (conf.name, process.pid)
+                info = ", ".join(
+                    "%r[%d]" % (conf.name, process.pid)
                     for (conf, (process, _)) in self._processes.iteritems())
                 self.log.info("%d bot(s) left alive: %s" % (len(self._processes), info))
 
@@ -293,6 +294,7 @@ class DefaultStartupBot(StartupBot):
                     continue
                 output.add(conf.with_workdir(workdir))
             yield idiokit.send(output)
+
 
 if __name__ == "__main__":
     DefaultStartupBot.from_command_line().execute()

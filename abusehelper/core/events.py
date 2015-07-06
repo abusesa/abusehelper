@@ -396,12 +396,12 @@ class Event(object):
             parsed = ((parser(x), x) for x in values)
         else:
             parsed = ((x, x) for x in values)
-            
+
         if filter is not None:
             filtered = ((x, y) for (x, y) in parsed if filter(x))
         else:
             filtered = ((x, y) for (x, y) in parsed if x is not None)
-            
+
         results = []
 
         for x, y in filtered:

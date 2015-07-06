@@ -8,13 +8,16 @@ try:
 except ImportError:
     VERSION = None
 
+
 def version():
     return VERSION
+
 
 def version_str():
     if version() is None:
         return "unknown"
     return version()
+
 
 def generate(base_path, version=None):
     if version is None:
@@ -26,6 +29,7 @@ def generate(base_path, version=None):
 
     global VERSION
     VERSION = version
+
 
 def _call(*args):
     try:
@@ -39,6 +43,7 @@ def _call(*args):
     if popen.returncode:
         return None
     return stdout.strip()
+
 
 def _parse_hg_archival(base_path):
     try:
@@ -55,6 +60,7 @@ def _parse_hg_archival(base_path):
         return data["node"].strip()[:12]
     return None
 
+
 def _generate_version_module(**keys):
     version_dir, _ = os.path.split(__file__)
 
@@ -65,6 +71,7 @@ def _generate_version_module(**keys):
             print >> module_file, ("%s = %r" % (key, value))
     finally:
         module_file.close()
+
 
 if __name__ == "__main__":
     print version_str()
