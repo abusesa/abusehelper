@@ -14,9 +14,9 @@ from abusehelper.contrib.opencollab.crypto import decrypt, DecryptionError
 TYPES = {"True":True, "true":True, "False":False, "false":False, "None":None,
          "none":None}
 
-TOKENS = {"AND":rules.AND, "OR":rules.OR, "NOT":rules.NOT,
-          "MATCH":rules.MATCH, "NETBLOCK":rules.NETBLOCK,
-          "ANYTHING":rules.ANYTHING}
+TOKENS = {"AND":rules.And, "OR":rules.Or, "NOT":rules.No,
+          "MATCH":rules.Match, "NETBLOCK":lambda x: rules.Match(value=rules.IP(x)),
+          "ANYTHING":rules.Anything}
 
 # Keys that are handled as a list in existing code should be lists
 LIST_KEYS = ['resolve', 'asns']
