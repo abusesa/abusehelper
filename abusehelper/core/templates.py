@@ -159,13 +159,13 @@ class Template(object):
 
         def format(self, name, *args):
             if name not in self.formatters:
-                raise TemplateError("unknown formatter " + repr(name))
+                raise TemplateError("unknown formatter {0!r}".format(name))
 
             formatter = self.formatters[name]
             try:
                 formatter.check(*args)
             except TemplateError as err:
-                raise TemplateError("invalid formatter " + repr(name) + ": " + err.message)
+                raise TemplateError("invalid formatter {0!r}: {1}".format(name, err))
             return u""
 
     class _Formatter(_Null):
@@ -187,7 +187,7 @@ class Template(object):
         except ValueError:
             raise TemplateError("invalid format")
         except TypeError as type_error:
-            raise TemplateError(type_error.message)
+            raise TemplateError(str(type_error))
 
         self.data % self._Checker(self.formatters)
 
