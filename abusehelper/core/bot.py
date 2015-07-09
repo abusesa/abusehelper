@@ -5,6 +5,7 @@ import csv
 import sys
 import inspect
 import logging
+import warnings
 import logging.handlers
 import optparse
 import traceback
@@ -287,13 +288,21 @@ class Bot(object):
         return log.EventLogger(logger)
 
     def execute(self):
-        try:
-            return self.run()
-        except SystemExit:
-            raise
-        except:
-            self.log.critical(traceback.format_exc())
-            sys.exit(1)
+        def showwarning(message, category, filename, fileno, file=None, line=None):
+            msg = warnings.formatwarning(message, category, filename, fileno, line)
+            self.log.warning(msg.strip())
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("always")
+            warnings.showwarning = showwarning
+
+            try:
+                return self.run()
+            except SystemExit:
+                raise
+            except:
+                self.log.critical(traceback.format_exc())
+                sys.exit(1)
 
     def run(self):
         pass
