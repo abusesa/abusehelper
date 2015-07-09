@@ -4,33 +4,14 @@ abuse.ch Feodo RSS feed bot.
 Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 
-from abusehelper.core import bot
-
-from . import AbuseCHFeedBot
-from abusehelper.bots.abusech import host_or_ip, split_description
+from abusehelper.bots.abusech import feodoccbot
 
 
-class FeodoCcBot(AbuseCHFeedBot):
-    feed_type = "c&c"
-
-    feeds = bot.ListParam(default=["https://feodotracker.abuse.ch/feodotracker.rss"])
-
-    # The timestamp in the title appears to be the firstseen timestamp,
-    # skip including it as the "source time".
-    parse_title = None
-
-    def parse_description(self, description):
-        got_version = False
-
-        for key, value in split_description(description):
-            if key == "version":
-                yield "malware", "feodo." + value.strip().lower()
-                got_version = True
-            elif key == "host":
-                yield host_or_ip(value)
-
-        if not got_version:
-            yield "malware", "feodo"
+class FeodoCcBot(feodoccbot.FeodoCcBot):
+    
+    def __init__(self, *args, **keys):
+        feodoccbot.FeodoCcBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
 
 
 if __name__ == "__main__":

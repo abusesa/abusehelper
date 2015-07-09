@@ -191,4 +191,3 @@ class Fuzzy(Rule):
     @classmethod
     def load(cls, dumped):
         return cls(dumped)
-

@@ -9,7 +9,7 @@ The contrib package in Abusehelper will be migrated under abusehelper.bots packa
 
 ## What do I need to do?
 
-All bots and modules abusehelper.contrib package will continue working until January 2016, but they will log deprecation warning to the logs. During this migration period, all references to abusehelper.contrib should be changed to point to abusehelper.bots package. Nothing else should be needed.
+All bots and modules abusehelper.contrib package will continue working until January 2016, but they will log deprecation errors to the logs. During this migration period, all references to abusehelper.contrib should be changed to point to abusehelper.bots package. Nothing else should be needed.
 
 Some of the bots have also migrated to the new Abusehelper community repository in: [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity)
 

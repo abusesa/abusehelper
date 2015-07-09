@@ -6,7 +6,7 @@ from . import atoms
 from . import rules
 from . import iprange
 
-from .parsing import *
+from .parsing import parser_singleton, transform, seq, txt, epsilon, forward_ref, union, maybe, step, step_default
 
 
 class Formatter(object):
@@ -133,7 +133,7 @@ def regexp_parser(data, rex=re.compile(r'/((?:\\.|[^\\/])*)/(i)?')):
 
 
 @formatter.handler(rules.Anything)
-def format_fuzzy(format, anything):
+def format_anything(format, anything):
     yield "*"
 
 

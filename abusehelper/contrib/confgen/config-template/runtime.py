@@ -1,6 +1,3 @@
-import re
-
-from abusehelper.core import rules
 from abusehelper.core.runtime import Session
 
 from startup import service_room as room_prefix
@@ -65,14 +62,6 @@ def configs():
 
     # Customer definitions
 
-    yield customer("everything-to-mail-at-8-o-clock",
-        rules.ANYTHING(),
-        mail(to="someone@example.com", times=["08:00"]))
-
-    yield customer("asn3-or-netblock",
-        rules.OR(
-            rules.MATCH("asn", "3"),
-            rules.NETBLOCK("127.0.0.1", 16)))
-
-    yield customer("fi-urls",
-        rules.MATCH("url", re.compile(r"^http(s)?://[\w\.]+\.fi(\W|$)", re.U | re.I)))
+    yield customer("everything-to-mail-at-8-o-clock", "*", mail(to="someone@example.com", times=["08:00"]))
+    yield customer("asn3-or-netblock", "asn=3 or 127.0.0.1/16")
+    yield customer("fi-urls", r"url=/^https?:\/\/[\w\.]+\.fi(\W|$)/i")

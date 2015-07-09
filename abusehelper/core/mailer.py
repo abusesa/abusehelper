@@ -115,7 +115,7 @@ class ReportBot(bot.ServiceBot):
 
                 self._current = args, keys
                 try:
-                    result = yield self.report(*args, **keys)
+                    yield self.report(*args, **keys)
                 except:
                     self.queue(0.0, *args, **keys)
                     raise
@@ -398,10 +398,12 @@ class MailerService(ReportBot):
         sent = False
 
         if not to_addrs:
-            self.log.info(u"Skipped message \"{0}\" (no recipients)".format(subject),
+            self.log.info(
+                u"Skipped message \"{0}\" (no recipients)".format(subject),
                 event=event.union(status="skipped (no recipients)"))
         elif not eventlist:
-            self.log.info(u"Skipped message \"{0}\" to {1} (no events)".format(subject, join_addresses(to_addrs)),
+            self.log.info(
+                u"Skipped message \"{0}\" to {1} (no events)".format(subject, join_addresses(to_addrs)),
                 event=event.union(status="skipped (no events)"))
         else:
             server = yield self._connect(self.smtp_host, self.smtp_port)
@@ -422,12 +424,13 @@ class MailerService(ReportBot):
                     self.log.error(u"Could not send message to {0}: {1!r}".format(join_addresses(to_addrs), exc))
                     if retries >= 1:
                         self.log.info(u"Retrying sending in 60 seconds")
-                        self.requeue(60.0, retries=retries-1)
+                        self.requeue(60.0, retries=retries - 1)
                     else:
                         self.log.error(u"Failed all retries, dropping the mail from the queue")
                 else:
                     sent = True
-                    self.log.info(u"Sent message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)),
+                    self.log.info(
+                        u"Sent message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)),
                         event=event.union(status="sent"))
             finally:
                 yield idiokit.thread(server.quit)

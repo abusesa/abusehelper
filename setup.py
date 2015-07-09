@@ -2,6 +2,7 @@ import os
 import imp
 from setuphelpers import setup, install_other
 
+
 def generate_version():
     base_path, _ = os.path.split(__file__)
     module_path = os.path.join(base_path, "abusehelper", "core")
@@ -13,6 +14,7 @@ def generate_version():
     return version_module.version_str()
 version = generate_version()
 
+
 def is_package(path):
     try:
         imp.find_module(".", [path])
@@ -20,10 +22,12 @@ def is_package(path):
         return False
     return True
 
+
 def collect_package(package, path=None):
     if path is None:
         path = os.path.join(*package.split("."))
     return _collect_package(package, path)
+
 
 def _collect_package(package, path):
     if not is_package(path):
@@ -35,6 +39,7 @@ def _collect_package(package, path):
         sub = os.path.join(path, name)
         for result in collect_package(package + "." + name, sub):
             yield result
+
 
 def collect_package_data(src, dst):
     paths = list()
