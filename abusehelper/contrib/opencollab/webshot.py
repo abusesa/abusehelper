@@ -4,7 +4,14 @@ resulting screenshot, server headers and HAR file of the grab to wiki.
 
 Tested with PhantomJS 1.6.2.
 
-Maintainer: "Juhani Eronen" <exec@iki.fi>
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
 """
 import os
 import socket
@@ -37,6 +44,10 @@ class WebshotExpert(Expert):
 
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
+
+        # log a notification about the abusehelper.contrib migration
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
+
         self.cache = dict()
 
         self.collab = GraphingWiki(self.collab_url,

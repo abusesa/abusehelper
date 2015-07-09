@@ -1,30 +1,21 @@
-import idiokit
-import combiner
-from abusehelper.core import events, cymruwhois
+from abusehelper.bots.experts import cymruexpert
 
-class CymruWhoisExpert(combiner.Expert):
-    def augment_keys(self, keys=["ip"], **_):
-        for key in keys:
-            if isinstance(key, basestring):
-                prefix = ""
-            else:
-                key, prefix = key
-            yield key, prefix
+"""
+Important notice:
 
-    @idiokit.stream
-    def augment(self, ip_key, prefix):
-        while True:
-            eid, event = yield idiokit.next()
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
 
-            for ip in event.values(ip_key):
-                items = yield cymruwhois.lookup(ip)
-                if not items:
-                    continue
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
 
-                augmentation = events.Event()
-                for key, value in items:
-                    augmentation.add(prefix + key, value)
-                yield idiokit.send(eid, augmentation)
+class CymruWhoisExpert(cymruexpert.CymruWhoisExpert):
+    def __init__(self, *args, **keys):
+        cymruexpert.CymruWhoisExpert.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
+
 
 if __name__ == "__main__":
     CymruWhoisExpert.from_command_line().execute()

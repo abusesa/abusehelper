@@ -1,20 +1,21 @@
-import idiokit
-from abusehelper.core import events
-from combiner import Expert
+from abusehelper.bots.experts import dummyexpert
 
-class DummyExpert(Expert):
-    @idiokit.stream
-    def augment(self):
-        counter = 0
-        
-        while True:
-            eid, event = yield idiokit.next()
+"""
+Important notice:
 
-            augment = events.Event()
-            augment.add("dummy counter", unicode(counter))
-            counter += 1
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
 
-            yield idiokit.send(eid, augment)
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
+
+class DummyExpert(dummyexpert.DummyExpert):
+    
+    def __init__(self, *args, **keys):
+        dummyexpert.DummyExpert.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
 
 if __name__ == "__main__":
     DummyExpert.from_command_line().execute()

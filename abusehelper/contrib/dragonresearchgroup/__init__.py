@@ -1,38 +1,19 @@
+from abusehelper.bots import dragonresearchgroup
+
 """
-Base for dragon research group bot
+Important notice:
 
-Maintainer: Codenomicon <clarified@codenomicon.com>
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references the bot.
 """
 
-import idiokit
-from abusehelper.core import utils, cymruwhois, bot
 
-
-class DragonBot(bot.PollingBot):
-    url = bot.Param()
-    use_cymru_whois = bot.BoolParam()
-
-    # The first column values (ASN and AS name) are ignored.
-    COLUMNS = [None, None, "ip", "time", "category"]
-
-    def poll(self):
-        if self.use_cymru_whois:
-            return self._poll() | cymruwhois.augment("ip")
-        return self._poll()
-
-    @idiokit.stream
-    def _poll(self):
-        self.log.info("Downloading %s" % self.url)
-        try:
-            info, fileobj = yield utils.fetch_url(self.url)
-        except utils.FetchUrlFailed, fuf:
-            self.log.error("Download failed: %r", fuf)
-            return
-        self.log.info("Downloaded")
-
-        charset = info.get_param("charset")
-        filtered = (x for x in fileobj if x.strip() and not x.startswith("#"))
-        yield utils.csv_to_events(filtered,
-                                  delimiter="|",
-                                  columns=self.COLUMNS,
-                                  charset=charset)
+class DragonBot(dragonresearchgroup.DragonBot):
+    
+    def __init__(self, *args, **keys):
+        dragonresearchgroup.DragonBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")

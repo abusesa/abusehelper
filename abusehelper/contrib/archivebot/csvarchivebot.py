@@ -1,39 +1,22 @@
-import csv
-from abusehelper.core import bot, archivebot
+from abusehelper.bots.archivebot import csvarchivebot
 
-class CSVArchiveBot(archivebot.ArchiveBot):
-    csv_columns = bot.ListParam()
+"""
+Important notice:
 
-    def archive_path(self, *args, **keys):
-        path = archivebot.ArchiveBot.archive_path(self, *args, **keys)
-        path += ".csv"
-        return path
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
 
-    def archive_open(self, archive_path):
-        archive = open(archive_path, "ab")
-        try:
-            csvfile = csv.writer(archive)
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references the bot.
+"""
 
-            if archive.tell() == 0:
-                csvfile.writerow([x.encode("utf-8") for x in self.csv_columns])
-        except:
-            archive.close()
-            raise
 
-        return archive, csvfile
-
-    def archive_write(self, (_, csvfile), timestamp, room_name, event):
-        row = list()
-        for column in self.csv_columns:
-            value = event.value(column, u"").encode("utf-8")
-            row.append(value)
-        csvfile.writerow(row)
-
-    def archive_flush(self, (archive, _)):
-        archive.flush()
-
-    def archive_close(self, (archive, _)):
-        archive.close()
+class CSVArchiveBot(csvarchivebot.CSVArchiveBot):
+    
+    def __init__(self, *args, **keys):
+        csvarchivebot.CSVArchiveBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
 
 if __name__ == "__main__":
     CSVArchiveBot.from_command_line().execute()

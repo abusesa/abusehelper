@@ -4,28 +4,14 @@ SpyEye binary RSS feed bot.
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
 
-from abusehelper.core import bot
-
-from . import sanitize_url, host_or_ip_from_url, split_description, AbuseCHFeedBot
+from abusehelper.bots.abusech import spyeyebinarybot
 
 
-class SpyEyeBinaryBot(AbuseCHFeedBot):
-    feed_malware = "spyeye"
-    feed_type = "malware"
-
-    feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=binaryurls"])
-
-    def parse_description(self, description):
-        for key, value in split_description(description):
-            if key == "spyeye binaryurl":
-                yield "url", sanitize_url(value)
-                yield host_or_ip_from_url(value)
-            elif key == "virustotal" and value.lower() != "n/a":
-                yield "virustotal", value
-            elif key == "status":
-                yield "status", value
-            elif key == "md5 hash":
-                yield "md5", value
+class SpyEyeBinaryBot(spyeyebinarybot.SpyEyeBinaryBot):
+    
+    def __init__(self, *args, **keys):
+        spyeyebinarybot.SpyEyeBinaryBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
 
 if __name__ == "__main__":
     SpyEyeBinaryBot.from_command_line().execute()

@@ -8,16 +8,17 @@ import subprocess
 from binascii import hexlify
 from random import SystemRandom
 from base64 import b64decode, b64encode
-
+from abusehelper.contrib.opencollab import log_deprecation
 
 random = SystemRandom()
 
-
 def gen_salt(length):
+    log_deprecation("opencollab.crypto")
     return "".join(chr(random.randint(0, 255)) for _ in xrange(length))
 
 
 def pbkdf2(key, salt, hash_func=hashlib.sha256, iterations=4096, length=32):
+    log_deprecation("opencollab.crypto")
     prf = _get_prf(hash_func)
 
     block_length = len(prf("", ""))
@@ -67,6 +68,7 @@ def _aes256(key, iv, data, encrypt=True):
 
 
 def crypt(data, password, iterations=4096):
+    log_deprecation("opencollab.crypto")
     key_length = 32
 
     enc_salt = gen_salt(key_length)
@@ -118,6 +120,7 @@ def _validate(data, validator):
 
 
 def decrypt(data, password):
+    log_deprecation("opencollab.crypto")
     try:
         data = json.loads(data)
     except ValueError:
@@ -157,6 +160,8 @@ def decrypt(data, password):
 
 
 if __name__ == "__main__":
+    log_deprecation("opencollab.crypto")
+
     import getpass
     from optparse import OptionParser
 

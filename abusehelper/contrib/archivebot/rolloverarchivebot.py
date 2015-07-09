@@ -1,34 +1,22 @@
-import time
-import calendar
+from abusehelper.bots.archivebot import rolloverarchivebot
 
-from abusehelper.core import bot, archivebot
+"""
+Important notice:
 
-def current_timestamp(timestamp, period):
-    time_list = list(time.gmtime())
-    period = period.lower()
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
 
-    if period == "day":
-        time_list[3:] = [0] * 6
-    elif period == "month":
-        time_list[2:] = [1] + [0] * 6
-    elif period == "week":
-        time_list[2] -= time_list[6]
-        time_list[3:] = [0] * 6
-    elif period == "year":
-        time_list[1:] = [1, 1] + [0] * 6
-    else:
-        return None
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references the bot.
+"""
 
-    return time.gmtime(calendar.timegm(time_list))
 
-class RollOverArchiveBot(archivebot.ArchiveBot):
-    rollover = bot.Param("period for doing archive file rollover " +
-                         "(day, week, month or year)")
-
-    def archive_path(self, timestamp, room_name, event):
-        path = archivebot.ArchiveBot.archive_path(self, timestamp, room_name, event)
-        path += "." + time.strftime("%Y%m%d", current_timestamp(timestamp, self.rollover))
-        return path
+class RollOverArchiveBot(rolloverarchivebot.RollOverArchiveBot):
+    
+    def __init__(self, *args, **keys):
+        rolloverarchivebot.RollOverArchiveBot.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
 
 if __name__ == "__main__":
     RollOverArchiveBot.from_command_line().execute()

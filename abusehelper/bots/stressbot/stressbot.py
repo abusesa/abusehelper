@@ -1,3 +1,10 @@
+"""
+Bot for testing XMPP server robustness. Sends rapidly as many events
+to a channel as possible.
+
+Maintainer: Codenomicon <clarified@codenomicon.com>
+"""
+
 import idiokit
 from abusehelper.core import bot, events
 

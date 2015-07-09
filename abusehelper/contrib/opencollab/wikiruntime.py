@@ -6,6 +6,17 @@ from abusehelper.core.runtime import RuntimeBot, Session
 
 from abusehelper.contrib.opencollab.wikistartup import WikiConfigInterface, rmlink, TYPES
 
+"""
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
+
 class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
     collab_url = bot.Param("Collab url")
     collab_user = bot.Param("Collab user")
@@ -22,6 +33,10 @@ class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
 
     def __init__(self, *args, **keys):
         super(RuntimeBot, self).__init__(*args, **keys)
+
+        # log a notification about the abusehelper.contrib migration
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
+
         self.collab = None
         self._metas = dict()
 

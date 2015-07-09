@@ -4,6 +4,16 @@ Ubuntu, it's the package python-paramiko), defaults to ssh-keyscan
 otherwise.
 
 Maintainer: "Juhani Eronen" <exec@iki.fi>
+
+
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
 """
 import socket
 
@@ -48,6 +58,11 @@ def _keyscan(hostname, port, keytype):
     return p.stdout.read()
 
 class SSHKeyScanExpert(Expert):
+
+    def __init__(self, *args, **keys):
+        Expert.__init__(self, *args, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
+
     def augment_keys(self, *args, **keys):
         yield (keys.get("resolve", ("ip",)))
 

@@ -11,6 +11,17 @@ from abusehelper.core import bot, rules
 from abusehelper.core.startup import Bot, StartupBot
 from abusehelper.contrib.opencollab.crypto import decrypt, DecryptionError
 
+"""
+Important notice:
+
+This module is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references.
+"""
+
 TYPES = {"True":True, "true":True, "False":False, "false":False, "None":None,
          "none":None}
 

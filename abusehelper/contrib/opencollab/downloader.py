@@ -1,9 +1,8 @@
 """
 Downloads files, follows up redirection chains and saves server
 headers and document contents to wiki.
-
-Maintainer: "Juhani Eronen" <exec@iki.fi>
 """
+
 import os
 import socket
 import idiokit
@@ -23,11 +22,14 @@ from opencollab.wiki import GraphingWiki
 from opencollab.wiki import WikiFailure
 from opencollab.util.file import uploadFile
 
+from abusehelper.contrib.opencollab import log_deprecation
+
 class RedirectLogger(urllib2.HTTPRedirectHandler):
     def __init__(self, *args, **kw):
         self.headers = dict()
         self.redirect_chain = dict()
         self.previous = str()
+        log_deprecation("opencollab.downloader")
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         path = req.get_host() + req.get_selector()
@@ -91,6 +93,9 @@ class DownloadExpert(Expert):
 
     def __init__(self, *args, **keys):
         Expert.__init__(self, *args, **keys)
+
+        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
+
         self.cache = dict()
 
         self.collab = GraphingWiki(self.collab_url,

@@ -2,6 +2,16 @@
 IODEF formatter for event data. Assumes some specific keys in the events.
 
 Maintainer: Jussi Eronen <exec@iki.fi>
+
+
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
 """
 
 import time

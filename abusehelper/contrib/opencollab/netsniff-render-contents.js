@@ -5,39 +5,39 @@
 
 var BASE64_ENCODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 var BASE64_DECODE_CHARS = new Array(
-	      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63,
-	      52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1,
-	      -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
-	      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1,
-	      -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-	      41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1
-	      );
+          -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+          -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+          -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63,
+          52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1,
+          -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
+          15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1,
+          -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+          41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1
+          );
 
 function encode(str) {
     var out = "", i = 0, len = str.length, c1, c2, c3;
     while (i < len) {
-	c1 = str.charCodeAt(i++) & 0xff;
-	if (i === len) {
-	    out += BASE64_ENCODE_CHARS.charAt(c1 >> 2);
-	    out += BASE64_ENCODE_CHARS.charAt((c1 & 0x3) << 4);
-	    out += "==";
-	    break;
-	}
-	c2 = str.charCodeAt(i++);
-	if (i === len) {
-	    out += BASE64_ENCODE_CHARS.charAt(c1 >> 2);
-	    out += BASE64_ENCODE_CHARS.charAt(((c1 & 0x3)<< 4) | ((c2 & 0xF0) >> 4));
-	    out += BASE64_ENCODE_CHARS.charAt((c2 & 0xF) << 2);
-	    out += "=";
-	    break;
-	}
-	c3 = str.charCodeAt(i++);
-	out += BASE64_ENCODE_CHARS.charAt(c1 >> 2);
-	out += BASE64_ENCODE_CHARS.charAt(((c1 & 0x3) << 4) | ((c2 & 0xF0) >> 4));
-	out += BASE64_ENCODE_CHARS.charAt(((c2 & 0xF) << 2) | ((c3 & 0xC0) >> 6));
-	out += BASE64_ENCODE_CHARS.charAt(c3 & 0x3F);
+    c1 = str.charCodeAt(i++) & 0xff;
+    if (i === len) {
+        out += BASE64_ENCODE_CHARS.charAt(c1 >> 2);
+        out += BASE64_ENCODE_CHARS.charAt((c1 & 0x3) << 4);
+        out += "==";
+        break;
+    }
+    c2 = str.charCodeAt(i++);
+    if (i === len) {
+        out += BASE64_ENCODE_CHARS.charAt(c1 >> 2);
+        out += BASE64_ENCODE_CHARS.charAt(((c1 & 0x3)<< 4) | ((c2 & 0xF0) >> 4));
+        out += BASE64_ENCODE_CHARS.charAt((c2 & 0xF) << 2);
+        out += "=";
+        break;
+    }
+    c3 = str.charCodeAt(i++);
+    out += BASE64_ENCODE_CHARS.charAt(c1 >> 2);
+    out += BASE64_ENCODE_CHARS.charAt(((c1 & 0x3) << 4) | ((c2 & 0xF0) >> 4));
+    out += BASE64_ENCODE_CHARS.charAt(((c2 & 0xF) << 2) | ((c3 & 0xC0) >> 6));
+    out += BASE64_ENCODE_CHARS.charAt(c3 & 0x3F);
     }
     return out;
 };
@@ -146,21 +146,21 @@ var casper = require("casper").create({
     },
     onResourceReceived: function(self, resource) {
         if (resource.stage === 'start') {
-	    resources[resource["id"]].startReply = resource;
+        resources[resource["id"]].startReply = resource;
         }
         if (resource.stage === 'end') {
-	    resources[resource["id"]].endReply = resource;
+        resources[resource["id"]].endReply = resource;
         }
-	if(!(resource["url"] in seen)) {
-	    out += resource["url"] + "\n";
-	    this.log("Downloading " + resource["url"], "verbose");
-	    data = this.base64encode(resource["url"]);
-	    if(!data) {
-		data = encode(this.getPageContent());
-	    }
-	    out += data + "\n\n";
-	    seen[resource["url"]] = 1;
-	}
+    if(!(resource["url"] in seen)) {
+        out += resource["url"] + "\n";
+        this.log("Downloading " + resource["url"], "verbose");
+        data = this.base64encode(resource["url"]);
+        if(!data) {
+        data = encode(this.getPageContent());
+        }
+        out += data + "\n\n";
+        seen[resource["url"]] = 1;
+    }
     },
     viewportSize: {
         width: 1024,
@@ -186,7 +186,7 @@ casper.start(url).run(function() {
     this.startTime = new Date();
     this.page.settings.localToRemoteUrlAccessEnabled = true;
     if(useragent) {
-	this.page.settings.userAgent = useragent;
+    this.page.settings.userAgent = useragent;
     }
 
     this.har = "";
@@ -194,7 +194,7 @@ casper.start(url).run(function() {
     this.page.render(picture);
      
     this.har = createHAR(this.page, this.getCurrentUrl(), this.getTitle(),
-			 this.startTime, resources);
+             this.startTime, resources);
     console.log(JSON.stringify(this.har, undefined, 4));
     fs.write(output, out, "w");
     this.exit();

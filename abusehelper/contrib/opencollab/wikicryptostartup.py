@@ -7,6 +7,17 @@ from abusehelper.core import bot, config
 from abusehelper.contrib.opencollab.crypto import decrypt, DecryptionError
 from abusehelper.contrib.opencollab.wikistartup import WikiStartupBot
 
+"""
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version exists now permanently under abusehelper.bots package. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
+
 def redirected(func, *args, **keys):
     oldStdout = sys.stdout
     sys.stdout = sys.stderr

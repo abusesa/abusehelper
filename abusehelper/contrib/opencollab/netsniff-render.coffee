@@ -2,6 +2,7 @@
 # PhantomJS examples.
 # Maintainer: "Juhani Eronen" <exec@iki.fi>
 
+
 if not Date::toISOString
     Date::toISOString = ->
         pad = (n) ->

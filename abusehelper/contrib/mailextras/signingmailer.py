@@ -19,6 +19,18 @@ from abusehelper.core import mailer, templates, bot
 
 from iodef import XMLFormatter
 
+"""
+Important notice:
+
+This bot is deprecated and will not be maintained. Maintained
+version will be moved under ahcommunity repository. 
+
+abusehelper.contrib package will be removed after 2016-01-01.
+During the migration period, you can already update your 
+references to the bot.
+"""
+
+
 def get_valid_keys(ctx, patterns=[], sign=0):
     keys = []
     for pattern in patterns:
@@ -115,6 +127,7 @@ class Mailer(mailer.MailerService):
 
     def __init__(self, **keys):
         mailer.MailerService.__init__(self, **keys)
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
         with tempfile.NamedTemporaryFile(dir=self.sent_dir):
             pass
