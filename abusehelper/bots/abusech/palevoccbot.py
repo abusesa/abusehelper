@@ -25,12 +25,7 @@ class PalevoCcBot(AbuseCHFeedBot):
         yield "description url", link
 
     def parse_title(self, title):
-        pieces = title.split(None, 1)
-
-        yield host_or_ip(pieces[0])
-
-        if len(pieces) > 1:
-            yield "source time", pieces[1]
+        yield host_or_ip(title.split()[0])
 
     def parse_description(self, description):
         for key, value in split_description(description):
