@@ -10,10 +10,10 @@ from abusehelper.contrib.opencollab.wikistartup import WikiConfigInterface, rmli
 Important notice:
 
 This bot is deprecated and will not be maintained. Maintained
-version exists now permanently under abusehelper.bots package. 
+version will be moved under ahcommunity repository.
 
 abusehelper.contrib package will be removed after 2016-01-01.
-During the migration period, you can already update your 
+During the migration period, you can already update your
 references to the bot.
 """
 
@@ -35,7 +35,7 @@ class WikiRuntimeBot(WikiConfigInterface, RuntimeBot):
         super(RuntimeBot, self).__init__(*args, **keys)
 
         # log a notification about the abusehelper.contrib migration
-        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
         self.collab = None
         self._metas = dict()

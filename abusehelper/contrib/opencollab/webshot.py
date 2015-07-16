@@ -3,16 +3,19 @@ Uses PhantomJS to grab screenshots of web pages, and saves the
 resulting screenshot, server headers and HAR file of the grab to wiki.
 
 Tested with PhantomJS 1.6.2.
+"""
 
+"""
 Important notice:
 
 This bot is deprecated and will not be maintained. Maintained
-version exists now permanently under abusehelper.bots package. 
+version will be moved under ahcommunity repository.
 
 abusehelper.contrib package will be removed after 2016-01-01.
-During the migration period, you can already update your 
+During the migration period, you can already update your
 references to the bot.
 """
+
 import os
 import socket
 import idiokit
@@ -46,7 +49,7 @@ class WebshotExpert(Expert):
         Expert.__init__(self, *args, **keys)
 
         # log a notification about the abusehelper.contrib migration
-        self.log.error("This bot is deprecated. It will move permanently under abusehelper.bots package after 2016-01-01. Please update your references to the bot.")
+        self.log.error("This bot is deprecated. It will move permanently under ahcommunity repository after 2016-01-01. Please update your references to the bot.")
 
         self.cache = dict()
 

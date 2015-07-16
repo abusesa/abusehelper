@@ -11,10 +11,10 @@ from abusehelper.contrib.opencollab.wikistartup import WikiStartupBot
 Important notice:
 
 This bot is deprecated and will not be maintained. Maintained
-version exists now permanently under abusehelper.bots package. 
+version will be moved under ahcommunity repository.
 
 abusehelper.contrib package will be removed after 2016-01-01.
-During the migration period, you can already update your 
+During the migration period, you can already update your
 references to the bot.
 """
 
@@ -37,14 +37,14 @@ class CryptoStartupBot(WikiStartupBot):
             raise bot.ParamError("No such file: " + repr(self.cryptofile))
         try:
             value = file(self.cryptofile, 'rb').read()
-        except IOError: 
+        except IOError:
             raise bot.ParamError("Error reading file: " + repr(self.cryptofile))
 
         self.decrypt_password = redirected(getpass.getpass, "Password: ")
         try:
             data = decrypt(value, self.decrypt_password)
         except DecryptionError:
-            raise bot.ParamError("Decryption error in: " + 
+            raise bot.ParamError("Decryption error in: " +
                                  repr(self.cryptofile))
         try:
             jsondata = json.loads(data)
