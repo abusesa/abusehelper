@@ -1,6 +1,6 @@
 ## Example
 
-The following piece of code demonstrates how to create a custom expert bot that just adds the key-value pair **counter=*n*** to each event it encounters.
+The following piece of code demonstrates how to create a custom expert bot that just adds the key-value pair **counter=_n_** to each event it encounters.
 
     import idiokit
     from abusehelper.core import events
