@@ -13,21 +13,34 @@ All bots and modules abusehelper.contrib package will continue working until Jan
 
 Some of the bots have also migrated to the new Abusehelper community repository in: [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity)
 
-Following bots have been migrated to ahcommunity repository and will cease working if used from abusehelper.contrib.
+Following bots and modules have been migrated to ahcommunity repository and will cease working if used from abusehelper.contrib.
 
 * contrib.bgp-xmpp
 * contrib.bgp-xmpp.bgprankingbot
+* contrib.csv2xmpp.csv2xmpp
 * contrib.experts.bgpexpert
 * contrib.experts.bgpquaggaexpert
+* contrib.experts.expertsanitizer
 * contrib.experts.iscpdnsexpert
+* contrib.experts.iso3166expert
+* contrib.experts.observerexpert
 * contrib.experts.malwarehash
 * contrib.experts.rtexpert
 * contrib.experts.sshkeyscan
 * contrib.experts.url2domain
 * contrib.iplist
 * contrib.iplist.iplist
+* contrib.logcollector.logcollectorbot
+* contrib.malwareblacklist.malwareblacklistbot
 * contrib.mailextras
 * contrib.mailextras.iodef
 * contrib.mailextras.signingmailer
 * contrib.urllistmailbot
 * contrib.urllistmailbot.urllistmailbot
+* contrib.opencollab.crypto
+* contrib.opencollab.downloader
+* contrib.opencollab.virtualboxsandbox
+* contrib.opencollab.webshot
+* contrib.opencollab.wikicryptostartup
+* contrib.opencollab.wikiruntime
+* contrib.opencollab.wikistartup
