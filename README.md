@@ -24,6 +24,7 @@ Following bots and modules have been migrated to ahcommunity repository and will
 * contrib.experts.iso3166expert
 * contrib.experts.observerexpert
 * contrib.experts.malwarehash
+* contrib.experts.passivedns
 * contrib.experts.rtexpert
 * contrib.experts.sshkeyscan
 * contrib.experts.url2domain
