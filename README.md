@@ -20,7 +20,6 @@ Following bots and modules have been migrated to ahcommunity repository and will
 * contrib.csv2xmpp.csv2xmpp
 * contrib.experts.bgpexpert
 * contrib.experts.bgpquaggaexpert
-* contrib.experts.expertsanitizer
 * contrib.experts.iscpdnsexpert
 * contrib.experts.iso3166expert
 * contrib.experts.observerexpert
