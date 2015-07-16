@@ -1,8 +1,8 @@
 import socket
 import idiokit
-from abusehelper.core import bot, events
-from abusehelper.bots.experts.combiner import Expert
 from opencollab import wiki
+from ...core import bot, events
+from . import Expert
 
 
 class OpenCollabExpert(Expert):
@@ -105,6 +105,7 @@ class OpenCollabExpert(Expert):
 
             if augment.contains():
                 yield idiokit.send(eid, augment)
+
 
 if __name__ == "__main__":
     OpenCollabExpert.from_command_line().execute()

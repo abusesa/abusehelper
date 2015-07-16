@@ -10,10 +10,11 @@ Pygeoip can currently use only the IPv4 version of the DB.
 
 Maintainer: Lari Huttunen <mit-code@huttu.net>
 """
+
 import socket
 import idiokit
-from abusehelper.core import events, bot
-from abusehelper.bots.experts.combiner import Expert
+from ...core import events, bot
+from . import Expert
 
 
 def is_ipv4(ip):
@@ -56,10 +57,10 @@ def load_geodb(path, log=None):
             record = reader.record_by_addr(ip)
         except GeoIPError:
             return {}
- 
+
         if record is None:
             return {}
- 
+
         result = {}
         geoip_cc = record.get("country_code", None)
         if geoip_cc:

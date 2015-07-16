@@ -1,8 +1,9 @@
 import idiokit
-import combiner
-from abusehelper.core import events, cymruwhois
+from ...core import events, cymruwhois
+from . import Expert
 
-class CymruWhoisExpert(combiner.Expert):
+
+class CymruWhoisExpert(Expert):
     def augment_keys(self, keys=["ip"], **_):
         for key in keys:
             if isinstance(key, basestring):
@@ -25,6 +26,7 @@ class CymruWhoisExpert(combiner.Expert):
                 for key, value in items:
                     augmentation.add(prefix + key, value)
                 yield idiokit.send(eid, augmentation)
+
 
 if __name__ == "__main__":
     CymruWhoisExpert.from_command_line().execute()

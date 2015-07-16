@@ -25,10 +25,10 @@ Maintainer: "Juhani Eronen" <exec@iki.fi>
 Important notice:
 
 This bot is deprecated and will not be maintained. Maintained
-version will be moved under ahcommunity repository. 
+version will be moved under ahcommunity repository.
 
 abusehelper.contrib package will be removed after 2016-01-01.
-During the migration period, you can already update your 
+During the migration period, you can already update your
 references to the bot.
 """
 import os
@@ -39,7 +39,7 @@ import csv
 
 import idiokit
 
-from abusehelper.core import bot, events, utils
+from abusehelper.core import bot, events
 from abusehelper.contrib.experts.combiner import Expert
 
 
@@ -63,7 +63,7 @@ class BgpBaseExpert(Expert):
 
         ip_num, = struct.unpack("!I", socket.inet_aton(ip))
 
-        ip_start = ip_num & (((1 << 32) - 1) ^ 
+        ip_start = ip_num & (((1 << 32) - 1) ^
                              ((1 << (32-original_bits)) - 1))
         ip_end = ip_start + (1 << (32 - original_bits))
 
