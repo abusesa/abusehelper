@@ -68,10 +68,6 @@ setup(
     version="2." + version,
     packages=packages,
     package_dir=packages,
-    package_data={
-        "abusehelper.bots.confgen":
-            collect_package_data("abusehelper/bots/confgen", "config-template")
-    },
     scripts=[
         "scripts/botnet",
         "scripts/roomreader"
