@@ -41,22 +41,6 @@ def _collect_package(package, path):
             yield result
 
 
-def collect_package_data(src, dst):
-    paths = list()
-
-    cwd = os.getcwd()
-    try:
-        os.chdir(src)
-
-        for dirpath, dirnames, filenames in os.walk(dst):
-            for filename in filenames:
-                normalized = os.path.normpath(os.path.join(dirpath, filename))
-                paths.append(os.path.normpath(normalized))
-    finally:
-        os.chdir(cwd)
-
-    return paths
-
 install_other("idiokit")
 
 packages = dict()
