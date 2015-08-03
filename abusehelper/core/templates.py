@@ -10,6 +10,7 @@ from email.mime.base import MIMEBase
 from email.encoders import encode_base64
 
 from .utils import force_decode
+from . import events
 
 
 class TemplateError(Exception):
@@ -30,6 +31,18 @@ class Const(Formatter):
 
     def format(self, obj, events, *args):
         return self.value
+
+
+class Event(Formatter):
+    def __init__(self, *args, **keys):
+        self._event = events.Event(*args, **keys)
+
+    def check(self, key=None):
+        if key is None:
+            raise TemplateError("key parameter required")
+
+    def format(self, obj, events, key):
+        return u", ".join(self._event.values(key))
 
 
 class AttachAndEmbedUnicode(Formatter):

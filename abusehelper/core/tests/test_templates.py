@@ -3,16 +3,41 @@ import unittest
 from .. import templates, events
 
 
-class TemplateTests(unittest.TestCase):
+class TestTemplate(unittest.TestCase):
     def test_basic_format_errors(self):
         self.assertRaises(templates.TemplateError, templates.Template, '%(x)')
         self.assertRaises(templates.TemplateError, templates.Template, '%(x)d')
         self.assertRaises(templates.TemplateError, templates.Template, '%(x)s')
 
+
+class TestConst(unittest.TestCase):
     def test_const_formatting(self):
         template = templates.Template("This is a %(const)s!", const=templates.Const("test"))
         self.assertEqual("This is a test!", template.format(None, []))
 
+
+class TestEvent(unittest.TestCase):
+    def test_missing_parameter(self):
+        self.assertRaises(templates.TemplateError, templates.Template, "%(event)s", event=templates.Event({}))
+
+    def test_single_value(self):
+        template = templates.Template("%(event, key)s", event=templates.Event({
+            "key": "1"
+        }))
+        self.assertEqual("1", template.format(None, []))
+
+    def test_multivalue(self):
+        template = templates.Template("%(event, key)s", event=templates.Event({
+            "key": ["1", "2"]
+        }))
+        self.assertEqual("1, 2", template.format(None, []))
+
+    def test_no_value(self):
+        template = templates.Template("%(event, key)s", event=templates.Event({}))
+        self.assertEqual("", template.format(None, []))
+
+
+class TestCSVFormatter(unittest.TestCase):
     def test_csv_formatting(self):
         template = templates.Template("Events:\r\n%(csv, |, a, b, c)s", csv=templates.CSVFormatter())
         event_list = [
@@ -32,6 +57,8 @@ class TemplateTests(unittest.TestCase):
         self.assertRaises(templates.TemplateError, templates.Template, '%(csv)s', csv=templates.CSVFormatter())
         self.assertRaises(templates.TemplateError, templates.Template, '%(csv, abc)s', csv=templates.CSVFormatter())
 
+
+class TestAttachZip(unittest.TestCase):
     def test_attach_zip_filenames(self):
         # Automatically add the .zip extension unless .zip extension is there already.
         # This logic is case-insensitive.
