@@ -350,7 +350,7 @@ class MailerService(ReportBot):
             "bcc": templates.Const(format_addresses(bcc))
         }
         for key, value in dict(template_values).iteritems():
-            template_keys[key] = templates.Const(value)
+            template_keys[key] = templates.Event(value)
 
         mail_template = MailTemplate(template, **template_keys)
         msg = yield idiokit.thread(mail_template.format, events)
