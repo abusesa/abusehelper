@@ -11,6 +11,9 @@ class TestTemplate(unittest.TestCase):
 
 
 class TestConst(unittest.TestCase):
+    def test_extra_parameters(self):
+        self.assertRaises(templates.TemplateError, templates.Template, "%(const, a)s", const=templates.Const("test"))
+
     def test_const_formatting(self):
         template = templates.Template("This is a %(const)s!", const=templates.Const("test"))
         self.assertEqual("This is a test!", template.format(None, []))
@@ -19,6 +22,9 @@ class TestConst(unittest.TestCase):
 class TestEvent(unittest.TestCase):
     def test_missing_parameter(self):
         self.assertRaises(templates.TemplateError, templates.Template, "%(event)s", event=templates.Event({}))
+
+    def test_extra_parameters(self):
+        self.assertRaises(templates.TemplateError, templates.Template, "%(event, a, b)s", event=templates.Event({}))
 
     def test_single_value(self):
         template = templates.Template("%(event, key)s", event=templates.Event({

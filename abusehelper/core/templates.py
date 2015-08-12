@@ -29,6 +29,10 @@ class Const(Formatter):
     def __init__(self, value):
         self.value = value
 
+    def check(self, *args):
+        if args:
+            raise TemplateError("no parameters allowed")
+
     def format(self, obj, events, *args):
         return self.value
 
@@ -37,9 +41,11 @@ class Event(Formatter):
     def __init__(self, *args, **keys):
         self._event = events.Event(*args, **keys)
 
-    def check(self, key=None):
-        if key is None:
+    def check(self, *args):
+        if not args:
             raise TemplateError("key parameter required")
+        if len(args) > 1:
+            raise TemplateError("only one key parameter allowed")
 
     def format(self, obj, events, key):
         return u", ".join(self._event.values(key))
