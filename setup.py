@@ -1,6 +1,76 @@
 import os
 import imp
-from setuphelpers import setup, install_other
+import sys
+import errno
+import unittest
+from distutils.core import setup, Command
+from distutils.dir_util import remove_tree
+from distutils.util import convert_path
+from distutils.command.build import build as _build
+from distutils.command.install import install as _install
+
+
+class Build(_build):
+    def run(self):
+        clean = self.distribution.reinitialize_command("clean", reinit_subcommands=True)
+        clean.all = True
+        self.distribution.run_command("clean")
+        _build.run(self)
+
+
+class Install(_install):
+    def run(self):
+        build_py = self.distribution.get_command_obj("build_py")
+        if self.distribution.packages:
+            for package in self.distribution.packages:
+                package_dir = build_py.get_package_dir(package)
+                rmtree(os.path.join(self.install_lib, package_dir))
+        install_other("idiokit")
+        _install.run(self)
+
+
+class Test(Command):
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        loader = unittest.defaultTestLoader
+        tests = loader.discover(os.path.dirname(__file__))
+
+        runner = unittest.TextTestRunner()
+        runner.run(tests)
+
+
+def rmtree(path):
+    try:
+        remove_tree(convert_path(path))
+    except OSError, err:
+        if err.errno != errno.ENOENT:
+            raise
+
+
+def install_other(subdir):
+    cwd = os.getcwd()
+    path = os.path.join(cwd, subdir)
+
+    try:
+        os.chdir(path)
+    except OSError, error:
+        if error.errno not in (errno.ENOENT, errno.ENOTDIR):
+            raise
+        print >> sys.stderr, "Could not find directory %r" % path
+        return
+
+    try:
+        module_info = imp.find_module("setup", ["."])
+        imp.load_module("setup", *module_info)
+    finally:
+        os.chdir(cwd)
 
 
 def generate_version():
@@ -41,8 +111,6 @@ def _collect_package(package, path):
             yield result
 
 
-install_other("idiokit")
-
 packages = dict()
 packages.update(collect_package("abusehelper"))
 packages.update(collect_package("abusehelper.bots"))
@@ -65,5 +133,10 @@ setup(
     author_email="contact@clarifiednetworks.com",
     url="https://bitbucket.org/clarifiednetworks/abusehelper",
     download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
-    license="MIT"
+    license="MIT",
+    cmdclass={
+        "build": Build,
+        "install": Install,
+        "test": Test
+    }
 )
