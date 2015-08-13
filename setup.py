@@ -117,7 +117,7 @@ packages.update(collect_package("abusehelper.bots"))
 
 setup(
     name="abusehelper",
-    version="2." + version,
+    version="2.1.0",
     packages=packages,
     package_dir=packages,
     scripts=[
