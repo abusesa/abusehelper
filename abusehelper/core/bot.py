@@ -22,8 +22,10 @@ class Param(object):
     param_order = 0
 
     def __init__(self, help=None, short=None, default=NO_VALUE):
+        help = None if help is None else inspect.cleandoc(help).strip()
+
         self.short = short
-        self.help = None if help is None else inspect.cleandoc(help)
+        self.help = help if help else None
         self.default = default
 
         self.order = Param.param_order
