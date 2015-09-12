@@ -303,7 +303,7 @@ class Bot(object):
             except SystemExit:
                 raise
             except:
-                self.log.critical(traceback.format_exc())
+                self.log.critical(traceback.format_exc().strip())
                 sys.exit(1)
 
     def run(self):
@@ -345,9 +345,8 @@ class XMPPBot(Bot):
     def run(self):
         return idiokit.main_loop(self.main())
 
-    @idiokit.stream
     def main(self):
-        yield idiokit.consume()
+        return idiokit.consume()
 
     @idiokit.stream
     def xmpp_connect(self):
@@ -422,13 +421,11 @@ class ServiceBot(XMPPBot):
                 raise services.Stop()
         return idiokit.main_loop(throw_stop_on_signal() | self._run())
 
-    @idiokit.stream
     def main(self, state):
-        yield idiokit.consume()
+        return idiokit.consume()
 
-    @idiokit.stream
     def session(self, state, **keys):
-        yield idiokit.consume()
+        return idiokit.consume()
 
 
 import hashlib
@@ -473,16 +470,14 @@ class FeedBot(ServiceBot):
             msg = yield idiokit.next()
             yield idiokit.send(msg)
 
-    @idiokit.stream
     def session(self, state, dst_room, **keys):
         connections = []
         for feed_key in self.feed_keys(dst_room=dst_room, **keys):
             connections.append(self._connections.inc(feed_key, dst_room))
 
         if connections:
-            yield idiokit.pipe(*connections)
-        else:
-            yield idiokit.consume()
+            return idiokit.pipe(*connections)
+        return idiokit.consume()
 
     @idiokit.stream
     def manage_room(self, name):
