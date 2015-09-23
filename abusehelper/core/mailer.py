@@ -253,6 +253,17 @@ def prep_recipient_header(msg, name, fallback_addresses):
         msg[name] = value
 
 
+def clean_recipients(recipients):
+    recipients = [addr for (name, addr) in getaddresses(recipients)]
+    return filter(None, (x.strip() for x in recipients))
+
+
+def format_recipients(recipients):
+    if not recipients:
+        return u"no recipients"
+    return join_addresses(recipients)
+
+
 class MailerService(ReportBot):
     mail_sender = bot.Param("""
         from whom it looks like the mails came from
@@ -293,7 +304,7 @@ class MailerService(ReportBot):
             try:
                 server = yield idiokit.thread(smtplib.SMTP, host, port)
             except (socket.error, smtplib.SMTPException) as exc:
-                self.log.error(u"Failed connecting to SMTP server: {0!r}".format(exc))
+                self.log.error(u"Failed connecting to SMTP server: {0}".format(utils.format_exception(exc)))
             else:
                 self.log.info(u"Connected to the SMTP server")
                 break
@@ -373,12 +384,16 @@ class MailerService(ReportBot):
 
         subject = decode_subject(msg.get("subject", ""))
 
+        header_recipients = clean_recipients(msg.get_all("to", []) + msg.get_all("cc", []) + msg.get_all("bcc", []))
         if self.mail_receiver_override is not None:
-            to_addrs = list(self.mail_receiver_override)
+            actual_recipients = clean_recipients(self.mail_receiver_override)
+            recipient_string = u"{actual_recipients} (overridden from {header_recipients})".format(
+                actual_recipients=format_recipients(actual_recipients),
+                header_recipients=format_recipients(header_recipients)
+            )
         else:
-            to_addrs = msg.get_all("to", []) + msg.get_all("cc", []) + msg.get_all("bcc", [])
-        to_addrs = [addr for (name, addr) in getaddresses(to_addrs)]
-        to_addrs = filter(None, [x.strip() for x in to_addrs])
+            actual_recipients = header_recipients
+            recipient_string = unicode(format_recipients(actual_recipients))
 
         # No need to keep both the mail object and mail data in memory.
         msg_data = msg.as_string()
@@ -391,37 +406,55 @@ class MailerService(ReportBot):
             "cc": cc,
             "bcc": bcc,
             "sender": from_addr[1],
-            "receiver": to_addrs,
+            "recipients": actual_recipients,
             "event count": unicode(len(eventlist))
         })
 
         sent = False
 
-        if not to_addrs:
+        if not actual_recipients:
             self.log.info(
-                u"Skipped message \"{0}\" (no recipients)".format(subject),
-                event=event.union(status="skipped (no recipients)"))
+                u"Skipped message \"{subject}\": {recipients}".format(
+                    subject=subject,
+                    recipients=recipient_string
+                ),
+                event=event.union(status="skipped (no recipients)")
+            )
         elif not eventlist:
             self.log.info(
-                u"Skipped message \"{0}\" to {1} (no events)".format(subject, join_addresses(to_addrs)),
-                event=event.union(status="skipped (no events)"))
+                u"Skipped message \"{subject}\" to {recipients}: no events".format(
+                    subject=subject,
+                    recipients=recipient_string
+                ),
+                event=event.union(status="skipped (no events)")
+            )
         else:
             server = yield self._connect(self.smtp_host, self.smtp_port)
             try:
                 yield self._login(server, self.smtp_auth_user, self.smtp_auth_password)
 
-                self.log.info(u"Sending message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)))
+                self.log.info(u"Sending message \"{subject}\" to {recipients}".format(
+                    subject=subject,
+                    recipients=recipient_string
+                ))
                 try:
-                    yield idiokit.thread(server.sendmail, from_addr[1], to_addrs, msg_data)
+                    yield idiokit.thread(server.sendmail, from_addr[1], actual_recipients, msg_data)
                 except smtplib.SMTPDataError as data_error:
-                    self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
-                        join_addresses(to_addrs), data_error))
+                    self.log.error(u"Could not send the message to {recipients}: {error}. Dropping message from queue".format(
+                        recipients=recipient_string,
+                        error=utils.format_exception(data_error)
+                    ))
                 except smtplib.SMTPRecipientsRefused as refused:
                     for recipient, reason in refused.recipients.iteritems():
-                        self.log.error(u"Could not send message to {0}: {1!r}. Dropping message from queue".format(
-                            join_addresses(to_addrs), reason))
+                        self.log.error(u"Could not the send message to {recipients}: {error}. Dropping message from queue".format(
+                            recipients=recipient_string,
+                            error=utils.format_exception(reason)
+                        ))
                 except (socket.error, smtplib.SMTPException) as exc:
-                    self.log.error(u"Could not send message to {0}: {1!r}".format(join_addresses(to_addrs), exc))
+                    self.log.error(u"Could not send the message to {recipients}: {error}".format(
+                        recipients=recipient_string,
+                        error=utils.format_exception(exc)
+                    ))
                     if retries >= 1:
                         self.log.info(u"Retrying sending in 60 seconds")
                         self.requeue(60.0, retries=retries - 1)
@@ -430,8 +463,12 @@ class MailerService(ReportBot):
                 else:
                     sent = True
                     self.log.info(
-                        u"Sent message \"{0}\" to {1}".format(subject, join_addresses(to_addrs)),
-                        event=event.union(status="sent"))
+                        u"Sent message \"{subject}\" to {recipients}".format(
+                            subject=subject,
+                            recipients=recipient_string
+                        ),
+                        event=event.union(status="sent")
+                    )
             finally:
                 yield idiokit.thread(server.quit)
 
