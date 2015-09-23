@@ -7,6 +7,7 @@ import gzip
 import socket
 import urllib2
 import httplib
+import traceback
 import collections
 import email.parser
 
@@ -16,6 +17,11 @@ import idiokit
 from idiokit import heap
 from cStringIO import StringIO
 from . import events
+
+
+def format_exception(exc):
+    lines = traceback.format_exception(type(exc), exc, None)
+    return "\n".join(lines).strip()
 
 
 class FetchUrlFailed(Exception):
