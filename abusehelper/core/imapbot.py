@@ -9,7 +9,7 @@ import email.header
 
 import idiokit
 from cStringIO import StringIO
-from . import bot
+from . import bot, utils
 
 
 def get_header(headers, key, default=None):
@@ -35,6 +35,10 @@ class IMAPBot(bot.FeedBot):
         the mail server port (default: 993 for SSL connections,
         143 for plain text connections)
         """, default=None)
+    mail_connection_timeout = bot.FloatParam("""
+        the timeout for the mail server connection socket, in seconds
+        (default: %default seconds)
+        """, default=60.0)
     mail_user = bot.Param("""
         the username used for mail server authentication
         """)
@@ -83,7 +87,7 @@ class IMAPBot(bot.FeedBot):
                         try:
                             mailbox = yield idiokit.thread(self.connect)
                         except (imaplib.IMAP4.abort, socket.error) as error:
-                            self.log.error("Failed IMAP connection ({0})".format(error))
+                            self.log.error("Failed IMAP connection ({0})".format(utils.format_exception(error)))
                         else:
                             break
 
@@ -100,7 +104,7 @@ class IMAPBot(bot.FeedBot):
                         result = yield idiokit.thread(method, *args, **keys)
                     except (imaplib.IMAP4.abort, socket.error) as error:
                         yield idiokit.thread(self.disconnect, mailbox)
-                        self.log.error("Lost IMAP connection ({0})".format(error))
+                        self.log.error("Lost IMAP connection ({0})".format(utils.format_exception(error)))
                         mailbox = None
                     except imaplib.IMAP4.error as error:
                         event.fail(type(error), error, None)
@@ -121,6 +125,7 @@ class IMAPBot(bot.FeedBot):
         else:
             mail_class = imaplib.IMAP4_SSL
         mailbox = mail_class(self.mail_server, self.mail_port)
+        mailbox.socket().settimeout(self.mail_connection_timeout)
 
         self.log.info("Logging in to IMAP server {0!r} port {1}".format(
             self.mail_server, self.mail_port))
