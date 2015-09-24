@@ -278,6 +278,10 @@ class MailerService(ReportBot):
     smtp_port = bot.IntParam("""
         port of the SMTP service used for sending mails
         """, default=25)
+    smtp_connection_timeout = bot.FloatParam("""
+        the timeout for the SMTP service connection socket, in seconds
+        (default: %default seconds)
+        """, default=60.0)
     smtp_auth_user = bot.Param("""
         username for the authenticated SMTP service
         """, default=None)
@@ -302,7 +306,7 @@ class MailerService(ReportBot):
         while server is None:
             self.log.info(u"Connecting to SMTP server {0!r} port {1}".format(host, port))
             try:
-                server = yield idiokit.thread(smtplib.SMTP, host, port)
+                server = yield idiokit.thread(smtplib.SMTP, host, port, timeout=self.smtp_connection_timeout)
             except (socket.error, smtplib.SMTPException) as exc:
                 self.log.error(u"Failed connecting to SMTP server: {0}".format(utils.format_exception(exc)))
             else:
