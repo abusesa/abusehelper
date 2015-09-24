@@ -163,7 +163,7 @@ class IMAPBot(bot.FeedBot):
     # Keep-alive
 
     @idiokit.stream
-    def noop(self, noop_interval=10.0):
+    def noop(self, noop_interval=300.0):
         while True:
             yield self.call("noop")
             yield idiokit.sleep(noop_interval)
