@@ -11,11 +11,17 @@ from ...events import Event
 
 
 class TestRules(unittest.TestCase):
-    def test_caching(self):
-        cache = dict()
+    def test_results_should_get_cached(self):
         rule = Match("a", "a")
+        cache = {}
         rule.match(Event(), cache)
+        self.assertTrue(rule in cache)
         self.assertFalse(cache[rule])
+
+    def test_cached_results_should_get_used(self):
+        rule = Match("a", "a")
+        cache = {rule: True}
+        self.assertTrue(rule.match(Event(), cache))
 
 
 class TestAnd(unittest.TestCase):
