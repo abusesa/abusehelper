@@ -38,8 +38,6 @@ class Lobby(idiokit.Proxy):
         for participant in self.room.participants:
             self._update_catalogue(participant.name, participant.payload)
 
-        self.xmpp.core.add_iq_handler(self.handle_iq, "start", SERVICE_NS)
-
         idiokit.Proxy.__init__(self, self.room | self._run())
 
     @idiokit.stream
@@ -175,22 +173,23 @@ class Lobby(idiokit.Proxy):
 
     @idiokit.stream
     def _run(self):
-        while True:
-            elements = yield idiokit.next()
+        with self.xmpp.core.iq_handler(self.handle_iq, "start", SERVICE_NS):
+            while True:
+                elements = yield idiokit.next()
 
-            for message in elements.named("message").with_attrs("from"):
-                for end in message.children("end", SERVICE_NS).with_attrs("id"):
-                    jid = JID(message.get_attr("from"))
-                    session_id = end.get_attr("id")
-                    self._discard_session(jid, session_id)
+                for message in elements.named("message").with_attrs("from"):
+                    for end in message.children("end", SERVICE_NS).with_attrs("id"):
+                        jid = JID(message.get_attr("from"))
+                        session_id = end.get_attr("id")
+                        self._discard_session(jid, session_id)
 
-            presences = elements.named("presence").with_attrs("from")
-            for presence in presences:
-                jid = JID(presence.get_attr("from"))
-                if presence.with_attrs(type="unavailable"):
-                    self._discard_jid(jid, Unavailable())
-                else:
-                    self._update_catalogue(jid, presence.children())
+                presences = elements.named("presence").with_attrs("from")
+                for presence in presences:
+                    jid = JID(presence.get_attr("from"))
+                    if presence.with_attrs(type="unavailable"):
+                        self._discard_jid(jid, Unavailable())
+                    else:
+                        self._update_catalogue(jid, presence.children())
 
     def _discard_session(self, jid, session_id, reason=Stop()):
         if jid in self.jids:

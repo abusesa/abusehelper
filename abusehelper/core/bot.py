@@ -404,7 +404,7 @@ class ServiceBot(XMPPBot):
 
         self.log.info("Joining lobby " + repr(self.service_room))
         self.lobby = yield services.join_lobby(self.xmpp, self.service_room, self.bot_name)
-        self.log.addHandler(log.RoomHandler(self.lobby.room))
+        self.log.addHandler(log.RoomHandler(self.lobby))
 
         self.log.info("Offering service " + repr(self.bot_name))
         try:
