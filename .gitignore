@@ -1,0 +1,3 @@
+/build
+*.pyc
+/abusehelper/core/_version.py
