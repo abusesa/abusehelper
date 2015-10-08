@@ -10,7 +10,6 @@ import idiokit
 import tempfile
 import subprocess
 import contextlib
-import multiprocessing
 from idiokit import socket, select
 from . import events, rules, taskfarm, bot
 
@@ -119,14 +118,11 @@ def run():
 class RoomGraphBot(bot.ServiceBot):
     concurrency = bot.IntParam("""
         the number of worker processes used for rule matching
-        (default: autodetect the number of CPU cores)
-        """, default=None)
+        (default: %default)
+        """, default=1)
 
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
-
-        if self.concurrency is None:
-            self.concurrency = multiprocessing.cpu_count()
 
         self._rooms = taskfarm.TaskFarm(self._handle_room)
         self._srcs = {}
@@ -230,7 +226,11 @@ class RoomGraphBot(bot.ServiceBot):
                     raise RuntimeError("unknown process id")
                 connections.append(conn)
 
-            self.log.info("Started {0} worker processes".format(self.concurrency))
+            if self.concurrency == 1:
+                self.log.info("Started 1 worker process")
+            else:
+                self.log.info("Started {0} worker processes".format(self.concurrency))
+
             self._ready.succeed(distribute_encode(connections))
             yield collect_decode(connections) | self._distribute()
         finally:
