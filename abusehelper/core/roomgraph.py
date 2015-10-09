@@ -127,7 +127,6 @@ class RoomGraphBot(bot.ServiceBot):
         self._rooms = taskfarm.TaskFarm(self._handle_room)
         self._srcs = {}
         self._processes = {}
-        self._socket_path = None
         self._ready = idiokit.Event()
 
     @idiokit.stream
@@ -183,48 +182,49 @@ class RoomGraphBot(bot.ServiceBot):
             distributor.send(True, ("dec_rule", (src_room, rule, dst_room)))
 
     def run(self):
-        with temporary_directory() as tmpdir:
-            processes = {}
-            for _ in xrange(self.concurrency):
-                while True:
-                    process_id = uuid.uuid4().hex
-                    if process_id not in processes:
-                        break
+        processes = {}
+        for _ in xrange(self.concurrency):
+            while True:
+                process_id = uuid.uuid4().hex
+                if process_id not in processes:
+                    break
 
-                env = dict(os.environ)
-                env["ABUSEHELPER_SUBPROCESS"] = ""
-                process = subprocess.Popen(
-                    [sys.executable, "-m", __loader__.fullname],
-                    stdin=subprocess.PIPE,
-                    close_fds=True,
-                    env=env
-                )
-                processes[process_id] = process
+            env = dict(os.environ)
+            env["ABUSEHELPER_SUBPROCESS"] = ""
+            process = subprocess.Popen(
+                [sys.executable, "-m", __loader__.fullname],
+                stdin=subprocess.PIPE,
+                close_fds=True,
+                env=env
+            )
+            processes[process_id] = process
 
-            self._socket_path = os.path.join(tmpdir, "socket")
-            self._processes = processes
-            return bot.ServiceBot.run(self)
+        self._processes = processes
+        return bot.ServiceBot.run(self)
 
     @idiokit.stream
     def main(self, _):
         sock = socket.Socket(socket.AF_UNIX)
         try:
-            yield sock.bind(self._socket_path)
-            yield sock.listen(self.concurrency)
+            with temporary_directory() as tmpdir:
+                socket_path = os.path.join(tmpdir, "socket")
 
-            for process_id, process in self._processes.iteritems():
-                cPickle.dump([self._socket_path, process_id, roomgraph, [], {}], process.stdin)
+                yield sock.bind(socket_path)
+                yield sock.listen(self.concurrency)
 
-            connections = []
-            waiting = set(self._processes)
-            while waiting:
-                conn, addr = yield sock.accept()
-                process_id = yield recvall(conn, 32, timeout=10.0)
-                try:
-                    waiting.remove(process_id)
-                except KeyError:
-                    raise RuntimeError("unknown process id")
-                connections.append(conn)
+                for process_id, process in self._processes.iteritems():
+                    cPickle.dump([socket_path, process_id, roomgraph, [], {}], process.stdin)
+
+                connections = []
+                waiting = set(self._processes)
+                while waiting:
+                    conn, addr = yield sock.accept()
+                    process_id = yield recvall(conn, 32, timeout=10.0)
+                    try:
+                        waiting.remove(process_id)
+                    except KeyError:
+                        raise RuntimeError("unknown process id")
+                    connections.append(conn)
 
             if self.concurrency == 1:
                 self.log.info("Started 1 worker process")
