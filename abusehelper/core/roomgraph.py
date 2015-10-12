@@ -233,6 +233,7 @@ class RoomGraphBot(bot.ServiceBot):
                             del process_ids[process_id]
                         except:
                             yield conn.close()
+                            raise
                         else:
                             connections.append(conn)
             finally:
