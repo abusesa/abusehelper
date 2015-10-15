@@ -22,6 +22,29 @@ def _replace_non_xml_chars(unicode_obj, replacement=u"\uFFFD"):
 _NON_XML = re.compile(u"[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]", re.U)
 
 
+def parse_text(element, key):
+    entry = element.find(key)
+    if entry is None:
+        return
+
+    if not isinstance(entry, basestring):
+        entry = entry.text
+
+    if entry:
+        return entry
+
+
+def is_domain(string):
+    for addr_type in (socket.AF_INET, socket.AF_INET6):
+        try:
+            socket.inet_ntop(addr_type, socket.inet_pton(addr_type, string))
+        except (ValueError, socket.error):
+            pass
+        else:
+            return False
+    return True
+
+
 class BZ2Reader(object):
     def __init__(self, fileobj):
         self._fileobj = fileobj
@@ -108,86 +131,63 @@ class PhishTankBot(bot.PollingBot):
 
         self._etag = None
 
-    def i_am_a_name(self, string):
-        for addr_type in (socket.AF_INET, socket.AF_INET6):
-            try:
-                socket.inet_ntop(addr_type, socket.inet_pton(addr_type, string))
-            except (ValueError, socket.error):
-                pass
-            else:
-                return False
-        return True
-
     @idiokit.stream
     def _handle_entry(self, entry, sites):
-        url = entry.find("url")
-        if url is None:
-            return
-        if not isinstance(url, basestring):
-            url = url.text
-
-        verification = entry.find("verification")
-        if verification is None:
-            return
-
-        verified = verification.find("verified")
-        if verified is None or verified.text != "yes":
-            return
-
-        ts = verification.find("verification_time")
-        if ts != None and ts.text:
-            try:
-                ts = datetime.strptime(ts.text, "%Y-%m-%dT%H:%M:%S+00:00")
-                ts = ts.strftime("%Y-%m-%d %H:%M:%SZ")
-            except ValueError:
-                ts = None
-
-        status = entry.find("status")
-        if status is None:
-            return
-
-        online = status.find("online")
-        if online is None or online.text != "yes":
-            return
-
         details = entry.find("details")
         if details is None:
             return
 
-        target = entry.find("target")
+        verification = entry.find("verification")
+        if verification is None or parse_text(verification, "verified") != "yes":
+            return
+
+        status = entry.find("status")
+        if status is None or parse_text(status, "online") != "yes":
+            return
+
+        url = parse_text(entry, "url")
+        if not url:
+            return
+
+        event = events.Event({"feed": "phishtank", "url": url})
+
+        domain = urlparse.urlparse(url).netloc
+        if is_domain(domain):
+            event.add("domain name", domain)
+
+        detail_url = parse_text(entry, "phish_detail_url")
+        if detail_url:
+            event.add("description url", detail_url)
+
+        target = parse_text(entry, "target")
+        if target:
+            event.add("target", target)
+
+        ts = parse_text(verification, "verification_time")
+        try:
+            ts = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S+00:00")
+            ts = ts.strftime("%Y-%m-%d %H:%M:%SZ")
+        except (ValueError, TypeError):
+            pass
+        else:
+            event.add("source time", ts)
 
         for detail in details.findall("detail"):
-            ip = detail.find("ip_address")
-            if ip is None:
+            ip = parse_text(detail, "ip_address")
+            if not ip:
                 continue
 
-            announcer = detail.find("announcing_network")
-            if announcer is None or announcer.text == None:
+            announcer = parse_text(detail, "announcing_network")
+            if not announcer:
                 continue
-
-            ip = ip.text
-            announcer = announcer.text
 
             url_data = sites.setdefault(url, set())
             if (ip, announcer) in url_data:
                 continue
             url_data.add((ip, announcer))
 
-            event = events.Event()
-            event.add("feed", "phishtank")
-            event.add("url", url)
-            parsed = urlparse.urlparse(url)
-            host = parsed.netloc
-            if self.i_am_a_name(host):
-                event.add("domain name", host)
             event.add("ip", ip)
             event.add("asn", announcer)
-
-            if ts:
-                event.add("source time", ts)
-
-            if target is not None and target.text is not None:
-                event.add("target", target.text)
 
             yield idiokit.send(event)
 
