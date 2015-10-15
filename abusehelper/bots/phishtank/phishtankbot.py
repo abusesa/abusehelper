@@ -163,15 +163,7 @@ class PhishTankBot(bot.PollingBot):
         if target:
             event.add("target", target)
 
-        ts = parse_text(verification, "verification_time")
-        try:
-            ts = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S+00:00")
-            ts = ts.strftime("%Y-%m-%d %H:%M:%SZ")
-        except (ValueError, TypeError):
-            pass
-        else:
-            event.add("source time", ts)
-
+        history = {}
         for detail in details.findall("detail"):
             ip = parse_text(detail, "ip_address")
             if not ip:
@@ -181,16 +173,28 @@ class PhishTankBot(bot.PollingBot):
             if not announcer:
                 continue
 
+            detail_time = parse_text(detail, "detail_time")
+            try:
+                ts = datetime.strptime(detail_time, "%Y-%m-%dT%H:%M:%S+00:00")
+            except (ValueError, TypeError):
+                continue
+
+            history[ts] = (ip, announcer)
+
+        if history:
+            latest = sorted(history.keys())[-1]
+            ip, announcer = history[latest]
+
             url_data = sites.setdefault(url, set())
             if (ip, announcer) in url_data:
-                continue
+                return
             url_data.add((ip, announcer))
 
-            detail_event = events.Event(event)
-            detail_event.add("ip", ip)
-            detail_event.add("asn", announcer)
+            event.add("ip", ip)
+            event.add("asn", announcer)
+            event.add("source time", latest.strftime("%Y-%m-%d %H:%M:%SZ"))
 
-            yield idiokit.send(detail_event)
+            yield idiokit.send(event)
 
     @idiokit.stream
     def poll(self):
