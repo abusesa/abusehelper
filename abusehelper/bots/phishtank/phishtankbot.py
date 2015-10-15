@@ -186,10 +186,11 @@ class PhishTankBot(bot.PollingBot):
                 continue
             url_data.add((ip, announcer))
 
-            event.add("ip", ip)
-            event.add("asn", announcer)
+            detail_event = events.Event(event)
+            detail_event.add("ip", ip)
+            detail_event.add("asn", announcer)
 
-            yield idiokit.send(event)
+            yield idiokit.send(detail_event)
 
     @idiokit.stream
     def poll(self):
