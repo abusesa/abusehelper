@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import re
+import ssl
 import socket
 import getpass
 import imaplib
@@ -24,6 +25,37 @@ def get_header(headers, key, default=None):
         bites.append(string)
 
     return u" ".join(bites)
+
+
+_DEFAULT_PORT_IMAP4 = 143
+_DEFAULT_PORT_IMAP4_SSL = 993
+
+
+class _IMAP4(imaplib.IMAP4):
+    def __init__(self, host, port, timeout=None):
+        self._timeout = timeout
+
+        imaplib.IMAP4.__init__(self, host, port)
+
+    def open(self, host="", port=_DEFAULT_PORT_IMAP4):
+        self.host = host
+        self.port = port
+        self.sock = socket.create_connection((host, port), timeout=self._timeout)
+        self.file = self.sock.makefile("rb")
+
+
+class _IMAP4_SSL(imaplib.IMAP4_SSL):
+    def __init__(self, host, port, certfile=None, keyfile=None, timeout=None):
+        self._timeout = timeout
+
+        imaplib.IMAP4_SSL.__init__(self, host, port, certfile, keyfile)
+
+    def open(self, host="", port=_DEFAULT_PORT_IMAP4_SSL):
+        self.host = host
+        self.port = port
+        self.sock = socket.create_connection((host, port), timeout=self._timeout)
+        self.sslobj = ssl.wrap_socket(self.sock, self.keyfile, self.certfile)
+        self.file = self.sslobj.makefile("rb")
 
 
 class IMAPBot(bot.FeedBot):
@@ -56,13 +88,11 @@ class IMAPBot(bot.FeedBot):
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
 
-        if self.mail_disable_ssl:
-            default_mail_port = 143
-        else:
-            default_mail_port = 993
-
         if self.mail_port is None:
-            self.mail_port = default_mail_port
+            if self.mail_disable_ssl:
+                self.mail_port = _DEFAULT_PORT_IMAP4
+            else:
+                self.mail_port = _DEFAULT_PORT_IMAP4_SSL
 
         if self.mail_password is None:
             self.mail_password = getpass.getpass("Mail password: ")
@@ -121,11 +151,10 @@ class IMAPBot(bot.FeedBot):
             self.mail_server, self.mail_port))
 
         if self.mail_disable_ssl:
-            mail_class = imaplib.IMAP4
+            mail_class = _IMAP4
         else:
-            mail_class = imaplib.IMAP4_SSL
-        mailbox = mail_class(self.mail_server, self.mail_port)
-        mailbox.socket().settimeout(self.mail_connection_timeout)
+            mail_class = _IMAP4_SSL
+        mailbox = mail_class(self.mail_server, self.mail_port, timeout=self.mail_connection_timeout)
 
         self.log.info("Logging in to IMAP server {0!r} port {1}".format(
             self.mail_server, self.mail_port))
@@ -163,7 +192,7 @@ class IMAPBot(bot.FeedBot):
     # Keep-alive
 
     @idiokit.stream
-    def noop(self, noop_interval=300.0):
+    def noop(self, noop_interval=60.0):
         while True:
             yield self.call("noop")
             yield idiokit.sleep(noop_interval)
