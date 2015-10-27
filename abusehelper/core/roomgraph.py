@@ -128,13 +128,38 @@ class RoomGraphBot(bot.ServiceBot):
         self._srcs = {}
         self._processes = ()
         self._ready = idiokit.Event()
+        self._stats = {}
+
+    def _inc_stats(self, room, seen=0, sent=0):
+        seen_count, sent_count = self._stats.get(room, (0, 0))
+        self._stats[room] = seen_count + seen, sent_count + sent
+
+    @idiokit.stream
+    def _log_stats(self, interval=15.0):
+        while True:
+            yield idiokit.sleep(interval)
+
+            for room, (seen, sent) in self._stats.iteritems():
+                self.log.info(
+                    u"Room {0}: seen {1}, sent {2} events".format(room, seen, sent),
+                    event=events.Event({
+                        "type": "room",
+                        "service": self.bot_name,
+                        "seen events": unicode(seen),
+                        "sent events": unicode(sent),
+                        "room": unicode(room)
+                    })
+                )
+            self._stats.clear()
 
     @idiokit.stream
     def _distribute(self):
-        waiters = dict()
+        waiters = {}
 
         while True:
-            event, dsts = yield idiokit.next()
+            src, event, dsts = yield idiokit.next()
+
+            count = 0
             for dst in dsts:
                 dst_room = self._rooms.get(dst)
 
@@ -142,7 +167,11 @@ class RoomGraphBot(bot.ServiceBot):
                     yield waiters.pop(dst_room)
 
                 if dst is not None:
+                    count += 1
                     waiters[dst_room] = dst_room.send(event.to_elements())
+
+            if count > 0:
+                self._inc_stats(src, sent=1)
 
     @idiokit.stream
     def _handle_room(self, room_name):
@@ -160,6 +189,7 @@ class RoomGraphBot(bot.ServiceBot):
             return
 
         for event in events.Event.from_elements(elements):
+            self._inc_stats(room_name, seen=1)
             yield False, ("event", (room_name, event))
 
     @idiokit.stream
@@ -240,11 +270,11 @@ class RoomGraphBot(bot.ServiceBot):
                 yield sock.close()
 
             if self.concurrency == 1:
-                self.log.info("Started 1 worker process")
+                self.log.info(u"Started 1 worker process")
             else:
-                self.log.info("Started {0} worker processes".format(self.concurrency))
+                self.log.info(u"Started {0} worker processes".format(self.concurrency))
             self._ready.succeed(distribute_encode(connections))
-            yield collect_decode(connections) | self._distribute()
+            yield collect_decode(connections) | self._distribute() | self._log_stats()
         finally:
             for conn in connections:
                 yield conn.close()
@@ -261,7 +291,7 @@ def roomgraph():
             if src in srcs:
                 dsts = set(srcs[src].classify(event))
                 if dsts:
-                    yield idiokit.send(event, dsts)
+                    yield idiokit.send(src, event, dsts)
         elif type_id == "inc_rule":
             src, rule, dst = args
             if src not in srcs:
