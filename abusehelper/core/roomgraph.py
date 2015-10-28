@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import os
 import sys
 import uuid
+import errno
 import struct
 import shutil
 import cPickle
@@ -23,13 +24,30 @@ def temporary_directory(*args, **keys):
         shutil.rmtree(tmpdir)
 
 
+class _ConnectionLost(Exception):
+    pass
+
+
+@contextlib.contextmanager
+def wrapped_socket_errnos(*errnos):
+    try:
+        yield
+    except socket.SocketError as error:
+        socket_errno = error.args[0]
+        if socket_errno in errnos:
+            raise _ConnectionLost(os.strerror(socket_errno))
+        raise
+
+
 @idiokit.stream
 def recvall(sock, amount, timeout=None):
     data = []
     while amount > 0:
-        piece = yield sock.recv(amount, timeout=timeout)
+        with wrapped_socket_errnos(errno.ECONNRESET):
+            piece = yield sock.recv(amount, timeout=timeout)
+
         if not piece:
-            raise RuntimeError("could not recv all bytes")
+            raise _ConnectionLost("Could not recv() all bytes")
         data.append(piece)
         amount -= len(piece)
     idiokit.stop("".join(data))
@@ -41,7 +59,9 @@ def encode(sock):
         msg = yield idiokit.next()
         msg_bytes = cPickle.dumps(msg, cPickle.HIGHEST_PROTOCOL)
         data = struct.pack("!I", len(msg_bytes)) + msg_bytes
-        yield sock.sendall(data)
+
+        with wrapped_socket_errnos(errno.ECONNRESET, errno.EPIPE):
+            yield sock.sendall(data)
 
 
 @idiokit.stream
@@ -111,7 +131,7 @@ def run():
 
     try:
         idiokit.main_loop(main(socket_path, process_id, callable, args, keys))
-    except idiokit.Signal:
+    except (idiokit.Signal, _ConnectionLost):
         pass
 
 
@@ -124,7 +144,7 @@ class RoomGraphBot(bot.ServiceBot):
     def __init__(self, *args, **keys):
         bot.ServiceBot.__init__(self, *args, **keys)
 
-        self._rooms = taskfarm.TaskFarm(self._handle_room)
+        self._rooms = taskfarm.TaskFarm(self._handle_room, grace_period=0.0)
         self._srcs = {}
         self._processes = ()
         self._ready = idiokit.Event()
