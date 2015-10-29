@@ -174,21 +174,15 @@ class RoomGraphBot(bot.ServiceBot):
 
     @idiokit.stream
     def _distribute(self):
-        waiters = {}
-
         while True:
             src, event, dsts = yield idiokit.next()
 
             count = 0
             for dst in dsts:
                 dst_room = self._rooms.get(dst)
-
-                if dst_room in waiters:
-                    yield waiters.pop(dst_room)
-
-                if dst is not None:
+                if dst_room is not None:
                     count += 1
-                    waiters[dst_room] = dst_room.send(event.to_elements())
+                    yield dst_room.send(event.to_elements())
 
             if count > 0:
                 self._inc_stats(src, sent=1)
