@@ -7,7 +7,7 @@ from abusehelper.core import bot, events
 
 
 @idiokit.stream
-def rate_limiter(rate_limit):
+def _rate_limiter(rate_limit):
     last_output = time.time()
 
     while True:
@@ -38,7 +38,7 @@ class Receiver(bot.XMPPBot):
         yield idiokit.pipe(
             self._read_stdin(),
             events.events_to_elements(),
-            rate_limiter(self.rate_limit),
+            _rate_limiter(self.rate_limit),
             room,
             idiokit.consume()
         )
