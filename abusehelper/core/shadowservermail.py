@@ -11,8 +11,8 @@ from . import utils, bot, imapbot
 
 
 class ShadowServerMail(imapbot.IMAPBot):
-    filter = bot.Param(default=r'(BODY "http://dl.shadowserver.org/" UNSEEN)')
-    url_rex = bot.Param(default=r"http://dl.shadowserver.org/\S+")
+    filter = bot.Param(default=r'(BODY "dl.shadowserver.org" UNSEEN)')
+    url_rex = bot.Param(default=r"http[s]?://dl.shadowserver.org/\S+")
 
     # Assume the file names to be something like
     # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
