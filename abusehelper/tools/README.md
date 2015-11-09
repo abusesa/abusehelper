@@ -2,7 +2,7 @@
 
 ## abusehelper.tools.sender
 
-A tool that reads JSON formatted events from the STDIN and sends them to a channel as AbuseHelper events. Thanks to the glorious UNIX piping facilities you can use pretty much every language to create the JSON events.
+A tool that reads JSON formatted events from the STDIN and sends them to an XMPP room as AbuseHelper events.
 
 ### Usage
 
@@ -45,7 +45,54 @@ for event_number in range(10000):
 Then you can use the script to produce data to the channel like this:
 
 ```
-python producer.py | python -m abusehelper.tools.sender user@xmpp.example.com my.room --rate-limit=10
+$ python producer.py | python -m abusehelper.tools.sender user@xmpp.example.com my.room --rate-limit=10
 ```
 
 This uses the ```user@xmpp.example.com``` account to send the produced dummy events to the XMPP room ```my.room``` and limits the datastream to max. 10 events per second.
+
+## abusehelper.tools.receiver
+
+A tool that reads AbuseHelper events from an XMPP room and writes them to STDOUT as JSON formatted lines.
+
+### Usage
+
+```
+$ abuseheleper.tools.receiver XMPP_JID ROOM
+```
+
+Where:
+
+ * ```XMPP_JID``` is your XMPP username you want to use for receiving events from the room.
+
+ * ```ROOM``` room is the XMPP room from where the events will be received from.
+
+### JSON format
+
+The tool produces the same kind of format as ```abusehelper.core.sender consumes```: One JSON dictionary by line, each dictinary value can be either a string or a list of strings.
+
+See the ```abusehelper.core.sender``` documentation for example.
+
+### Example
+
+Assume you have a short script called ```consumer.py``` that consumes the data lines and filters out all non-c&c events:
+
+```
+import sys
+import json
+
+for line in sys.stdin:
+    obj = json.loads(line)
+
+    event_type = obj.get("type", None)
+    if isinstance(event_type, list):
+        if "c&c" in event_type:
+            print line,
+    elif event_type == "c&c":
+        print line,
+```
+
+Then you can use the script to consume data from the channel like this:
+
+```
+$ python -m abusehelper.tools.sender user@xmpp.example.com my.room | python myconsumer.py
+```
