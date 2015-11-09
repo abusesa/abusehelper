@@ -49,6 +49,8 @@ class Receiver(bot.XMPPBot):
             yield select.select([sys.stdin], [], [])
 
             line = sys.stdin.readline()
+            if not line:
+                break
             if not line.strip():
                 continue
 
