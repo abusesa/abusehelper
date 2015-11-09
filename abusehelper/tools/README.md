@@ -7,7 +7,7 @@ A tool that reads JSON formatted events from the STDIN and sends them to an XMPP
 ### Usage
 
 ```
-$ abuseheleper.tools.sender XMPP_JID ROOM --rate-limit=N
+$ abusehelper.tools.sender XMPP_JID ROOM --rate-limit=N
 ```
 
 Where:
@@ -28,7 +28,7 @@ The tool reads lines (ending with ```\n```) from the STDIN, and interprets every
 
 ### Example
 
-Thanks to the glorious UNIX piping facilities you can use pretty much every language to create the JSON events. For this example let's use Python.
+Thanks to the glorious UNIX piping facilities you can use pretty much every programming language to create the JSON events. Let's use Python for this example.
 
 Assume you have a short script called ```producer.py``` that produces JSON data:
 
@@ -68,7 +68,7 @@ Where:
 
 ### JSON format
 
-The tool produces the same kind of format as ```abusehelper.core.sender consumes```: One JSON dictionary by line, each dictinary value can be either a string or a list of strings.
+The tool produces the same kind of format as ```abusehelper.core.sender``` consumes: One JSON dictionary by line, each dictinary value can be either a string or a list of strings.
 
 See the ```abusehelper.core.sender``` documentation for example.
 
