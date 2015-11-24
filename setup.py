@@ -2,8 +2,7 @@ import os
 import imp
 import sys
 import errno
-import unittest
-from distutils.core import setup, Command
+from distutils.core import setup
 from distutils.dir_util import remove_tree
 from distutils.util import convert_path
 from distutils.command.build import build as _build
@@ -27,23 +26,6 @@ class Install(_install):
                 rmtree(os.path.join(self.install_lib, package_dir))
         install_other("idiokit")
         _install.run(self)
-
-
-class Test(Command):
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        loader = unittest.defaultTestLoader
-        tests = loader.discover(os.path.dirname(__file__))
-
-        runner = unittest.TextTestRunner()
-        runner.run(tests)
 
 
 def rmtree(path):
@@ -138,7 +120,6 @@ setup(
     ],
     cmdclass={
         "build": Build,
-        "install": Install,
-        "test": Test
+        "install": Install
     }
 )
