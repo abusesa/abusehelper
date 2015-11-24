@@ -17,7 +17,7 @@ class TestSerialize(unittest.TestCase):
         self.assertEqual(False, serialize.load(serialize.dump(False)))
 
     def test_none_roundtrip(self):
-        self.assertIs(None, serialize.load(serialize.dump(None)))
+        self.assertTrue(serialize.load(serialize.dump(None)) is None)
 
     def test_bytes_roundtrip(self):
         self.assertEqual(
