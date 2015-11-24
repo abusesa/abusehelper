@@ -48,7 +48,6 @@ def load_geodb(path, log=None):
 
         return result
 
-
     def legacy_geoip(reader, ip):
         if not is_ipv4(ip):
             return {}

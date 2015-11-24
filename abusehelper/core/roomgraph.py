@@ -231,8 +231,14 @@ class RoomGraphBot(bot.ServiceBot):
             for _ in xrange(self.concurrency):
                 env = dict(os.environ)
                 env["ABUSEHELPER_SUBPROCESS"] = ""
+
+                # Find out the full package & module name. Don't refer to the
+                # variable __loader__ directly to keep flake8 (version 2.5.0)
+                # linter happy.
+                fullname = globals()["__loader__"].fullname
+
                 processes.append(subprocess.Popen(
-                    [sys.executable, "-m", __loader__.fullname],
+                    [sys.executable, "-m", fullname],
                     stdin=subprocess.PIPE,
                     close_fds=True,
                     env=env

@@ -3,6 +3,7 @@ import calendar
 
 from abusehelper.core import bot, archivebot
 
+
 def current_timestamp(timestamp, period):
     time_list = list(time.gmtime())
     period = period.lower()
@@ -20,6 +21,7 @@ def current_timestamp(timestamp, period):
         return None
 
     return time.gmtime(calendar.timegm(time_list))
+
 
 class RollOverArchiveBot(archivebot.ArchiveBot):
     rollover = bot.Param("period for doing archive file rollover " +

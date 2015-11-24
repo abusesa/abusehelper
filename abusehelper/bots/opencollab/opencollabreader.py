@@ -36,7 +36,8 @@ class OpenCollabReader(bot.FeedBot):
 
     @idiokit.stream
     def feed(self, query, feed_all):
-        collab = wiki.GraphingWiki(self.collab_url,
+        collab = wiki.GraphingWiki(
+            self.collab_url,
             ssl_verify_cert=not self.collab_ignore_cert,
             ssl_ca_certs=self.collab_extra_ca_certs)
         yield idiokit.thread(collab.authenticate, self.collab_user, self.collab_password)
@@ -61,8 +62,7 @@ class OpenCollabReader(bot.FeedBot):
                     event = current.setdefault(page, events.Event())
                     event.add("id:open", self.page_id(page))
                     event.add("gwikipagename", page)
-                    event.add("collab url", self.collab_url + \
-                        urllib.quote(page.encode("utf8")))
+                    event.add("collab url", self.collab_url + urllib.quote(page.encode("utf8")))
 
                     removed.discard(page)
 

@@ -66,7 +66,6 @@ class Roomreader(bot.XMPPBot):
 
                 if self.show_events:
                     for event in events.Event.from_elements(message):
-                        self.log.info("<{0}> {1}",
+                        self.log.info("<{0}> {1}".format(
                             unicode(sender).encode("unicode-escape"),
-                            event)
-
+                            event))
