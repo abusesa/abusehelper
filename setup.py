@@ -133,6 +133,9 @@ setup(
         "scripts/botnet",
         "scripts/roomreader"
     ],
+    install_requires=[
+        "idiokit>=2.2.0,<3.0.0"
+    ],
     cmdclass={
         "build": Build,
         "install": Install,

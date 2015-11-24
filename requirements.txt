@@ -1,0 +1,2 @@
+-e git+https://github.com/abusesa/idiokit.git#egg=idiokit
+-e .
