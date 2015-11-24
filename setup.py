@@ -118,12 +118,6 @@ packages.update(collect_package("abusehelper.bots"))
 setup(
     name="abusehelper",
     version="2.1.0",
-    packages=packages,
-    package_dir=packages,
-    scripts=[
-        "scripts/botnet",
-        "scripts/roomreader"
-    ],
     description="A framework for receiving and redistributing abuse feeds",
     long_description=(
         "AbuseHelper is a modular, scalable and robust " +
@@ -131,9 +125,14 @@ setup(
     ),
     author="Clarified Networks",
     author_email="contact@clarifiednetworks.com",
-    url="https://bitbucket.org/clarifiednetworks/abusehelper",
-    download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
+    url="https://github.com/abusesa/abusehelper/",
     license="MIT",
+    packages=packages,
+    package_dir=packages,
+    scripts=[
+        "scripts/botnet",
+        "scripts/roomreader"
+    ],
     cmdclass={
         "build": Build,
         "install": Install,
