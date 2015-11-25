@@ -63,4 +63,3 @@ class VxVaultBot(bot.PollingBot):
 
 if __name__ == "__main__":
     VxVaultBot.from_command_line().execute()
-

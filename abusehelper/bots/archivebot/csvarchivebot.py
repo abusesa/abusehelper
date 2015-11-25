@@ -1,6 +1,7 @@
 import csv
 from abusehelper.core import bot, archivebot
 
+
 class CSVArchiveBot(archivebot.ArchiveBot):
     csv_columns = bot.ListParam()
 

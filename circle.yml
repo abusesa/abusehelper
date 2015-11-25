@@ -1,0 +1,7 @@
+dependencies:
+  pre:
+    - pyenv local 2.6.8 2.7.10
+
+test:
+  override:
+    - tox

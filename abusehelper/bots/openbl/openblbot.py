@@ -49,9 +49,10 @@ class OpenBLBot(bot.PollingBot):
             event.add("feed", "openbl")
             event.add("description url", self.feed_url)
             event.add("type", "brute-force")
-            event.add("description",
-                "This host has most likely been performing brute-force "
-                "attacks on one of the following services: FTP, SSH, POP3, "
+            event.add(
+                "description",
+                "This host has most likely been performing brute-force " +
+                "attacks on one of the following services: FTP, SSH, POP3, " +
                 "IMAP, IMAPS or POP3S.")
             yield idiokit.send(event)
 

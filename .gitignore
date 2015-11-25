@@ -1,3 +1,9 @@
 /build
 *.pyc
+/.tox
+/.cache
+__pycache__/
+/MANIFEST
 /abusehelper/core/_version.py
+*.egg-info/
+/src

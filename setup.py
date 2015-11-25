@@ -2,8 +2,7 @@ import os
 import imp
 import sys
 import errno
-import unittest
-from distutils.core import setup, Command
+from distutils.core import setup
 from distutils.dir_util import remove_tree
 from distutils.util import convert_path
 from distutils.command.build import build as _build
@@ -27,23 +26,6 @@ class Install(_install):
                 rmtree(os.path.join(self.install_lib, package_dir))
         install_other("idiokit")
         _install.run(self)
-
-
-class Test(Command):
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        loader = unittest.defaultTestLoader
-        tests = loader.discover(os.path.dirname(__file__))
-
-        runner = unittest.TextTestRunner()
-        runner.run(tests)
 
 
 def rmtree(path):
@@ -118,12 +100,6 @@ packages.update(collect_package("abusehelper.bots"))
 setup(
     name="abusehelper",
     version="2.1.0",
-    packages=packages,
-    package_dir=packages,
-    scripts=[
-        "scripts/botnet",
-        "scripts/roomreader"
-    ],
     description="A framework for receiving and redistributing abuse feeds",
     long_description=(
         "AbuseHelper is a modular, scalable and robust " +
@@ -131,12 +107,19 @@ setup(
     ),
     author="Clarified Networks",
     author_email="contact@clarifiednetworks.com",
-    url="https://bitbucket.org/clarifiednetworks/abusehelper",
-    download_url="https://bitbucket.org/clarifiednetworks/abusehelper/downloads",
+    url="https://github.com/abusesa/abusehelper/",
     license="MIT",
+    packages=packages,
+    package_dir=packages,
+    scripts=[
+        "scripts/botnet",
+        "scripts/roomreader"
+    ],
+    install_requires=[
+        "idiokit>=2.2.0,<3.0.0"
+    ],
     cmdclass={
         "build": Build,
-        "install": Install,
-        "test": Test
+        "install": Install
     }
 )

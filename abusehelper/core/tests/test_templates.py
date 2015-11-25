@@ -36,7 +36,7 @@ class TestEvent(unittest.TestCase):
         template = templates.Template("%(event, key)s", event=templates.Event({
             "key": ["1", "2"]
         }))
-        self.assertEqual("1, 2", template.format(None, []))
+        self.assertTrue(template.format(None, []) in ["1, 2", "2, 1"])
 
     def test_no_value(self):
         template = templates.Template("%(event, key)s", event=templates.Event({}))
