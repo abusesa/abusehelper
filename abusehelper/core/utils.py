@@ -145,15 +145,15 @@ class _CSVReader(object):
         line raises csv.Error("newline inside string") even when strict=False
         (which is the default).
 
-        >>> list(_CSVReader(["a,b,c", "\"x\",\"y"]))
+        >>> list(_CSVReader(["a,b,c\n", "\"x\",\"y"]))
         [[u'a', u'b', u'c'], [u'x', u'y']]
 
-        >>> list(_CSVReader(["a,b,c", "\"x\",\"y", "z"]))
-        [[u'a', u'b', u'c'], [u'x', u'yz']]
+        >>> list(_CSVReader(["a,b,c\n", "\"x\",\"y\n", "z"]))
+        [[u'a', u'b', u'c'], [u'x', u'y\nz']]
 
         Remember to raise csv.Error in such cases if strict=True.
 
-        >>> reader = iter(_CSVReader(["a,b,c", "\"x\",\"y"], strict=True))
+        >>> reader = iter(_CSVReader(["a,b,c\n", "\"x\",\"y"], strict=True))
         >>> reader.next()
         [u'a', u'b', u'c']
         >>> reader.next()
@@ -161,7 +161,7 @@ class _CSVReader(object):
             ...
         Error: ...
 
-        >>> reader = iter(_CSVReader(["a,b,c", "\"x\",\"y", "z"], strict=True))
+        >>> reader = iter(_CSVReader(["a,b,c\n", "\"x\",\"y\n", "z"], strict=True))
         >>> reader.next()
         [u'a', u'b', u'c']
         >>> reader.next()
