@@ -112,21 +112,86 @@ def force_decode(string, encodings=["ascii", "utf-8"]):
     return string.decode("latin-1", "replace")
 
 
-def _csv_reader(fileobj, charset=None, **keys):
-    if charset is None:
-        decode = force_decode
-    else:
-        decode = lambda x: x.decode(charset)
-    lines = (decode(line).encode("utf-8").replace("\x00", "\xc0") for line in fileobj)
-    normalize = lambda x: x.replace("\xc0", "\x00").decode("utf-8").strip()
+class _CSVReader(object):
+    r"""
+    >>> list(_CSVReader(["\"x\",\"y\""]))
+    [[u'x', u'y']]
+    """
 
-    for row in csv.reader(lines, **keys):
-        yield map(normalize, row)
+    def __init__(self, lines, charset=None, **keys):
+        self._lines = lines
+        self._last_lines = []
+        self._keys = keys
+        self._decode = force_decode if charset is None else lambda x: x.decode(charset)
+
+    def _iterlines(self):
+        r"""
+        Work around the fact that the csv module doesn't support NUL bytes.
+
+        >>> list(_CSVReader(["x\x00,\"x\x00\""]))
+        [[u'x\x00', u'x\x00']]
+        """
+
+        for line in self._lines:
+            self._last_lines.append(self._decode(line).encode("utf-8").replace("\x00", "\xc0"))
+            yield self._last_lines[-1]
+
+    def _normalize(self, value):
+        return value.replace("\xc0", "\x00").decode("utf-8").strip()
+
+    def _retry_last_lines(self, quotechar):
+        r"""
+        Work around issue https://bugs.python.org/issue16013 where an incomplete
+        line raises csv.Error("newline inside string") even when strict=False
+        (which is the default).
+
+        >>> list(_CSVReader(["a,b,c", "\"x\",\"y"]))
+        [[u'a', u'b', u'c'], [u'x', u'y']]
+
+        >>> list(_CSVReader(["a,b,c", "\"x\",\"y", "z"]))
+        [[u'a', u'b', u'c'], [u'x', u'yz']]
+
+        Remember to raise csv.Error in such cases if strict=True.
+
+        >>> reader = iter(_CSVReader(["a,b,c", "\"x\",\"y"], strict=True))
+        >>> reader.next()
+        [u'a', u'b', u'c']
+        >>> reader.next()
+        Traceback (most recent call last):
+            ...
+        Error: ...
+
+        >>> reader = iter(_CSVReader(["a,b,c", "\"x\",\"y", "z"], strict=True))
+        >>> reader.next()
+        [u'a', u'b', u'c']
+        >>> reader.next()
+        Traceback (most recent call last):
+            ...
+        Error: ...
+        """
+
+        last_lines = list(self._last_lines)
+        last_lines[-1] += quotechar
+        for row in csv.reader(last_lines, **self._keys):
+            yield map(self._normalize, row)
+
+    def __iter__(self):
+        reader = csv.reader(self._iterlines(), **self._keys)
+        try:
+            for row in reader:
+                self._last_lines = []
+                yield map(self._normalize, row)
+        except csv.Error as error:
+            if reader.dialect.strict or error.args[:1] != ("newline inside string",):
+                raise
+
+            for row in self._retry_last_lines(reader.dialect.quotechar):
+                yield row
 
 
 @idiokit.stream
 def csv_to_events(fileobj, delimiter=",", columns=None, charset=None):
-    for row in _csv_reader(fileobj, charset=charset, delimiter=delimiter):
+    for row in _CSVReader(fileobj, charset=charset, delimiter=delimiter):
         if columns is None:
             columns = row
             continue
