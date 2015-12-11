@@ -1,5 +1,11 @@
 [![Circle CI](https://circleci.com/gh/abusesa/abusehelper.svg?style=shield)](https://circleci.com/gh/abusesa/abusehelper)
 
+# AbuseHelper
+
+AbuseHelper is an open-source framework for receiving and redistributing abuse feeds and threat intel.
+
+## License
+
 Files under contrib/ are (c) respective copyright holders if named in the specific file, everything else is current (c) by Codenomicon Ltd. Everything is licensed under MIT license (http://www.opensource.org/licenses/mit-license.php), see LICENSE.
 
 ## Important notice 2015-07-09
