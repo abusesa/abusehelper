@@ -58,7 +58,7 @@ def _rename(path):
 
 def compress(path):
     try:
-        base = path[:path.index(".json.compress")]
+        base = path[:path.index(".compress")]
     except ValueError:
         return
 
