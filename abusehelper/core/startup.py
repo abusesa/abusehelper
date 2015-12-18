@@ -7,6 +7,7 @@ import errno
 import signal
 import subprocess
 import cPickle as pickle
+from numbers import Real
 
 import idiokit
 from . import bot, config
@@ -170,7 +171,7 @@ class StartupBot(bot.Bot):
                 del self._strategies[conf]
                 continue
 
-            if isinstance(output_value, (int, float)):
+            if isinstance(output_value, Real):
                 self._strategies[conf] = output_value + now, strategy
             else:
                 del self._strategies[conf]
