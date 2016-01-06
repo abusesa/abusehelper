@@ -13,10 +13,10 @@ Everything starts by importing ```maildirbot``` and subclassing ```maildirbot.Ha
 
 ```python
 import idiokit
-import maildirbot
+from abusehelper.core.mail import Handler
 
 
-class MyHandler(maildirbot.Handler):
+class MyHandler(Handler):
     pass
 ```
 
@@ -24,10 +24,10 @@ In theory this is enough, yet useless. We need to figure out which mail parts we
 
 ```python
 import idiokit
-import maildirbot
+from abusehelper.core.mail import Handler
 
 
-class MyHandler(maildirbot.Handler):
+class MyHandler(Handler):
     @idiokit.stream
     def handle_text_plain(self, ...):
         ...
@@ -43,11 +43,11 @@ These parameters can in turn be used to parse AbuseHelper events from the mail p
 
 ```python
 import idiokit
-import maildirbot
 from abusehelper.core import events
+from abusehelper.core.mail import Handler
 
 
-class MyHandler(maildirbot.Handler):
+class MyHandler(Handler):
     @idiokit.stream
     def handle_text_plain(self, msg, log):
         data = msg.get_payload(decode=True)
@@ -71,6 +71,8 @@ As stated earlier a custom handler should be provided as a parameter when launch
 
 ```python
 if __name__ == "__main__":
+    from abusehelper.core.mail import maildirbot
+
     maildirbot.MailDirBot.from_command_line(MyHandler()).execute()
 ```
 
