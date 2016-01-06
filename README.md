@@ -1,6 +1,4 @@
-[![Circle CI](https://circleci.com/gh/abusesa/abusehelper.svg?style=shield)](https://circleci.com/gh/abusesa/abusehelper)
-
-# AbuseHelper
+# AbuseHelper [![Circle CI](https://circleci.com/gh/abusesa/abusehelper.svg?style=shield)](https://circleci.com/gh/abusesa/abusehelper)
 
 AbuseHelper is an open-source framework for receiving and redistributing abuse feeds and threat intel.
 
