@@ -2,17 +2,15 @@
 
 AbuseHelper is an open-source framework for receiving and redistributing abuse feeds and threat intel.
 
-## License
+## Updates
 
-Files under contrib/ are (c) respective copyright holders if named in the specific file, everything else is current (c) by Codenomicon Ltd. Everything is licensed under MIT license (http://www.opensource.org/licenses/mit-license.php), see LICENSE.
-
-## 2015-01-05 Legacy rules removed
+### 2015-01-05 Legacy rules removed
 
 Legacy rules from ```abusehelper.core.rules.compat``` (```AND```, ```OR```, ```NOT```, ```MATCH```, ```ANYTHING``` and ```NETBLOCK```) have now been removed after a deprecation period. Please use corresponding ```abusehelper.core.rules``` functionality (```And```, ```Or```, ...).
 
-## 2015-01-04 Contrib package removal
+### 2015-01-04 Contrib package removal
 
-The migration period for the contrib package removal has ended. Please change all references of abusehelper.contrib package to abusehelper.bots. All the internal references within AbuseHelper have been updated to support the migration.
+The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to abusehelper.bots. All the internal references within AbuseHelper have been updated to support the migration.
 
 Some of the bots have also migrated to the new AbuseHelper community repository in: [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity)
 
@@ -45,3 +43,7 @@ contrib.opencollab.wikicryptostartup
 contrib.opencollab.wikiruntime
 contrib.opencollab.wikistartup
 ```
+
+## License
+
+Files are (c) respective copyright holders if named in the specific file, everything else is current (c) by Codenomicon Ltd. Everything is licensed under [MIT license](http://www.opensource.org/licenses/mit-license.php), see [LICENSE](./LICENSE).
