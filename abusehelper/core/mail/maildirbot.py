@@ -8,7 +8,7 @@ import contextlib
 import email
 import email.header
 from abusehelper.core import bot, utils
-from ._utils import get_header, CallableParam
+from ._utils import get_header, escape_whitespace, CallableParam
 
 
 def try_rename(from_name, to_name):
@@ -147,8 +147,8 @@ class MailDirBot(bot.FeedBot):
             if msg is None:
                 continue
 
-            subject = get_header(msg, "Subject", "<no subject>")
-            sender = get_header(msg, "From", "<unknown sender>")
+            subject = escape_whitespace(get_header(msg, "Subject", "<no subject>"))
+            sender = escape_whitespace(get_header(msg, "From", "<unknown sender>"))
             self.log.info(u"Handler #{0} handling mail '{1}' from {2}".format(nth_concurrent, subject, sender))
 
             handler = self.handler(self.log)

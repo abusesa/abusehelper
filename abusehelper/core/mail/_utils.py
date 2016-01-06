@@ -1,3 +1,4 @@
+import re
 import email.header
 from ..bot import Param, ParamError
 
@@ -16,8 +17,23 @@ def get_header(headers, key, default=None):
     return u" ".join(bites)
 
 
-def load_callable(value):
+def escape_whitespace(unicode_string):
+    r"""
+    Return the given unicode string with the whitespace escaped
+    using 'unicode-escape' encoding.
+
+    >>> escape_whitespace(u"space is not escaped")
+    u'space is not escaped'
+
+    >>> escape_whitespace(u"multi\nline\nwith\ttabs")
+    u'multi\\nline\\nwith\\ttabs'
     """
+
+    return re.sub(r"\s", lambda x: unicode(x.group(0).encode("unicode-escape")), unicode_string, re.U)
+
+
+def load_callable(value):
+    r"""
     Load and return a callable.
 
     >>> import uuid
