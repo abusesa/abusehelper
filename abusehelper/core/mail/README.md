@@ -65,19 +65,10 @@ Now we just want to launch and test our handler somehow.
 
 ## Launching a handler as a bot
 
-As stated earlier a custom handler should be provided as a parameter when launching a ```MailDirBot``` instance. This happens by adding the following to the end of your handler module:
-
-```python
-if __name__ == "__main__":
-    from abusehelper.core.mail import maildirbot
-
-    maildirbot.MailDirBot.from_command_line(MyHandler()).execute()
-```
-
-And there you go. You can now launch it with
+As stated earlier a custom handler should be provided as a parameter when launching a ```MailDirBot``` instance. This happens like this:
 
 ```
-$ python myhandler.py user@xmpp.example.com lobby.room Mail/customer1 myworkdir
+$ python myhandler.py user@xmpp.example.com lobby.room myhandler.MyHandler Mail/customer1 myworkdir
 ```
 
 and the bot will start chewing through the mails in the Mail/customer1 directory, producing the events from text/plain parts and moving the handled mails under the workdir. If you're feeling extra adventurous add ```--concurrency=5``` there and the bot will handle 5 mails simultaneously when it can.
