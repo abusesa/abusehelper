@@ -35,11 +35,7 @@ class MyHandler(Handler):
 
 There is a notable exception when dealing with mime types containing hyphens such as application/octet-stream. In such cases replace the hyphen with a double underscore (e.g. ```handle_application_octet__stream```).
 
-So what does our ```handle_text_plain``` get as parameters? The complete method signature would be ```handle_text_plain(self, msg, log)``` where:
-   * ```msg``` is the currently handled part of the mail, wrapped in Python's standard ```email.message.Message``` object.
-   * ```log``` is regular logger object from Python's standard ```logging``` module.
-
-These parameters can in turn be used to parse AbuseHelper events from the mail part while logging interesting information about what's happening:
+So what does our ```handle_text_plain``` get as parameters? The complete method signature would be ```handle_text_plain(self, msg)``` where ```msg``` is the currently handled part of the mail, wrapped in Python's standard ```email.message.Message``` object. ```msg``` can then be examined to parse AbuseHelper events from it:
 
 ```python
 import idiokit
@@ -49,20 +45,22 @@ from abusehelper.core.mail import Handler
 
 class MyHandler(Handler):
     @idiokit.stream
-    def handle_text_plain(self, msg, log):
+    def handle_text_plain(self, msg):
         data = msg.get_payload(decode=True)
 
-        log.info("Starting to process {0} bytes of data".format(len(data)))
+        self.log.info("Starting to process {0} bytes of data".format(len(data)))
 
         for line in data.splitlines():
             yield idiokit.send(events.Event({
                 "line": line.decode("utf-8", "replace")
             }))
 
-        log.info("Done")
+        self.log.info("Done")
 ```
 
-And there you go, a *bona fide* handler. Now we just want to launch and test it somehow.
+And there you go, a *bona fide* handler. Note how the handler has a special attribute ```self.log``` for logging information about what's happening.
+
+Now we just want to launch and test our handler somehow.
 
 
 ## Launching a handler as a bot

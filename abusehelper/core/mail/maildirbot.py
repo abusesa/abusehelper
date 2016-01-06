@@ -8,6 +8,7 @@ import contextlib
 import email
 import email.header
 from abusehelper.core import bot, utils
+from . import _load_callable, _CallableParam
 
 
 def try_rename(from_name, to_name):
@@ -82,15 +83,15 @@ def lockfile(filename):
 
 
 class MailDirBot(bot.FeedBot):
+    handler = _CallableParam()
     input_dir = bot.Param()
     work_dir = bot.Param()
     concurrency = bot.IntParam(default=1)
     poll_interval = bot.FloatParam(default=1)
 
-    def __init__(self, handler, *args, **keys):
+    def __init__(self, *args, **keys):
         bot.FeedBot.__init__(self, *args, **keys)
 
-        self._handler = handler
         self._queue = utils.WaitQueue()
 
     def feed_keys(self, *args, **keys):
@@ -164,7 +165,8 @@ class MailDirBot(bot.FeedBot):
             sender = get_header(msg, "From", "<unknown sender>")
             self.log.info(u"Handler #{0} handling mail '{1}' from {2}".format(nth_concurrent, subject, sender))
 
-            yield self._handler.handle(msg, self.log)
+            handler = self.handler(self.log)
+            yield handler.handle(msg)
 
             os.rename(input_name, output_name)
             self.log.info(u"Handler #{0} done with mail '{1}' from {2}".format(nth_concurrent, subject, sender))
@@ -202,9 +204,7 @@ if __name__ == "__main__":
 
     if len(args) < 1:
         parser.error("expected handler")
-    module, _, classname = args[0].rpartition(".")
-    mod = __import__(module, fromlist=[classname])
-    handler = getattr(mod, classname)()
+    handler_class = _load_callable(args[0])
 
     for arg in args[1:]:
         for dirname, filename in iter_dir(arg):
@@ -215,5 +215,6 @@ if __name__ == "__main__":
                 continue
 
             logging.info("handling '{0}'".format(orig_name))
-            idiokit.main_loop(handler.handle(msg, logging) | print_events())
+            handler = handler_class(logging)
+            idiokit.main_loop(handler.handle(msg) | print_events())
             logging.info("done with '{0}'".format(orig_name))
