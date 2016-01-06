@@ -8,7 +8,7 @@ import contextlib
 import email
 import email.header
 from abusehelper.core import bot, utils
-from . import _load_callable, _CallableParam
+from . import _CallableParam
 
 
 def try_rename(from_name, to_name):
@@ -173,48 +173,4 @@ class MailDirBot(bot.FeedBot):
 
 
 if __name__ == "__main__":
-    import json
-    import logging
-    import optparse
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s %(levelname)s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%SZ"
-    )
-
-    @idiokit.stream
-    def print_events():
-        while True:
-            event = yield idiokit.next()
-
-            json_dict = {}
-            for key in event.keys():
-                values = event.values(key)
-                if len(values) == 1:
-                    json_dict[key] = values[0]
-                else:
-                    json_dict[key] = list(values)
-            print json.dumps(json_dict)
-
-    parser = optparse.OptionParser()
-    parser.set_usage("usage: %prog [options] handler [dirname ...]")
-
-    options, args = parser.parse_args()
-
-    if len(args) < 1:
-        parser.error("expected handler")
-    handler_class = _load_callable(args[0])
-
-    for arg in args[1:]:
-        for dirname, filename in iter_dir(arg):
-            orig_name = os.path.join(dirname, filename)
-            msg = try_read_message(orig_name)
-            if msg is None:
-                logging.info("skipped '{0}' (could not open)".format(orig_name))
-                continue
-
-            logging.info("handling '{0}'".format(orig_name))
-            handler = handler_class(logging)
-            idiokit.main_loop(handler.handle(msg) | print_events())
-            logging.info("done with '{0}'".format(orig_name))
+    MailDirBot.from_command_line().execute()

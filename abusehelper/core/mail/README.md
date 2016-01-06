@@ -94,7 +94,7 @@ The motivation separating the part doing the Maildir juggling (```MailDirBot```)
 Run your handler like this:
 
 ```
-$ python -m maildirbot myhandler.MyHandler Mail/customer1/new
+$ python -m abusehelper.core.mail.tester myhandler.MyHandler Mail/customer1/new
 ```
 
 This will now parse the mails under the Mail/customer/new directory and output the events as JSON to STDOUT and write the logs to STDERR.
