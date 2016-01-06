@@ -6,7 +6,7 @@ import optparse
 
 import idiokit
 from ..utils import format_exception
-from . import _load_callable
+from ._utils import load_callable
 
 
 @idiokit.stream
@@ -37,7 +37,7 @@ def main():
     options, args = parser.parse_args()
     if len(args) < 1:
         parser.error("expected handler")
-    handler_class = _load_callable(args[0])
+    handler_class = load_callable(args[0])
 
     for dirname in args[1:]:
         for filename in os.listdir(dirname):

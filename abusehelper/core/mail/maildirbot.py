@@ -8,7 +8,7 @@ import contextlib
 import email
 import email.header
 from abusehelper.core import bot, utils
-from . import _CallableParam
+from ._utils import get_header, CallableParam
 
 
 def try_rename(from_name, to_name):
@@ -29,20 +29,6 @@ def try_read_message(path):
         if ioe.errno != errno.ENOENT:
             raise
     return None
-
-
-def get_header(headers, key, default=None):
-    value = headers.get(key, None)
-    if value is None:
-        return default
-
-    bites = []
-    for string, encoding in email.header.decode_header(value):
-        if encoding is not None:
-            string = string.decode(encoding, "replace")
-        bites.append(string)
-
-    return u" ".join(bites)
 
 
 def makedirs(*args, **keys):
@@ -83,7 +69,7 @@ def lockfile(filename):
 
 
 class MailDirBot(bot.FeedBot):
-    handler = _CallableParam()
+    handler = CallableParam()
     input_dir = bot.Param()
     work_dir = bot.Param()
     concurrency = bot.IntParam(default=1)
