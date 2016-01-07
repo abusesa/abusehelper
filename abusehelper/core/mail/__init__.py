@@ -19,4 +19,6 @@ class Handler(object):
 
             skip_rest = yield handler(part)
             if skip_rest:
-                return
+                idiokit.stop(True)
+
+        idiokit.stop(False)
