@@ -102,5 +102,5 @@ class CallableParam(Param):
     def parse(self, value):
         try:
             return load_callable(value)
-        except ValueError as error:
+        except (ValueError, TypeError) as error:
             raise ParamError(*error.args)
