@@ -65,14 +65,16 @@ class Expert(_RoomBot):
         self._augments = taskfarm.TaskFarm(self._handle_augment)
 
     def _handle_augment(self, src_room, dst_room, args):
-        return (self.from_room(src_room)
-                | events.stanzas_to_events()
-                | _ignore_augmentations(src_room == dst_room)
-                | _create_eids()
-                | self.augment(*args)
-                | _embed_eids()
-                | events.events_to_elements()
-                | self.to_room(dst_room))
+        return idiokit.pipe(
+            self.from_room(src_room),
+            events.stanzas_to_events(),
+            _ignore_augmentations(src_room == dst_room),
+            _create_eids(),
+            self.augment(*args),
+            _embed_eids(),
+            events.events_to_elements(),
+            self.to_room(dst_room)
+        )
 
     @idiokit.stream
     def session(self, state, src_room, dst_room=None, **keys):

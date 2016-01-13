@@ -71,16 +71,18 @@ class Combiner(_RoomBot):
 
         ids = dict()
         queue = collections.deque()
-        yield (self.from_room(src_room)
-               | events.stanzas_to_events()
-               | _ignore_augmentations(augment_room == src_room)
-               | self.collect(ids, queue, time_window)
-               | self.cleanup(ids, queue)
-               | events.events_to_elements()
-               | self.to_room(dst_room)
-               | self.from_room(augment_room)
-               | events.stanzas_to_events()
-               | self.combine(ids, queue, time_window))
+        yield idiokit.pipe(
+            self.from_room(src_room),
+            events.stanzas_to_events(),
+            _ignore_augmentations(augment_room == src_room),
+            self.collect(ids, queue, time_window),
+            self.cleanup(ids, queue),
+            events.events_to_elements(),
+            self.to_room(dst_room),
+            self.from_room(augment_room),
+            events.stanzas_to_events(),
+            self.combine(ids, queue, time_window)
+        )
 
 
 if __name__ == "__main__":

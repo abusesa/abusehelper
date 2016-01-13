@@ -3,6 +3,9 @@ from __future__ import absolute_import
 import os
 import csv
 import sys
+import time
+import getpass
+import hashlib
 import inspect
 import logging
 import warnings
@@ -10,6 +13,11 @@ import logging.handlers
 import optparse
 import traceback
 import cPickle as pickle
+
+import idiokit
+from idiokit.xmpp import connect
+
+from . import log, events, taskfarm, utils, services, version
 
 
 class ParamError(Exception):
@@ -310,14 +318,6 @@ class Bot(object):
         pass
 
 
-import time
-import getpass
-
-import idiokit
-from idiokit.xmpp import connect
-from . import log
-
-
 class XMPPBot(Bot):
     xmpp_jid = Param("the XMPP JID (e.g. xmppuser@xmpp.example.com)")
     xmpp_password = Param(
@@ -361,9 +361,6 @@ class XMPPBot(Bot):
             ssl_ca_certs=self.xmpp_extra_ca_certs)
         self.log.info("Connected to XMPP service with JID " + repr(self.xmpp_jid))
         idiokit.stop(xmpp)
-
-
-from . import services, version
 
 
 class _Service(services.Service):
@@ -426,10 +423,6 @@ class ServiceBot(XMPPBot):
 
     def session(self, state, **keys):
         return idiokit.consume()
-
-
-import hashlib
-from . import events, taskfarm, utils
 
 
 class FeedBot(ServiceBot):

@@ -6,8 +6,15 @@ import socket
 import getpass
 import smtplib
 import collections
+from email import message_from_string
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.charset import Charset, QP
+from email.header import decode_header
+from email.utils import getaddresses, formataddr
 
 import idiokit
+
 from . import events, taskfarm, services, templates, bot, utils
 
 
@@ -168,14 +175,6 @@ class ReportBot(bot.ServiceBot):
     @idiokit.stream
     def report(self, collected):
         yield idiokit.sleep(0.0)
-
-
-from email import message_from_string
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.charset import Charset, QP
-from email.header import decode_header
-from email.utils import getaddresses, formataddr
 
 
 class MailTemplate(templates.Template):

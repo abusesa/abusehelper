@@ -69,10 +69,8 @@ class DotBot(bot.Bot):
         services = dot.services()
         sessions = dot.sessions()
 
-        if self.show_startups:
-            missing = lambda x: x not in services
-        else:
-            missing = lambda x: False
+        def missing(x):
+            return self.show_startups and x not in services
 
         for session in sessions:
             conf = dict(session.conf)
