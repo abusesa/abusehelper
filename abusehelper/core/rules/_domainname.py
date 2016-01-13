@@ -1,37 +1,7 @@
 from itertools import izip
 
 
-class Name(object):
-    def __init__(self, labels):
-        self._hash = None
-        self._labels = tuple(labels)
-
-    def __hash__(self):
-        r"""
-        >>> s = set([Name(["a", "b", "c"])])
-        >>> Name(["a", "b", "c"]) in s
-        True
-        >>> Name(["x", "y", "z"]) in s
-        False
-        """
-
-        if self._hash is None:
-            self._hash = hash(Name) ^ hash(self._labels)
-        return self._hash
-
-    def __eq__(self, other):
-        if not isinstance(other, Name):
-            return NotImplemented
-        return self._labels == other._labels
-
-    def __ne__(self, other):
-        eq = self.__eq__(other)
-        if eq is NotImplemented:
-            return NotImplemented
-        return not eq
-
-
-def _issubdomain(name_labels, pattern_labels):
+def _issubdomain(name, pattern_labels):
     r"""
     _issubdomain(["a", "b", "c"], ["b", "c"])
     True
@@ -55,10 +25,10 @@ def _issubdomain(name_labels, pattern_labels):
     False
     """
 
-    if len(pattern_labels) > len(name_labels):
+    if len(pattern_labels) > len(name):
         return False
 
-    for left, right in izip(reversed(name_labels), reversed(pattern_labels)):
+    for left, right in izip(reversed(name), reversed(pattern_labels)):
         if left != right:
             return False
 
@@ -109,47 +79,47 @@ class Pattern(object):
     def contains(self, name):
         r"""
         >>> p = Pattern(0, ["example"])
-        >>> p.contains(Name(["example"]))
+        >>> p.contains(["example"])
         True
-        >>> p.contains(Name(["domain", "example"]))
+        >>> p.contains(["domain", "example"])
         True
-        >>> p.contains(Name(["sub", "domain", "example"]))
+        >>> p.contains(["sub", "domain", "example"])
         True
-        >>> p.contains(Name(["other"]))
+        >>> p.contains(["other"])
         False
 
         >>> p = Pattern(1, ["example"])
-        >>> p.contains(Name(["example"]))
+        >>> p.contains(["example"])
         False
-        >>> p.contains(Name(["domain", "example"]))
+        >>> p.contains(["domain", "example"])
         True
-        >>> p.contains(Name(["sub", "domain", "example"]))
+        >>> p.contains(["sub", "domain", "example"])
         True
         """
 
-        if len(name._labels) < self._length:
+        if len(name) < self._length:
             return False
-        return _issubdomain(name._labels, self._labels)
+        return _issubdomain(name, self._labels)
 
     def matches(self, name):
         r"""
         >>> p = Pattern(0, ["example"])
-        >>> p.matches(Name(["example"]))
+        >>> p.matches(["example"])
         True
-        >>> p.matches(Name(["domain", "example"]))
+        >>> p.matches(["domain", "example"])
         False
-        >>> p.matches(Name(["other"]))
+        >>> p.matches(["other"])
         False
 
         >>> p = Pattern(1, ["example"])
-        >>> p.matches(Name(["example"]))
+        >>> p.matches(["example"])
         False
-        >>> p.matches(Name(["domain", "example"]))
+        >>> p.matches(["domain", "example"])
         True
-        >>> p.matches(Name(["sub", "domain", "example"]))
+        >>> p.matches(["sub", "domain", "example"])
         False
         """
 
-        if len(name._labels) != self._length:
+        if len(name) != self._length:
             return False
-        return _issubdomain(name._labels, self._labels)
+        return _issubdomain(name, self._labels)
