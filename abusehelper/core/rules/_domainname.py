@@ -35,10 +35,17 @@ def parse_name(string):
     >>> parse_name(u"domain.example")
     (u'domain', u'example')
 
-    The resulting labels are normalized with idna.nameprep and lowercased.
+    Internationalized domain names are supported. To normalize the labels they
+    are run through idna.ToASCII and lowercased.
 
     >>> parse_name(u"DOMAIN.example")
     (u'domain', u'example')
+    >>> parse_name(u"\xe4.example")
+    (u'\xe4', u'example')
+    >>> parse_name(u"\xc4.example")
+    (u'\xe4', u'example')
+    >>> parse_name(u"xn--4ca.example")
+    (u'\xe4', u'example')
 
     Return None if the string is not a well-formed domain name. For example the
     name must honor the maximum name length (253 characters, including periods)
