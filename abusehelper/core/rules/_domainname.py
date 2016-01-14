@@ -161,6 +161,36 @@ pattern_parser = _PatternParser()
 
 
 class Pattern(object):
+    @classmethod
+    def from_string(cls, string):
+        r"""
+        Return a pattern parsed from a string.
+
+        >>> Pattern.from_string("*.example") == Pattern(1, ["example"])
+        True
+
+        Raise ValueError if the string is not a valid domain name pattern.
+
+        >>> Pattern.from_string("this is not a pattern")
+        Traceback (most recent call last):
+            ...
+        ValueError: ...
+
+        Non-unicode strings will be decoded using the default "ascii" encoding.
+
+        >>> Pattern.from_string("\xe4")
+        Traceback (most recent call last):
+            ...
+        UnicodeDecodeError: ...
+        """
+
+        result = pattern_parser.parse(unicode(string).strip())
+        if result is not None:
+            pattern, suffix = result
+            if not suffix:
+                return pattern
+        raise ValueError("not a valid domain name pattern")
+
     def __init__(self, free, labels):
         self._hash = None
         self._free = free
