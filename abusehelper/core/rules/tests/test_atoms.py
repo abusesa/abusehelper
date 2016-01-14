@@ -119,19 +119,44 @@ class TestIP(unittest.TestCase):
 
 
 class TestDomainName(unittest.TestCase):
-    _options = [
-        DomainName("domain.example"),
-        DomainName("*.example")
-    ]
+    def test_non_wildcard_label_should_(self):
+        self.assertTrue(DomainName("domain.example").match("domain.example"))
+        self.assertFalse(DomainName("domain.example").match("domain.test"))
 
-    def test_matching(self):
+    def test_subdomains_should_match_to_their_parent_domains(self):
+        self.assertTrue(DomainName("domain.example").match("sub.domain.example"))
+        self.assertTrue(DomainName("domain.example").match("deep.sub.domain.example"))
+
+    def test_constructor_should_handle_names_case_insensitively(self):
+        self.assertEqual(DomainName("domain.example"), DomainName("domain.EXAMPLE"))
+
+    def test_match_should_handle_names_case_insensitively(self):
+        self.assertTrue(DomainName("domain.example").match("domain.example"))
+        self.assertTrue(DomainName("domain.example").match("domain.EXAMPLE"))
+
+    def test_wildcard_should_match_to_any_label(self):
         self.assertTrue(DomainName("*.example").match("domain.example"))
         self.assertTrue(DomainName("*.example").match("sub.domain.example"))
-        self.assertFalse(DomainName("*.example").match("domain.test"))
 
-        self.assertTrue(DomainName("domain.example").match("domain.example"))
-        self.assertTrue(DomainName("domain.example").match("sub.domain.example"))
-        self.assertFalse(DomainName("domain.example").match("domain.test"))
+    def test_wildcard_should_demand_a_label_to_match_to(self):
+        self.assertFalse(DomainName("*.*.example").match("domain.example"))
+        self.assertTrue(DomainName("*.*.example").match("sub.domain.example"))
+
+    def test_constructor_should_normalize_internationalized_names(self):
+        self.assertEqual(DomainName("\xe4.example"), DomainName("xn--4ca.example"))
+        self.assertEqual(DomainName("\xe4.example"), DomainName("\xc4.example"))
+
+    def test_match_should_normalize_internationalized_names(self):
+        self.assertTrue(DomainName("\xe4.example").match("\xe4.example"))
+        self.assertTrue(DomainName("\xe4.example").match("xn--4ca.example"))
+        self.assertTrue(DomainName("\xe4.example").match("\xc4.example"))
+
+    _options = [
+        DomainName("domain.example"),
+        DomainName("*.example"),
+        DomainName("\xe4.example"),
+        DomainName("xn--4ca.example")
+    ]
 
     def test_pickling_and_unpickling(self):
         for option in self._options:
