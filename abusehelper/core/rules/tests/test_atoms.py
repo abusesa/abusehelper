@@ -4,7 +4,7 @@ import re
 import pickle
 import unittest
 
-from ..atoms import String, RegExp, IP
+from ..atoms import String, RegExp, IP, DomainName
 
 
 class TestString(unittest.TestCase):
@@ -108,6 +108,30 @@ class TestIP(unittest.TestCase):
         IP("2001:db8::/24"),
         IP("2001:db8::-2001:db8::1")
     ]
+
+    def test_pickling_and_unpickling(self):
+        for option in self._options:
+            self.assertEqual(option, pickle.loads(pickle.dumps(option)))
+
+    def test_repr(self):
+        for option in self._options:
+            self.assertEqual(option, eval(repr(option)))
+
+
+class TestDomainName(unittest.TestCase):
+    _options = [
+        DomainName("domain.example"),
+        DomainName("*.example")
+    ]
+
+    def test_matching(self):
+        self.assertTrue(DomainName("*.example").match("domain.example"))
+        self.assertTrue(DomainName("*.example").match("sub.domain.example"))
+        self.assertFalse(DomainName("*.example").match("domain.test"))
+
+        self.assertTrue(DomainName("domain.example").match("domain.example"))
+        self.assertTrue(DomainName("domain.example").match("sub.domain.example"))
+        self.assertFalse(DomainName("domain.example").match("domain.test"))
 
     def test_pickling_and_unpickling(self):
         for option in self._options:
