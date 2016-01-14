@@ -163,8 +163,9 @@ pattern_parser = _PatternParser()
 class Pattern(object):
     def __init__(self, free, labels):
         self._hash = None
+        self._free = free
         self._labels = tuple(labels)
-        self._length = free + len(self._labels)
+        self._length = self._free + len(self._labels)
 
     def __hash__(self):
         r"""
@@ -178,7 +179,7 @@ class Pattern(object):
         """
 
         if self._hash is None:
-            self._hash = hash(Pattern) ^ hash(self._length) ^ hash(self._labels)
+            self._hash = hash(Pattern) ^ hash(self._free) ^ hash(self._labels)
         return self._hash
 
     def __eq__(self, other):
@@ -193,13 +194,25 @@ class Pattern(object):
 
         if not isinstance(other, Pattern):
             return NotImplemented
-        return self._length == other._length and self._labels == other._labels
+        return self._free == other._free and self._labels == other._labels
 
     def __ne__(self, other):
         eq = self.__eq__(other)
         if eq is NotImplemented:
             return NotImplemented
         return not eq
+
+    def __unicode__(self):
+        r"""
+        Return the pattern formatted as an unicode object.
+
+        >>> unicode(Pattern(1, ["example"]))
+        u'*.example'
+        >>> unicode(Pattern(0, ["domain", "example"]))
+        u'domain.example'
+        """
+
+        return u"*." * self._free + ".".join(self._labels)
 
     def contains(self, name):
         r"""
