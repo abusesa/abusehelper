@@ -4,7 +4,7 @@ import re
 import pickle
 import unittest
 
-from ..atoms import String, RegExp, IP
+from ..atoms import String, RegExp, IP, DomainName
 from ..rules import And, Or, No, Match, NonMatch, Fuzzy
 
 from ...events import Event
@@ -99,11 +99,20 @@ class TestMatch(unittest.TestCase):
             Match("a", re.compile("b")),
             Match("a", RegExp("b")))
 
+    def test_domainname(self):
+        matcher = Match("a", DomainName("*.example"))
+        self.assertTrue(matcher.match(Event({"a": "domain.example"})))
+        self.assertTrue(matcher.match(Event({"a": "sub.domain.example"})))
+        self.assertFalse(matcher.match(Event({"a": "*.example"})))
+        self.assertFalse(matcher.match(Event({"a": "*.domain.example"})))
+        self.assertFalse(matcher.match(Event({"a": "domain.test"})))
+
     _options = [
         Match(),
         Match("a", String("b")),
         Match("a", RegExp("b")),
-        Match("a", IP("192.0.2.0"))
+        Match("a", IP("192.0.2.0")),
+        Match("a", DomainName("*.example"))
     ]
 
     def test_pickling_and_unpickling(self):
@@ -124,11 +133,20 @@ class TestNonMatch(unittest.TestCase):
             NonMatch("a", re.compile("b")),
             NonMatch("a", RegExp("b")))
 
+    def test_domainname(self):
+        matcher = NonMatch("a", DomainName("*.example"))
+        self.assertFalse(matcher.match(Event({"a": "domain.example"})))
+        self.assertFalse(matcher.match(Event({"a": "sub.domain.example"})))
+        self.assertTrue(matcher.match(Event({"a": "*.example"})))
+        self.assertTrue(matcher.match(Event({"a": "*.domain.example"})))
+        self.assertTrue(matcher.match(Event({"a": "domain.test"})))
+
     _options = [
         NonMatch(),
         NonMatch("a", String("b")),
         NonMatch("a", RegExp("b")),
-        NonMatch("a", IP("192.0.2.0"))
+        NonMatch("a", IP("192.0.2.0")),
+        NonMatch("a", DomainName("*.example"))
     ]
 
     def test_pickling_and_unpickling(self):
@@ -167,7 +185,8 @@ class TestFuzzy(unittest.TestCase):
     _options = [
         Fuzzy(String("a")),
         Fuzzy(RegExp("a")),
-        Fuzzy(IP("192.0.2.0"))
+        Fuzzy(IP("192.0.2.0")),
+        Fuzzy(DomainName("*.example"))
     ]
 
     def test_pickling_and_unpickling(self):
