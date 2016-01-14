@@ -69,6 +69,7 @@ class TestSerialize(unittest.TestCase):
         rule = rules.And(
             rules.Match(u"a", rules.String(u"a")),
             rules.Match(u"b", rules.RegExp(u"b")),
-            rules.Match(u"c", rules.IP(u"192.0.2.0"))
+            rules.Match(u"c", rules.IP(u"192.0.2.0")),
+            rules.Match(u"d", rules.DomainName(u"domain.example"))
         )
         self.assertEqual(serialize.load(serialize.dump(rule)), rule)
