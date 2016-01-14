@@ -2,9 +2,29 @@ import re
 from itertools import izip
 from encodings import idna
 
+from . import parsing
+
 
 # A regular expression for checking a validity of a ASCII domain name label.
 _LABEL_REX = re.compile(r"^[a-z0-9](?:[\-a-z0-9]{0,61}[a-z0-9])?$")
+
+
+def _parse_labels(string):
+    try:
+        # Note: idna.ToASCII also enforces the minimum and maximum label length.
+        labels = tuple(idna.ToASCII(x).lower() for x in string.split(u"."))
+    except UnicodeError:
+        return None
+
+    if len(labels) + sum(len(x) for x in labels) > 253:
+        return None
+
+    if labels[-1].isdigit():
+        return None
+    if not all(_LABEL_REX.match(x) for x in labels):
+        return None
+
+    return tuple(idna.ToUnicode(x) for x in labels)
 
 
 def parse_name(string):
@@ -13,6 +33,11 @@ def parse_name(string):
     unicode string.
 
     >>> parse_name(u"domain.example")
+    (u'domain', u'example')
+
+    The resulting labels are normalized with idna.nameprep and lowercased.
+
+    >>> parse_name(u"DOMAIN.example")
     (u'domain', u'example')
 
     Return None if the string is not a well-formed domain name. For example the
@@ -44,27 +69,10 @@ def parse_name(string):
     >>> parse_name(u"example")
     """
 
-    labels = string.split(".")
-
     # Don't accept plain top-level domains.
-    if len(labels) < 2:
+    if "." not in string:
         return None
-
-    try:
-        # Note: idna.ToASCII also enforces the minimum and maximum label length.
-        labels = map(idna.ToASCII, string.split("."))
-    except UnicodeError:
-        return None
-
-    if len(labels) + sum(len(x) for x in labels) > 253:
-        return None
-
-    if labels[-1].isdigit():
-        return None
-    if not all(_LABEL_REX.match(x) for x in labels):
-        return None
-
-    return tuple(idna.ToUnicode(x) for x in labels)
+    return _parse_labels(string)
 
 
 def _issubdomain(name, pattern_labels):
@@ -99,6 +107,57 @@ def _issubdomain(name, pattern_labels):
             return False
 
     return True
+
+
+class _PatternParser(parsing.Parser):
+    r"""
+    A parser for domain name patterns.
+
+    >>> parser = _PatternParser()
+    >>> parser.parse("domain.example") == (Pattern(0, ["domain", "example"]), "")
+    True
+    >>> parser.parse("*.domain.example") == (Pattern(1, ["domain", "example"]), "")
+    True
+
+    Only the matching prefix should be consumed.
+
+    >>> parser.parse("domain.example test") == (Pattern(0, ["domain", "example"]), " test")
+    True
+
+    To same rules and normalizations apply to the non-wildcard labels as with
+    parse_name, with one exception: A plain top-level domain is allowed when it
+    follows at least one wildcard label.
+
+    >>> parser.parse("*.example") == (Pattern(1, ["example"]), "")
+    True
+
+    Wildcards are only accepted in the beginning of the pattern and the pattern has
+    to end with a non-wildcard part.
+
+    >>> parser.parse("domain.*.example")
+    >>> parser.parse("*.*")
+    """
+
+    _PATTERN_REX = re.compile(r"(?:[^\.\*\s]+\.)*[^\.\*\s]+")
+
+    def parse_gen(self, (string, start, end)):
+        free = 0
+        while string.startswith("*.", start, end):
+            free += 1
+            start += 2
+
+        match = self._PATTERN_REX.match(string, start, end)
+        if not match:
+            yield None, None
+
+        labels = _parse_labels(match.group(0))
+        if labels is None or free + len(labels) < 2:
+            yield None, None
+
+        yield None, (Pattern(free, labels), (string, match.end(), end))
+
+
+pattern_parser = _PatternParser()
 
 
 class Pattern(object):
