@@ -24,16 +24,16 @@ def _normalize(value):
     u'b'
     >>> _normalize(1)
     Traceback (most recent call last):
-    ...
+        ...
     TypeError: expected a string value, got the value 1 of type int
 
     When converting str objects the default encoding is tried, and an
     UnicodeDecodeError is raised if the value can not bot converted.
 
-    >>> _normalize("\\xe4") #doctest: +IGNORE_EXCEPTION_DETAIL
+    >>> _normalize("\\xe4")
     Traceback (most recent call last):
-    ...
-    UnicodeDecodeError: <the error goes here>
+        ...
+    UnicodeDecodeError: ...
     """
 
     if isinstance(value, basestring):
@@ -467,11 +467,11 @@ class Event(object):
         >>> event = Event()
         >>> event.value()
         Traceback (most recent call last):
-        ...
+            ...
         KeyError: 'no value available'
         >>> event.value("somekey")
         Traceback (most recent call last):
-        ...
+            ...
         KeyError: 'somekey'
 
         As with .values(...), parsing and filtering functions can be
@@ -489,7 +489,7 @@ class Event(object):
         1
         >>> event.value("other", parser=int_parse)
         Traceback (most recent call last):
-        ...
+            ...
         KeyError: 'other'
         """
 
