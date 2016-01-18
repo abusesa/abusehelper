@@ -275,26 +275,3 @@ class Pattern(object):
         if len(name) < self._length:
             return False
         return _issubdomain(name, self._labels)
-
-    def matches(self, name):
-        r"""
-        >>> p = Pattern(0, ["example"])
-        >>> p.matches(["example"])
-        True
-        >>> p.matches(["domain", "example"])
-        False
-        >>> p.matches(["other"])
-        False
-
-        >>> p = Pattern(1, ["example"])
-        >>> p.matches(["example"])
-        False
-        >>> p.matches(["domain", "example"])
-        True
-        >>> p.matches(["sub", "domain", "example"])
-        False
-        """
-
-        if len(name) != self._length:
-            return False
-        return _issubdomain(name, self._labels)
