@@ -4,7 +4,7 @@ AbuseHelper is an open-source framework for receiving and redistributing abuse f
 
 ## Running tests & linter
 
-We have enabled automated tests (for Python 2.6, 2.7 and PyPy) and flake8 linting. The build logs are viewable at https://circleci.com/gh/abusesa/abusehelper.
+We run automated tests (for Python 2.6, 2.7 and PyPy) and flake8 linter for each repository push. View the logs at https://circleci.com/gh/abusesa/abusehelper.
 
 To run the tests locally you need to have [```tox```](http://tox.testrun.org/) installed (for example via ```pip install tox```). Then, while in the project directory, run:
 
@@ -15,6 +15,12 @@ $ tox
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md).
+
+## Community extensions
+
+This project provides the core AbuseHelper functionality, including choice bots and tools.
+
+The [AbuseHelper Community](https://bitbucket.org/ahcommunity/) repository builds upon the core, for example by offering a fine selection of community-maintained bots.
 
 ## License
 
