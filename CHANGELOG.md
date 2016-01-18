@@ -2,13 +2,29 @@
 
 ## 3.0.0 (not released)
 
-### Deprecated
+### Features
 
- * **(2015-01-05) Legacy rules removed:** Legacy rules from ```abusehelper.core.rules.compat``` (```AND```, ```OR```, ```NOT```, ```MATCH```, ```ANYTHING``` and ```NETBLOCK```) have now been removed after a deprecation period. Please use corresponding ```abusehelper.core.rules``` functionality (```And```, ```Or```, ...).
+ * Move ```abusehelper.core.roomgraph``` rule matching to separate worker processes. The new startup option ```concurrency=[integer]``` defines how many worker processes should get launched, defaulting to ```1```.
 
- *  **(2015-01-04) Contrib package removed:** The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to abusehelper.bots. All the internal references within AbuseHelper have been updated to support the migration.
+ * Add a rotating and compressing JSON archivebot ```abusehelper.bots.archivebot.archivebot```.
 
-    Some of the bots have migrated to the AbuseHelper community repository in [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity), namely:
+ * Add ```abusehelper.tools.sender``` and ```abusehelper.tools.receiver```. ```sender``` is a tool for sending JSON formatted data as events to a XMPP room while ```receiver``` is for receiving events from a room as JSON. See [abusehelper/tools/README.md](abusehelper/tools/README.md) for reference.
+
+### Fixes
+
+ * Support HTTPS URLs in mails processed by ```abusehelper.core.shadowservermail```.
+
+ * Set socket timeouts for ```abusehelper.core.imapbot```'s IMAP connections, controlled with the ```mail_connection_timeout=[seconds]``` option and defaulting to 60 seconds.
+
+ * Set socket timeouts for ```abusehelper.core.mailer```'s SMTP connections, controlled with the ```smtp_connection_timeout=[seconds]``` option and defaulting to 60 seconds.
+
+### Deprecations
+
+ * Legacy rules from ```abusehelper.core.rules.compat``` (```AND```, ```OR```, ```NOT```, ```MATCH```, ```ANYTHING``` and ```NETBLOCK```) have been removed after a deprecation period. Please use corresponding ```abusehelper.core.rules``` functionality (```And```, ```Or```, ...).
+
+ *  The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to ```abusehelper.bots```. All the internal references within AbuseHelper have been updated to support the migration.
+
+    Sevaral bots migrated to the AbuseHelper community repository in [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity):
 
     * contrib.arbor.atlassrf
     * contrib.arbor.ssh
