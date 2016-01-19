@@ -10,7 +10,8 @@
  * Add a rotating and compressing JSON archivebot ```abusehelper.bots.archivebot.archivebot``` ([13173cb](https://github.com/abusesa/abusehelper/commit/13173cb4f3d33dba896a7efdde64348911fb8090))
  * Add ```abusehelper.tools.sender``` and ```abusehelper.tools.receiver``` ([a75fae4](https://github.com/abusesa/abusehelper/commit/a75fae4dbb2d197e2d62e434a18dff562af02ce4), [5706398](https://github.com/abusesa/abusehelper/commit/5706398e736a758ff5cc0401b406aa657b195f28))
    * ```sender``` is a tool for sending JSON formatted data as events to a XMPP room.
-   * ```receiver``` is for receiving events from a room as JSON. See [abusehelper/tools/README.md](abusehelper/tools/README.md) for reference.
+   * ```receiver``` is for receiving events from a room as JSON.
+   * See [abusehelper/tools/README.md](abusehelper/tools/README.md) for reference.
 
 ### Fixes
 
