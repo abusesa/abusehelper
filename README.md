@@ -2,47 +2,25 @@
 
 AbuseHelper is an open-source framework for receiving and redistributing abuse feeds and threat intel.
 
-## Updates
+## Running tests & linter
 
-### 2015-01-05 Legacy rules removed
+We run automated tests (for Python 2.6, 2.7 and PyPy) and flake8 linter for each repository push. View the logs at https://circleci.com/gh/abusesa/abusehelper.
 
-Legacy rules from ```abusehelper.core.rules.compat``` (```AND```, ```OR```, ```NOT```, ```MATCH```, ```ANYTHING``` and ```NETBLOCK```) have now been removed after a deprecation period. Please use corresponding ```abusehelper.core.rules``` functionality (```And```, ```Or```, ...).
-
-### 2015-01-04 Contrib package removal
-
-The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to abusehelper.bots. All the internal references within AbuseHelper have been updated to support the migration.
-
-Some of the bots have also migrated to the new AbuseHelper community repository in: [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity)
+To run the tests locally you need to have [```tox```](http://tox.testrun.org/) installed (for example via ```pip install tox```). Then, while in the project directory, run:
 
 ```
-contrib.arbor.atlassrf
-contrib.arbor.ssh
-contrib.bgp-xmpp.bgprankingbot
-contrib.csv2xmpp.csv2xmpp
-contrib.experts.bgpexpert
-contrib.experts.bgpquaggaexpert
-contrib.experts.iscpdnsexpert
-contrib.experts.iso3166expert
-contrib.experts.observerexpert
-contrib.experts.malwarehash
-contrib.experts.passivedns
-contrib.experts.rtexpert
-contrib.experts.sshkeyscan
-contrib.experts.url2domain
-contrib.iplist.iplist
-contrib.logcollector.logcollectorbot
-contrib.malwareblacklist.malwareblacklistbot
-contrib.mailextras.iodef
-contrib.mailextras.signingmailer
-contrib.urllistmailbot.urllistmailbot
-contrib.opencollab.crypto
-contrib.opencollab.downloader
-contrib.opencollab.virtualboxsandbox
-contrib.opencollab.webshot
-contrib.opencollab.wikicryptostartup
-contrib.opencollab.wikiruntime
-contrib.opencollab.wikistartup
+$ tox
 ```
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).
+
+## Community extensions
+
+This project provides the core AbuseHelper functionality, including choice bots and tools.
+
+The [AbuseHelper Community](https://bitbucket.org/ahcommunity/) repository builds upon the core, for example by offering a fine selection of community-maintained bots.
 
 ## License
 
