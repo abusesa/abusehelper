@@ -46,6 +46,7 @@ class Serializer(object):
             self.register("rx", Rule(rules.RegExp))
             self.register("rs", Rule(rules.String))
             self.register("ri", Rule(rules.IP))
+            self.register("rd", Rule(rules.DomainName))
 
     def register(self, name, serializer):
         with self._lock:

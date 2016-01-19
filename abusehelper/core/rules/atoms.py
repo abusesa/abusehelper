@@ -4,6 +4,7 @@ import re
 
 from . import core
 from . import iprange
+from . import _domainname
 
 
 class Atom(core.Matcher):
@@ -125,6 +126,41 @@ class IP(Atom):
 
     def dump(self):
         return unicode(self._range)
+
+    @classmethod
+    def load(cls, value):
+        return cls(value)
+
+
+class DomainName(Atom):
+    @property
+    def pattern(self):
+        return self._pattern
+
+    def init(self, pattern):
+        Atom.init(self)
+
+        if not isinstance(pattern, _domainname.Pattern):
+            pattern = _domainname.Pattern.from_string(pattern)
+        self._pattern = pattern
+
+    def unique_key(self):
+        return self._pattern
+
+    def __repr__(self):
+        return Atom.__repr__(self, unicode(self._pattern))
+
+    def __unicode__(self):
+        return unicode(self._pattern)
+
+    def match(self, value):
+        name = _domainname.parse_name(value)
+        if name is None:
+            return False
+        return self._pattern.contains(name)
+
+    def dump(self):
+        return unicode(self._pattern)
 
     @classmethod
     def load(cls, value):
