@@ -24,7 +24,6 @@
  * Remove ```abusehelper.core.dshield```, the DShield bot will be further maintained in the AbuseHelper Community repository ([#14](https://github.com/abusesa/abusehelper/pull/14))
  * Legacy rules from ```abusehelper.core.rules.compat``` (```AND```, ```OR```, ```NOT```, ```MATCH```, ```ANYTHING``` and ```NETBLOCK```) have been removed after a deprecation period. Please use corresponding ```abusehelper.core.rules``` functionality (```And```, ```Or```, ...).
  *  The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to ```abusehelper.bots```. Several bots also migrated to the AbuseHelper community repository in [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity):
-
     * contrib.arbor.atlassrf
     * contrib.arbor.ssh
     * contrib.bgp-xmpp.bgprankingbot
