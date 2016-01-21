@@ -14,13 +14,6 @@ def iter_runtimes(obj):
             yield runtime()
             continue
 
-        # Backwards compatibility
-        runtime_method = getattr(obj, "runtime", None)
-        if callable(runtime_method):
-            for obj in config.flatten(runtime_method()):
-                yield obj
-            continue
-
 
 class Pipeable(object):
     def _collect(self):
