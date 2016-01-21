@@ -20,15 +20,6 @@ def iter_startups(iterable):
             yield startup()
             continue
 
-        # Backwards compatibility
-        startup_method = getattr(obj, "startup", None)
-        if callable(startup_method):
-            params = startup_method()
-            name = params["bot_name"]
-            module = params.pop("module", None)
-            yield Bot(name, module, **params)
-            continue
-
 
 class Bot(object):
     _defaults = dict()
