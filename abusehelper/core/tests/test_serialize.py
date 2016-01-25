@@ -2,8 +2,6 @@ import sys
 import math
 import unittest
 
-from idiokit.xmlcore import Element
-
 from .. import serialize
 from .. import rules
 
