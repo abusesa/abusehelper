@@ -172,12 +172,12 @@ class StartupBot(bot.Bot):
                 logline = "Bot %r was terminated." % (conf.name)
 
                 if process.returncode < 0:
-                    logline += " Caught signal %d" % (process.returncode)
+                    logline += " Terminated by signal %d" % (process.returncode)
                     signames = _signal_number_to_symbols(abs(process.returncode))
                     if signames:
                         logline += " (%s)" % " or ".join(signames)
                 else:
-                    logline += " Process returned with code %d" % (process.returncode)
+                    logline += " Return code %d" % (process.returncode)
 
                 self.log.info(logline)
 
