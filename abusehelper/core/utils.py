@@ -4,10 +4,8 @@ import csv
 import ssl
 import gzip
 import time
-import signal
 import socket
 import httplib
-import numbers
 import urllib2
 import traceback
 import collections
@@ -20,34 +18,6 @@ from idiokit import heap
 from cStringIO import StringIO
 
 from . import events
-
-
-def _is_signal(name):
-    if not name.startswith("SIG") or name.startswith("SIG_"):
-        return False
-
-    signum = getattr(signal, name)
-
-    if not isinstance(signum, numbers.Integral):
-        return False
-
-    return True
-
-
-def signal_number_to_symbol(signum):
-
-    if not isinstance(signum, numbers.Integral):
-        return None
-
-    signames = filter(
-        lambda name: getattr(signal, name) == abs(signum),
-        filter(_is_signal, dir(signal))
-    )
-
-    if not signames:
-        return None
-
-    return signames
 
 
 def format_exception(exc):

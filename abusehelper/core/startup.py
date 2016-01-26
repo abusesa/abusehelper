@@ -5,12 +5,13 @@ import sys
 import time
 import errno
 import signal
+import numbers
 import subprocess
 import cPickle as pickle
 from numbers import Real
 
 import idiokit
-from . import bot, config, utils
+from . import bot, config
 
 
 def iter_startups(iterable):
@@ -19,6 +20,28 @@ def iter_startups(iterable):
         if callable(startup):
             yield startup()
             continue
+
+
+def _signal_number_to_symbols(signal_number):
+
+    signal_names = []
+
+    for name in dir(signal):
+
+        if not name.startswith("SIG") or name.startswith("SIG_"):
+            continue
+
+        value = getattr(signal, name)
+
+        if not isinstance(value, numbers.Integral):
+            continue
+
+        if not value == signal_number:
+            continue
+
+        signal_names.append(name)
+
+    return signal_names
 
 
 class Bot(object):
@@ -146,12 +169,15 @@ class StartupBot(bot.Bot):
             if process is not None and process.poll() is None:
                 continue
             if process is not None and process.poll() is not None:
-                logline = "Bot %r was terminated. Caught signal %d" % (conf.name, process.returncode)
+                logline = "Bot %r was terminated." % (conf.name)
 
-                signames = utils.signal_number_to_symbol(process.returncode)
-
-                if signames:
-                    logline += " (%s)" % " or ".join(signames)
+                if process.returncode < 0:
+                    logline += " Caught signal %d" % (process.returncode)
+                    signames = _signal_number_to_symbols(abs(process.returncode))
+                    if signames:
+                        logline += " (%s)" % " or ".join(signames)
+                else:
+                    logline += " Process returned with code %d" % (process.returncode)
 
                 self.log.info(logline)
 
