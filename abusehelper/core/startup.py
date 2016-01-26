@@ -10,7 +10,7 @@ import cPickle as pickle
 from numbers import Real
 
 import idiokit
-from . import bot, config
+from . import bot, config, utils
 
 
 def iter_startups(iterable):
@@ -146,7 +146,15 @@ class StartupBot(bot.Bot):
             if process is not None and process.poll() is None:
                 continue
             if process is not None and process.poll() is not None:
-                self.log.info("Bot %r exited with return value %d", conf.name, process.poll())
+                logline = "Bot %r was terminated. Caught signal %d" % (conf.name, process.returncode)
+
+                signames = utils.signal_number_to_symbol(process.returncode)
+
+                if signames:
+                    logline += " (%s)" % " or ".join(signames)
+
+                self.log.info(logline)
+
             self._processes.pop(conf, None)
             self._strategies[conf] = time.time(), strategy
 
