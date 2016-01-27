@@ -2,20 +2,21 @@ from __future__ import absolute_import
 
 import csv
 import ssl
-import time
 import gzip
+import time
 import socket
-import urllib2
 import httplib
+import urllib2
 import traceback
 import collections
 import email.parser
-
 import cPickle as pickle
 
 import idiokit
+
 from idiokit import heap
 from cStringIO import StringIO
+
 from . import events
 
 

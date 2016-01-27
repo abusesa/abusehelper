@@ -5,6 +5,7 @@ import sys
 import time
 import errno
 import signal
+import numbers
 import subprocess
 import cPickle as pickle
 from numbers import Real
@@ -19,6 +20,28 @@ def iter_startups(iterable):
         if callable(startup):
             yield startup()
             continue
+
+
+def _signal_number_to_symbols(signal_number):
+
+    signal_names = []
+
+    for name in dir(signal):
+
+        if not name.startswith("SIG") or name.startswith("SIG_"):
+            continue
+
+        value = getattr(signal, name)
+
+        if not isinstance(value, numbers.Integral):
+            continue
+
+        if not value == signal_number:
+            continue
+
+        signal_names.append(name)
+
+    return signal_names
 
 
 class Bot(object):
@@ -146,7 +169,18 @@ class StartupBot(bot.Bot):
             if process is not None and process.poll() is None:
                 continue
             if process is not None and process.poll() is not None:
-                self.log.info("Bot %r exited with return value %d", conf.name, process.poll())
+                logline = "Bot %r was terminated." % (conf.name)
+
+                if process.returncode < 0:
+                    logline += " Terminated by signal %d" % (process.returncode)
+                    signames = _signal_number_to_symbols(abs(process.returncode))
+                    if signames:
+                        logline += " (%s)" % " or ".join(signames)
+                else:
+                    logline += " Return code %d" % (process.returncode)
+
+                self.log.info(logline)
+
             self._processes.pop(conf, None)
             self._strategies[conf] = time.time(), strategy
 
