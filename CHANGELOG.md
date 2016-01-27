@@ -12,7 +12,7 @@
    * ```sender``` is a tool for sending JSON formatted data as events to a XMPP room.
    * ```receiver``` is for receiving events from a room as JSON.
    * See [abusehelper/tools/README.md](abusehelper/tools/README.md) for reference.
- * Change the bot return code and termination signal logging format to include the symbolic form of the signal along with the signal code. ([1a67e54])(https://github.com/abusesa/abusehelper/commit/1a67e5411d6a558972ef5f39e28b7a4bd21f5f98)
+ * Change the bot return code and termination signal logging format to include the symbolic form of the signal along with the signal code. ([1a67e54](https://github.com/abusesa/abusehelper/commit/1a67e5411d6a558972ef5f39e28b7a4bd21f5f98))
 ### Fixes
 
  * Support HTTPS URLs in mails processed by ```abusehelper.core.shadowservermail```.
