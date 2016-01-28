@@ -25,6 +25,7 @@
  * Legacy rules from ```abusehelper.core.rules.compat``` (```AND```, ```OR```, ```NOT```, ```MATCH```, ```ANYTHING``` and ```NETBLOCK```) have been removed after a deprecation period. Please use corresponding ```abusehelper.core.rules``` functionality (```And```, ```Or```, ...).
  * Remove backwards compatibility from ```abusehelper.core.runtime``` and ```abusehelper.core.startup``` when launching and maintaining running bots ([#20](https://github.com/abusesa/abusehelper/pull/20))
  * Remove *warn* and *fatal* logging methods from ```abusehelper.core.log.EventLogger``` ([#19](https://github.com/abusesa/abusehelper/pull/19))
+ * Remove ```abusehelper.core.archivebot```. Encouraging users to move to use ```abusehelper.bots.archivebot.archivebot``` instead which supports JSON archiving and daily rotation of the archives. ([issue #23](https://github.com/abusesa/abusehelper/issues/23)))
  *  The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to ```abusehelper.bots```. Several bots also migrated to the AbuseHelper community repository in [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity):
     * contrib.arbor.atlassrf
     * contrib.arbor.ssh
