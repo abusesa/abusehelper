@@ -182,7 +182,7 @@ class ArchiveBot(bot.ServiceBot):
 
     def _archive(self, room):
         compress = utils.WaitQueue()
-        room_path = room_jid_to_path(room)
+        room_path = _room_jid_to_path(room)
 
         _dir = os.path.join(self.archive_dir, room_path)
         for root, _, files in os.walk(_dir):
