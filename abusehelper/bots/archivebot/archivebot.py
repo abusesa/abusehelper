@@ -49,8 +49,8 @@ def open_archive(archive_dir, ts, room_name):
 
 def room_jid_to_path(jid):
     room_jid = JID(jid)
-    room_node = unicode(room_jid.node).encode("utf-8")
-    room_domain = unicode(room_jid.domain).encode("utf-8")
+    room_node = room_jid.node.encode("utf-8")
+    room_domain = room_jid.domain.encode("utf-8")
 
     subrooms = []
 
@@ -64,8 +64,8 @@ def room_jid_to_path(jid):
     room_node = ".".join(subrooms)
 
     return os.path.join(
-        urllib.quote(room_domain).lower(),
-        urllib.quote(room_node).lower()
+        urllib.quote(room_domain, safe="").lower(),
+        urllib.quote(room_node, safe="").lower()
     )
 
 
@@ -158,7 +158,7 @@ class ArchiveBot(bot.ServiceBot):
             try:
                 yield idiokit.pipe(room,
                                    events.stanzas_to_events(),
-                                   self._archive(room.jid))
+                                   self._archive(room.jid.bare()))
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
