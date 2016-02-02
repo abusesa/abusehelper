@@ -5,9 +5,12 @@ import json
 import time
 import errno
 import random
+import urllib
+
 from datetime import datetime
 
 import idiokit
+from idiokit.xmpp.jid import JID
 from abusehelper.core import bot, events, taskfarm, utils
 
 
@@ -42,6 +45,46 @@ def open_archive(archive_dir, ts, room_name):
     dirname = os.path.dirname(path)
     ensure_dir(dirname)
     return open(path, "ab")
+
+
+def _room_jid_to_path(jid):
+    """Return sanitized and normalised domain/node path name from
+    a bare or a full room JID.
+
+    >>> _room_jid_to_path("room@a.b/c")
+    'a.b/room'
+
+    >>> _room_jid_to_path("room.subroom@a.b/c")
+    'a.b/room.subroom'
+
+    >>> _room_jid_to_path("room..subroom@a.b/c")
+    'a.b/room.%20.subroom'
+
+    >>> _room_jid_to_path("..@a.b")
+    'a.b/%20.%20.%20'
+
+    >>> _room_jid_to_path(".@a.b")
+    'a.b/%20.%20'
+    """
+    room_jid = JID(jid)
+    room_node = room_jid.node.encode("utf-8")
+    room_domain = room_jid.domain.encode("utf-8")
+
+    subrooms = []
+
+    for piece in room_node.split("."):
+        if piece == "":
+            subrooms.append(" ")
+            continue
+
+        subrooms.append(piece)
+
+    room_node = ".".join(subrooms)
+
+    return os.path.join(
+        urllib.quote(room_domain, safe="").lower(),
+        urllib.quote(room_node, safe="").lower()
+    )
 
 
 def _rename(path):
@@ -139,8 +182,9 @@ class ArchiveBot(bot.ServiceBot):
 
     def _archive(self, room):
         compress = utils.WaitQueue()
+        room_path = _room_jid_to_path(room)
 
-        _dir = os.path.join(self.archive_dir, unicode(room).encode("utf-8"))
+        _dir = os.path.join(self.archive_dir, room_path)
         for root, _, files in os.walk(_dir):
             if not files:
                 continue
@@ -149,7 +193,7 @@ class ArchiveBot(bot.ServiceBot):
                 compress.queue(0.0, path)
 
         collect = idiokit.pipe(
-            self._collect(room, compress),
+            self._collect(room_path, compress),
             self._compress(compress)
         )
 
