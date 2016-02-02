@@ -5,9 +5,12 @@ import json
 import time
 import errno
 import random
+import urllib
+
 from datetime import datetime
 
 import idiokit
+from idiokit.xmpp.jid import JID
 from abusehelper.core import bot, events, taskfarm, utils
 
 
@@ -42,6 +45,28 @@ def open_archive(archive_dir, ts, room_name):
     dirname = os.path.dirname(path)
     ensure_dir(dirname)
     return open(path, "ab")
+
+
+def room_jid_to_path(jid):
+    room_jid = JID(jid)
+    room_node = unicode(room_jid.node).encode("utf-8")
+    room_domain = unicode(room_jid.domain).encode("utf-8")
+
+    subrooms = []
+
+    for piece in room_node.split("."):
+        if piece == "":
+            subrooms.append(" ")
+            continue
+
+        subrooms.append(piece)
+
+    room_node = ".".join(subrooms)
+
+    return os.path.join(
+        urllib.quote(room_domain).lower(),
+        urllib.quote(room_node).lower()
+    )
 
 
 def _rename(path):
@@ -133,14 +158,15 @@ class ArchiveBot(bot.ServiceBot):
             try:
                 yield idiokit.pipe(room,
                                    events.stanzas_to_events(),
-                                   self._archive(room.jid.bare()))
+                                   self._archive(room.jid))
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
     def _archive(self, room):
         compress = utils.WaitQueue()
+        room_path = room_jid_to_path(room)
 
-        _dir = os.path.join(self.archive_dir, unicode(room).encode("utf-8"))
+        _dir = os.path.join(self.archive_dir, room_path)
         for root, _, files in os.walk(_dir):
             if not files:
                 continue
@@ -149,7 +175,7 @@ class ArchiveBot(bot.ServiceBot):
                 compress.queue(0.0, path)
 
         collect = idiokit.pipe(
-            self._collect(room, compress),
+            self._collect(room_path, compress),
             self._compress(compress)
         )
 
