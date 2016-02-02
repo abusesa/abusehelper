@@ -49,7 +49,7 @@ def _rename(path):
     base = os.path.join(head, tail + ".compress")
 
     new_path = "{0}-{1:x}".format(base, random.getrandbits(32))
-    while os.path.isfile(base):
+    while os.path.isfile(new_path):
         new_path = "{0}-{1:x}".format(base, random.getrandbits(32))
 
     os.rename(path, new_path)
