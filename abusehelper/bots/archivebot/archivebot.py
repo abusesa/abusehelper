@@ -47,7 +47,25 @@ def open_archive(archive_dir, ts, room_name):
     return open(path, "ab")
 
 
-def room_jid_to_path(jid):
+def _room_jid_to_path(jid):
+    """Return sanitized and normalised domain/node path name from
+    a bare or a full room JID.
+
+    >>> _room_jid_to_path("room@a.b/c")
+    'a.b/room'
+
+    >>> _room_jid_to_path("room.subroom@a.b/c")
+    'a.b/room.subroom'
+
+    >>> _room_jid_to_path("room..subroom@a.b/c")
+    'a.b/room.%20.subroom'
+
+    >>> _room_jid_to_path("..@a.b")
+    'a.b/%20.%20.%20'
+
+    >>> _room_jid_to_path(".@a.b")
+    'a.b/%20.%20'
+    """
     room_jid = JID(jid)
     room_node = room_jid.node.encode("utf-8")
     room_domain = room_jid.domain.encode("utf-8")
