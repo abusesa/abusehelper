@@ -1,5 +1,4 @@
 import os
-import glob
 import gzip
 import json
 import time
@@ -185,12 +184,10 @@ class ArchiveBot(bot.ServiceBot):
         room_path = _room_jid_to_path(room)
 
         _dir = os.path.join(self.archive_dir, room_path)
-        for root, _, files in os.walk(_dir):
-            if not files:
-                continue
-
-            for path in glob.glob("{0}/*.json.compress*".format(root)):
-                compress.queue(0.0, path)
+        for root, _, filenames in os.walk(_dir):
+            for filename in filenames:
+                if ".json.compress" in filename:
+                    compress.queue(0.0, os.path.join(room, filename))
 
         collect = idiokit.pipe(
             self._collect(room_path, compress),
