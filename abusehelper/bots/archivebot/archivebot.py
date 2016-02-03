@@ -163,7 +163,7 @@ class ArchiveBot(bot.ServiceBot):
 
         for root, _, filenames in os.walk(_dir):
             for filename in filenames:
-                if ".json.compress" in filename:
+                if filename.endswith(".json.compress"):
                     compress.queue(0.0, os.path.join(root, filename))
 
         collect = idiokit.pipe(
