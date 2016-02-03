@@ -47,6 +47,26 @@ class HTTPError(FetchUrlFailed):
 
 
 def _is_timeout(reason):
+    r"""
+    Return True if the parameter looks like a socket timeout error.
+
+    >>> _is_timeout(socket.timeout())
+    True
+    >>> _is_timeout(ssl.SSLError("_ssl.c:123: The handshake operation timed out"))
+    True
+
+    Return False for all other objects.
+
+    >>> _is_timeout(socket.error())
+    False
+    >>> _is_timeout(ssl.SSLError("[SSL: UNKNOWN_PROTOCOL] unknown protocol (_ssl.c:456)"))
+    False
+    >>> _is_timeout(Exception())
+    False
+    >>> _is_timeout(None)
+    False
+    """
+
     if isinstance(reason, socket.timeout):
         return True
 
@@ -54,13 +74,12 @@ def _is_timeout(reason):
     # raise a generic ssl.SSLError instead of e.g. socket.timeout.
     # Recognizing specific errors by their message strings is not usually
     # the preferred option, but in this case it seems to be about the only way.
-    if (isinstance(reason, ssl.SSLError) and
-            reason.args and
-            isinstance(reason.args[0], str) and
-            reason.args[0].endswith(" operation timed out")):
-        return True
-
-    return False
+    return (
+        isinstance(reason, ssl.SSLError) and
+        reason.args and
+        isinstance(reason.args[0], str) and
+        reason.args[0].endswith(" operation timed out")
+    )
 
 
 @idiokit.stream
