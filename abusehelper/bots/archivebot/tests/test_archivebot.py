@@ -14,10 +14,9 @@ class TestRename(unittest.TestCase):
             self.assertTrue(os.path.isfile(new_tmp))
             self.assertTrue(new_tmp.find(".compress") > 1)
         finally:
-            if os.path.isfile(tmp.name):
-                os.remove(tmp.name)
-            if os.path.isfile(new_tmp):
-                os.remove(new_tmp)
+            for file in [tmp.name, new_tmp]:
+                if os.path.isfile(file):
+                    os.remove(file)
 
 
 class TestCompress(unittest.TestCase):
@@ -32,5 +31,6 @@ class TestCompress(unittest.TestCase):
             gz_file = archivebot.compress(tmp.name)
             self.assertEqual(gz_file, tmp.name.replace(".compress", ".gz"))
         finally:
-            if os.path.isfile(tmp.name):
-                os.remove(tmp.name)
+            for file in [tmp.name, gz_file]:
+                if os.path.isfile(file):
+                    os.remove(file)
