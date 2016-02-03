@@ -1,5 +1,4 @@
 import os
-import glob
 import gzip
 import json
 import time
@@ -162,12 +161,10 @@ class ArchiveBot(bot.ServiceBot):
             self.log.error("Incorrect room name lands outside the archive directory.")
             raise ValueError
 
-        for root, _, files in os.walk(_dir):
-            if not files:
-                continue
-
-            for path in glob.glob("{0}/*.json.compress*".format(root)):
-                compress.queue(0.0, path)
+        for root, _, filenames in os.walk(_dir):
+            for filename in filenames:
+                if ".json.compress" in filename:
+                    compress.queue(0.0, os.path.join(root, filename))
 
         collect = idiokit.pipe(
             self._collect(room_name, compress),
