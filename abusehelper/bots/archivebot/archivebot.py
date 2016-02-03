@@ -33,7 +33,7 @@ def archive_path(ts, room_name):
     gmtime = time.gmtime(ts)
 
     return os.path.join(
-        unicode(room_name).encode("utf-8"),
+        room_name,
         time.strftime("%Y", gmtime),
         time.strftime("%m", gmtime),
         time.strftime("%d.json", gmtime)
@@ -47,44 +47,16 @@ def open_archive(archive_dir, ts, room_name):
     return open(path, "ab")
 
 
-def _room_jid_to_path(jid):
+def _encode_room_jid(jid):
     """Return sanitized and normalised domain/node path name from
     a bare or a full room JID.
-
-    >>> _room_jid_to_path("room@a.b/c")
-    'a.b/room'
-
-    >>> _room_jid_to_path("room.subroom@a.b/c")
-    'a.b/room.subroom'
-
-    >>> _room_jid_to_path("room..subroom@a.b/c")
-    'a.b/room.%20.subroom'
-
-    >>> _room_jid_to_path("..@a.b")
-    'a.b/%20.%20.%20'
-
-    >>> _room_jid_to_path(".@a.b")
-    'a.b/%20.%20'
     """
     room_jid = JID(jid)
-    room_node = room_jid.node.encode("utf-8")
-    room_domain = room_jid.domain.encode("utf-8")
 
-    subrooms = []
+    room_node = urllib.quote(room_jid.node, safe=" @")
+    room_domain = urllib.quote(room_jid.domain, safe=" @")
 
-    for piece in room_node.split("."):
-        if piece == "":
-            subrooms.append(" ")
-            continue
-
-        subrooms.append(piece)
-
-    room_node = ".".join(subrooms)
-
-    return os.path.join(
-        urllib.quote(room_domain, safe="").lower(),
-        urllib.quote(room_node, safe="").lower()
-    )
+    return "{0}@{1}".format(room_node, room_domain)
 
 
 def _rename(path):
@@ -180,11 +152,16 @@ class ArchiveBot(bot.ServiceBot):
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
-    def _archive(self, room):
+    def _archive(self, room_bare_jid):
         compress = utils.WaitQueue()
-        room_path = _room_jid_to_path(room)
+        room_name = _encode_room_jid(room_bare_jid)
 
-        _dir = os.path.join(self.archive_dir, room_path)
+        _dir = os.path.join(self.archive_dir, room_name)
+
+        if _dir != os.path.normpath(_dir):
+            self.log.error("Incorrect room name lands outside the archive directory.")
+            raise ValueError
+
         for root, _, files in os.walk(_dir):
             if not files:
                 continue
@@ -193,7 +170,7 @@ class ArchiveBot(bot.ServiceBot):
                 compress.queue(0.0, path)
 
         collect = idiokit.pipe(
-            self._collect(room_path, compress),
+            self._collect(room_name, compress),
             self._compress(compress)
         )
 
@@ -203,7 +180,7 @@ class ArchiveBot(bot.ServiceBot):
         return collect
 
     @idiokit.stream
-    def _collect(self, room, compress):
+    def _collect(self, room_name, compress):
         archive = None
         needs_flush = False
 
@@ -223,7 +200,7 @@ class ArchiveBot(bot.ServiceBot):
                         archive = None
 
                     needs_flush = False
-                    archive = open_archive(self.archive_dir, time.time(), room)
+                    archive = open_archive(self.archive_dir, time.time(), room_name)
                     self.log.info("Opened archive {0!r}".format(archive.name))
                 elif archive is not None:
                     json_dict = dict((key, event.values(key)) for key in event.keys())
