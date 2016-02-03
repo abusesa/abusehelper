@@ -52,10 +52,10 @@ def _encode_room_jid(jid):
     """
     room_jid = JID(jid)
 
-    room_node = urllib.quote(room_jid.node, safe=" @")
-    room_domain = urllib.quote(room_jid.domain, safe=" @")
+    if room_jid != room_jid.bare():
+        raise ValueError("given room JID does not match with the bare room JID")
 
-    return "{0}@{1}".format(room_node, room_domain)
+    return urllib.quote(unicode(room_jid).encode("utf-8"), safe=" @")
 
 
 def _rename(path):
@@ -158,8 +158,7 @@ class ArchiveBot(bot.ServiceBot):
         _dir = os.path.join(self.archive_dir, room_name)
 
         if _dir != os.path.normpath(_dir):
-            self.log.error("Incorrect room name lands outside the archive directory.")
-            raise ValueError
+            raise ValueError("incorrect room name lands outside the archive directory")
 
         for root, _, filenames in os.walk(_dir):
             for filename in filenames:
