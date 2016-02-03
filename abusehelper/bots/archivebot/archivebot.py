@@ -41,7 +41,7 @@ def open_archive(archive_dir, ts, room_name):
     path = os.path.join(archive_dir, archive_path(ts, room_name))
     dirname = os.path.dirname(path)
     ensure_dir(dirname)
-    return open(path, "ab")
+    return open(path, "ab", buffering=1)
 
 
 def _rename(path):
@@ -82,21 +82,14 @@ def compress(path):
 
 
 @idiokit.stream
-def flush(flush_interval=2.0):
-    while True:
-        yield idiokit.send()
-        yield idiokit.sleep(flush_interval)
-
-
-@idiokit.stream
-def rotate():
+def rotate(event):
     last = None
 
     while True:
         now = datetime.utcnow().day
         if now != last:
             last = now
-            yield idiokit.send(True)
+            yield idiokit.send(event)
 
         yield idiokit.sleep(1.0)
 
@@ -148,43 +141,33 @@ class ArchiveBot(bot.ServiceBot):
             for path in glob.glob("{0}/*.json.compress*".format(root)):
                 compress.queue(0.0, path)
 
+        rotate_event = object()
         collect = idiokit.pipe(
-            self._collect(room, compress),
+            self._collect(rotate_event, room, compress),
             self._compress(compress)
         )
-
-        idiokit.pipe(flush(), collect)
-        idiokit.pipe(rotate(), collect)
-
+        idiokit.pipe(rotate(rotate_event), collect)
         return collect
 
     @idiokit.stream
-    def _collect(self, room, compress):
+    def _collect(self, rotate_event, room, compress):
         archive = None
-        needs_flush = False
-
         try:
             while True:
                 event = yield idiokit.next()
 
-                if event is None:
-                    if archive is not None and needs_flush:
-                        archive.flush()
-                        needs_flush = False
-                elif event is True:
+                if event is rotate_event:
                     if archive is not None:
                         archive.flush()
                         archive.close()
                         yield compress.queue(0.0, _rename(archive.name))
                         archive = None
-
-                    needs_flush = False
-                    archive = open_archive(self.archive_dir, time.time(), room)
-                    self.log.info("Opened archive {0!r}".format(archive.name))
-                elif archive is not None:
+                else:
+                    if archive is None:
+                        archive = open_archive(self.archive_dir, time.time(), room)
+                        self.log.info("Opened archive {0!r}".format(archive.name))
                     json_dict = dict((key, event.values(key)) for key in event.keys())
                     archive.write(json.dumps(json_dict) + os.linesep)
-                    needs_flush = True
         finally:
             if archive is not None:
                 archive.flush()
