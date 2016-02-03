@@ -57,10 +57,10 @@ def _rename(path):
 
 
 def compress(path):
-    try:
-        base = path[:path.index(".compress")]
-    except ValueError:
-        return
+    if path.endswith(".compress"):
+        base = path[:-len(".compress")]
+    else:
+        raise ValueError("Invalid filename " + path)
 
     gz_path = "{0}.gz".format(base)
     while os.path.isfile(gz_path):
@@ -196,10 +196,10 @@ class ArchiveBot(bot.ServiceBot):
         while True:
             compress_path = yield queue.wait()
 
-            path = yield idiokit.thread(compress, compress_path)
-            if path:
+            try:
+                path = yield idiokit.thread(compress, compress_path)
                 self.log.info("Compressed archive {0!r}".format(path))
-            else:
+            except ValueError:
                 self.log.error("Invalid path {0!r}".format(compress_path))
 
 
