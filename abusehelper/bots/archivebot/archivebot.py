@@ -123,27 +123,30 @@ def open_archive(archive_dir, ts, room_name):
 
 
 def _encode_room_jid(jid):
-    """Return sanitized and normalised domain/node path name from
+    r"""Return sanitized and normalised domain/node path name from
     a bare room JID.
 
-    Accepts JID argument as an unicode string u"room@example.com"
-    or a byte string "room@example.com".
+    Accepts JID argument as an unicode string u"room@example.com",
+    as a byte string "room@example.com", or an idiokit.xmpp.jid.JID object.
 
     >>> _encode_room_jid("room.subroom@example.com")
     'room.subroom@example.com'
-
-    >>> _encode_room_jid(u"room.caf\xe9.subroom@example.com")
-    'room.caf%C3%A9.subroom@example.com'
 
     >>> _encode_room_jid("room.subroom@example.com/resource")
     Traceback (most recent call last):
     ...
     ValueError: given room JID does not match with the bare room JID
 
+    >>> _encode_room_jid(u"room.caf\xe9.subroom@example.com")
+    'room.caf%C3%A9.subroom@example.com'
+
     >>> _encode_room_jid("room.caf\xe9.subroom@example.com")
     Traceback (most recent call last):
     ...
     UnicodeDecodeError: 'ascii' codec can't decode byte 0xe9 in position 8: ordinal not in range(128)
+
+    >>> _encode_room_jid(JID("room.subroom@example.com"))
+    'room.subroom@example.com'
     """
     room_jid = JID(jid)
 
