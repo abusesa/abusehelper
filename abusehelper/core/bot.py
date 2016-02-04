@@ -29,11 +29,9 @@ class Param(object):
     nargs = 1
     param_order = 0
 
-    def __init__(self, help=None, short=None, default=NO_VALUE):
-        help = None if help is None else inspect.cleandoc(help).strip()
-
+    def __init__(self, help="", short=None, default=NO_VALUE):
         self.short = short
-        self.help = help if help else None
+        self.help = inspect.cleandoc(help).strip()
         self.default = default
 
         self.order = Param.param_order
@@ -63,7 +61,7 @@ class ListParam(Param):
 class BoolParam(Param):
     nargs = 0
 
-    def __init__(self, help=None, short=None):
+    def __init__(self, help="", short=None):
         Param.__init__(self, help=help, short=short, default=False)
 
     def parse(self, value=None):
