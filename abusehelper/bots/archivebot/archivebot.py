@@ -108,7 +108,7 @@ def archive_path(ts, room_name):
     gmtime = time.gmtime(ts)
 
     return os.path.join(
-        room_name.encode("utf-8"),
+        room_name,
         time.strftime("%Y", gmtime),
         time.strftime("%m", gmtime),
         time.strftime("%d.json", gmtime)
