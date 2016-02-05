@@ -34,7 +34,7 @@ All the timestamps should be normalized to UTC. If the source reports only a dat
 
 ## Identity
 
-The abuse type of an event defines the way these IOC needs to be interpreted. For a botnet drone they refer to the compromized machine, whereas for a command and control server they refer the server itself.
+The abuse type of an event defines the way these IOC needs to be interpreted. For a botnet drone they refer to the compromised machine, whereas for a command and control server they refer the server itself.
 
 |attribute|description|
 --- | --- |
@@ -90,8 +90,8 @@ As stated above, each abuse handling organization should define a policy, which 
 --- | --- |
 |reported ip|Should you perform your own attribution on a DNS name referred to by host, the ip reported by the source is replaced.|
 |reported asn|The autonomous system number related to the resource, which was reported by the source.|
-|reported as name|The autonomous system name registered to the reported asn above.|
-|reported cc|The country codeof the reported IOC above.|
+|reported as name|The autonomous system name registered to the reported asn.|
+|reported cc|The country code of the reported ip.|
 
 ### Geolocation
 
@@ -107,7 +107,7 @@ We recognize that ip geolocation is not an exact science and analysis of the abu
 
 ## Additional Elements
 
-The idea behind the additional elements is to denote generic metadata about the abuse event, which complements the identity or temporal information about the victim, vulnerable service or a piece of criminal infrastructure. The purpose of this information is to give more context to the abuse type denoted byt the "type" key.
+The idea behind the additional elements is to denote generic metadata about the abuse event, which complements the identity or temporal information about the victim, vulnerable service or a piece of criminal infrastructure. The purpose of this information is to give more context to the abuse type denoted by the "type" key.
 
 |attribute|description|
 --- | --- |
@@ -161,7 +161,7 @@ The **type** values offer a data-backed taxonomy for classifying abuse and vulne
 
 |attribute|description|
 --- | --- |
-|backdoor|This refers to hosts, which have been compromized and backdoored with a remote access or trojan in the traditional sense.|
+|backdoor|This refers to hosts, which have been compromised and backdoored with a remote access or trojan in the traditional sense.|
 |blacklist|Some sources provide blacklists, which clearly refer to abusive behavior, such as spamming, but fail to denote the exact reason why a given identity has been blacklisted. The reason may be that the justification is anecdotal or missing entirely. This type should only be used if the typing fits the definition of a blacklist, but an event specific denomination is not possible for one reason or another.|
 |botnet drone|This is the most numerous type of abuse, as it refers to compromised computers calling out to a command and control mechanism.|
 |brute-force|This type refers to a machine, which has been observed to perform brute-force attacks over a given application protocol, e.g. ssh|
@@ -170,7 +170,7 @@ The **type** values offer a data-backed taxonomy for classifying abuse and vulne
 |ddos infrastructure|This type refers to various parts of DDoS botnet infrastructure.|
 |ddos target|This type refers to the intended target of a DDoS attack, i.e. the intended domain name or ip address.|
 |defacement|This type refers to hacktivism, which on a technical level is an indicator of a compromised service.|
-|dropzone|Information Content Security|This IOC refers to place where the compromized machines store the stolen user data.|
+|dropzone|Information Content Security|This IOC refers to place where the compromised machines store the stolen user data.|
 |exploit url|An exploit or an exploit kit is often served through a malicious URL.|
 |ids alert|Alerts from a heuristic sensor network. This is a generic classification, as often the taxonomy of these types of events leave a lot to wish for in terms of consistency.|
 |malware url|A URL is the most common resource with reference to malware binary distribution.|
