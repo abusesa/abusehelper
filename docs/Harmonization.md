@@ -43,7 +43,7 @@ The abuse type of an event defines the way these IOC needs to be interpreted. Fo
 |port|The port through which the abuse activity is taking place. For example a command and control server report will most likely contain a port, which is directly related to the reported ip or host.|
 |url|A URL denotes an IOC, which refers to a malicious resource, whose interpretation is defined by the abuse type. A URL with the abuse type phishing refers to a phishing resource.|
 |email address|An email address, whose interpretation is based on the abuse type.|
-|reverse dns|Reverse DNS name acquired through a reverse DNS query on an IP address. N.B. Record types other than PTR records may also appear in the reverse DNS tree. http://en.wikipedia.org/wiki/Reverse_DNS_lookup|
+|reverse dns|A Reverse DNS name acquired through a reverse DNS lookup on an IP address. N.B. Record types other than PTR records may also appear in the reverse DNS tree. http://en.wikipedia.org/wiki/Reverse_DNS_lookup|
 |asn|Autonomous system number.|
 |as name|The registered name for an autonomous system.|
 |bgp prefix|A CIDR associated to an autonomous system.|
