@@ -144,6 +144,21 @@ Having a functional ontology to work with, especially for the abuse types is imp
 |type|The type is one of the most crucial pieces of information for any given threat event. The main idea of dynamic typing is to keep our ontology flexible, since we need to evolve with the evolving threatscape present in the data. Furthermore, the value data set for the type attribute should be kept as minimal as possible to avoid a **type explosion**, which in turn dilutes the business value of dynamic typing.
 |threat type|At present, we have two types of threats present in the data: **ioc** (Indicators of Compromise) and **vulnerable service**s. Moreover, on a functional level IoCs may be further categorized into **victim**s and **infrastructure**s. N.B. The threat type may very well be a multi-value attribute, e.g. "threat type"=ioc, "threat type"=infrastructure. At minimum, it should denote between "threat type"=ioc or "threat type"="vulnerable service", where additional tagging complements a given threat type.|
 
+### Threat Type Values
+
+The idea behind the **threat type** tagging is to enable the abuse handlers automate semantic filtering based on the type of observation in question. The basic dichotomy present in the data at present is between vulnerable services and abuse. Moreover, for sensoring purposes for example, it is easier to use IoC, which represent compromised criminal infrastructure, rather than victims.
+
+|attribute|description|
+--- | --- |
+|ioc|All abuse type events must be tagged with this threat type.|
+|vulnerable service|All vulnerable network service observations must be tagged with this threat type.|
+|infrastructure|Infrastructure indicators, such as c&c observations should be tagged with this threat type.|
+|victim|Botnet drone observations should be tagged with this threat type.|
+
+### Type Values
+
+The **type** values offer a data-backed taxonomy for classifying abuse and vulnerable services observations in a uniform manner. A concise, yet functional classification system enables you to make informed decisions about the state of your network estate in real-time.
+
 |attribute|description|
 --- | --- |
 |backdoor|This refers to hosts, which have been compromized and backdoored with a remote access or trojan in the traditional sense.|
