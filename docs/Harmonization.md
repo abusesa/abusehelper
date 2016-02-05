@@ -112,7 +112,7 @@ The idea behind the additional elements is to denote generic metadata about the 
 |attribute|description|
 --- | --- |
 |abuse contact|An abuse contact email address for an IP network.|
-|additional information": "Sometimes it may be necessary to relay a an additional piece of information to the report recipient related to the specific context at hand. This key acts as a conduit for derived schemas to do it. So in a sense it is a placeholder for useful context dependent information, which would be otherwise difficult to convey.|
+|additional information|Sometimes it may be necessary to relay a an additional piece of information to the report recipient related to the specific context at hand. This key acts as a conduit for derived schemas to do it. So in a sense it is a placeholder for useful context dependent information, which would be otherwise difficult to convey.|
 |comment|Free text commentary about the abuse event augmented by an analyst.|
 |description|A free-form textual description of an abuse or vulnerable service event.|
 |description url|A description URL is a link to a further description of threat in question.|
