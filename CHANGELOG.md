@@ -12,6 +12,7 @@
    * ```sender``` is a tool for sending JSON formatted data as events to a XMPP room.
    * ```receiver``` is for receiving events from a room as JSON.
    * See [abusehelper/tools/README.md](abusehelper/tools/README.md) for reference.
+ * Change the bot return code and termination signal logging format to include the symbolic form of the signal along with the signal code. ([#22](https://github.com/abusesa/abusehelper/pull/22))
 
 ### Fixes
 
@@ -27,6 +28,8 @@
  * Remove *warn* and *fatal* logging methods from ```abusehelper.core.log.EventLogger``` ([#19](https://github.com/abusesa/abusehelper/pull/19))
  * Remove ```abusehelper.core.archivebot```. Encouraging users to move to use ```abusehelper.bots.archivebot.archivebot``` instead which supports JSON archiving and daily rotation of the archives ([#23](https://github.com/abusesa/abusehelper/issues/23), [#24](https://github.com/abusesa/abusehelper/pull/24))
  *  The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to ```abusehelper.bots```. Several bots also migrated to the AbuseHelper community repository in [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity):
+ * Remove temporary backwards compatibility code from ```abusehelper.core.serialize``` ([#21](https://github.com/abusesa/abusehelper/pull/21))
+ * The migration period for the contrib package removal has ended. Please change all references of ```abusehelper.contrib``` package to ```abusehelper.bots```. Several bots also migrated to the AbuseHelper community repository in [https://bitbucket.org/ahcommunity/ahcommunity](https://bitbucket.org/ahcommunity/ahcommunity):
     * contrib.arbor.atlassrf
     * contrib.arbor.ssh
     * contrib.bgp-xmpp.bgprankingbot

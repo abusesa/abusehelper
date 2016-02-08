@@ -1,2 +1,3 @@
 -e git+https://github.com/abusesa/idiokit.git#egg=idiokit
+-e git+https://github.com/graphingwiki/opencollab.git#egg=opencollab
 -e .

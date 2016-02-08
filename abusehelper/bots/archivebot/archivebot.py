@@ -1,18 +1,93 @@
 import os
-import glob
+import re
 import gzip
 import json
 import time
 import errno
 import random
+import contextlib
 from datetime import datetime
 
 import idiokit
 from abusehelper.core import bot, events, taskfarm, utils
 
 
-def ensure_dir(dir_name):
+def _create_compress_path(path):
+    head, tail = os.path.split(path)
+
+    while True:
+        new_tail = "{0}.compress-{1:08x}".format(tail, random.getrandbits(32))
+        new_path = os.path.join(head, new_tail)
+
+        if not os.path.isfile(new_path):
+            return new_path
+
+
+def _split_compress_path(path):
+    r"""
+    Return the rotated file path split to the (directory, filename) tuple, where
+    the temporary .compress-******** part has been removed from the filename.
+
+    >>> _split_compress_path("path/to/test.json.compress-0123abcd")
+    ('path/to', 'test.json')
+
+    Raise ValueError for paths that don not look like rotated files.
+
+    >>> _split_compress_path("path/to/test.json")
+    Traceback (most recent call last):
+        ...
+    ValueError: invalid filename path/to/test.json
     """
+
+    directory, filename = os.path.split(path)
+
+    match = re.match(r"^(.*)\.compress-[0-9a-f]{8}$", filename, re.I)
+    if match is None:
+        raise ValueError("invalid filename {0}".format(path))
+
+    filename = match.group(1)
+    return directory, filename
+
+
+def _is_compress_path(path):
+    r"""
+    Return True if path is a valid rotated file path, False otherwise.
+
+    >>> _is_compress_path("path/to/test.json.compress-1234abcd")
+    True
+    >>> _is_compress_path("path/to/test.json")
+    False
+    """
+
+    try:
+        _split_compress_path(path)
+    except ValueError:
+        return False
+    return True
+
+
+@contextlib.contextmanager
+def _unique_writable_file(directory, prefix, suffix):
+    count = 0
+    path = os.path.join(directory, "{0}{1}".format(prefix, suffix))
+
+    while True:
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+        except OSError as ose:
+            if ose.errno != errno.EEXIST:
+                raise
+            count += 1
+            path = os.path.join(directory, "{0}-{1:08d}{2}".format(prefix, count, suffix))
+        else:
+            break
+
+    with os.fdopen(fd, "wb") as fileobj:
+        yield path, fileobj
+
+
+def ensure_dir(dir_name):
+    r"""
     Ensure that the directory exists (create if necessary) and return
     the absolute directory path.
     """
@@ -41,37 +116,26 @@ def open_archive(archive_dir, ts, room_name):
     path = os.path.join(archive_dir, archive_path(ts, room_name))
     dirname = os.path.dirname(path)
     ensure_dir(dirname)
-    return open(path, "ab")
+    return open(path, "ab", buffering=1)
 
 
 def _rename(path):
-    head, tail = os.path.split(path)
-    base = os.path.join(head, tail + ".compress")
-
-    new_path = "{0}-{1:x}".format(base, random.getrandbits(32))
-    while os.path.isfile(base):
-        new_path = "{0}-{1:x}".format(base, random.getrandbits(32))
-
+    new_path = _create_compress_path(path)
     os.rename(path, new_path)
     return new_path
 
 
 def compress(path):
-    try:
-        base = path[:path.index(".compress")]
-    except ValueError:
-        return
-
-    gz_path = "{0}.gz".format(base)
-    while os.path.isfile(gz_path):
-        gz_path = "{0}-{1:x}.gz".format(base, random.getrandbits(32))
-
     with open(path, "rb") as archive:
-        compressed = gzip.open(gz_path, "wb")
-        try:
-            compressed.writelines(archive)
-        finally:
-            compressed.close()
+        directory, filename = _split_compress_path(path)
+        prefix, suffix = os.path.splitext(filename)
+
+        with _unique_writable_file(directory, prefix, suffix + ".gz") as (gz_path, gz_file):
+            compressed = gzip.GzipFile(fileobj=gz_file)
+            try:
+                compressed.writelines(archive)
+            finally:
+                compressed.close()
 
     try:
         os.remove(path)
@@ -82,21 +146,14 @@ def compress(path):
 
 
 @idiokit.stream
-def flush(flush_interval=2.0):
-    while True:
-        yield idiokit.send()
-        yield idiokit.sleep(flush_interval)
-
-
-@idiokit.stream
-def rotate():
+def rotate(event):
     last = None
 
     while True:
         now = datetime.utcnow().day
         if now != last:
             last = now
-            yield idiokit.send(True)
+            yield idiokit.send(event)
 
         yield idiokit.sleep(1.0)
 
@@ -141,50 +198,39 @@ class ArchiveBot(bot.ServiceBot):
         compress = utils.WaitQueue()
 
         _dir = os.path.join(self.archive_dir, unicode(room).encode("utf-8"))
-        for root, _, files in os.walk(_dir):
-            if not files:
-                continue
+        for root, _, filenames in os.walk(_dir):
+            for filename in filenames:
+                path = os.path.join(root, filename)
+                if _is_compress_path(path):
+                    compress.queue(0.0, path)
 
-            for path in glob.glob("{0}/*.json.compress*".format(root)):
-                compress.queue(0.0, path)
-
+        rotate_event = object()
         collect = idiokit.pipe(
-            self._collect(room, compress),
+            self._collect(rotate_event, room, compress),
             self._compress(compress)
         )
-
-        idiokit.pipe(flush(), collect)
-        idiokit.pipe(rotate(), collect)
-
+        idiokit.pipe(rotate(rotate_event), collect)
         return collect
 
     @idiokit.stream
-    def _collect(self, room, compress):
+    def _collect(self, rotate_event, room, compress):
         archive = None
-        needs_flush = False
-
         try:
             while True:
                 event = yield idiokit.next()
 
-                if event is None:
-                    if archive is not None and needs_flush:
-                        archive.flush()
-                        needs_flush = False
-                elif event is True:
+                if event is rotate_event:
                     if archive is not None:
                         archive.flush()
                         archive.close()
                         yield compress.queue(0.0, _rename(archive.name))
                         archive = None
-
-                    needs_flush = False
-                    archive = open_archive(self.archive_dir, time.time(), room)
-                    self.log.info("Opened archive {0!r}".format(archive.name))
-                elif archive is not None:
+                else:
+                    if archive is None:
+                        archive = open_archive(self.archive_dir, time.time(), room)
+                        self.log.info("Opened archive {0!r}".format(archive.name))
                     json_dict = dict((key, event.values(key)) for key in event.keys())
                     archive.write(json.dumps(json_dict) + os.linesep)
-                    needs_flush = True
         finally:
             if archive is not None:
                 archive.flush()
@@ -196,10 +242,10 @@ class ArchiveBot(bot.ServiceBot):
         while True:
             compress_path = yield queue.wait()
 
-            path = yield idiokit.thread(compress, compress_path)
-            if path:
+            try:
+                path = yield idiokit.thread(compress, compress_path)
                 self.log.info("Compressed archive {0!r}".format(path))
-            else:
+            except ValueError:
                 self.log.error("Invalid path {0!r}".format(compress_path))
 
 
