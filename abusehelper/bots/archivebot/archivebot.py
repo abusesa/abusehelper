@@ -5,10 +5,13 @@ import json
 import time
 import errno
 import random
+import urllib
 import contextlib
+
 from datetime import datetime
 
 import idiokit
+from idiokit.xmpp.jid import JID
 from abusehelper.core import bot, events, taskfarm, utils
 
 
@@ -105,7 +108,7 @@ def archive_path(ts, room_name):
     gmtime = time.gmtime(ts)
 
     return os.path.join(
-        unicode(room_name).encode("utf-8"),
+        room_name,
         time.strftime("%Y", gmtime),
         time.strftime("%m", gmtime),
         time.strftime("%d.json", gmtime)
@@ -117,6 +120,40 @@ def open_archive(archive_dir, ts, room_name):
     dirname = os.path.dirname(path)
     ensure_dir(dirname)
     return open(path, "ab", buffering=1)
+
+
+def _encode_room_jid(jid):
+    r"""Return sanitized and normalised domain/node path name from
+    a bare room JID.
+
+    Accepts JID argument as an unicode string u"room@example.com",
+    as a byte string "room@example.com", or an idiokit.xmpp.jid.JID object.
+
+    >>> _encode_room_jid("room.subroom@example.com")
+    'room.subroom@example.com'
+
+    >>> _encode_room_jid("room.subroom@example.com/resource")
+    Traceback (most recent call last):
+    ...
+    ValueError: given room JID does not match with the bare room JID
+
+    >>> _encode_room_jid(u"room.caf\xe9.subroom@example.com")
+    'room.caf%C3%A9.subroom@example.com'
+
+    >>> _encode_room_jid("room.caf\xe9.subroom@example.com")
+    Traceback (most recent call last):
+    ...
+    UnicodeDecodeError: 'ascii' codec can't decode byte 0xe9 in position 8: ordinal not in range(128)
+
+    >>> _encode_room_jid(JID("room.subroom@example.com"))
+    'room.subroom@example.com'
+    """
+    room_jid = JID(jid)
+
+    if room_jid != room_jid.bare():
+        raise ValueError("given room JID does not match with the bare room JID")
+
+    return urllib.quote(unicode(room_jid).encode("utf-8"), safe=" @")
 
 
 def _rename(path):
@@ -194,10 +231,15 @@ class ArchiveBot(bot.ServiceBot):
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
-    def _archive(self, room):
+    def _archive(self, room_bare_jid):
         compress = utils.WaitQueue()
+        room_name = _encode_room_jid(room_bare_jid)
 
-        _dir = os.path.join(self.archive_dir, unicode(room).encode("utf-8"))
+        _dir = os.path.join(self.archive_dir, room_name)
+
+        if _dir != os.path.normpath(_dir):
+            raise ValueError("incorrect room name lands outside the archive directory")
+
         for root, _, filenames in os.walk(_dir):
             for filename in filenames:
                 path = os.path.join(root, filename)
@@ -206,14 +248,14 @@ class ArchiveBot(bot.ServiceBot):
 
         rotate_event = object()
         collect = idiokit.pipe(
-            self._collect(rotate_event, room, compress),
+            self._collect(rotate_event, room_name, compress),
             self._compress(compress)
         )
         idiokit.pipe(rotate(rotate_event), collect)
         return collect
 
     @idiokit.stream
-    def _collect(self, rotate_event, room, compress):
+    def _collect(self, rotate_event, room_name, compress):
         archive = None
         try:
             while True:
@@ -227,7 +269,7 @@ class ArchiveBot(bot.ServiceBot):
                         archive = None
                 else:
                     if archive is None:
-                        archive = open_archive(self.archive_dir, time.time(), room)
+                        archive = open_archive(self.archive_dir, time.time(), room_name)
                         self.log.info("Opened archive {0!r}".format(archive.name))
                     json_dict = dict((key, event.values(key)) for key in event.keys())
                     archive.write(json.dumps(json_dict) + os.linesep)
