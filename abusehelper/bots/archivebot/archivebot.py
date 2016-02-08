@@ -76,7 +76,7 @@ def _unique_writable_file(directory, prefix, suffix):
 
     while True:
         try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except OSError as ose:
             if ose.errno != errno.EEXIST:
                 raise
@@ -85,8 +85,17 @@ def _unique_writable_file(directory, prefix, suffix):
         else:
             break
 
-    with os.fdopen(fd, "wb") as fileobj:
+    try:
+        fileobj = os.fdopen(fd, "wb")
+    except:
+        os.remove(path)
+        os.close(fd)
+        raise
+
+    try:
         yield path, fileobj
+    finally:
+        fileobj.close()
 
 
 def ensure_dir(dir_name):
@@ -192,19 +201,6 @@ def compress(path):
     return gz_path
 
 
-@idiokit.stream
-def rotate(event):
-    last = None
-
-    while True:
-        now = datetime.utcnow().day
-        if now != last:
-            last = now
-            yield idiokit.send(event)
-
-        yield idiokit.sleep(1.0)
-
-
 class ArchiveBot(bot.ServiceBot):
     archive_dir = bot.Param("directory where archive files are written")
 
@@ -256,36 +252,28 @@ class ArchiveBot(bot.ServiceBot):
                 if _is_compress_path(path):
                     compress.queue(0.0, path)
 
-        rotate_event = object()
-        collect = idiokit.pipe(
-            self._collect(rotate_event, room_name, compress),
+        return idiokit.pipe(
+            self._collect(room_name, compress),
             self._compress(compress)
         )
-        idiokit.pipe(rotate(rotate_event), collect)
-        return collect
 
     @idiokit.stream
-    def _collect(self, rotate_event, room_name, compress):
-        archive = None
-        try:
-            while True:
-                event = yield idiokit.next()
+    def _collect(self, room_name, compress):
+        event = yield idiokit.next()
 
-                if event is rotate_event:
-                    if archive is not None:
-                        archive.close()
-                        yield compress.queue(0.0, _rename(archive.name))
-                        archive = None
-                else:
-                    if archive is None:
-                        archive = open_archive(self.archive_dir, time.time(), room_name)
-                        self.log.info("Opened archive {0!r}".format(archive.name))
+        while True:
+            current = datetime.utcnow().day
+
+            with open_archive(self.archive_dir, time.time(), room_name) as archive:
+                self.log.info("Opened archive {0!r}".format(archive.name))
+
+                while current == datetime.utcnow().day:
                     json_dict = dict((key, event.values(key)) for key in event.keys())
                     archive.write(json.dumps(json_dict) + os.linesep)
-        finally:
-            if archive is not None:
-                archive.close()
-                self.log.info("Closed archive {0!r}".format(archive.name))
+
+                    event = yield idiokit.next()
+
+            yield compress.queue(0.0, _rename(archive.name))
 
     @idiokit.stream
     def _compress(self, queue):
