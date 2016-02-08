@@ -273,7 +273,6 @@ class ArchiveBot(bot.ServiceBot):
 
                 if event is rotate_event:
                     if archive is not None:
-                        archive.flush()
                         archive.close()
                         yield compress.queue(0.0, _rename(archive.name))
                         archive = None
@@ -285,7 +284,6 @@ class ArchiveBot(bot.ServiceBot):
                     archive.write(json.dumps(json_dict) + os.linesep)
         finally:
             if archive is not None:
-                archive.flush()
                 archive.close()
                 self.log.info("Closed archive {0!r}".format(archive.name))
 
