@@ -64,13 +64,13 @@ class TestRename(unittest.TestCase):
 class TestCompress(unittest.TestCase):
     def test_dotcompress(self):
         with tempfile.NamedTemporaryFile(prefix="roomname.compress@example") as tmp:
-            self.assertRaises(ValueError, archivebot.compress, tmp.name)
+            self.assertRaises(ValueError, archivebot._compress, tmp.name)
 
     def test_valid_compress(self):
         try:
             tmp = tempfile.NamedTemporaryFile(suffix=".compress-00000000", delete=False)
             tmp.write("test")
-            gz_file = archivebot.compress(tmp.name)
+            gz_file = archivebot._compress(tmp.name)
             try:
                 self.assertEqual(gz_file, tmp.name[:-18] + ".gz")
             finally:

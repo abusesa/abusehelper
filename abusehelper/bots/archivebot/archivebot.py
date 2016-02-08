@@ -98,7 +98,7 @@ def _unique_writable_file(directory, prefix, suffix):
         fileobj.close()
 
 
-def ensure_dir(dir_name):
+def _ensure_dir(dir_name):
     r"""
     Ensure that the directory exists (create if necessary) and return
     the absolute directory path.
@@ -113,7 +113,7 @@ def ensure_dir(dir_name):
     return dir_name
 
 
-def archive_path(ts, room_name):
+def _archive_path(ts, room_name):
     gmtime = time.gmtime(ts)
 
     return os.path.join(
@@ -124,10 +124,10 @@ def archive_path(ts, room_name):
     )
 
 
-def open_archive(archive_dir, ts, room_name):
-    path = os.path.join(archive_dir, archive_path(ts, room_name))
+def _open_archive(archive_dir, ts, room_name):
+    path = os.path.join(archive_dir, _archive_path(ts, room_name))
     dirname = os.path.dirname(path)
-    ensure_dir(dirname)
+    _ensure_dir(dirname)
     return open(path, "ab", buffering=1)
 
 
@@ -181,7 +181,7 @@ def _rename(path):
     return new_path
 
 
-def compress(path):
+def _compress(path):
     with open(path, "rb") as archive:
         directory, filename = _split_compress_path(path)
         prefix, suffix = os.path.splitext(filename)
@@ -204,11 +204,11 @@ def compress(path):
 class ArchiveBot(bot.ServiceBot):
     archive_dir = bot.Param("directory where archive files are written")
 
-    def __init__(self, *args, **kwargs):
-        super(ArchiveBot, self).__init__(*args, **kwargs)
+    def __init__(self, *args, **keys):
+        super(ArchiveBot, self).__init__(*args, **keys)
 
-        self.rooms = taskfarm.TaskFarm(self.handle_room, grace_period=0.0)
-        self.archive_dir = ensure_dir(self.archive_dir)
+        self.rooms = taskfarm.TaskFarm(self._handle_room, grace_period=0.0)
+        self.archive_dir = _ensure_dir(self.archive_dir)
 
     @idiokit.stream
     def session(self, state, src_room):
@@ -216,7 +216,7 @@ class ArchiveBot(bot.ServiceBot):
         yield self.rooms.inc(src_jid.bare())
 
     @idiokit.stream
-    def handle_room(self, name):
+    def _handle_room(self, name):
         msg = "room {0!r}".format(name)
 
         attrs = events.Event({
@@ -231,9 +231,11 @@ class ArchiveBot(bot.ServiceBot):
 
             log.open("Joined " + msg, attrs, status="joined")
             try:
-                yield idiokit.pipe(room,
-                                   events.stanzas_to_events(),
-                                   self._archive(room.jid.bare()))
+                yield idiokit.pipe(
+                    room,
+                    events.stanzas_to_events(),
+                    self._archive(room.jid.bare())
+                )
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
@@ -264,7 +266,7 @@ class ArchiveBot(bot.ServiceBot):
         while True:
             current = datetime.utcnow().day
 
-            with open_archive(self.archive_dir, time.time(), room_name) as archive:
+            with _open_archive(self.archive_dir, time.time(), room_name) as archive:
                 self.log.info("Opened archive {0!r}".format(archive.name))
 
                 while current == datetime.utcnow().day:
@@ -281,7 +283,7 @@ class ArchiveBot(bot.ServiceBot):
             compress_path = yield queue.wait()
 
             try:
-                path = yield idiokit.thread(compress, compress_path)
+                path = yield idiokit.thread(_compress, compress_path)
                 self.log.info("Compressed archive {0!r}".format(path))
             except ValueError:
                 self.log.error("Invalid path {0!r}".format(compress_path))
