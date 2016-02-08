@@ -88,8 +88,8 @@ def _unique_writable_file(directory, prefix, suffix):
     try:
         fileobj = os.fdopen(fd, "wb")
     except:
-        os.remove(path)
         os.close(fd)
+        os.remove(path)
         raise
 
     try:
