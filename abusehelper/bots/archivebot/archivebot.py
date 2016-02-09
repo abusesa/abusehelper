@@ -75,8 +75,9 @@ def _unique_writable_file(directory, prefix, suffix):
     path = os.path.join(directory, "{0}{1}".format(prefix, suffix))
 
     while True:
+        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0)
         try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            fd = os.open(path, flags)
         except OSError as ose:
             if ose.errno != errno.EEXIST:
                 raise
