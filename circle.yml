@@ -5,4 +5,4 @@ dependencies:
 
 test:
   override:
-    - tox -- --junit-xml=$CIRCLE_TEST_REPORTS/pytest/'$TOXENV'.xml --junit-prefix='$TOXENV'
+    - tox -- --junitxml=$CIRCLE_TEST_REPORTS/pytest/'$TOXENV'.xml
