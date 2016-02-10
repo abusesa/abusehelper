@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0 (not released)
+## 3.0.0 (2016-02-10)
 
 ### Features
 
