@@ -4,7 +4,7 @@ What is data harmonization? What is an ontology? The purpose of this document is
 
 With data harmonization briefly visited, we move on to defining an ontology. An ontology in our case is a higher level abstraction of a language, where each lexeme addresses an observable characteristic of either an Indicator of Compromise, IoC, or a vulnerable service discovered through actively scanning the Internet. Our grammar is thus expressed as sets of key-value pairs, which are straightforward to serialize into AbuseHelper events.
 
-Below, we will reference events as collections of ontology key-value pairs. Please note that we use **key** to denote a harmonized event key, whereas a lexeme in this ontology is called an **attribute**.
+Below, we will reference events as collections of ontology driven key-value pairs. Please note that we use the term **key** to denote an event schema and the term **attribute** to denote an ontology lexeme.
 
 ## Ontology, Schema or Taxonomy
 
@@ -12,7 +12,7 @@ As stated above, an ontology is a higher level abstraction of the semantic chara
 
 # Core Attributes
 
-For an abuse or vulnerable service event to be actionable and able to reach the right end point recipient, various keys need to be present in it.
+For an abuse or vulnerable service event to be actionable and able to reach the right end point recipient, various keys need to be present.
 
 ## Feed Attributes
 
