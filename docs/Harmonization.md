@@ -1,6 +1,10 @@
 # Data Harmonization Ontology (TLP White)
 
-What is data harmonization? What is an ontology? The purpose of this document is to help you better deal with the complexity that arises from processing threat intelligence from heterogeneous sources. Data harmonization is a contract to call same things always by the same name, i.e. an ip address is always referred to as an **ip**. With data harmonization briefly visited, we move on to defining an ontology. An ontology in our case is a higher level abstraction of a language, where each lexeme addresses an observable characteristic of either an Indicator of Compromise, IoC, or a vulnerable service discovered through actively scanning the Internet. Our grammar is thus expressed as sets of key-value pairs, which are straightforward to serialize into AbuseHelper events. Below, we will reference events as collections of ontology key-value pairs.
+What is data harmonization? What is an ontology? The purpose of this document is to help you better deal with the complexity that arises from processing threat intelligence from heterogeneous sources. Data harmonization is a contract to call same things always by the same name, i.e. an ip address is always referred to as an **ip**.
+
+With data harmonization briefly visited, we move on to defining an ontology. An ontology in our case is a higher level abstraction of a language, where each lexeme addresses an observable characteristic of either an Indicator of Compromise, IoC, or a vulnerable service discovered through actively scanning the Internet. Our grammar is thus expressed as sets of key-value pairs, which are straightforward to serialize into AbuseHelper events.
+
+Below, we will reference events as collections of ontology key-value pairs. Please note that we use **key** to denote a harmonized event key, whereas a lexeme in this ontology is called an **attribute**.
 
 ## Ontology, Schema or Taxonomy
 
@@ -8,7 +12,7 @@ As stated above, an ontology is a higher level abstraction of the semantic chara
 
 # Core Attributes
 
-For an abuse or vulnerable service event to be actionable and able to reach the right end recipient, various key attributes need to be present.
+For an abuse or vulnerable service event to be actionable and able to reach the right end point recipient, various keys need to be present in it.
 
 ## Feed Attributes
 
@@ -84,7 +88,7 @@ Since many of the sources report events related to a compromised machines, such 
 
 ### Reported Identity
 
-As stated above, each abuse handling organization should define a policy, which attributes to use as the primary elements describing a given event. Often the sources have done their attribution, but you may choose to correlate their attributive elements against your own or a 3rd party.. In practice this means that your sanitation should prefix the elements with the **reported** keyword, to denote that you've decided the attribute these yourself. The list below is not comprehensive, rather than a list of common things you may want to attribute yourself. Moreover, if you choose to perform your own attribution, the observation time will become your authoritative point of reference related to these correlated attributes.
+As stated above, each abuse handling organization should define a policy, which attributes to use as the primary elements describing a given event. Often, the sources have performed their attribution, but you may choose to correlate their attributive elements against your own or those of a third party. In practice, this means that your sanitation should prefix the keys with the **reported** keyword, to denote that you have decided to perform the attribution on your own. The list below is not comprehensive, rather than a list of common things you may want to correlate yourself. Moreover, if you choose to perform your own attribution, the **observation time** will become your authoritative point of reference in relation to the correlated attributes.
 
 |attribute|description|
 --- | --- |
@@ -105,14 +109,14 @@ We recognize that ip geolocation is not an exact science and analysis of the abu
 |latitude|Latitude coordinate derived from a geolocation service, such as MaxMind geoip db.|
 |longitude|Longitude coordinate derived from a geolocation service, such as MaxMind geoip db.|
 
-## Additional Elements
+## Additional Attributes
 
-The idea behind the additional elements is to denote generic metadata about the abuse event, which complements the identity or temporal information about the victim, vulnerable service or a piece of criminal infrastructure. The purpose of this information is to give more context to the abuse type denoted by the "type" key.
+The idea behind the additional attributes is to denote generic metadata about an event, which complements the identity or temporal information about the victim, vulnerable service or a piece of compromised infrastructure. The purpose of this information is to give more context to the abuse type denoted by the "type" attribute.
 
 |attribute|description|
 --- | --- |
 |abuse contact|An abuse contact email address for an IP network.|
-|additional information|Sometimes it may be necessary to relay a an additional piece of information to the report recipient related to the specific context at hand. This key acts as a conduit for derived schemas to do it. So in a sense it is a placeholder for useful context dependent information, which would be otherwise difficult to convey.|
+|additional information|Sometimes it may be necessary to relay a an additional piece of information to the report recipient related to the specific context at hand. So in a sense it is a placeholder for useful context dependent information, which would be otherwise difficult to convey without changing a schema.|
 |comment|Free text commentary about the abuse event augmented by an analyst.|
 |description url|A description URL is a link to a further description of threat in question.|
 |description|A free-form textual description of an abuse or vulnerable service event.|
@@ -126,7 +130,7 @@ The idea behind the additional elements is to denote generic metadata about the 
 |transport protocol|Some feeds report a protocol, which often denotes the observed transport, e.g. tcp. This should be noted appropriately if the protocol attribute should denote the protocol of a vulnerable service for example.|
 |uuid|[AbuseSA](http://www.abusesa.com) and AbuseHelper are using python uuids to identify abuse events. The python UUIDs are generated based on [RFC4122](http://tools.ietf.org/html/rfc4122) using the uuid.uuid4() function. Please note that the "uuid" serves a different communicative function than the tracking id. The purpose of the uuid is to denote a unique identifier, which uniquely identifies a single event.|
 
-### Artifact Elements
+### Artifact Attributes
 
 |attribute|description|
 --- | --- |
@@ -134,7 +138,7 @@ The idea behind the additional elements is to denote generic metadata about the 
 |artifact hash|A string depicting a checksum for a file, be it a malware sample for example.|
 |artifact version|A version string for an identified artifact generation, e.g. a crime-ware kit.|
 
-## Classification Elements
+## Classification Attributes
 
 Having a functional ontology to work with, especially for the abuse types is important for you to be able to classify, prioritize and report relevant actionable intelligence to the parties who need to be informed. Below, is a list of harmonized values for the **threat types** we have observed in our quality assurance efforts and collaborating with our AbuseSA customers and the AbuseHelper community. The driving idea for this ontology has been to use a minimal set of values with maximal usability. 
 
@@ -182,7 +186,7 @@ The **type** values offer a data-backed taxonomy for classifying abuse and vulne
 |test|This is a type for testing purposes.|
 |vulnerable service|This type refers to poorly configured or vulnerable network service, which may be abused by a third party. For example, these services relate to open proxies, open dns resolvers, network time servers (ntp) or character generation services (chargen), simple network management services (snmp). In addition, to specify the network service and its potential abuse, one should use the protocol, port and description attributes for that purpose respectively.|
 
-## Topic or Provider Specific Elements
+## Topic or Provider Specific Attributes
 
 Since the basic idea of an ontology is to specify a core language, which is able to communicate the relevant aspects of a topic in an effective manner, it leaves room for topic specific lexemes outside the generic terminology. In the context of abuse reporting, this is especially true with emerging trends, where a single source may start reporting on a topic and other follow suit. Previously, we listed some of these keys such as "dns version" or "notified by" as part of the ontology.
 
@@ -191,6 +195,16 @@ At present, we have decided to leave them out of the ontology and only bring in 
 The important thing is just to avoid collision with the core ontology name space. In other words, topic or provider specific keys are the new emerging attributes, which may become part of the ontology if they get adopted to describe a facet of a generic topic. For example above, we have decided to use the "cc" key as the authoritative country code denominator.
 
 For a given context, there may be other provider specific interpretations, which we have decided to prefix with the provider name. Example of such a prefix are "cymru cc" or "geoip cc", where the provider name is prepended to denote the source of this geolocation information.
+
+## Harmonization Best Practices
+
+There are a number of things, which you will have to take into account when harmonizing heterogeneous datasets. The established attributes in this ontology should help you on your way, when dealing with topic or provider specific attributes. In general, the attribute names should be **lower case** and instead of underscores, "\_", you should use white space " ". E.g. DNS\_Version would be harmonized into "dns version".
+
+We recognize that for traditional database schemas this approach may be challenging, but converting spaces into underscores in the attribute names should not be an impossible undertaking. The idea of the ontology, after all, is to be a human readable abstraction. In the context of the serialized AbuseHelper XMPP events, white space in key names does not pose a problem. Moreover, the underlying AbuseHelper filtering rule language is perfectly capable of dealing with white space in key names.
+
+On the note of human readability, we need to strike a balance between attribute name length and readability. "src port" may be natural for technical people, but "source port" is more readable. "reverse dns" instead of "reverse domain name system name" on the other hand  is more practical. As human readability is not an exact science, the important point is to have a clear naming convention and stick with it. For example, "destination domain name" is a bit wieldy, but "dst domain name" or "dst dns" would not use the same rationale as "domain name" for example.
+
+In summary, the underlying idea of this ontology is to provide a good basis to build on, whether the use case is filtering, aggregation, reporting or alerting. Not having to deal with 32 names for an ip address for example, makes life a lot easier at the end of the pipeline.
 
 # History of this Document
 
