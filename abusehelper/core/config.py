@@ -2,10 +2,12 @@ import os
 import sys
 import imp
 import time
+import traceback
 import contextlib
 import collections
 
 import idiokit
+from . import utils
 
 
 class HashableFrozenDict(collections.Mapping, collections.Hashable):
@@ -150,11 +152,18 @@ def follow_config(path, poll_interval=1.0, force_interval=30.0):
                 last_error_msg = None
                 last_mtime = mtime
                 last_reload = now
-        except Exception as exc:
-            error_msg = "Could not load module {0!r}: {1!r}".format(abspath, exc)
+        except Exception:
+            _, exc_value, exc_tb = sys.exc_info()
+
+            stack = traceback.extract_tb(exc_tb)
+            error_msg = "Could not load {path!r} (most recent call last):\n{stack}\n{exception}".format(
+                path=abspath,
+                stack="".join(traceback.format_list(stack)).rstrip(),
+                exception=utils.format_exception(exc_value)
+            )
+
             if error_msg != last_error_msg:
                 yield idiokit.send(False, error_msg)
-
                 last_error_msg = error_msg
                 last_mtime = None
 
