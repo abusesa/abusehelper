@@ -139,32 +139,31 @@ def follow_config(path, poll_interval=1.0, force_interval=30.0):
 
     abspath = os.path.abspath(path)
     while True:
-        try:
-            now = time.time()
-            if now < last_reload:
-                last_reload = now
+        now = time.time()
+        if now < last_reload:
+            last_reload = now
 
-            mtime = os.path.getmtime(abspath)
-            if now > last_reload + force_interval or last_mtime != mtime:
+        mtime = os.path.getmtime(abspath)
+        if now > last_reload + force_interval or last_mtime != mtime:
+            try:
                 configs = load_configs(abspath)
-                yield idiokit.send(True, tuple(flatten(configs)))
+            except Exception:
+                _, exc_value, exc_tb = sys.exc_info()
 
+                stack = traceback.extract_tb(exc_tb)
+                error_msg = "Could not load {path!r} (most recent call last):\n{stack}\n{exception}".format(
+                    path=abspath,
+                    stack="".join(traceback.format_list(stack)).rstrip(),
+                    exception=utils.format_exception(exc_value)
+                )
+
+                if error_msg != last_error_msg:
+                    yield idiokit.send(False, error_msg)
+                    last_error_msg = error_msg
+                    last_mtime = None
+            else:
+                yield idiokit.send(True, tuple(flatten(configs)))
                 last_error_msg = None
                 last_mtime = mtime
                 last_reload = now
-        except Exception:
-            _, exc_value, exc_tb = sys.exc_info()
-
-            stack = traceback.extract_tb(exc_tb)
-            error_msg = "Could not load {path!r} (most recent call last):\n{stack}\n{exception}".format(
-                path=abspath,
-                stack="".join(traceback.format_list(stack)).rstrip(),
-                exception=utils.format_exception(exc_value)
-            )
-
-            if error_msg != last_error_msg:
-                yield idiokit.send(False, error_msg)
-                last_error_msg = error_msg
-                last_mtime = None
-
         yield idiokit.sleep(poll_interval)
