@@ -300,14 +300,15 @@ class DefaultStartupBot(StartupBot):
     enable = bot.ListParam("bots that are run (default: run all bots)", default=None)
     disable = bot.ListParam("bots that are not run (default: run all bots)", default=None)
 
-    @idiokit.stream
     def configs(self):
         abspath = os.path.abspath(self.config)
-        workdir = os.path.dirname(abspath)
+        return config.follow_config(abspath) | self._follow_config(abspath)
 
-        follow = config.follow_config(abspath)
+    @idiokit.stream
+    def _follow_config(self, abspath):
+        workdir = os.path.dirname(abspath)
         while True:
-            ok, obj = yield follow.next()
+            ok, obj = yield idiokit.next()
             if not ok:
                 self.log.error(obj)
                 continue
