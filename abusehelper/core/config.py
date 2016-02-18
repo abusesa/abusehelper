@@ -67,20 +67,20 @@ def flatten(obj):
     []
     """
 
-    if callable(obj):
-        for flattened in flatten(obj()):
-            yield flattened
-        return
+    queue = collections.deque([obj])
+    while queue:
+        obj = queue.popleft()
 
-    try:
-        iterable = iter(obj)
-    except TypeError:
-        yield obj
-        return
+        if callable(obj):
+            queue.appendleft(obj())
+            continue
 
-    for item in iterable:
-        for flattened in flatten(item):
-            yield flattened
+        try:
+            iterable = iter(obj)
+        except TypeError:
+            yield obj
+        else:
+            queue.extendleft(reversed(list(iterable)))
 
 
 @contextlib.contextmanager
@@ -122,10 +122,10 @@ def load_configs(path, name="configs"):
             sys.path.insert(0, dirname)
 
             module = _load_config_module(abspath)
-            if not hasattr(module, name):
+            try:
+                config_attr = getattr(module, name)
+            except AttributeError:
                 raise ImportError("no {0!r} defined in module {1!r}".format(name, filename))
-
-            config_attr = getattr(module, name)
             return tuple(flatten(config_attr))
         finally:
             sys.path[:] = sys_path
@@ -151,6 +151,8 @@ def follow_config(path, poll_interval=1.0, force_interval=30.0):
                 _, exc_value, exc_tb = sys.exc_info()
 
                 stack = traceback.extract_tb(exc_tb)
+                stack = stack[1:]  # Make the traceback flatter by discarding the current stack frame
+
                 error_msg = "Could not load {path!r} (most recent call last):\n{stack}\n{exception}".format(
                     path=abspath,
                     stack="".join(traceback.format_list(stack)).rstrip(),
@@ -162,7 +164,7 @@ def follow_config(path, poll_interval=1.0, force_interval=30.0):
                     last_error_msg = error_msg
                     last_mtime = None
             else:
-                yield idiokit.send(True, tuple(flatten(configs)))
+                yield idiokit.send(True, configs)
                 last_error_msg = None
                 last_mtime = mtime
                 last_reload = now
