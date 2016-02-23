@@ -4,7 +4,7 @@
 
 ### Features
 
- * More extensive logging for the startupbot to include tracebacks if startup.py configuration file is not valid. ([#36](https://github.com/abusesa/abusehelper/pull/36))
+ * More extensive logging for the ```abusehelper.core.startup``` module to include tracebacks if ```startup.py``` configuration file is not valid. ([#36](https://github.com/abusesa/abusehelper/pull/36))
 
 ## 3.0.0 (2016-02-10)
 
