@@ -13,10 +13,12 @@ setup(
     url="https://github.com/abusesa/abusehelper/",
     license="MIT",
     packages=find_packages(exclude=["*.tests"]),
-    scripts=[
-        "scripts/botnet",
-        "scripts/roomreader"
-    ],
+    entry_points={
+        "console_scripts": [
+            "botnet=abusehelper.tools.botnet:main",
+            "roomreader=abusehelper.tools.roomreader:main"
+        ]
+    },
     install_requires=[
         "idiokit>=2.4.0,<3.0.0"
     ]
