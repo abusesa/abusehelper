@@ -1,5 +1,4 @@
 import os
-import stat
 import shutil
 import tempfile
 import unittest
@@ -38,13 +37,13 @@ class TestUniqueWritableFile(unittest.TestCase):
                 self.assertEqual(filename, os.path.join(tmp, "filename-00000003.ext"))
 
     def test_should_raise_OSError_other_than_EEXIST(self):
-        def try_to_create(tmp):
-            with archivebot._unique_writable_file(tmp, "filename", ".ext"):
+        def try_to_create(directory):
+            with archivebot._unique_writable_file(directory, "filename", ".ext"):
                 pass
 
         with tmpdir() as tmp:
-            os.chmod(os.path.join(tmp), stat.S_IREAD)
-            self.assertRaises(OSError, try_to_create, tmp)
+            non_existing_dir = os.path.join(tmp, "non-existing-dir")
+            self.assertRaises(OSError, try_to_create, non_existing_dir)
 
 
 class TestRename(unittest.TestCase):
