@@ -19,9 +19,8 @@ def _parse():
     while True:
         event = yield idiokit.next()
 
-        for key, value in event.items():
-            if not value.strip():
-                event.clear(key)
+        for key in event.keys():
+            event.pop(key, filter=lambda value: not value.strip())
 
         for key in ("ip", "asn", "country"):
             event.update(key, _value_split(event.pop(key)))
