@@ -21,7 +21,7 @@ def _parse():
 
         for key, value in event.items():
             if not value.strip():
-                event.pop(key)
+                event.clear(key)
 
         for key in ("ip", "asn", "country"):
             event.update(key, _value_split(event.pop(key)))
