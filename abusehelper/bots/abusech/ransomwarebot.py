@@ -2,15 +2,13 @@ import idiokit
 from abusehelper.core import bot, utils
 
 
-COLUMNS = ("first seen", "threat", "malware", "host", "url", "status", "registrar", "ip", "asn", "country")
+COLUMNS = ("first seen", "threat", "malware", "host", "url", "status", "registrar", "ip", "asn", "cc")
 
 
 def _value_split(values):
     results = set()
-
     for value in values:
         results = results | set([x for x in value.split("|") if x])
-
     return tuple(results)
 
 
@@ -36,9 +34,8 @@ class RansomwareTrackerBot(bot.PollingBot):
         self.log.info("Downloading %s" % self.feed_url)
         try:
             info, fileobj = yield utils.fetch_url(self.feed_url)
-        except utils.FetchUrlFailed, fuf:
-            self.log.error("Download failed: %r", fuf)
-            idiokit.stop()
+        except utils.FetchUrlFailed as fuf:
+            raise bot.PollSkipped("Download failed: {1}".format(fuf))
 
         lines = []
         for line in fileobj:
