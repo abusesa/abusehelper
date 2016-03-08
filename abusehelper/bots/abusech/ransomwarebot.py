@@ -21,7 +21,7 @@ def _parse():
         for key in event.keys():
             event.pop(key, filter=lambda value: not value.strip())
 
-        for key in ("ip", "asn", "country"):
+        for key in ("ip", "asn", "cc"):
             event.update(key, _value_split(event.pop(key)))
 
         for timestamp in event.pop("first seen"):
