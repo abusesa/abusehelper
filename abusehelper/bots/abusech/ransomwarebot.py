@@ -1,3 +1,4 @@
+import time
 import idiokit
 from abusehelper.core import bot, utils
 
@@ -22,6 +23,17 @@ def _parse():
 
         for key in ("ip", "asn", "country"):
             event.update(key, _value_split(event.pop(key)))
+
+        for timestamp in event.pop("first seen"):
+            try:
+                timestamp = time.strftime(
+                    "%Y-%m-%d %H:%M:%SZ",
+                    time.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+                )
+            except ValueError:
+                pass
+            else:
+                event.add("first seen", timestamp)
 
         yield idiokit.send(event)
 
