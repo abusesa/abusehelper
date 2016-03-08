@@ -43,7 +43,7 @@ class RansomwareTrackerBot(bot.PollingBot):
 
     @idiokit.stream
     def poll(self):
-        self.log.info("Downloading %s" % self.feed_url)
+        self.log.info("Downloading {0}".format(self.feed_url))
         try:
             info, fileobj = yield utils.fetch_url(self.feed_url)
         except utils.FetchUrlFailed as fuf:
