@@ -4,7 +4,7 @@
 
 ### Features
 
- * More extensive logging for ```abusehelper.core.startup``` and ```abusehelper.core.runtime``` to include tracebacks if the configuration file is not valid ([#36](https://github.com/abusesa/abusehelper/pull/36))
+ * More extensive logging with tracebacks when ```abusehelper.core.startup``` and ```abusehelper.core.runtime``` fail to load the configuration file ([#36](https://github.com/abusesa/abusehelper/pull/36))
  * Add ```abusehelper.bots.abusesech.ransomwarebot``` ([#40](https://github.com/abusesa/abusehelper/pull/40))
 
 ## 3.0.0 (2016-02-10)
