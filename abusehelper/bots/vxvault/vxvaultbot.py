@@ -56,7 +56,7 @@ class VxVaultBot(bot.PollingBot):
                 event.add("ip", netloc)
             event.add("feed", "vxvault")
             event.add("feed url", self.feed_url)
-            event.add("type", "malware")
+            event.add("type", "malware url")
             event.add("description", "This host is most likely hosting a malware URL.")
             yield idiokit.send(event)
 

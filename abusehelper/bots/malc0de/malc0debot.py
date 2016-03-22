@@ -28,7 +28,7 @@ class Malc0deBot(RSSBot):
 
         event = events.Event()
         event.add("feed", "malc0de")
-        event.add("type", "malware")
+        event.add("type", "malware url")
 
         link = keys.get("link", None)
         if link:

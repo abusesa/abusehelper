@@ -15,10 +15,10 @@ AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
 # Based on analysis in VSRoom for the most common types.
 CLASSIFICATION = {
-    "TDSS": [("type", "botnet drone"), ("malware", "tdss")],
-    "ZeroAccess": [("type", "botnet drone"), ("malware", "zeroaccess")],
+    "TDSS": [("type", "botnet drone"), ("malware family", "tdss")],
+    "ZeroAccess": [("type", "botnet drone"), ("malware family", "zeroaccess")],
 
-    "Malware Distribution": [("type", "malware")],
+    "Malware Distribution": [("type", "malware family")],
 
     "Double HTTP": [("type", "brute-force"), ("protocol", "http")],
     "Sipvicious": [("type", "brute-force"), ("protocol", "sip")],
@@ -29,8 +29,8 @@ CLASSIFICATION = {
     "WEB Proxy": [("type", "brute-force"), ("protocol", "http")],
     "Wordpress": [("type", "brute-force"), ("protocol", "http")],
 
-    "DHL Spambot": [("type", "spam")],
-    "Spam Bot": [("type", "spam")],
+    "DHL Spambot": [("type", "spam infrastructure")],
+    "Spam Bot": [("type", "spam infrastructure")],
 
     "Remax Phish": [("type", "phishing")],
 
@@ -38,7 +38,7 @@ CLASSIFICATION = {
     "Dell Kace backdoor": [("type", "exploit"), ("protocol", "http")],
     "dfind SK": [("type", "exploit")],
     "FTP Administrator": [("type", "exploit"), ("protocol", "ftp")],
-    "g01pack": [("type", "exploit"), ("malware", "g01pack")],
+    "g01pack": [("type", "exploit"), ("malware family", "g01pack")],
     "Heartblead": [("type", "exploit"), ("protocol", "ssl/tls"), ("additional information", "Heartbleed")],
     "HTTP Get with Title": [("exploit", "scanner"), ("protocol", "http")],
     "Malicious 8x8": [("type", "exploit"), ("protocol", "http")],
@@ -47,7 +47,6 @@ CLASSIFICATION = {
     "php injection": [("type", "exploit"), ("protocol", "http")],
     "PHP-cgi vulnerability": [("type", "exploit"), ("protocol", "http")],
     "ZmEu": [("type", "exploit"), ("protocol", "http")],
-
     "Morfeus F": [("type", "scanner")],
 }
 
