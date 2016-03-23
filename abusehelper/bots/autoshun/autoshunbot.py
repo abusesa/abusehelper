@@ -13,6 +13,7 @@ from abusehelper.core import utils, cymruwhois, bot
 
 AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
+
 class AutoshunBot(bot.PollingBot):
     COLUMNS = ["ip", "time", "info"]
     time_offset = 5
