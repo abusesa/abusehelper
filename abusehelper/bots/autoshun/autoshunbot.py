@@ -13,44 +13,6 @@ from abusehelper.core import utils, cymruwhois, bot
 
 AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
 
-# Based on analysis in VSRoom for the most common types.
-CLASSIFICATION = {
-    "TDSS": [("type", "botnet drone"), ("malware family", "tdss")],
-    "ZeroAccess": [("type", "botnet drone"), ("malware family", "zeroaccess")],
-
-    "Malware Distribution": [("type", "malware family")],
-
-    "Double HTTP": [("type", "brute-force"), ("protocol", "http")],
-    "Sipvicious": [("type", "brute-force"), ("protocol", "sip")],
-    "SSH": [("type", "brute-force"), ("protocol", "ssh")],
-    "Teminal Server": [("type", "brute-force"), ("protocol", "rdp"), ("additional information", "Terminal Server")],
-    "Tomcat": [("type", "brute-force"), ("protocol", "http")],
-    "TomCat Auth": [("type", "brute-force"), ("protocol", "http")],
-    "WEB Proxy": [("type", "brute-force"), ("protocol", "http")],
-    "Wordpress": [("type", "brute-force"), ("protocol", "http")],
-
-    "DHL Spambot": [("type", "spam infrastructure")],
-    "Spam Bot": [("type", "spam infrastructure")],
-
-    "Remax Phish": [("type", "phishing")],
-
-    "Core-Project": [("type", "exploit")],
-    "Dell Kace backdoor": [("type", "exploit"), ("protocol", "http")],
-    "dfind SK": [("type", "exploit")],
-    "FTP Administrator": [("type", "exploit"), ("protocol", "ftp")],
-    "g01pack": [("type", "exploit"), ("malware family", "g01pack")],
-    "Heartblead": [("type", "exploit"), ("protocol", "ssl/tls"), ("additional information", "Heartbleed")],
-    "HTTP Get with Title": [("exploit", "scanner"), ("protocol", "http")],
-    "Malicious 8x8": [("type", "exploit"), ("protocol", "http")],
-    "Muieblackcat": [("type", "exploit"), ("protocol", "http")],
-    "Oracle SQL Injection": [("type", "exploit"), ("protocol", "http")],
-    "php injection": [("type", "exploit"), ("protocol", "http")],
-    "PHP-cgi vulnerability": [("type", "exploit"), ("protocol", "http")],
-    "ZmEu": [("type", "exploit"), ("protocol", "http")],
-    "Morfeus F": [("type", "scanner")],
-}
-
-
 class AutoshunBot(bot.PollingBot):
     COLUMNS = ["ip", "time", "info"]
     time_offset = 5
@@ -94,14 +56,9 @@ class AutoshunBot(bot.PollingBot):
             event.add("description", "This host has triggered an IDS alert.")
 
             for info in event.values("info"):
-                for name, tuples in CLASSIFICATION.items():
-                    if info.startswith(name):
-                        for pair in tuples:
-                            event.add(pair[0], pair[1])
-                event.add("autoshun classification", info)
+                event.add("additional information", info)
             event.clear("info")
-            if not event.contains("type"):
-                event.add("type", "ids alert")
+            event.add("type", "ids alert")
             times = event.values("time")
             for time in times:
                 try:
