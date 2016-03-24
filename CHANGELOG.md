@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.1.0 (2016-03-XX)
+
 ### Features
 
  * More extensive logging with tracebacks when ```abusehelper.core.startup``` and ```abusehelper.core.runtime``` fail to load the configuration file ([#36](https://github.com/abusesa/abusehelper/pull/36))

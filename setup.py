@@ -99,7 +99,7 @@ packages.update(collect_package("abusehelper.bots"))
 
 setup(
     name="abusehelper",
-    version="3.0.0",
+    version="3.1.0",
     description="A framework for receiving and redistributing abuse feeds",
     long_description=(
         "AbuseHelper is a modular, scalable and robust " +
