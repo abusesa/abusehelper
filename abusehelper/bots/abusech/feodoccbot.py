@@ -24,7 +24,7 @@ class FeodoCcBot(AbuseCHFeedBot):
 
         for key, value in split_description(description):
             if key == "version":
-                yield "malware", "feodo." + value.strip().lower()
+                yield "malware family", "feodo." + value.strip().lower()
                 got_version = True
             elif key == "host":
                 yield host_or_ip(value)
