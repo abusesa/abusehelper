@@ -12,6 +12,7 @@ from . import host_or_ip_from_url, split_description, AbuseCHFeedBot
 class ZeusConfigBot(AbuseCHFeedBot):
     feed_malware = "zeus"
     feed_type = "malware configuration"
+    feed_name = "zeus malware configurations"
 
     feeds = bot.ListParam(default=["https://zeustracker.abuse.ch/monitor.php?urlfeed=configs"])
 

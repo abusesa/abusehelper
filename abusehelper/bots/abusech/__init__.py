@@ -60,7 +60,6 @@ def split_description(description):
 
 
 class AbuseCHFeedBot(RSSBot):
-    feed_name = "abuse.ch"
     feed_malware = []
     feed_type = []
 

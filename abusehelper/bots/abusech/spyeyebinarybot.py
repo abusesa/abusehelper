@@ -12,6 +12,7 @@ from . import sanitize_url, host_or_ip_from_url, split_description, AbuseCHFeedB
 class SpyEyeBinaryBot(AbuseCHFeedBot):
     feed_malware = "spyeye"
     feed_type = "malware"
+    feed_name = "spyeye malware urls"
 
     feeds = bot.ListParam(default=["https://spyeyetracker.abuse.ch/monitor.php?rssfeed=binaryurls"])
 

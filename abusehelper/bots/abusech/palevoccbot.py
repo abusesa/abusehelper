@@ -13,6 +13,7 @@ from . import host_or_ip, split_description, AbuseCHFeedBot
 class PalevoCcBot(AbuseCHFeedBot):
     feed_malware = "palevo"
     feed_type = "c&c"
+    feed_name = "palevo c&c"
 
     feeds = bot.ListParam(default=["https://palevotracker.abuse.ch/?rssfeed"])
 

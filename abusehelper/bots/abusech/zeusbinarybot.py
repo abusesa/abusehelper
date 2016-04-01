@@ -12,6 +12,7 @@ from . import sanitize_url, host_or_ip_from_url, split_description, AbuseCHFeedB
 class ZeusBinaryBot(AbuseCHFeedBot):
     feed_malware = "zeus"
     feed_type = "malware"
+    feed_name = "zeus malware urls"
 
     feeds = bot.ListParam(default=["https://zeustracker.abuse.ch/monitor.php?urlfeed=binaries"])
 

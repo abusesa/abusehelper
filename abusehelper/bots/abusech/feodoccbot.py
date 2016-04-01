@@ -11,6 +11,7 @@ from . import host_or_ip, split_description, AbuseCHFeedBot
 
 class FeodoCcBot(AbuseCHFeedBot):
     feed_type = "c&c"
+    feed_name = "feodo c&c"
 
     feeds = bot.ListParam(default=["https://feodotracker.abuse.ch/feodotracker.rss"])
 
