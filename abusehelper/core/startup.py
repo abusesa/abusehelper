@@ -5,6 +5,7 @@ import sys
 import time
 import errno
 import signal
+import numbers
 import subprocess
 import cPickle as pickle
 from numbers import Real
@@ -20,14 +21,27 @@ def iter_startups(iterable):
             yield startup()
             continue
 
-        # Backwards compatibility
-        startup_method = getattr(obj, "startup", None)
-        if callable(startup_method):
-            params = startup_method()
-            name = params["bot_name"]
-            module = params.pop("module", None)
-            yield Bot(name, module, **params)
+
+def _signal_number_to_symbols(signal_number):
+
+    signal_names = []
+
+    for name in dir(signal):
+
+        if not name.startswith("SIG") or name.startswith("SIG_"):
             continue
+
+        value = getattr(signal, name)
+
+        if not isinstance(value, numbers.Integral):
+            continue
+
+        if not value == signal_number:
+            continue
+
+        signal_names.append(name)
+
+    return signal_names
 
 
 class Bot(object):
@@ -155,7 +169,18 @@ class StartupBot(bot.Bot):
             if process is not None and process.poll() is None:
                 continue
             if process is not None and process.poll() is not None:
-                self.log.info("Bot %r exited with return value %d", conf.name, process.poll())
+                logline = "Bot %r was terminated." % (conf.name)
+
+                if process.returncode < 0:
+                    logline += " Terminated by signal %d" % (process.returncode)
+                    signames = _signal_number_to_symbols(abs(process.returncode))
+                    if signames:
+                        logline += " (%s)" % " or ".join(signames)
+                else:
+                    logline += " Return code %d" % (process.returncode)
+
+                self.log.info(logline)
+
             self._processes.pop(conf, None)
             self._strategies[conf] = time.time(), strategy
 
@@ -275,14 +300,15 @@ class DefaultStartupBot(StartupBot):
     enable = bot.ListParam("bots that are run (default: run all bots)", default=None)
     disable = bot.ListParam("bots that are not run (default: run all bots)", default=None)
 
-    @idiokit.stream
     def configs(self):
         abspath = os.path.abspath(self.config)
-        workdir = os.path.dirname(abspath)
+        return config.follow_config(abspath) | self._follow_config(abspath)
 
-        follow = config.follow_config(abspath)
+    @idiokit.stream
+    def _follow_config(self, abspath):
+        workdir = os.path.dirname(abspath)
         while True:
-            ok, obj = yield follow.next()
+            ok, obj = yield idiokit.next()
             if not ok:
                 self.log.error(obj)
                 continue

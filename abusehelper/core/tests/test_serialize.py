@@ -2,8 +2,6 @@ import sys
 import math
 import unittest
 
-from idiokit.xmlcore import Element
-
 from .. import serialize
 from .. import rules
 
@@ -59,11 +57,6 @@ class TestSerialize(unittest.TestCase):
     def test_dict_roundtrip(self):
         self.assertEqual({}, serialize.load(serialize.dump({})))
         self.assertEqual({"a": 1}, serialize.load(serialize.dump({"a": 1})))
-
-    def test_dict_backwards_compatibility(self):
-        element = Element("d")
-        element.add(serialize.dump(["a", "b"]).children())
-        self.assertEqual(serialize.load(element), {"a": "b"})
 
     def test_rule_roundtrip(self):
         rule = rules.And(
