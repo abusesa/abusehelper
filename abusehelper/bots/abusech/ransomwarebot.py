@@ -47,7 +47,7 @@ class RansomwareTrackerBot(bot.PollingBot):
         try:
             info, fileobj = yield utils.fetch_url(self.feed_url)
         except utils.FetchUrlFailed as fuf:
-            raise bot.PollSkipped("Download failed: {1}".format(fuf))
+            raise bot.PollSkipped("Download failed: {0}".format(fuf))
 
         lines = []
         for line in fileobj:
