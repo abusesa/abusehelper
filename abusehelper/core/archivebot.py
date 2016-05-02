@@ -84,6 +84,7 @@ class ArchiveBot(bot.ServiceBot):
 
     def __init__(self, *args, **keys):
         super(ArchiveBot, self).__init__(*args, **keys)
+        self.log.warn("This bot will be deprecated in the Abusehelper 4.0.0 release. Please use abusehelper.bots.archivebot module instead.")
 
         self.rooms = taskfarm.TaskFarm(self.handle_room, grace_period=0.0)
         self.archive_dir = ensure_dir(self.archive_dir)
