@@ -1,8 +1,5 @@
 # Changelog
 
-## 3.1.1 (unreleased)
- * ```abusehelper.core.archivebot``` module now logs a deprecation warning. Archivebot, ```abusehelper.bots.archivebot.csvarchivebot```, and ```abusehelper.bots.archivebot.rolloverarchivebot``` will be replaced by ```abusehelper.bots.archivebot``` module.
-
 ## 3.1.0 (2016-04-06)
 
 ### Features
