@@ -28,10 +28,6 @@ class Receiver(bot.XMPPBot):
             for key, value in event.items():
                 out_dict.setdefault(key, []).append(value)
 
-            for key, values in out_dict.iteritems():
-                if len(values) == 1:
-                    out_dict[key] = values[0]
-
             print json.dumps(out_dict)
 
 
