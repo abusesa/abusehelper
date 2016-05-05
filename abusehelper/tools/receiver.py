@@ -5,7 +5,7 @@ from abusehelper.core import bot, events
 
 class Receiver(bot.XMPPBot):
     room = bot.Param("""
-        The room for receiving events from
+        the room for receiving events from
     """)
 
     @idiokit.stream
