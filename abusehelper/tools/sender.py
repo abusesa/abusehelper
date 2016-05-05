@@ -24,10 +24,10 @@ def _rate_limiter(rate_limit):
 
 class Receiver(bot.XMPPBot):
     room = bot.Param("""
-        The room for receiving events from
+        the room for receiving events from
     """)
     rate_limit = bot.IntParam("""
-        Rate limit for the sent stream
+        rate limit for the sent stream
     """, default=None)
 
     @idiokit.stream
