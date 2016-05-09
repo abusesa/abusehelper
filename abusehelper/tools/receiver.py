@@ -5,7 +5,7 @@ from abusehelper.core import bot, events
 
 class Receiver(bot.XMPPBot):
     room = bot.Param("""
-        The room for receiving events from
+        the room for receiving events from
     """)
 
     @idiokit.stream
@@ -21,6 +21,8 @@ class Receiver(bot.XMPPBot):
 
     @idiokit.stream
     def _recv(self):
+        dumps = json.JSONEncoder(check_circular=False).encode
+
         while True:
             event = yield idiokit.next()
 
@@ -28,11 +30,7 @@ class Receiver(bot.XMPPBot):
             for key, value in event.items():
                 out_dict.setdefault(key, []).append(value)
 
-            for key, values in out_dict.iteritems():
-                if len(values) == 1:
-                    out_dict[key] = values[0]
-
-            print json.dumps(out_dict)
+            print dumps(out_dict)
 
 
 if __name__ == "__main__":
