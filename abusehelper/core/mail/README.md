@@ -121,12 +121,12 @@ class TestMyHandler(unittest.TestCase):
         ])
 ```
 
-Notice how the input data can be passed in as a nicely indented triple-quoted string. `handle` runs the data through `[inspect.cleandoc](https://docs.python.org/2/library/inspect.html#inspect.cleandoc)` before parsing.
+Notice how the input data can be passed in as a nicely indented triple-quoted string. `handle` runs the data through [`inspect.cleandoc`](https://docs.python.org/2/library/inspect.html#inspect.cleandoc) before parsing.
 
 
 ## Message Objects
 
-As mentioned earlier the handlers expect `abusehelper.core.message.Message` objects to parse. The `Message` class methods are mostly modeled after standard library's `[email.message.Message](https://docs.python.org/2/library/email.message.html#email.message.Message)` with the following differences:
+As mentioned earlier the handlers expect `abusehelper.core.message.Message` objects to parse. The `Message` class methods are mostly modeled after standard library's [`email.message.Message`](https://docs.python.org/2/library/email.message.html#email.message.Message) with the following differences:
 
  * `abusehelper.core.message.Message` objects are immutable, so all mutating methods like `add_header`, `attach` etc. are omitted.
 
