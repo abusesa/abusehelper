@@ -9,7 +9,8 @@ import email.header
 
 import idiokit
 from .. import bot, utils
-from ._utils import get_header, escape_whitespace, CallableParam
+from ._utils import get_header, escape_whitespace
+from . import HandlerParam, load_handler
 
 
 _DEFAULT_PORT_IMAP4 = 143
@@ -44,7 +45,7 @@ class _IMAP4_SSL(imaplib.IMAP4_SSL):
 
 
 class IMAPBot(bot.FeedBot):
-    handler = CallableParam()
+    handler = HandlerParam()
     poll_interval = bot.IntParam(default=300)
     filter = bot.Param(default="(UNSEEN)")
 
@@ -74,6 +75,8 @@ class IMAPBot(bot.FeedBot):
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
 
+        self.handler = load_handler(self.handler)
+
         if self.mail_port is None:
             if self.mail_disable_ssl:
                 self.mail_port = _DEFAULT_PORT_IMAP4
@@ -82,6 +85,7 @@ class IMAPBot(bot.FeedBot):
 
         if self.mail_password is None:
             self.mail_password = getpass.getpass("Mail password: ")
+
         self.queue = self.run_mailbox()
 
     def feed(self):

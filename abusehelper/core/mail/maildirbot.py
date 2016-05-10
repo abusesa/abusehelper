@@ -8,7 +8,8 @@ import contextlib
 import email
 import email.header
 from abusehelper.core import bot, utils
-from ._utils import get_header, escape_whitespace, CallableParam
+from ._utils import get_header, escape_whitespace
+from . import HandlerParam, load_handler
 
 
 def try_rename(from_name, to_name):
@@ -69,7 +70,7 @@ def lockfile(filename):
 
 
 class MailDirBot(bot.FeedBot):
-    handler = CallableParam()
+    handler = HandlerParam()
     input_dir = bot.Param()
     work_dir = bot.Param()
     concurrency = bot.IntParam(default=1)
@@ -77,6 +78,8 @@ class MailDirBot(bot.FeedBot):
 
     def __init__(self, *args, **keys):
         bot.FeedBot.__init__(self, *args, **keys)
+
+        self.handler = load_handler(self.handler)
 
         self._queue = utils.WaitQueue()
 
@@ -151,7 +154,7 @@ class MailDirBot(bot.FeedBot):
             sender = escape_whitespace(get_header(msg, "From", "<unknown sender>"))
             self.log.info(u"Handler #{0} handling mail '{1}' from {2}".format(nth_concurrent, subject, sender))
 
-            handler = self.handler(self.log)
+            handler = self.handler(log=self.log)
             yield handler.handle(msg)
 
             os.rename(input_name, output_name)

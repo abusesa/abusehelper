@@ -7,7 +7,7 @@ import optparse
 
 import idiokit
 from ..utils import format_exception
-from ._utils import load_callable
+from . import load_handler
 
 
 def _event_to_dict(event):
@@ -52,10 +52,10 @@ class _NullHandler(logging.Handler):
         pass
 
 
-def handle(handler_class, msg_data):
+def handle(handler_spec, msg_data):
     r"""
     Return a list of event dictionaries collected by handling
-    msg_data using handler_class.
+    msg_data using handler_spec.
 
     >>> from abusehelper.core.events import Event
     >>> from abusehelper.core.mail import Handler
@@ -82,6 +82,8 @@ def handle(handler_class, msg_data):
     [{u'a': u'test'}]
     """
 
+    handler_class = load_handler(handler_spec)
+
     msg = email.message_from_string(inspect.cleandoc(msg_data))
 
     log = logging.getLogger("Null")
@@ -102,27 +104,36 @@ def main():
     )
 
     parser = optparse.OptionParser()
-    parser.set_usage("usage: %prog [options] handler [dirname ...]")
+    parser.set_usage("usage: %prog [options] handler [path ...]")
 
     options, args = parser.parse_args()
     if len(args) < 1:
         parser.error("expected handler")
-    handler_class = load_callable(args[0])
 
-    for dirname in args[1:]:
-        for filename in os.listdir(dirname):
-            orig_name = os.path.join(dirname, filename)
-            try:
-                with open(orig_name, "rb") as fp:
-                    msg = email.message_from_file(fp)
-            except IOError as ioe:
-                logging.info("skipped '{0}' ({1})".format(orig_name, format_exception(ioe)))
-                continue
+    try:
+        handler_spec = json.loads(args[0])
+    except ValueError:
+        handler_spec = args[0]
+    handler_class = load_handler(handler_spec)
 
-            logging.info("handling '{0}'".format(orig_name))
-            handler = handler_class(logging)
+    def handle_file(filepath):
+        try:
+            with open(filepath, "rb") as fp:
+                msg = email.message_from_file(fp)
+        except IOError as ioe:
+            logging.info("skipped '{0}' ({1})".format(filepath, format_exception(ioe)))
+        else:
+            logging.info("handling '{0}'".format(filepath))
+            handler = handler_class(log=logging)
             idiokit.main_loop(handler.handle(msg) | _print_events())
-            logging.info("done with '{0}'".format(orig_name))
+            logging.info("done with '{0}'".format(filepath))
+
+    for path in args[1:]:
+        if os.path.isdir(path):
+            for filename in os.listdir(path):
+                handle_file(os.path.join(path, filename))
+        else:
+            handle_file(path)
 
 
 if __name__ == "__main__":
