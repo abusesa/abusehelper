@@ -157,10 +157,10 @@ from abusehelper.core import mail, events
 
 
 class MyHandler(mail.Handler):
-    def __init__(self, include_headers=[], *args, **keys):
+    def __init__(self, headers=[], *args, **keys):
         mail.Handler.__init__(self, *args, **keys)
 
-        self.include_headers = include_headers
+        self.headers = headers
 
     @idiokit.stream
     def handle_text_plain(self, msg):
@@ -171,7 +171,7 @@ class MyHandler(mail.Handler):
                 "line": line.decode("utf-8", "replace"),
             })
 
-            for header in self.include_headers:
+            for header in self.headers:
                 value = msg.get_unicode(header, None, errors="replace")
                 if value is not None:
                     event.add(header, value)
@@ -179,10 +179,10 @@ class MyHandler(mail.Handler):
             yield idiokit.send(event)
 ```
 
-`include_headers` is the parameter in question and is an empty list `[]` by default. What happens when we pass in `["subject"]`?
+`headers` is the parameter in question and is an empty list `[]` by default. What happens when we pass in `["subject"]`?
 
 ```console
-$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "include_headers": ["subject"]}' << EOF
+$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' << EOF
 From: sender@example.com
 Subject: Greetings
 
@@ -209,10 +209,10 @@ from abusehelper.core import mail, events
 
 
 class MyHandler(mail.Handler):
-    def __init__(self, include_headers=[], *args, **keys):
+    def __init__(self, headers=[], *args, **keys):
         mail.Handler.__init__(self, *args, **keys)
 
-        self.include_headers = include_headers
+        self.headers = headers
 
     @idiokit.stream
     def handle_text_plain(self, msg):
@@ -226,7 +226,7 @@ class MyHandler(mail.Handler):
                 "line": line.decode("utf-8", "replace"),
             })
 
-            for header in self.include_headers:
+            for header in self.headers:
                 value = msg.get_unicode(header, None, errors="replace")
                 if value is not None:
                     event.add(header, value)
@@ -237,7 +237,7 @@ class MyHandler(mail.Handler):
 Run the command again:
 
 ```console
-$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "include_headers": ["subject"]}' << EOF
+$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' << EOF
 From: sender@example.com
 Subject: Greetings
 
