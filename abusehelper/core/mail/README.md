@@ -32,7 +32,7 @@ class MyHandler(mail.Handler):
 
 There is a notable exception when dealing with mime types containing hyphens such as `application/octet-stream`. In such cases replace the hyphen with a double underscore (e.g. `handle_application_octet__stream`).
 
-So what does our `handle_text_plain` get as parameters? The complete method signature would be `handle_text_plain(self, msg)` where `msg` is the currently handled part of the mail, wrapped in a `abusehelper.core.mail.message.Message` object. `msg` can then be examined to parse AbuseHelper events from it:
+So what does our `handle_text_plain` get as arguments? The complete method signature would be `handle_text_plain(self, msg)` where `msg` is the currently handled part of the mail, wrapped in a `abusehelper.core.mail.message.Message` object. `msg` can then be examined to parse AbuseHelper events from it:
 
 ```python
 import idiokit
@@ -137,7 +137,7 @@ As mentioned earlier the handlers expect `abusehelper.core.message.Message` obje
 `abusehelper.core.message.message_from_string` can be used to parse a `Message` object from a string.
 
 
-## Parameterizing Handlers
+## Configuring Handlers
 
 Up to this point we have used a shorthand in our examples. Turns out that the command line parameter `myhandler.MyHandler` is just a shorthand for `{"class": "myhandler.MyHandler"}`, and the startup parameter `handler="myhandler.MyHandler"` is just a shorthand for `handler={"class": "myhandler.MyHandler"}`. Therefore command:
 
@@ -181,7 +181,7 @@ class MyHandler(mail.Handler):
             yield idiokit.send(event)
 ```
 
-`headers` is the parameter in question and is an empty list `[]` by default. What happens when we pass in `["subject"]`?
+`headers` is the argument in question and is an empty list `[]` by default. What happens when we pass in `["subject"]`?
 
 ```console
 $ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' <<EOF
@@ -227,7 +227,7 @@ class TestMyHandler(unittest.TestCase):
 
 ## Logging
 
-In fact *all* handlers are parameterizable - the base class `abusehelper.core.mail.Handler` requires all runners to pass in the keyword argument `log`. The log can then be used inside the handler as `self.log` for, well, logging.
+In fact *all* handlers are configurable - the base class `abusehelper.core.mail.Handler` requires all runners to pass in the keyword argument `log`. The log can then be used inside the handler as `self.log` for, well, logging.
 
 ```python
 import idiokit
