@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import logging
 import inspect
@@ -116,6 +117,16 @@ def main():
         handler_spec = args[0]
     handler_class = load_handler(handler_spec)
 
+    def handle_msg(msg):
+        handler = handler_class(log=logging)
+        idiokit.main_loop(handler.handle(msg) | _print_events())
+
+    def handle_stdin():
+        logging.info("handling stdin")
+        msg = message_from_string(sys.stdin.read())
+        handle_msg(msg)
+        logging.info("done with stdin")
+
     def handle_file(filepath):
         try:
             with open(filepath, "rb") as fp:
@@ -124,17 +135,21 @@ def main():
             logging.info("skipped '{0}' ({1})".format(filepath, format_exception(ioe)))
         else:
             logging.info("handling '{0}'".format(filepath))
-            handler = handler_class(log=logging)
-            idiokit.main_loop(handler.handle(msg) | _print_events())
+            handle_msg(msg)
             logging.info("done with '{0}'".format(filepath))
 
-    for path in args[1:]:
-        if os.path.isdir(path):
-            for filename in os.listdir(path):
-                handle_file(os.path.join(path, filename))
-        else:
-            handle_file(path)
-
+    paths = args[1:]
+    if not paths:
+        handle_stdin()
+    else:
+        for path in paths:
+            if path == "-":
+                handle_stdin()
+            elif os.path.isdir(path):
+                for filename in os.listdir(path):
+                    handle_file(os.path.join(path, filename))
+            else:
+                handle_file(path)
 
 if __name__ == "__main__":
     main()
