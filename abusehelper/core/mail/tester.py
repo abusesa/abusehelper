@@ -90,7 +90,7 @@ def handle(handler_spec, msg_data):
     log_handler = _NullHandler()
     log.addHandler(log_handler)
     try:
-        handler = handler_class(log)
+        handler = handler_class(log=log)
         return idiokit.main_loop(handler.handle(msg) | _collect_events())
     finally:
         log.removeHandler(log_handler)

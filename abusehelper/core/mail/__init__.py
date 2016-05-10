@@ -38,31 +38,55 @@ class HandlerParam(bot.Param):
 
 def load_handler(handler_spec):
     """
-    >>> from abusehelper.core.mail import Handler
-    >>> handler = load_handler(Handler)
-    >>> type(handler())
+    >>> import logging
+    >>> log = logging.getLogger("dummy")
+    >>> handler = load_handler({
+    ...     "class": "abusehelper.core.mail.Handler"
+    ... })
+    >>> type(handler(log=log))
     <class 'abusehelper.core.mail.Handler'>
-    >>> handler = load_handler("abusehelper.core.mail.Handler")
+    >>> handler(log=log).log is log
+    True
+
+    Extra keys in aside from "class" will be given as keyword arguments when
+    instantiating the class. The arguments given to load_handler take priority
+    over overlapping keyword arguments given at instantiation.
+
+    >>> handler = load_handler({
+    ...     "class": "abusehelper.core.mail.Handler",
+    ...     "log": log
+    ... })
+    >>> handler().log is log
+    True
+    >>> other_log = logging.getLogger("other")
+    >>> other_log is not log
+    True
+    >>> handler(log=other_log).log is log
+    True
+
+    Instead of a string the "class" key can contain a Handler type object.
+
+    >>> from abusehelper.core.mail import Handler
+    >>> handler = load_handler({
+    ...     "class": Handler,
+    ...     "log": log
+    ... })
     >>> type(handler())
     <class 'abusehelper.core.mail.Handler'>
 
-    >>> dummy_log = object()
-    >>> handler = load_handler({
-    ...     "class": "abusehelper.core.mail.Handler",
-    ...     "log": dummy_log
-    ... })
-    >>> type(handler())
+    A plain string is a shorthand for {"class": <string>}, and a plain
+    Handler type object is a shorthand for {"class": <object>}.
+
+    >>> handler = load_handler("abusehelper.core.mail.Handler")
+    >>> type(handler(log=log))
     <class 'abusehelper.core.mail.Handler'>
-    >>> handler().log is dummy_log
-    True
-    >>> handler = load_handler({
-    ...     "class": Handler,
-    ...     "log": dummy_log
-    ... })
-    >>> type(handler())
+
+    >>> handler = load_handler(Handler)
+    >>> type(handler(log=log))
     <class 'abusehelper.core.mail.Handler'>
-    >>> handler().log is dummy_log
-    True
+
+    ValueError will be raised when there is no "class" key and the argument is
+    not a shorthand.
 
     >>> load_handler({})
     Traceback (most recent call last):
@@ -79,8 +103,7 @@ def load_handler(handler_spec):
         class_ = load_callable(class_path)
         return _wrap_handler(class_, **handler_dict)
 
-    # Wrap with _load_handler_wrapper anyway to force all arguments to be given
-    # as keyword arguments.
+    # Wrap with anyway to force all arguments to be given as keyword arguments.
     class_ = load_callable(handler_spec)
     return _wrap_handler(class_)
 
