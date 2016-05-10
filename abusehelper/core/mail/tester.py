@@ -14,11 +14,7 @@ from . import load_handler
 def _event_to_dict(event):
     event_dict = {}
     for key in event.keys():
-        values = event.values(key)
-        if len(values) == 1:
-            event_dict[key] = values[0]
-        else:
-            event_dict[key] = list(values)
+        event_dict[key] = list(event.values(key))
     return event_dict
 
 
