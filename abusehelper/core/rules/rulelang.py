@@ -5,6 +5,7 @@ import collections
 from . import atoms
 from . import rules
 from . import iprange
+from . import _domainname
 
 from .parsing import parser_singleton, transform, seq, txt, epsilon, forward_ref, union, maybe, step, step_default
 
@@ -109,6 +110,14 @@ ip_parser = transform(atoms.IP, iprange.IPRange.parser)
 @formatter.handler(atoms.IP)
 def format_ip(format, ip):
     yield unicode(ip.range)
+
+
+domainname_parser = transform(atoms.DomainName, _domainname.pattern_parser)
+
+
+@formatter.handler(atoms.DomainName)
+def format_domainname(format, name):
+    yield unicode(name.pattern)
 
 
 star_parser = seq(txt("*"), epsilon(None), pick=1)
@@ -229,12 +238,12 @@ def _create_parser():
 
     match_tail = union(
         seq(maybe(ws), txt("="), maybe(txt("=")), maybe(ws), union(star_parser, regexp_parser, string_parser), pick=-1),
-        seq(ws, txt("in", ignore_case=True), ws, ip_parser, pick=-1),
+        seq(ws, txt("in", ignore_case=True), ws, union(ip_parser, domainname_parser), pick=-1),
     )
 
     non_match_tail = union(
         seq(maybe(ws), txt("!="), maybe(ws), union(star_parser, regexp_parser, string_parser), pick=-1),
-        seq(ws, txt("not", ignore_case=True), ws, txt("in", ignore_case=True), ws, ip_parser, pick=-1),
+        seq(ws, txt("not", ignore_case=True), ws, txt("in", ignore_case=True), ws, union(ip_parser, domainname_parser), pick=-1),
     )
 
     basic = union(
@@ -247,7 +256,7 @@ def _create_parser():
 
         transform(
             rules.Fuzzy,
-            union(regexp_parser, ip_parser)
+            union(regexp_parser, ip_parser, domainname_parser)
         ),
 
         step(

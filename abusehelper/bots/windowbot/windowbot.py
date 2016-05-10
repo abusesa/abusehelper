@@ -1,5 +1,9 @@
+import time
+import collections
+
 import idiokit
-from abusehelper.core import bot, taskfarm, rules
+
+from abusehelper.core import bot, taskfarm, rules, events
 
 
 class RoomBot(bot.ServiceBot):
@@ -27,11 +31,6 @@ class RoomBot(bot.ServiceBot):
 
     def from_room(self, name):
         return idiokit.consume() | self.room_handlers.inc(name)
-
-
-import time
-import collections
-from abusehelper.core import events
 
 
 class WindowBot(RoomBot):
@@ -88,16 +87,16 @@ class WindowBot(RoomBot):
         ids = dict()
 
         to = self.to_room(dst_room)
-        idiokit.pipe(self.purge(ids, queue),
-                     events.events_to_elements(),
-                     to)
+        idiokit.pipe(self.purge(ids, queue), events.events_to_elements(), to)
 
-        yield (self.from_room(src_room)
-               | events.stanzas_to_events()
-               | self.match(rule)
-               | self.process(ids, queue, window_time)
-               | events.events_to_elements()
-               | to)
+        yield idiokit.pipe(
+            self.from_room(src_room),
+            events.stanzas_to_events(),
+            self.match(rule),
+            self.process(ids, queue, window_time),
+            events.events_to_elements(),
+            to
+        )
 
 if __name__ == "__main__":
     WindowBot.from_command_line().execute()

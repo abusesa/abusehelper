@@ -6,7 +6,7 @@ A tool that reads JSON formatted events from the STDIN and sends them to an XMPP
 
 ### Usage
 
-```
+```ShellSession
 $ abusehelper.tools.sender XMPP_JID ROOM --rate-limit=N
 ```
 
@@ -22,7 +22,7 @@ Where:
 
 The tool reads lines (ending with ```\n```) from the STDIN, and interprets every line as a JSON dictionary. The dictionary should contain either a string or a list of strings as values:
 
-```
+```json
 {"ip": "192.0.2.100", "cc": "FI", "bgp prefix": ["192.0.2.0/24", "192.0.2.0/28"]}
 ```
 
@@ -32,7 +32,7 @@ Thanks to the glorious UNIX piping facilities you can use pretty much every prog
 
 Assume you have a short script called ```producer.py``` that produces JSON data:
 
-```
+```python
 import json
 
 for event_number in range(10000):
@@ -44,7 +44,7 @@ for event_number in range(10000):
 
 Then you can use the script to produce data to the channel like this:
 
-```
+```ShellSession
 $ python producer.py | python -m abusehelper.tools.sender user@xmpp.example.com my.room --rate-limit=10
 ```
 
@@ -56,7 +56,7 @@ A tool that reads AbuseHelper events from an XMPP room and writes them to STDOUT
 
 ### Usage
 
-```
+```ShellSession
 $ abuseheleper.tools.receiver XMPP_JID ROOM
 ```
 
@@ -76,7 +76,7 @@ See the ```abusehelper.core.sender``` documentation for example.
 
 Assume you have a short script called ```consumer.py``` that consumes the data lines and filters out all non-c&c events:
 
-```
+```python
 import sys
 import json
 
@@ -93,6 +93,6 @@ for line in sys.stdin:
 
 Then you can use the script to consume data from the channel like this:
 
-```
+```ShellSession
 $ python -m abusehelper.tools.sender user@xmpp.example.com my.room | python myconsumer.py
 ```

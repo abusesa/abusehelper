@@ -1,13 +1,19 @@
 from __future__ import absolute_import
 
+import os
 import uuid
+import fcntl
+import errno
 import random
+import cPickle as pickle
 
 import idiokit
 from idiokit.xmpp.core import XMPPError
 from idiokit.xmpp.jid import JID
 from idiokit.xmlcore import Element
+
 from . import serialize
+
 
 SERVICE_NS = "abusehelper#service"
 
@@ -235,17 +241,11 @@ class Lobby(idiokit.Proxy):
             self.xmpp.core.message(jid, end)
             self._discard_session(jid, session_id)
 
-import os
-import fcntl
-import errno
-import cPickle as pickle
-
-O_BINARY = getattr(os, "O_BINARY", 0)
-
 
 def open_file(filename):
     # Open file, create if necessary.
 
+    O_BINARY = getattr(os, "O_BINARY", 0)
     fd = os.open(filename, os.O_RDWR | os.O_CREAT | O_BINARY)
     return os.fdopen(fd, "r+b")
 

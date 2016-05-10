@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 import sys
 import unittest
 
-from ..atoms import String, RegExp, IP
+from ..atoms import String, RegExp, IP, DomainName
 from ..rules import And, Or, No, Match, NonMatch, Fuzzy, Anything
 from ..rulelang import format, parse, rule
 
@@ -62,6 +62,13 @@ class TestParse(unittest.TestCase):
         self.assertEqual(Match("a", IP("1.2.3.4")), parse("a in 1.2.3.4"))
         self.assertEqual(Match("a", IP("1.2.3.4")), parse("a in 1.2.3.4/32"))
 
+        self.assertEqual(Match("a", DomainName("domain.example")), parse("a in domain.example"))
+        self.assertEqual(Match("a", DomainName("domain.example")), parse("a in DOMAIN.example"))
+        self.assertEqual(Match("a", DomainName("*.example")), parse("a in *.example"))
+        self.assertEqual(Match("a", DomainName("\xe4.example")), parse("a in \xe4.example"))
+        self.assertEqual(Match("a", DomainName("\xe4.example")), parse("a in \xc4.example"))
+        self.assertEqual(Match("a", DomainName("\xe4.example")), parse("a in xn--4ca.example"))
+
     def test_no(self):
         x = Fuzzy(String("x"))
 
@@ -97,6 +104,13 @@ class TestParse(unittest.TestCase):
 
         self.assertEqual(NonMatch("a", IP("1.2.3.4")), parse("a not in 1.2.3.4"))
         self.assertEqual(NonMatch("a", IP("1.2.3.4")), parse("a not in 1.2.3.4/32"))
+
+        self.assertEqual(NonMatch("a", DomainName("domain.example")), parse("a not in domain.example"))
+        self.assertEqual(NonMatch("a", DomainName("domain.example")), parse("a not in DOMAIN.example"))
+        self.assertEqual(NonMatch("a", DomainName("*.example")), parse("a not in *.example"))
+        self.assertEqual(NonMatch("a", DomainName("\xe4.example")), parse("a not in \xe4.example"))
+        self.assertEqual(NonMatch("a", DomainName("\xe4.example")), parse("a not in \xc4.example"))
+        self.assertEqual(NonMatch("a", DomainName("\xe4.example")), parse("a not in xn--4ca.example"))
 
     def test_fuzzy(self):
         self.assertEqual(parse('a'), Fuzzy(String('a')))
@@ -143,6 +157,10 @@ class TestFormat(unittest.TestCase):
         # forward slashes must be left intact.
         self.assertEqual(r'/\\\/\//', format(Fuzzy(RegExp(r'\\\//'))))
         self.assertEqual(r'/^http:\/\//', format(Fuzzy(RegExp(r'^http://'))))
+
+    def test_domainname(self):
+        self.assertEqual("domain.example", format(Fuzzy(DomainName("domain.example"))))
+        self.assertEqual("*.example", format(Fuzzy(DomainName("*.example"))))
 
     def test_allow_recursion_deeper_than_the_recursion_limit(self):
         limit = 2 * sys.getrecursionlimit()

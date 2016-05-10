@@ -1,14 +1,8 @@
 import time
-import doctest
 import calendar
 import unittest
 
 from .. import cron
-
-
-def load_tests(loader, tests, ignore):
-    tests.addTests(doctest.DocTestSuite(cron))
-    return tests
 
 
 class TestCron(unittest.TestCase):

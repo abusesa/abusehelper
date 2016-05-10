@@ -46,6 +46,7 @@ class Serializer(object):
             self.register("rx", Rule(rules.RegExp))
             self.register("rs", Rule(rules.String))
             self.register("ri", Rule(rules.IP))
+            self.register("rd", Rule(rules.DomainName))
 
     def register(self, name, serializer):
         with self._lock:
@@ -131,10 +132,7 @@ class Dict(SubSerializer):
         return self._list.dump(obj.items(), name, context)
 
     def load(self, element, context):
-        items = self._list.load(element, context)
-        if all(isinstance(x, tuple) and len(x) == 2 for x in items):
-            return dict(items)
-        return dict(zip(items[::2], items[1::2]))
+        return dict(self._list.load(element, context))
 
     def normalize(self, obj, context):
         return dict(self._list.normalize(obj.items(), context))

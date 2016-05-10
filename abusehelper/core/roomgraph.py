@@ -2,26 +2,15 @@ from __future__ import absolute_import
 
 import os
 import sys
-import uuid
 import errno
 import struct
-import shutil
 import cPickle
 import idiokit
-import tempfile
 import subprocess
 import contextlib
+import socket as native_socket
 from idiokit import socket, select
 from . import events, rules, taskfarm, bot
-
-
-@contextlib.contextmanager
-def temporary_directory(*args, **keys):
-    tmpdir = tempfile.mkdtemp(*args, **keys)
-    try:
-        yield tmpdir
-    finally:
-        shutil.rmtree(tmpdir)
 
 
 class _ConnectionLost(Exception):
@@ -32,48 +21,54 @@ class _ConnectionLost(Exception):
 def wrapped_socket_errnos(*errnos):
     try:
         yield
-    except socket.SocketError as error:
+    except (native_socket.error, socket.SocketError) as error:
         socket_errno = error.args[0]
         if socket_errno in errnos:
             raise _ConnectionLost(os.strerror(socket_errno))
         raise
 
 
+def _recvall_blocking(conn, amount):
+    data = []
+    while amount > 0:
+        with wrapped_socket_errnos(errno.ECONNRESET):
+            piece = conn.recv(amount)
+
+        if not piece:
+            raise _ConnectionLost("could not recv() all bytes")
+        data.append(piece)
+        amount -= len(piece)
+    return "".join(data)
+
+
+def send_encoded(conn, obj):
+    msg_bytes = cPickle.dumps(obj, cPickle.HIGHEST_PROTOCOL)
+    data = struct.pack("!I", len(msg_bytes)) + msg_bytes
+
+    with wrapped_socket_errnos(errno.ECONNRESET, errno.EPIPE):
+        conn.sendall(data)
+
+
+def recv_decoded(sock):
+    length_bytes = _recvall_blocking(sock, 4)
+    length, = struct.unpack("!I", length_bytes)
+
+    msg_bytes = _recvall_blocking(sock, length)
+    return cPickle.loads(msg_bytes)
+
+
 @idiokit.stream
-def recvall(sock, amount, timeout=None):
+def _recvall_stream(sock, amount, timeout=None):
     data = []
     while amount > 0:
         with wrapped_socket_errnos(errno.ECONNRESET):
             piece = yield sock.recv(amount, timeout=timeout)
 
         if not piece:
-            raise _ConnectionLost("Could not recv() all bytes")
+            raise _ConnectionLost("could not recv() all bytes")
         data.append(piece)
         amount -= len(piece)
     idiokit.stop("".join(data))
-
-
-@idiokit.stream
-def encode(sock):
-    while True:
-        msg = yield idiokit.next()
-        msg_bytes = cPickle.dumps(msg, cPickle.HIGHEST_PROTOCOL)
-        data = struct.pack("!I", len(msg_bytes)) + msg_bytes
-
-        with wrapped_socket_errnos(errno.ECONNRESET, errno.EPIPE):
-            yield sock.sendall(data)
-
-
-@idiokit.stream
-def decode(sock):
-    while True:
-        length_bytes = yield recvall(sock, 4)
-        length, = struct.unpack("!I", length_bytes)
-
-        msg_bytes = yield recvall(sock, length)
-        msg = cPickle.loads(msg_bytes)
-
-        yield idiokit.send(msg)
 
 
 @idiokit.stream
@@ -107,32 +102,11 @@ def collect_decode(socks):
 
         sock = readable.pop()
 
-        length_bytes = yield recvall(sock, 4)
+        length_bytes = yield _recvall_stream(sock, 4)
         length, = struct.unpack("!I", length_bytes)
 
-        msg_bytes = yield recvall(sock, length)
-        msg = cPickle.loads(msg_bytes)
-
-        yield idiokit.send(msg)
-
-
-def run():
-    @idiokit.stream
-    def main(socket_path, process_id, callable, args, keys):
-        sock = socket.Socket(socket.AF_UNIX)
-        try:
-            yield sock.connect(socket_path)
-            yield sock.sendall(process_id)
-            yield decode(sock) | callable(*args, **keys) | encode(sock)
-        finally:
-            yield sock.close()
-
-    socket_path, process_id, callable, args, keys = cPickle.load(sys.stdin)
-
-    try:
-        idiokit.main_loop(main(socket_path, process_id, callable, args, keys))
-    except (idiokit.Signal, _ConnectionLost):
-        pass
+        msg_bytes = yield _recvall_stream(sock, length)
+        yield idiokit.send(cPickle.loads(msg_bytes))
 
 
 class RoomGraphBot(bot.ServiceBot):
@@ -146,7 +120,6 @@ class RoomGraphBot(bot.ServiceBot):
 
         self._rooms = taskfarm.TaskFarm(self._handle_room, grace_period=0.0)
         self._srcs = {}
-        self._processes = ()
         self._ready = idiokit.Event()
         self._stats = {}
 
@@ -225,93 +198,70 @@ class RoomGraphBot(bot.ServiceBot):
         finally:
             distributor.send(True, ("dec_rule", (src_room, rule, dst_room)))
 
-    def run(self):
-        processes = []
+    @idiokit.stream
+    def _start_worker(self):
+        env = dict(os.environ)
+        env["ABUSEHELPER_SUBPROCESS"] = ""
+
+        # Find out the full package & module name. Don't refer to the
+        # variable __loader__ directly to keep flake8 (version 2.5.0)
+        # linter happy.
+        fullname = globals()["__loader__"].fullname
+
+        own_conn, other_conn = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
-            for _ in xrange(self.concurrency):
-                env = dict(os.environ)
-                env["ABUSEHELPER_SUBPROCESS"] = ""
-
-                # Find out the full package & module name. Don't refer to the
-                # variable __loader__ directly to keep flake8 (version 2.5.0)
-                # linter happy.
-                fullname = globals()["__loader__"].fullname
-
-                processes.append(subprocess.Popen(
-                    [sys.executable, "-m", fullname],
-                    stdin=subprocess.PIPE,
-                    close_fds=True,
-                    env=env
-                ))
-            self._processes = tuple(processes)
-
-            return bot.ServiceBot.run(self)
+            process = subprocess.Popen(
+                [sys.executable, "-m", fullname],
+                stdin=other_conn.fileno(),
+                close_fds=True,
+                env=env
+            )
+        except:
+            yield own_conn.close()
+            raise
         finally:
-            for process in processes:
-                process.terminate()
-            for process in processes:
-                process.wait()
-            self._processes = ()
+            yield other_conn.close()
+
+        idiokit.stop(process, own_conn)
 
     @idiokit.stream
     def main(self, _):
+        processes = []
         connections = []
         try:
-            sock = socket.Socket(socket.AF_UNIX)
-            try:
-                with temporary_directory() as tmpdir:
-                    socket_path = os.path.join(tmpdir, "socket")
-
-                    yield sock.bind(socket_path)
-                    yield sock.listen(self.concurrency)
-
-                    process_ids = {}
-                    for process in self._processes:
-                        while True:
-                            process_id = uuid.uuid4().hex
-                            if process_id not in process_ids:
-                                break
-                        process_ids[process_id] = process
-                        cPickle.dump([socket_path, process_id, roomgraph, [], {}], process.stdin)
-
-                    while process_ids:
-                        conn, addr = yield sock.accept()
-                        try:
-                            process_id = yield recvall(conn, 32, timeout=10.0)
-                            if process_id not in process_ids:
-                                raise RuntimeError("unknown process id")
-                            del process_ids[process_id]
-                        except:
-                            yield conn.close()
-                            raise
-                        else:
-                            connections.append(conn)
-            finally:
-                yield sock.close()
+            for _ in xrange(self.concurrency):
+                process, connection = yield self._start_worker()
+                processes.append(process)
+                connections.append(connection)
 
             if self.concurrency == 1:
                 self.log.info(u"Started 1 worker process")
             else:
                 self.log.info(u"Started {0} worker processes".format(self.concurrency))
+
             self._ready.succeed(distribute_encode(connections))
             yield collect_decode(connections) | self._distribute() | self._log_stats()
         finally:
-            for conn in connections:
-                yield conn.close()
+            for connection in connections:
+                yield connection.close()
+
+            for process in processes:
+                process.terminate()
+            for process in processes:
+                process.wait()
 
 
-@idiokit.stream
-def roomgraph():
+def roomgraph(conn):
     srcs = {}
 
     while True:
-        type_id, args = yield idiokit.next()
+        type_id, args = recv_decoded(conn)
         if type_id == "event":
             src, event = args
             if src in srcs:
                 dsts = set(srcs[src].classify(event))
                 if dsts:
-                    yield idiokit.send(src, event, dsts)
+                    send_encoded(conn, (src, event, dsts))
         elif type_id == "inc_rule":
             src, rule, dst = args
             if src not in srcs:
@@ -329,6 +279,18 @@ def roomgraph():
 
 if __name__ == "__main__":
     if "ABUSEHELPER_SUBPROCESS" in os.environ:
-        run()
+        conn = native_socket.fromfd(0, native_socket.AF_UNIX, native_socket.SOCK_STREAM)
+        try:
+            rfd, wfd = os.pipe()
+            os.dup2(rfd, 0)
+            os.close(rfd)
+            os.close(wfd)
+
+            conn.setblocking(True)
+            roomgraph(conn)
+        except _ConnectionLost:
+            pass
+        finally:
+            conn.close()
     else:
         RoomGraphBot.from_command_line().execute()
