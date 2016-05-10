@@ -60,6 +60,7 @@ The first runner we'll use is `abusehelper.core.mail.tester`, useful when you're
 ```console
 $ python -m abusehelper.core.mail.tester myhandler.MyHandler <<EOF
 From: sender@example.com
+Subject: Greetings
 
 Hello, World!
 EOF
@@ -110,6 +111,7 @@ class TestMyHandler(unittest.TestCase):
     def test_should_parse_lines_from_mails(self):
         eventlist = handle(MyHandler, """
             From: sender@example.com
+            Subject: Greetings
 
             Hello, World!            
         """)
@@ -196,6 +198,30 @@ Now we can see that the mail subject indeed appears in the output event:
 2016-05-11 01:01:47Z INFO Handling stdin
 {"line": ["Hello, World!"], "subject": ["Greetings"]}
 2016-05-11 01:01:47Z INFO Done with stdin
+```
+
+We can also add a new test to our unit test file:
+
+```python
+...
+
+class TestMyHandler(unittest.TestCase):
+    ...
+
+    def test_should_include_given_headers(self):
+        eventlist = handle({
+            "class": MyHandler,
+            "headers": ["subject"]
+        }, """
+            From: sender@example.com
+            Subject: Greetings
+
+            Hello, World!            
+        """)
+
+        self.assertEqual(eventlist, [
+            {"line": ["Hello, World!"], "subject": ["Greetings"]}
+        ])
 ```
 
 
