@@ -58,7 +58,7 @@ And there you go, a *bona fide* handler. Let's launch and test it.
 The first runner we'll use is `abusehelper.core.mail.tester`, particularly useful when you're working on and rapidly iterating handler code. The tool accepts input from either files, directories containing files or [stdin](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_.28stdin.29). Use stdin and pipe in some raw mail data:
 
 ```console
-python -m abusehelper.core.mail.tester myhandler.MyHandler << EOF
+$ python -m abusehelper.core.mail.tester myhandler.MyHandler << EOF
 From: sender@example.com
 Content-Type: text/plain
 
@@ -69,9 +69,9 @@ EOF
 The output of the above command should be something like this:
 
 ```console
-2016-05-10 23:14:27Z INFO handling stdin
+2016-05-10 23:14:27Z INFO Handling stdin
 {"line": ["Hello, World!"]}
-2016-05-10 23:14:27Z INFO done with stdin
+2016-05-10 23:14:27Z INFO Done with stdin
 ```
 
 The lines starting with the timestamps are log lines written to stderr. The `{"line": ["Hello, World!"]}` line is the (only) event the handler just extracted from the mail, written to stdout in [JSON](https://en.wikipedia.org/wiki/JSON) format.
@@ -135,3 +135,101 @@ As mentioned earlier the handlers expect `abusehelper.core.message.Message` obje
  * There's an additional convenience method `get_unicode(self, key, failobj=None, errors="strict")` that returns header field values as `unicode`.
 
 `abusehelper.core.message.message_from_string` can be used to parse a `Message` object from a string.
+
+
+## Logging
+
+```python
+import idiokit
+from abusehelper.core import mail, events
+
+
+class MyHandler(mail.Handler):
+    @idiokit.stream
+    def handle_text_plain(self, msg):
+        data = yield msg.get_payload(decode=True)
+
+        sender = msg.get_unicode("From", "<unknown sender>", errors="replace")
+        self.log.info(u"Parsing data from {0}".format(sender))
+
+        for line in data.splitlines():
+            yield idiokit.send(events.Event({
+                "line": line.decode("utf-8", "replace"),
+            }))
+```
+
+Test:
+
+```console
+$ python -m abusehelper.core.mail.tester myhandler.MyHandler << EOF
+From: sender@example.com
+Subject: Greetings
+Content-Type: text/plain
+
+Hello, World!
+EOF
+```
+
+Output:
+
+```console
+2016-05-11 00:59:46Z INFO Handling stdin
+2016-05-11 00:59:46Z INFO Parsing data from sender@example.com
+{"line": ["Hello, World!"]}
+2016-05-11 00:59:46Z INFO Done with stdin
+```
+
+
+## Parameterizing Handlers
+
+```python
+import idiokit
+from abusehelper.core import mail, events
+
+
+class MyHandler(mail.Handler):
+    def __init__(self, include_headers=[], *args, **keys):
+        mail.Handler.__init__(self, *args, **keys)
+
+        self.include_headers = include_headers
+
+    @idiokit.stream
+    def handle_text_plain(self, msg):
+        data = yield msg.get_payload(decode=True)
+
+        sender = msg.get_unicode("From", "<unknown sender>", errors="replace")
+        self.log.info(u"Parsing data from {0}".format(sender))
+
+        for line in data.splitlines():
+            event = events.Event({
+                "line": line.decode("utf-8", "replace"),
+            })
+
+            for header in self.include_headers:
+                value = msg.get_unicode(header, None, errors="replace")
+                if value is not None:
+                    event.add(header, value)
+
+            yield idiokit.send(event)
+```
+
+Test:
+
+```console
+$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "include_headers": ["subject"]}' << EOF
+From: sender@example.com
+Subject: Greetings
+Content-Type: text/plain
+
+Hello, World!
+EOF
+```
+
+Output:
+
+```console
+2016-05-11 01:01:47Z INFO Handling stdin
+2016-05-11 01:01:47Z INFO Parsing data from sender@example.com
+{"line": ["Hello, World!"], "subject": ["Greetings"]}
+2016-05-11 01:01:47Z INFO Done with stdin
+```
