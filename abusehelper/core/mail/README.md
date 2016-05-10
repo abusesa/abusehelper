@@ -1,6 +1,6 @@
 # Mail Handlers
 
-A mail **handler** can be thought as general recipe how a single email message should be parsed and extracted into AbuseHelper events. However the handler doesn't know (and indeed doesn't *need* to know) the particulars how and from where each message should be received - that is the job for **runners**. By separating handlers and runners conceptually from each other we can write a handler and then use it with different mail sources, be it [IMAP](https://en.wikipedia.org/wiki/Internet_Message_Access_Protocol), [Maildir](https://en.wikipedia.org/wiki/Maildir), passing in files manually or automated tests.
+A mail **handler** can be thought as general recipe how a single email message should be parsed and extracted into AbuseHelper events. However the handler doesn't know (and indeed doesn't *need* to know) the specifics how and from where each message should be received - that is the job for **runners**. By separating handlers and runners conceptually from each other we can write a handler and then use it with different mail sources, be it [IMAP](https://en.wikipedia.org/wiki/Internet_Message_Access_Protocol), [Maildir](https://en.wikipedia.org/wiki/Maildir), passing in files manually or automated tests.
 
 Let's start by first defining our own custom handler, and then have a look on the different runners available.
 
@@ -55,12 +55,11 @@ And there you go, a *bona fide* handler. Let's launch and test it.
 
 ## Trying Out Handlers on the Command Line
 
-The first runner we'll use is `abusehelper.core.mail.tester`, particularly useful when you're working on and rapidly iterating handler code. The tool accepts input from either files, directories containing files or [stdin](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_.28stdin.29). Use stdin and pipe in some raw mail data:
+The first runner we'll use is `abusehelper.core.mail.tester`, useful when you're working on and rapidly iterating handler code. The tool accepts input from either files, directories containing files or [stdin](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_.28stdin.29). Use stdin and pipe in some raw mail data:
 
 ```console
 $ python -m abusehelper.core.mail.tester myhandler.MyHandler << EOF
 From: sender@example.com
-Content-Type: text/plain
 
 Hello, World!
 EOF
@@ -111,7 +110,6 @@ class TestMyHandler(unittest.TestCase):
     def test_should_parse_lines_from_mails(self):
         eventlist = handle(MyHandler, """
             From: sender@example.com
-            Content-Type: text/plain
 
             Hello, World!            
         """)
@@ -137,7 +135,21 @@ As mentioned earlier the handlers expect `abusehelper.core.message.Message` obje
 `abusehelper.core.message.message_from_string` can be used to parse a `Message` object from a string.
 
 
-## Logging
+## Parameterizing Handlers
+
+Up to this point we have used a shorthand in our examples. Turns out that the command line parameter `myhandler.MyHandler` is just a shorthand for `{"class": "myhandler.MyHandler"}`, and the startup parameter `handler="myhandler.MyHandler"` is just a shorthand for `handler={"class": "myhandler.MyHandler"}`. Therefore command:
+
+```console
+$ python -m abusehelper.core.mail.tester myhandler.MyHandler
+```
+
+is actually exactly the same thing as:
+
+```console
+$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler"}'
+```
+
+Now why would anyone want to use this longer form? Configurability! Sometimes the ability to configure our handlers is a good idea for reusability, and the longer form allows just that. The `"class"` key will be used to pinpoint the used handler, but rest of the keys will be passed on to the handler's constructor as keyword arguments. Let's modify `MyHandler` to take in a configurable list of mail headers it should include in the parsed events.
 
 ```python
 import idiokit
@@ -145,42 +157,51 @@ from abusehelper.core import mail, events
 
 
 class MyHandler(mail.Handler):
+    def __init__(self, include_headers=[], *args, **keys):
+        mail.Handler.__init__(self, *args, **keys)
+
+        self.include_headers = include_headers
+
     @idiokit.stream
     def handle_text_plain(self, msg):
         data = yield msg.get_payload(decode=True)
 
-        sender = msg.get_unicode("From", "<unknown sender>", errors="replace")
-        self.log.info(u"Parsing data from {0}".format(sender))
-
         for line in data.splitlines():
-            yield idiokit.send(events.Event({
+            event = events.Event({
                 "line": line.decode("utf-8", "replace"),
-            }))
+            })
+
+            for header in self.include_headers:
+                value = msg.get_unicode(header, None, errors="replace")
+                if value is not None:
+                    event.add(header, value)
+
+            yield idiokit.send(event)
 ```
 
-Test:
+`include_headers` is the parameter in question and is an empty list `[]` by default. What happens when we pass in `["subject"]`?
 
 ```console
-$ python -m abusehelper.core.mail.tester myhandler.MyHandler << EOF
+$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "include_headers": ["subject"]}' << EOF
 From: sender@example.com
 Subject: Greetings
-Content-Type: text/plain
 
 Hello, World!
 EOF
 ```
 
-Output:
+Now we can see that the mail subject indeed appears in the output event:
 
 ```console
-2016-05-11 00:59:46Z INFO Handling stdin
-2016-05-11 00:59:46Z INFO Parsing data from sender@example.com
-{"line": ["Hello, World!"]}
-2016-05-11 00:59:46Z INFO Done with stdin
+2016-05-11 01:01:47Z INFO Handling stdin
+{"line": ["Hello, World!"], "subject": ["Greetings"]}
+2016-05-11 01:01:47Z INFO Done with stdin
 ```
 
 
-## Parameterizing Handlers
+## Logging
+
+In fact *all* handlers are parameterizable - the base class `abusehelper.core.mail.Handler` requires all runners to pass in the keyword argument `log`. The log can then be used inside the handler as `self.log` for, well, logging.
 
 ```python
 import idiokit
@@ -213,23 +234,22 @@ class MyHandler(mail.Handler):
             yield idiokit.send(event)
 ```
 
-Test:
+Run the command again:
 
 ```console
 $ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "include_headers": ["subject"]}' << EOF
 From: sender@example.com
 Subject: Greetings
-Content-Type: text/plain
 
 Hello, World!
 EOF
 ```
 
-Output:
+There should now be a new log line giving us information about the mail's sender.
 
 ```console
-2016-05-11 01:01:47Z INFO Handling stdin
-2016-05-11 01:01:47Z INFO Parsing data from sender@example.com
+2016-05-11 00:59:46Z INFO Handling stdin
+2016-05-11 00:59:46Z INFO Parsing data from sender@example.com
 {"line": ["Hello, World!"], "subject": ["Greetings"]}
-2016-05-11 01:01:47Z INFO Done with stdin
+2016-05-11 00:59:46Z INFO Done with stdin
 ```
