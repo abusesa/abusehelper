@@ -118,21 +118,21 @@ def main():
         idiokit.main_loop(handler.handle(msg) | _print_events())
 
     def handle_stdin():
-        logging.info("handling stdin")
+        logging.info("Handling stdin")
         msg = message_from_string(sys.stdin.read())
         handle_msg(msg)
-        logging.info("done with stdin")
+        logging.info("Done with stdin")
 
     def handle_file(filepath):
         try:
             with open(filepath, "rb") as fp:
                 msg = message_from_string(fp.read())
         except IOError as ioe:
-            logging.info("skipped '{0}' ({1})".format(filepath, format_exception(ioe)))
+            logging.info("Skipped '{0}' ({1})".format(filepath, format_exception(ioe)))
         else:
-            logging.info("handling '{0}'".format(filepath))
+            logging.info("Handling '{0}'".format(filepath))
             handle_msg(msg)
-            logging.info("done with '{0}'".format(filepath))
+            logging.info("Done with '{0}'".format(filepath))
 
     paths = args[1:]
     if not paths:
