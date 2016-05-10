@@ -213,7 +213,7 @@ class IMAPBot(bot.FeedBot):
             sender = escape_whitespace(msg.get_unicode("From", "<unknown sender>", errors="replace"))
 
             self.log.info(u"Handling mail '{0}' from {1}".format(subject, sender))
-            handler = self.handler(self.log)
+            handler = self.handler(log=self.log)
             yield handler.handle(msg)
             self.log.info(u"Done with mail '{0}' from {1}".format(subject, sender))
 
