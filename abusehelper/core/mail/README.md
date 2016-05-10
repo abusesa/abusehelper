@@ -58,7 +58,7 @@ And there you go, a *bona fide* handler. Let's launch and test it.
 The first runner we'll use is `abusehelper.core.mail.tester`, useful when you're working on and rapidly iterating handler code. The tool accepts input from either files, directories containing files or [stdin](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_.28stdin.29). Use stdin and pipe in some raw mail data:
 
 ```console
-$ python -m abusehelper.core.mail.tester myhandler.MyHandler << EOF
+$ python -m abusehelper.core.mail.tester myhandler.MyHandler <<EOF
 From: sender@example.com
 
 Hello, World!
@@ -182,7 +182,7 @@ class MyHandler(mail.Handler):
 `headers` is the parameter in question and is an empty list `[]` by default. What happens when we pass in `["subject"]`?
 
 ```console
-$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' << EOF
+$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' <<EOF
 From: sender@example.com
 Subject: Greetings
 
@@ -237,7 +237,7 @@ class MyHandler(mail.Handler):
 Run the command again:
 
 ```console
-$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' << EOF
+$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' <<EOF
 From: sender@example.com
 Subject: Greetings
 
