@@ -35,14 +35,22 @@ def _add_filename_info(groupdict):
 
 
 class Handler(mail.Handler):
-    url_rex = r"http[s]?://dl.shadowserver.org/\S+"
+    def __init__(
+        self,
+        log,
+        url_rex=r"http[s]?://dl.shadowserver.org/\S+",
+        # Assume the file names to be something like
+        # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
+        filename_rex=r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>[^-]*).*\..*",
+        retry_count=5,
+        retry_interval=600
+    ):
+        mail.Handler.__init__(self, log)
 
-    # Assume the file names to be something like
-    # YYYY-dd-mm-<reporttype>-<countrycode>.<extension(s)>
-    filename_rex = r"(?P<report_date>\d{4}-\d\d-\d\d)-(?P<report_type>[^-]*).*\..*"
-
-    retry_count = 5
-    retry_interval = 600
+        self.url_rex = url_rex
+        self.filename_rex = filename_rex
+        self.retry_count = retry_count
+        self.retry_interval = retry_interval
 
     @idiokit.stream
     def parse_csv(self, filename, fileobj):

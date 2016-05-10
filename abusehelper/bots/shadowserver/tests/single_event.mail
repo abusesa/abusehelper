@@ -1,0 +1,24 @@
+From: sender@example.com
+To: receiver@example.com
+Mime-Version: 1.0
+Content-Type: multipart/mixed;
+ boundary="TESTBOUNDARY"
+
+This is a multi-part message in MIME format.
+--TESTBOUNDARY
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+https://dl.example.com/
+
+--TESTBOUNDARY
+Content-Type: text/csv;
+ name="2016-01-01-single_event-test.csv"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment;
+ filename="2016-01-01-single_event-test.csv"
+
+"timestamp","ip","port","domain"
+"2016-01-01 00:00:00","192.0.2.0","","-"
+
+--TESTBOUNDARY--
