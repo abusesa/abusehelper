@@ -74,7 +74,7 @@ The output of the above command should be something like this:
 2016-05-10 23:14:27Z INFO done with stdin
 ```
 
-The lines starting with the timestamps are log lines. The `{"line": ["Hello, World!"]}` line is the (only) event the handler just extracted from the mail.
+The lines starting with the timestamps are log lines written to stderr. The `{"line": ["Hello, World!"]}` line is the (only) event the handler just extracted from the mail, written to stdout in [JSON](https://en.wikipedia.org/wiki/JSON) format.
 
 
 ## Turning Handlers into Maildir Bots
@@ -99,7 +99,7 @@ $ python -m abusehelper.core.mail.imapbot user@xmpp.example.com lobby.room myhan
 
 `abusehelper.core.mail.tester` contains function `handle` for writing repeatable tests for handlers. `handle` requires two arguments: the handler class being tested and some mail data. The return value is a list of parsed events (as `dict`s) that can be inspected to check whether it matches the expected output.
 
-An example test file that uses the standard library's `unittest` unit testing framework follows.
+An example test file that uses the standard library's [`unittest`](https://docs.python.org/2/library/unittest.html) unit testing framework follows.
 
 ```python
 import unittest
@@ -126,7 +126,7 @@ Notice how the input data can be passed in as a nicely indented triple-quoted st
 
 ## Message Objects
 
-As mentioned earlier the handlers expect `abusehelper.core.message.Message` objects to parse. The `Message` class methods are mostly modeled after standard library's [`email.message.Message`](https://docs.python.org/2/library/email.message.html#email.message.Message) with the following differences:
+As mentioned earlier the handlers expect `abusehelper.core.message.Message` objects to parse. The method of `Message` are modeled after standard library's [`email.message.Message`](https://docs.python.org/2/library/email.message.html#email.message.Message) class with the following notable differences:
 
  * `abusehelper.core.message.Message` objects are immutable, so all mutating methods like `add_header`, `attach` etc. are omitted.
 
