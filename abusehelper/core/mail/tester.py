@@ -63,7 +63,7 @@ def handle(handler_spec, msg_data):
     ...         yield idiokit.send(Event(a="test"))
     ...
     >>> handle(MyHandler, "From: test@email.example\n\nThis is the payload.")
-    [{u'a': u'test'}]
+    [{u'a': [u'test']}]
 
     Note that to simplify testing the output is a list of dictionaries
     instead of abusehelper.core.events.Event objects.
@@ -76,7 +76,7 @@ def handle(handler_spec, msg_data):
     ...
     ...     This is the payload.
     ... ''')
-    [{u'a': u'test'}]
+    [{u'a': [u'test']}]
     """
 
     handler_class = load_handler(handler_spec)

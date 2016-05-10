@@ -21,9 +21,9 @@ class TestMailHandler(unittest.TestCase):
     def test_non_shadowserver_file_should_not_be_handled(self):
         self.assertOutput("single_event.mail", [
             {
-                "timestamp": "2016-01-01 00:00:00",
-                "ip": "192.0.2.0",
-                "report_date": "2016-01-01",
-                "report_type": "single_event"
+                "timestamp": ["2016-01-01 00:00:00"],
+                "ip": ["192.0.2.0"],
+                "report_date": ["2016-01-01"],
+                "report_type": ["single_event"]
             }
         ])

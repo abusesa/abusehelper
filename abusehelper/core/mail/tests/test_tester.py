@@ -22,7 +22,7 @@ class TestTester(unittest.TestCase):
 
                 This is the payload.
             """),
-            [{"line": "This is the payload."}]
+            [{"line": ["This is the payload."]}]
         )
 
     def test_exceptions_raised_inside_the_handler_should_get_propagated(self):
