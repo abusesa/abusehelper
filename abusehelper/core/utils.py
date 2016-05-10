@@ -5,6 +5,7 @@ import ssl
 import time
 import gzip
 import socket
+import inspect
 import urllib2
 import httplib
 import traceback
@@ -17,6 +18,32 @@ import idiokit
 from idiokit import heap
 from cStringIO import StringIO
 from . import events
+
+
+def format_type(value):
+    """
+    Return a full name of the value's type.
+
+    >>> import abusehelper.core.events
+    >>> format_type(abusehelper.core.events.Event())
+    'abusehelper.core.events.Event'
+
+    The package path prefix for builtin types gets omitted.
+
+    >>> format_type(abusehelper.core.events)
+    'module'
+    >>> format_type(abusehelper.core.events.Event)
+    'type'
+    >>> format_type(1)
+    'int'
+    """
+
+    type_ = type(value)
+    name = type_.__name__
+    module = inspect.getmodule(type_)
+    if module is not None and module.__name__ != "__builtin__":
+        name = module.__name__ + "." + name
+    return name
 
 
 def format_exception(exc):
