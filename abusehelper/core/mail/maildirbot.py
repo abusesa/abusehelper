@@ -5,10 +5,8 @@ import errno
 import idiokit
 import itertools
 import contextlib
-import email
-import email.header
 from abusehelper.core import bot, utils
-from ._utils import get_header, escape_whitespace
+from .message import message_from_string, escape_whitespace
 from . import HandlerParam, load_handler
 
 
@@ -25,7 +23,7 @@ def try_rename(from_name, to_name):
 def try_read_message(path):
     try:
         with open(path, "rb") as fp:
-            return email.message_from_file(fp)
+            return message_from_string(fp.read())
     except IOError as ioe:
         if ioe.errno != errno.ENOENT:
             raise
@@ -150,8 +148,8 @@ class MailDirBot(bot.FeedBot):
             if msg is None:
                 continue
 
-            subject = escape_whitespace(get_header(msg, "Subject", "<no subject>"))
-            sender = escape_whitespace(get_header(msg, "From", "<unknown sender>"))
+            subject = escape_whitespace(msg.get_unicode("Subject", "<no subject>", errors="replace"))
+            sender = escape_whitespace(msg.get_unicode("From", "<unknown sender>", errors="replace"))
             self.log.info(u"Handler #{0} handling mail '{1}' from {2}".format(nth_concurrent, subject, sender))
 
             handler = self.handler(log=self.log)

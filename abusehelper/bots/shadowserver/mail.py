@@ -4,7 +4,26 @@ from cStringIO import StringIO
 
 import idiokit
 from ...core import mail, utils
-from ...core.mail._utils import get_header
+
+
+@idiokit.stream
+def _collect_texts_and_attachments():
+    texts = []
+    attachments = []
+
+    while True:
+        try:
+            msg_part = yield idiokit.next()
+        except StopIteration:
+            idiokit.stop(texts, attachments)
+
+        content_type = msg_part.get_content_type()
+        filename = msg_part.get_filename(None)
+
+        if filename is not None:
+            attachments.append(msg_part)
+        elif content_type == "text/plain":
+            texts.append(msg_part)
 
 
 @idiokit.stream
@@ -67,19 +86,8 @@ class Handler(mail.Handler):
 
     @idiokit.stream
     def handle(self, msg):
-        texts = []
-        attachments = []
-
-        for msg_part in msg.walk():
-            content_type = msg_part.get_content_type()
-            filename = msg_part.get_filename(None)
-
-            if filename is not None:
-                attachments.append(msg_part)
-            elif content_type == "text/plain":
-                texts.append(msg_part)
-
-        subject = get_header(msg, "Subject", None)
+        texts, attachments = yield msg.walk() | _collect_texts_and_attachments()
+        subject = msg.get_unicode("Subject", None)
         for msg in attachments + texts:
             result = yield mail.Handler.handle(self, msg) | _normalize(subject)
             if result:
@@ -87,7 +95,7 @@ class Handler(mail.Handler):
 
     @idiokit.stream
     def handle_text_plain(self, msg):
-        data = msg.get_payload(decode=True)
+        data = yield msg.get_payload(decode=True)
 
         filename = msg.get_filename(None)
         if filename is not None:
@@ -129,17 +137,15 @@ class Handler(mail.Handler):
             self.log.error("No filename given for the data")
             idiokit.stop(False)
 
-        data = msg.get_payload(decode=True)
-
         self.log.info("Parsing CSV data from an attachment")
-        data = msg.get_payload(decode=True)
+        data = yield msg.get_payload(decode=True)
         result = yield self.parse_csv(filename, StringIO(data))
         idiokit.stop(result)
 
     @idiokit.stream
     def handle_application_zip(self, msg):
         self.log.info("Opening a ZIP attachment")
-        data = msg.get_payload(decode=True)
+        data = yield msg.get_payload(decode=True)
         try:
             zip = zipfile.ZipFile(StringIO(data))
         except zipfile.BadZipfile as error:

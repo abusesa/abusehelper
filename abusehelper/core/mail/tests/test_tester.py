@@ -11,7 +11,7 @@ class TestTester(unittest.TestCase):
         class PayloadLineHandler(Handler):
             @idiokit.stream
             def handle_text_plain(self, msg):
-                data = msg.get_payload()
+                data = yield msg.get_payload()
                 for line in data.splitlines():
                     yield idiokit.send(Event(line=line))
                 idiokit.stop(True)

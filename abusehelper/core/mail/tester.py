@@ -1,12 +1,12 @@
 import os
 import json
-import email
 import logging
 import inspect
 import optparse
 
 import idiokit
 from ..utils import format_exception
+from .message import message_from_string
 from . import load_handler
 
 
@@ -84,7 +84,7 @@ def handle(handler_spec, msg_data):
 
     handler_class = load_handler(handler_spec)
 
-    msg = email.message_from_string(inspect.cleandoc(msg_data))
+    msg = message_from_string(inspect.cleandoc(msg_data))
 
     log = logging.getLogger("Null")
     log_handler = _NullHandler()
@@ -119,7 +119,7 @@ def main():
     def handle_file(filepath):
         try:
             with open(filepath, "rb") as fp:
-                msg = email.message_from_file(fp)
+                msg = message_from_string(fp.read())
         except IOError as ioe:
             logging.info("skipped '{0}' ({1})".format(filepath, format_exception(ioe)))
         else:

@@ -4,12 +4,10 @@ import ssl
 import socket
 import getpass
 import imaplib
-import email.parser
-import email.header
 
 import idiokit
 from .. import bot, utils
-from ._utils import get_header, escape_whitespace
+from .message import message_from_string, escape_whitespace
 from . import HandlerParam, load_handler
 
 
@@ -210,9 +208,9 @@ class IMAPBot(bot.FeedBot):
             else:
                 continue
 
-            msg = email.message_from_string(data)
-            subject = escape_whitespace(get_header(msg, "Subject", "<no subject>"))
-            sender = escape_whitespace(get_header(msg, "From", "<unknown sender>"))
+            msg = message_from_string(data)
+            subject = escape_whitespace(msg.get_unicode("Subject", "<no subject>", errors="replace"))
+            sender = escape_whitespace(msg.get_unicode("From", "<unknown sender>", errors="replace"))
 
             self.log.info(u"Handling mail '{0}' from {1}".format(subject, sender))
             handler = self.handler(self.log)
