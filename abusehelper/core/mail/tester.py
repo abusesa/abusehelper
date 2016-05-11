@@ -79,7 +79,7 @@ def handle(handler_spec, msg_data):
     [{u'a': [u'test']}]
     """
 
-    handler_class = load_handler(handler_spec)
+    handler_type = load_handler(handler_spec)
 
     msg = message_from_string(inspect.cleandoc(msg_data))
 
@@ -87,7 +87,7 @@ def handle(handler_spec, msg_data):
     log_handler = _NullHandler()
     log.addHandler(log_handler)
     try:
-        handler = handler_class(log=log)
+        handler = handler_type(log=log)
         return idiokit.main_loop(handler.handle(msg) | _collect_events())
     finally:
         log.removeHandler(log_handler)
@@ -111,10 +111,10 @@ def main():
         handler_spec = json.loads(args[0])
     except ValueError:
         handler_spec = args[0]
-    handler_class = load_handler(handler_spec)
+    handler_type = load_handler(handler_spec)
 
     def handle_msg(msg):
-        handler = handler_class(log=logging)
+        handler = handler_type(log=logging)
         idiokit.main_loop(handler.handle(msg) | _print_events())
 
     def handle_stdin():

@@ -49,19 +49,19 @@ def load_callable(value):
     """
 
     if isinstance(value, basestring):
-        module, _, classname = value.rpartition(".")
+        module, _, name = value.rpartition(".")
         if not module:
             raise ValueError("missing module name")
 
         try:
-            mod = __import__(module, fromlist=[classname])
+            mod = __import__(module, fromlist=[name])
         except ImportError:
             raise ImportError("no module named '{0}'".format(module))
 
         try:
-            value = getattr(mod, classname)
+            value = getattr(mod, name)
         except AttributeError:
-            raise ImportError("module '{0}' has no attribute '{1}'".format(module, classname))
+            raise ImportError("module '{0}' has no attribute '{1}'".format(module, name))
 
     if not callable(value):
         raise TypeError("expected a string or a callable, got {0}".format(utils.format_type(value)))

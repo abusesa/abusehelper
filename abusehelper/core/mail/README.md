@@ -139,7 +139,7 @@ As mentioned earlier the handlers expect `abusehelper.core.message.Message` obje
 
 ## Configuring Handlers
 
-Up to this point we have used a shorthand in our examples. Turns out that the command line parameter `myhandler.MyHandler` is just a shorthand for `{"class": "myhandler.MyHandler"}`, and the startup parameter `handler="myhandler.MyHandler"` is just a shorthand for `handler={"class": "myhandler.MyHandler"}`. Therefore command:
+Up to this point we have used a shorthand in our examples. Turns out that the command line parameter `myhandler.MyHandler` is just a shorthand for `{"type": "myhandler.MyHandler"}`, and the startup parameter `handler="myhandler.MyHandler"` is just a shorthand for `handler={"type": "myhandler.MyHandler"}`. Therefore command:
 
 ```console
 $ python -m abusehelper.core.mail.tester myhandler.MyHandler
@@ -148,10 +148,10 @@ $ python -m abusehelper.core.mail.tester myhandler.MyHandler
 is actually exactly the same thing as:
 
 ```console
-$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler"}'
+$ python -m abusehelper.core.mail.tester '{"type": "myhandler.MyHandler"}'
 ```
 
-Now why would anyone want to use this longer form? Configurability! Sometimes the ability to configure our handlers is a good idea for reusability, and the longer form allows just that. The `"class"` key will be used to pinpoint the used handler, but rest of the keys will be passed on to the handler's constructor as keyword arguments. Let's modify `MyHandler` to take in a configurable list of mail headers it should include in the parsed events.
+Now why would anyone want to use this longer form? Configurability! Sometimes the ability to configure our handlers is a good idea for reusability, and the longer form allows just that. The `"type"` key will be used to pinpoint the used handler, but rest of the keys will be passed on to the handler's constructor as keyword arguments. Let's modify `MyHandler` to take in a configurable list of mail headers it should include in the parsed events.
 
 ```python
 import idiokit
@@ -184,7 +184,7 @@ class MyHandler(mail.Handler):
 `headers` is the argument in question and is an empty list `[]` by default. What happens when we pass in `["subject"]`?
 
 ```console
-$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' <<EOF
+$ python -m abusehelper.core.mail.tester '{"type": "myhandler.MyHandler", "headers": ["subject"]}' <<EOF
 From: sender@example.com
 Subject: Greetings
 
@@ -210,7 +210,7 @@ class TestMyHandler(unittest.TestCase):
 
     def test_should_include_given_headers(self):
         eventlist = handle({
-            "class": MyHandler,
+            "type": MyHandler,
             "headers": ["subject"]
         }, """
             From: sender@example.com
@@ -263,7 +263,7 @@ class MyHandler(mail.Handler):
 Run the command again:
 
 ```console
-$ python -m abusehelper.core.mail.tester '{"class": "myhandler.MyHandler", "headers": ["subject"]}' <<EOF
+$ python -m abusehelper.core.mail.tester '{"type": "myhandler.MyHandler", "headers": ["subject"]}' <<EOF
 From: sender@example.com
 Subject: Greetings
 

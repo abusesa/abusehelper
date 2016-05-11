@@ -46,19 +46,19 @@ def load_handler(handler_spec):
     >>> import logging
     >>> log = logging.getLogger("dummy")
     >>> handler = load_handler({
-    ...     "class": "abusehelper.core.mail.Handler"
+    ...     "type": "abusehelper.core.mail.Handler"
     ... })
     >>> type(handler(log=log))
     <class 'abusehelper.core.mail.Handler'>
     >>> handler(log=log).log is log
     True
 
-    Extra keys in aside from "class" will be given as keyword arguments when
-    instantiating the class. The arguments given to load_handler take priority
+    Extra keys in aside from "type" will be given as keyword arguments when
+    instantiating the handler. The arguments given to load_handler take priority
     over overlapping keyword arguments given at instantiation.
 
     >>> handler = load_handler({
-    ...     "class": "abusehelper.core.mail.Handler",
+    ...     "type": "abusehelper.core.mail.Handler",
     ...     "log": log
     ... })
     >>> handler().log is log
@@ -69,18 +69,18 @@ def load_handler(handler_spec):
     >>> handler(log=other_log).log is log
     True
 
-    Instead of a string the "class" key can contain a Handler type object.
+    Instead of a string the "type" key can contain a Handler type object.
 
     >>> from abusehelper.core.mail import Handler
     >>> handler = load_handler({
-    ...     "class": Handler,
+    ...     "type": Handler,
     ...     "log": log
     ... })
     >>> type(handler())
     <class 'abusehelper.core.mail.Handler'>
 
-    A plain string is a shorthand for {"class": <string>}, and a plain
-    Handler type object is a shorthand for {"class": <object>}.
+    A plain string is a shorthand for {"type": <string>}, and a plain
+    Handler type object is a shorthand for {"type": <object>}.
 
     >>> handler = load_handler("abusehelper.core.mail.Handler")
     >>> type(handler(log=log))
@@ -90,32 +90,32 @@ def load_handler(handler_spec):
     >>> type(handler(log=log))
     <class 'abusehelper.core.mail.Handler'>
 
-    ValueError will be raised when there is no "class" key and the argument is
+    ValueError will be raised when there is no "type" key and the argument is
     not a shorthand.
 
     >>> load_handler({})
     Traceback (most recent call last):
         ...
-    ValueError: missing key 'class'
+    ValueError: missing key 'type'
     """
 
     if isinstance(handler_spec, collections.Mapping):
         handler_dict = dict(handler_spec)
         try:
-            class_path = handler_dict.pop("class")
+            type_path = handler_dict.pop("type")
         except KeyError:
-            raise ValueError("missing key 'class'")
-        class_ = load_callable(class_path)
-        return _wrap_handler(class_, **handler_dict)
+            raise ValueError("missing key 'type'")
+        type_ = load_callable(type_path)
+        return _wrap_handler(type_, **handler_dict)
 
     # Wrap with anyway to force all arguments to be given as keyword arguments.
-    class_ = load_callable(handler_spec)
-    return _wrap_handler(class_)
+    type_ = load_callable(handler_spec)
+    return _wrap_handler(type_)
 
 
-def _wrap_handler(class_, **fixed):
+def _wrap_handler(type_, **fixed):
     def _wrapper(**defaults):
         kwargs = dict(defaults)
         kwargs.update(fixed)
-        return class_(**kwargs)
+        return type_(**kwargs)
     return _wrapper
