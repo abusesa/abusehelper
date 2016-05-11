@@ -77,7 +77,7 @@ The output of the above command should be something like this:
 The lines starting with the timestamps are log lines written to stderr. The `{"line": ["Hello, World!"]}` line is the (only) event the handler just extracted from the mail, written to stdout in [JSON](https://en.wikipedia.org/wiki/JSON) format.
 
 
-## Turning Handlers into Maildir Bots
+## Turning Handlers into Bots
 
 `abusehelper.core.mail.maildirbot` is a runner for reading mails from a directory adhering to the [Maildir](https://en.wikipedia.org/wiki/Maildir) format, feeding them to a handler and then passing on the parsed events to an XMPP channel. So it's a runner for turning a handler into a feed bot! A basic start incantation looks like:
 
