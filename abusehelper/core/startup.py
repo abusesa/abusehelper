@@ -138,7 +138,7 @@ class _ConfSignal(Exception):
         return self.args[0]
 
 
-class StartupBot(bot.Bot):
+class _StartupBot(bot.Bot):
     def __init__(self, *args, **keys):
         bot.Bot.__init__(self, *args, **keys)
 
@@ -150,13 +150,20 @@ class StartupBot(bot.Bot):
         yield idiokit.sleep(0.0)
 
     @idiokit.stream
-    def handle(self, conf, delay=15):
+    def handle(self, conf, min_delay=15.0, max_delay=600.0):
+        delay = min_delay
+
         while True:
             self.log.info("Launching bot {0!r} from module {1!r}".format(conf.name, conf.module))
-            yield self.launch(conf)
+            returncode = yield self.launch(conf)
 
             self.log.info("Relaunching {0!r} in {1} seconds".format(conf.name, delay))
             yield idiokit.sleep(delay)
+
+            if returncode > 0:
+                delay = min(delay * 2, max_delay)
+            else:
+                delay = min_delay
 
     @idiokit.stream
     def launch(self, conf):
@@ -330,6 +337,38 @@ class StartupBot(bot.Bot):
 
             self.log.info("Bot {0!r} was terminated {1}".format(conf.name, info))
         return process.returncode
+
+
+# This is a backwards compatibility wrapper that offers the old strategy()
+# method API but warns if it has actually been used to implement a custom
+# relaunch strategy. When this deprecated functionality is ready to be removed
+# just delete this class and rename the base class _StartupBot to StartupBot.
+class StartupBot(_StartupBot):
+    def strategy(self, conf, delay=15):
+        while True:
+            yield conf
+
+            self.log.info("Relaunching {0!r} in {1} seconds".format(conf.name, delay))
+            yield delay
+
+    @idiokit.stream
+    def handle(self, conf):
+        if type(self).strategy == StartupBot.strategy:
+            yield _StartupBot.handle(self, conf)
+            return
+
+        import warnings
+        warnings.warn(
+            "Implementing custom startup bot relaunch strategies by implementing " +
+            "strategy() has been deprecated.",
+            DeprecationWarning
+        )
+
+        for value in self.strategy(conf):
+            if isinstance(value, numbers.Real):
+                yield idiokit.sleep(value)
+            else:
+                yield self.launch(value)
 
 
 class DefaultStartupBot(StartupBot):
