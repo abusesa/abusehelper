@@ -116,7 +116,7 @@ setup(
         "scripts/roomreader"
     ],
     install_requires=[
-        "idiokit>=2.5.0,<3.0.0"
+        "idiokit>=2.6.0,<3.0.0"
     ],
     cmdclass={
         "build": Build,
