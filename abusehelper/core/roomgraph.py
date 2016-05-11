@@ -212,13 +212,14 @@ class RoomGraphBot(bot.ServiceBot):
         try:
             process = subprocess.Popen(
                 [sys.executable, "-m", fullname],
+                preexec_fn=os.setpgrp,
                 stdin=other_conn.fileno(),
                 close_fds=True,
                 env=env
             )
-        except:
+        except BaseException as exc:
             yield own_conn.close()
-            raise
+            raise exc
         finally:
             yield other_conn.close()
 
