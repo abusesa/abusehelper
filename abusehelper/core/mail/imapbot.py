@@ -6,6 +6,7 @@ import getpass
 import imaplib
 
 import idiokit
+from idiokit.ssl import ca_certs, match_hostname
 from .. import bot, utils
 from .message import message_from_string, escape_whitespace
 from . import HandlerParam, load_handler
@@ -38,7 +39,18 @@ class _IMAP4_SSL(imaplib.IMAP4_SSL):
         self.host = host
         self.port = port
         self.sock = socket.create_connection((host, port), timeout=self._timeout)
-        self.sslobj = ssl.wrap_socket(self.sock, self.keyfile, self.certfile)
+
+        with ca_certs() as certs:
+            self.sslobj = ssl.wrap_socket(
+                self.sock,
+                keyfile=self.keyfile,
+                certfile=self.certfile,
+                cert_reqs=ssl.CERT_REQUIRED,
+                ca_certs=certs
+            )
+        cert = self.sslobj.getpeercert()
+        match_hostname(cert, host)
+
         self.file = self.sslobj.makefile("rb")
 
 
