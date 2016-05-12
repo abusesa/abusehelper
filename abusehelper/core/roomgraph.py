@@ -198,7 +198,6 @@ class RoomGraphBot(bot.ServiceBot):
         finally:
             distributor.send(True, ("dec_rule", (src_room, rule, dst_room)))
 
-    @idiokit.stream
     def _start_worker(self):
         env = dict(os.environ)
         env["ABUSEHELPER_SUBPROCESS"] = ""
@@ -208,7 +207,7 @@ class RoomGraphBot(bot.ServiceBot):
         # linter happy.
         fullname = globals()["__loader__"].fullname
 
-        own_conn, other_conn = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        own_conn, other_conn = native_socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             process = subprocess.Popen(
                 [sys.executable, "-m", fullname],
@@ -217,13 +216,17 @@ class RoomGraphBot(bot.ServiceBot):
                 close_fds=True,
                 env=env
             )
-        except BaseException as exc:
-            yield own_conn.close()
-            raise exc
-        finally:
-            yield other_conn.close()
 
-        idiokit.stop(process, own_conn)
+            try:
+                conn = socket.fromfd(own_conn.fileno(), socket.AF_UNIX, socket.SOCK_STREAM)
+            except:
+                process.terminate()
+                process.wait()
+                raise
+        finally:
+            own_conn.close()
+            other_conn.close()
+        return process, conn
 
     @idiokit.stream
     def main(self, _):
@@ -231,7 +234,7 @@ class RoomGraphBot(bot.ServiceBot):
         connections = []
         try:
             for _ in xrange(self.concurrency):
-                process, connection = yield self._start_worker()
+                process, connection = self._start_worker()
                 processes.append(process)
                 connections.append(connection)
 
