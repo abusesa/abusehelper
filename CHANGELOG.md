@@ -1,8 +1,18 @@
 # Changelog
 
-## 3.1.1 (unreleased)
+## 3.2.0 (unreleased)
+
+### Features
+
+ * New ```abusehelper.core.mail```package. ([#6](https://github.com/abusesa/abusehelper/pull/6))
+
+### Fixes
+
+ * Simpler ```abusehelper.core.roomgraph``` multiprocessing implementation, which also boosts performance due to less idiokit overhead. ([#50](https://github.com/abusesa/abusehelper/pull/50))
+ 
+### Deprecations
+
  * ```abusehelper.core.archivebot``` module now logs a deprecation warning. Archivebot, ```abusehelper.bots.archivebot.csvarchivebot```, and ```abusehelper.bots.archivebot.rolloverarchivebot``` will be replaced by ```abusehelper.bots.archivebot``` module.
- * Simpler ```abusehelper.core.roomgraph``` multiprocessing implementation, which also boosts performance due to less idiokit overhead ([#50](https://github.com/abusesa/abusehelper/pull/50))
 
 ## 3.1.0 (2016-04-06)
 
