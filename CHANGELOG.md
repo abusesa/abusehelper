@@ -5,6 +5,7 @@
 ### Features
 
  * New ```abusehelper.core.mail```package. ([#6](https://github.com/abusesa/abusehelper/pull/6))
+  * See [abusehelper/core/mail/README.md](abusehelper/core/mail/README.md) for details.
 
 ### Fixes
 
