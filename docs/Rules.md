@@ -185,10 +185,10 @@ As a shorthand a plain string `"some string"` can be used in place of `rules.Str
 
 ### Composite Rules
 
- * `rules.And(rule, [rule...])` builds __*x* AND *y*__ rules
+ * `rules.And(rule, ...)` builds __*x* AND *y*__ rules
    * `rules.And(rules.Match("cc", "FI"), rules.Match("type", "malware"))` for __cc = FI AND type = malware__
 
- * `rules.Or(rule, [rule...])` builds __*x* OR *y*__ rules
+ * `rules.Or(rule, ...)` builds __*x* OR *y*__ rules
    * `rules.Or(rules.Match("cc", "FI"), rules.Match("domain name", rules.DomainName("*.fi")))` for __cc = FI AND "domain name" in *.fi__
 
  * `rules.No(rule)` builds __NO *x*__ rules
