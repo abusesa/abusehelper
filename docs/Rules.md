@@ -223,6 +223,6 @@ We're dealing with multi-value events, so there's a difference between *"key x h
 
  * Any event: __*__
  * Any non-empty event: __* = *__
- * Empty event: __no * = *__
+ * Empty event: __NO * = *__
  * Event a value or values for key __x__: __x = *__
- * Event has no values for key __x__: __no x = *__
+ * Event has no values for key __x__: __NO x = *__
