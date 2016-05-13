@@ -9,11 +9,13 @@ import httplib
 import inspect
 import urllib2
 import traceback
+import functools
 import collections
 import email.parser
 import cPickle as pickle
 
 import idiokit
+from idiokit.ssl import ca_certs, match_hostname
 
 from idiokit import heap
 from cStringIO import StringIO
@@ -109,10 +111,113 @@ def _is_timeout(reason):
     )
 
 
+class _CustomHTTPSConnection(httplib.HTTPConnection):
+    default_port = httplib.HTTPS_PORT
+
+    def __init__(
+        self,
+        host,
+        port=None,
+        strict=None,
+        timeout=None,
+        certfile=None,
+        keyfile=None,
+        require_cert=True,
+        ca_certs=None
+    ):
+        httplib.HTTPConnection.__init__(self, host, port, strict, timeout)
+
+        self.certfile = certfile
+        self.keyfile = keyfile
+        self.require_cert = require_cert
+        self.ca_certs = ca_certs
+
+    def connect(self):
+        httplib.HTTPConnection.connect(self)
+
+        with ca_certs(self.ca_certs) as certs:
+            self.sock = ssl.wrap_socket(
+                self.sock,
+                certfile=self.certfile,
+                keyfile=self.keyfile,
+                cert_reqs=ssl.CERT_REQUIRED if self.require_cert else ssl.CERT_NONE,
+                ca_certs=certs
+            )
+
+        if self.require_cert:
+            hostname = self.host if not self._tunnel_host else self._tunnel_host
+            cert = self.sock.getpeercert()
+            match_hostname(cert, hostname)
+
+
+class _CustomHTTPSHandler(urllib2.HTTPSHandler):
+    def __init__(self, cert=None, verify=True):
+        urllib2.HTTPSHandler.__init__(self)
+
+        if cert is None:
+            certfile = None
+            keyfile = None
+        elif isinstance(cert, basestring):
+            certfile = cert
+            keyfile = cert
+        else:
+            certfile, keyfile = cert
+
+        if isinstance(verify, basestring):
+            require_cert = True
+            ca_certs = verify
+        elif verify is True:
+            require_cert = True
+            ca_certs = None
+        elif verify is False:
+            require_cert = False
+            ca_certs = None
+        else:
+            raise TypeError("\"verify\" parameter must be a boolean or a string")
+
+        self._certfile = certfile
+        self._keyfile = keyfile
+        self._require_cert = require_cert
+        self._ca_certs = ca_certs
+
+    def https_open(self, req):
+        connection_constructor = functools.partial(
+            _CustomHTTPSConnection,
+            certfile=self._certfile,
+            keyfile=self._keyfile,
+            require_cert=self._require_cert,
+            ca_certs=self._ca_certs
+        )
+        return self.do_open(connection_constructor, req)
+
+
 @idiokit.stream
-def fetch_url(url, opener=None, timeout=60.0, chunk_size=16384):
-    if opener is None:
-        opener = urllib2.build_opener()
+def fetch_url(
+    url,
+    opener=None,
+    timeout=60.0,
+    chunk_size=16384,
+    cookies=None,
+    auth=None,
+    cert=None,
+    verify=True,
+    proxies=None
+):
+    if opener is not None:
+        raise TypeError("'opener' argument is no longer supported")
+
+    handlers = [
+        _CustomHTTPSHandler(cert=cert, verify=verify),
+        urllib2.ProxyHandler(proxies)
+    ]
+    if cookies is not None:
+        handlers.append(urllib2.CookieProcessor(cookies))
+    if auth is not None:
+        username, password = auth
+        passmgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        passmgr.add_password(None, url, username, password)
+        handlers.append(urllib2.HTTPBasicAuthHandler(passmgr))
+    opener = urllib2.build_opener(*handlers)
 
     try:
         output = StringIO()
