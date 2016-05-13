@@ -14,9 +14,7 @@ class TransformationBot(Transformation):
 
     @idiokit.stream
     def transform_keys(self, **keys):
-        keys = dict(keys)
-        keys.update(log=self.log)
-        yield idiokit.send(self.handler(**keys))
+        yield idiokit.send((self.handler(log=self.log),))
 
     def transform(self, handler):
         return handler.transform()
