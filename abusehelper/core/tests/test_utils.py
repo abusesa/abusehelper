@@ -1,7 +1,26 @@
+import socket
 import pickle
+import urllib2
 import unittest
 
+import idiokit
+
 from .. import utils
+
+
+class TestFetchUrl(unittest.TestCase):
+    def test_should_raise_TypeError_when_passing_in_an_opener(self):
+        sock = socket.socket()
+        try:
+            sock.bind(("localhost", 0))
+            sock.listen(1)
+            _, port = sock.getsockname()
+
+            opener = urllib2.build_opener()
+            fetch = utils.fetch_url("http://localhost:{0}".format(port), opener=opener)
+            self.assertRaises(TypeError, idiokit.main_loop, fetch)
+        finally:
+            sock.close()
 
 
 class TestCompressedCollection(unittest.TestCase):
