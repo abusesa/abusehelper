@@ -6,9 +6,8 @@ import getpass
 import imaplib
 
 import idiokit
-from .. import bot, utils
+from .. import bot, utils, handlers
 from .message import message_from_string, escape_whitespace
-from . import HandlerParam, load_handler
 
 
 _DEFAULT_PORT_IMAP4 = 143
@@ -43,7 +42,7 @@ class _IMAP4_SSL(imaplib.IMAP4_SSL):
 
 
 class IMAPBot(bot.FeedBot):
-    handler = HandlerParam()
+    handler = handlers.HandlerParam()
     poll_interval = bot.IntParam(default=300)
     filter = bot.Param(default="(UNSEEN)")
 
@@ -73,7 +72,7 @@ class IMAPBot(bot.FeedBot):
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
 
-        self.handler = load_handler(self.handler)
+        self.handler = handlers.load_handler(self.handler)
 
         if self.mail_port is None:
             if self.mail_disable_ssl:

@@ -6,9 +6,8 @@ import inspect
 import optparse
 
 import idiokit
-from ..utils import format_exception
+from .. import handlers, utils
 from .message import message_from_string
-from . import load_handler
 
 
 def _event_to_dict(event):
@@ -79,7 +78,7 @@ def handle(handler_spec, msg_data):
     [{u'a': [u'test']}]
     """
 
-    handler_type = load_handler(handler_spec)
+    handler_type = handlers.load_handler(handler_spec)
 
     msg = message_from_string(inspect.cleandoc(msg_data))
 
@@ -111,7 +110,7 @@ def main():
         handler_spec = json.loads(args[0])
     except ValueError:
         handler_spec = args[0]
-    handler_type = load_handler(handler_spec)
+    handler_type = handlers.load_handler(handler_spec)
 
     def handle_msg(msg):
         handler = handler_type(log=logging)
@@ -128,7 +127,7 @@ def main():
             with open(filepath, "rb") as fp:
                 msg = message_from_string(fp.read())
         except IOError as ioe:
-            logging.info("Skipped '{0}' ({1})".format(filepath, format_exception(ioe)))
+            logging.info("Skipped '{0}' ({1})".format(filepath, utils.format_exception(ioe)))
         else:
             logging.info("Handling '{0}'".format(filepath))
             handle_msg(msg)
