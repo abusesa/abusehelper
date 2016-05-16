@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.2.0 (unreleased)
+## 4.0.0 (2016-05-18)
 
 ### Features
 
@@ -9,8 +9,9 @@
 
 ### Fixes
 
+ * Fixed MITM vulnerability in multiple places using TLS. See docs/SECURITY-2016-01.md for more information.
  * Simpler ```abusehelper.core.roomgraph``` multiprocessing implementation, which also boosts performance due to less idiokit overhead. ([#50](https://github.com/abusesa/abusehelper/pull/50))
- 
+
 ### Deprecations
 
  * ```abusehelper.core.archivebot``` module now logs a deprecation warning. Archivebot, ```abusehelper.bots.archivebot.csvarchivebot```, and ```abusehelper.bots.archivebot.rolloverarchivebot``` will be replaced by ```abusehelper.bots.archivebot``` module.
