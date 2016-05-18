@@ -215,7 +215,13 @@ def fetch_url(
     if auth is not None:
         username, password = auth
         passmgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
-        passmgr.add_password(None, url, username, password)
+
+        if isinstance(url, urllib2.Request):
+            uri = url.get_full_url()
+            passmgr.add_password(None, uri, username, password)
+        else:
+            passmgr.add_password(None, url, username, password)
+            
         handlers.append(urllib2.HTTPBasicAuthHandler(passmgr))
     opener = urllib2.build_opener(*handlers)
 
