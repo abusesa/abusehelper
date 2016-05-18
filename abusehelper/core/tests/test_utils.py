@@ -173,8 +173,18 @@ class TestFetchUrl(unittest.TestCase):
         @idiokit.stream
         def test():
             server, url = yield create_https_server("localhost")
+
             with tmpfile(ca_data) as ca_certs:
                 _, fileobj = yield idiokit.pipe(server, utils.fetch_url(url, verify=ca_certs))
+            self.assertEqual(fileobj.read(), "ok")
+        idiokit.main_loop(test())
+
+    def test_should_allow_passing_Request_objects_as_url_parameter(self):
+        @idiokit.stream
+        def test():
+            server, url = yield create_https_server("localhost")
+            request = urllib2.Request(url)
+            _, fileobj = yield idiokit.pipe(server, utils.fetch_url(request, verify=False))
             self.assertEqual(fileobj.read(), "ok")
         idiokit.main_loop(test())
 
