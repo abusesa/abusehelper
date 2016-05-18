@@ -211,7 +211,7 @@ def fetch_url(
         urllib2.ProxyHandler(proxies)
     ]
     if cookies is not None:
-        handlers.append(urllib2.CookieProcessor(cookies))
+        handlers.append(urllib2.HTTPCookieProcessor(cookies))
     if auth is not None:
         username, password = auth
         passmgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
