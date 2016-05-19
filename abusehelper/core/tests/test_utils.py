@@ -184,7 +184,12 @@ class TestFetchUrl(unittest.TestCase):
         def test():
             server, url = yield create_https_server("localhost")
             request = urllib2.Request(url)
-            _, fileobj = yield idiokit.pipe(server, utils.fetch_url(request, verify=False))
+
+            with tmpfile(ca_data) as ca_certs:
+                try:
+                    _, fileobj = yield idiokit.pipe(server, utils.fetch_url(request, verify=ca_certs))
+                except idiokit.ssl.SSLCertificateError:
+                    return
             self.assertEqual(fileobj.read(), "ok")
         idiokit.main_loop(test())
 
