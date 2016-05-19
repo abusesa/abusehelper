@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.1 (2016-05-19)
+
+### Features
+
+ * Add option to provide custom CA certificate file to abusehelper.core.imapbot and abusehelper.core.mail.imapbot. ([#57](https://github.com/abusesa/abusehelper/pull/57), [#58](https://github.com/abusesa/abusehelper/pull/58))
+
 ## 4.0.0 (2016-05-19)
 
 ### Features

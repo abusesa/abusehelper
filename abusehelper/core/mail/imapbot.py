@@ -30,8 +30,9 @@ class _IMAP4(imaplib.IMAP4):
 
 
 class _IMAP4_SSL(imaplib.IMAP4_SSL):
-    def __init__(self, host, port, certfile=None, keyfile=None, timeout=None):
+    def __init__(self, host, port, certfile=None, keyfile=None, timeout=None, ca_certs=None):
         self._timeout = timeout
+        self.ca_certs = ca_certs
 
         imaplib.IMAP4_SSL.__init__(self, host, port, certfile, keyfile)
 
@@ -40,7 +41,7 @@ class _IMAP4_SSL(imaplib.IMAP4_SSL):
         self.port = port
         self.sock = socket.create_connection((host, port), timeout=self._timeout)
 
-        with ca_certs() as certs:
+        with ca_certs(self.ca_certs) as certs:
             self.sslobj = ssl.wrap_socket(
                 self.sock,
                 keyfile=self.keyfile,
@@ -77,6 +78,9 @@ class IMAPBot(bot.FeedBot):
     mail_box = bot.Param("""
         the polled mailbox (default: %default)
         """, default="INBOX")
+    mail_ca_certs = bot.Param("""
+        custom file to look for CA certificates
+        """, default=None)
     mail_disable_ssl = bot.BoolParam("""
         connect to the mail server using unencrypted plain
         text connections (default: use encrypted SSL connections)
@@ -151,10 +155,18 @@ class IMAPBot(bot.FeedBot):
             self.mail_server, self.mail_port))
 
         if self.mail_disable_ssl:
-            mail_class = _IMAP4
+            mailbox = _IMAP4(
+                self.mail_server,
+                self.mail_port,
+                timeout=self.mail_connection_timeout
+            )
         else:
-            mail_class = _IMAP4_SSL
-        mailbox = mail_class(self.mail_server, self.mail_port, timeout=self.mail_connection_timeout)
+            mailbox = _IMAP4_SSL(
+                self.mail_server,
+                self.mail_port,
+                timeout=self.mail_connection_timeout,
+                ca_certs=self.mail_ca_certs
+            )
 
         self.log.info("Logging in to IMAP server {0!r} port {1}".format(
             self.mail_server, self.mail_port))
