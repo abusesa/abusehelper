@@ -221,7 +221,7 @@ def fetch_url(
             passmgr.add_password(None, uri, username, password)
         else:
             passmgr.add_password(None, url, username, password)
-            
+
         handlers.append(urllib2.HTTPBasicAuthHandler(passmgr))
     opener = urllib2.build_opener(*handlers)
 
