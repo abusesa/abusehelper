@@ -10,7 +10,7 @@
 ### Fixes
 
  * Fixed TLS MITM vulnerability in abusehelper.core.imapbot, abusehelper.core.mailer and abusehelper.core.utils.fetch_url modules. See docs/SECURITY-2016-01.md for more information.
-* Simpler ```abusehelper.core.roomgraph``` multiprocessing implementation, which also boosts performance due to less idiokit overhead. ([#50](https://github.com/abusesa/abusehelper/pull/50))
+ * Simpler ```abusehelper.core.roomgraph``` multiprocessing implementation, which also boosts performance due to less idiokit overhead. ([#50](https://github.com/abusesa/abusehelper/pull/50))
 
 ### Deprecations
 
