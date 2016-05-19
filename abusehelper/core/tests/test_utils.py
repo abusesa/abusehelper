@@ -106,6 +106,7 @@ def create_https_server(host):
     try:
         yield sock.bind((host, 0))
         _, port = yield sock.getsockname()
+        yield sock.listen(1)
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         yield sock.close()
@@ -113,7 +114,6 @@ def create_https_server(host):
 
     @idiokit.stream
     def _server():
-        yield sock.listen(1)
         conn, addr = yield sock.accept()
 
         try:
