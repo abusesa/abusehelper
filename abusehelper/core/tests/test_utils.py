@@ -188,7 +188,7 @@ class TestFetchUrl(unittest.TestCase):
             self.assertEqual(fileobj.read(), "ok")
         idiokit.main_loop(test())
 
-    def test_should_check_hostname_when_verifyin_certificates(self):
+    def test_should_check_hostname_when_verifying_certificates(self):
         @idiokit.stream
         def test():
             server, url = yield create_https_server("127.0.0.1")
