@@ -16,6 +16,11 @@ $ tox
 
 See [CHANGELOG.md](./CHANGELOG.md).
 
+## Security Announcements
+
+ * [AbuseHelper Security Announcement 2016-01](./docs/docs/SECURITY-2016-01.md).
+   * Summary: Multiple places failed to check X.509 certificates leading to possibility to MITM connections.
+
 ## Community extensions
 
 This project provides the core AbuseHelper functionality, including choice bots and tools.
