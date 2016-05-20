@@ -268,10 +268,11 @@ def format_recipients(recipients):
 # hostname checks. The code is varied from the original smtplib.SMTP
 # implementation.
 class SMTP(smtplib.SMTP):
-    def __init__(self, host, *args, **keys):
-        smtplib.SMTP.__init__(self, host, *args, **keys)
+    def __init__(self, host, port, ca_certs=None, *args, **keys):
+        smtplib.SMTP.__init__(self, host, port, *args, **keys)
 
         self._host = host
+        self._ca_certs = ca_certs
 
     def starttls(self, keyfile=None, certfile=None):
         self.ehlo_or_helo_if_needed()
@@ -280,7 +281,7 @@ class SMTP(smtplib.SMTP):
 
         response, reply = self.docmd("STARTTLS")
         if response == 220:
-            with ca_certs() as certs:
+            with ca_certs(self._ca_certs) as certs:
                 self.sock = ssl.wrap_socket(
                     self.sock,
                     certfile=certfile,
@@ -323,6 +324,9 @@ class MailerService(ReportBot):
     smtp_auth_password = bot.Param("""
         password for the authenticated SMTP service
         """, default=None)
+    smtp_ca_certs = bot.Param("""
+        custom file to look for CA certificates
+        """, default=None)
     max_retries = bot.IntParam("""
         how many times sending is retried before dropping mail
         from the send queue
@@ -341,7 +345,11 @@ class MailerService(ReportBot):
         while server is None:
             self.log.info(u"Connecting to SMTP server {0!r} port {1}".format(host, port))
             try:
-                server = yield idiokit.thread(SMTP, host, port, timeout=self.smtp_connection_timeout)
+                server = yield idiokit.thread(
+                    SMTP, host, port,
+                    ca_certs=self.smtp_ca_certs,
+                    timeout=self.smtp_connection_timeout
+                )
             except (socket.error, smtplib.SMTPException) as exc:
                 self.log.error(u"Failed connecting to SMTP server: {0}".format(utils.format_exception(exc)))
             else:
