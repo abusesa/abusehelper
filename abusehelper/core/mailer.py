@@ -269,7 +269,7 @@ def format_recipients(recipients):
 # implementation.
 class SMTP(smtplib.SMTP):
     def __init__(self, host, port, ca_certs=None, *args, **keys):
-        smtplib.SMTP.__init__(self, host, *args, **keys)
+        smtplib.SMTP.__init__(self, host, port, *args, **keys)
 
         self._host = host
         self._ca_certs = ca_certs
