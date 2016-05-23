@@ -114,7 +114,10 @@ def create_https_server(host):
 
     @idiokit.stream
     def _server():
-        conn, addr = yield sock.accept()
+        try:
+            conn, addr = yield sock.accept()
+        finally:
+            yield sock.close()
 
         try:
             with tmpfile(cert_data) as certfile:
@@ -126,7 +129,6 @@ def create_https_server(host):
                 yield ssl_conn.close()
         finally:
             yield conn.close()
-            yield sock.close()
 
     idiokit.stop(_server(), "https://{0}:{1}/".format(host, port))
 
