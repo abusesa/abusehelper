@@ -6,8 +6,8 @@ import idiokit
 import itertools
 import contextlib
 from abusehelper.core import bot, utils
+from .. import handlers
 from .message import message_from_string, escape_whitespace
-from . import HandlerParam, load_handler
 
 
 def try_rename(from_name, to_name):
@@ -68,7 +68,7 @@ def lockfile(filename):
 
 
 class MailDirBot(bot.FeedBot):
-    handler = HandlerParam()
+    handler = handlers.HandlerParam()
     input_dir = bot.Param()
     work_dir = bot.Param()
     concurrency = bot.IntParam(default=1)
@@ -77,7 +77,7 @@ class MailDirBot(bot.FeedBot):
     def __init__(self, *args, **keys):
         bot.FeedBot.__init__(self, *args, **keys)
 
-        self.handler = load_handler(self.handler)
+        self.handler = handlers.load_handler(self.handler)
 
         self._queue = utils.WaitQueue()
 
