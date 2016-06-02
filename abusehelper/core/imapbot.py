@@ -9,6 +9,7 @@ import email.parser
 import email.header
 
 import idiokit
+from idiokit.ssl import ca_certs, match_hostname
 from cStringIO import StringIO
 from . import bot, utils
 
@@ -45,8 +46,9 @@ class _IMAP4(imaplib.IMAP4):
 
 
 class _IMAP4_SSL(imaplib.IMAP4_SSL):
-    def __init__(self, host, port, certfile=None, keyfile=None, timeout=None):
+    def __init__(self, host, port, certfile=None, keyfile=None, timeout=None, ca_certs=None):
         self._timeout = timeout
+        self.ca_certs = ca_certs
 
         imaplib.IMAP4_SSL.__init__(self, host, port, certfile, keyfile)
 
@@ -54,7 +56,18 @@ class _IMAP4_SSL(imaplib.IMAP4_SSL):
         self.host = host
         self.port = port
         self.sock = socket.create_connection((host, port), timeout=self._timeout)
-        self.sslobj = ssl.wrap_socket(self.sock, self.keyfile, self.certfile)
+
+        with ca_certs(self.ca_certs) as certs:
+            self.sslobj = ssl.wrap_socket(
+                self.sock,
+                keyfile=self.keyfile,
+                certfile=self.certfile,
+                cert_reqs=ssl.CERT_REQUIRED,
+                ca_certs=certs
+            )
+        cert = self.sslobj.getpeercert()
+        match_hostname(cert, host)
+
         self.file = self.sslobj.makefile("rb")
 
 
@@ -80,6 +93,9 @@ class IMAPBot(bot.FeedBot):
     mail_box = bot.Param("""
         the polled mailbox (default: %default)
         """, default="INBOX")
+    mail_ca_certs = bot.Param("""
+        custom file to look for CA certificates
+        """, default=None)
     mail_disable_ssl = bot.BoolParam("""
         connect to the mail server using unencrypted plain
         text connections (default: use encrypted SSL connections)
@@ -151,10 +167,18 @@ class IMAPBot(bot.FeedBot):
             self.mail_server, self.mail_port))
 
         if self.mail_disable_ssl:
-            mail_class = _IMAP4
+            mailbox = _IMAP4(
+                self.mail_server,
+                self.mail_port,
+                timeout=self.mail_connection_timeout
+            )
         else:
-            mail_class = _IMAP4_SSL
-        mailbox = mail_class(self.mail_server, self.mail_port, timeout=self.mail_connection_timeout)
+            mailbox = _IMAP4_SSL(
+                self.mail_server,
+                self.mail_port,
+                timeout=self.mail_connection_timeout,
+                ca_certs=self.mail_ca_certs
+            )
 
         self.log.info("Logging in to IMAP server {0!r} port {1}".format(
             self.mail_server, self.mail_port))
@@ -304,3 +328,7 @@ class IMAPBot(bot.FeedBot):
             skip_rest = yield handler(headers, fileobj)
             if skip_rest:
                 return
+
+
+if __name__ == "__main__":
+    IMAPBot.from_command_line().execute()

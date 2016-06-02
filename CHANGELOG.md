@@ -1,6 +1,12 @@
 # Changelog
 
-## 3.2.0 (unreleased)
+## 4.0.1 (2016-05-19)
+
+### Features
+
+ * Add option to provide custom CA certificate file to abusehelper.core.imapbot, abusehelper.core.mail.imapbot and abusehelper.core.mailer. ([#57](https://github.com/abusesa/abusehelper/pull/57), [#58](https://github.com/abusesa/abusehelper/pull/58), [#62](https://github.com/abusesa/abusehelper/pull/62))
+
+## 4.0.0 (2016-05-19)
 
 ### Features
 
@@ -9,8 +15,9 @@
 
 ### Fixes
 
+ * Fixed TLS MITM vulnerability in abusehelper.core.imapbot, abusehelper.core.mailer and abusehelper.core.utils.fetch_url modules. See [docs/SECURITY-2016-01.md](docs/SECURITY-2016-01.md) for more information.
  * Simpler ```abusehelper.core.roomgraph``` multiprocessing implementation, which also boosts performance due to less idiokit overhead. ([#50](https://github.com/abusesa/abusehelper/pull/50))
- 
+
 ### Deprecations
 
  * ```abusehelper.core.archivebot``` module now logs a deprecation warning. Archivebot, ```abusehelper.bots.archivebot.csvarchivebot```, and ```abusehelper.bots.archivebot.rolloverarchivebot``` will be replaced by ```abusehelper.bots.archivebot``` module.
