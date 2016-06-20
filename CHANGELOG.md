@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.2 (not released)
+
+### Fixes
+
+ * Fixed abusehelper.bots.openbl.openblbot which failed to parse malformed lines. ([#63](https://github.com/abusesa/abusehelper/pull/63), [#64](https://github.com/abusesa/abusehelper/pull/64))
+
 ## 4.0.1 (2016-05-19)
 
 ### Features
