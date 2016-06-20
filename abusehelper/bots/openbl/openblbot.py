@@ -13,7 +13,8 @@ OPENBL_FEED_URL = "https://www.openbl.org/lists/date_all.txt"
 
 
 def _normalize_time(time):
-    return _time.strftime("%Y-%m-%d %H:%M:%SZ", _time.gmtime(seconds))
+    seconds = _time.gmtime(int(time))
+    return _time.strftime("%Y-%m-%d %H:%M:%SZ", seconds)
 
 
 def _parse_line(line):

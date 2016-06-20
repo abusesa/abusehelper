@@ -22,5 +22,5 @@ class TestOpenBLBot(unittest.TestCase):
         line = "127.0.0.1\t1466409706"
         event = events.Event()
         event.add("ip", "127.0.0.1")
-        event.add("source time", "2016-06-20 07:01:46Z")
+        event.add("source time", "2016-06-20 08:01:46Z")
         self.assertEqual(_parse_line(line), event)
