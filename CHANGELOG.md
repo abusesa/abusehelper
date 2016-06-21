@@ -1,9 +1,14 @@
 # Changelog
 
+## 4.1.0 (not released)
+
+### Features
+
+ * Switch to setuptools for packaging ([#37](https://github.com/abusesa/abusehelper/pull/37))
+
 ### Deprecations
 
- * Removed SpyEye tracker bots. [[#65]](https://github.com/abusesa/abusehelper/pull/65)
-
+ * Removed SpyEye tracker bots. ([#65](https://github.com/abusesa/abusehelper/pull/65))
 
 ## 4.0.1 (2016-05-19)
 

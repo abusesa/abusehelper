@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="abusehelper",
-    version="4.0.1",
+    version="4.1.0",
     description="A framework for receiving and redistributing abuse feeds",
     long_description=(
         "AbuseHelper is a modular, scalable and robust " +
@@ -20,6 +20,6 @@ setup(
         ]
     },
     install_requires=[
-        "idiokit>=2.6.0,<3.0.0"
+        "idiokit>=2.8.0,<3.0.0"
     ]
 )
