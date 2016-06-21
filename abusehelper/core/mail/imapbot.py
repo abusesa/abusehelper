@@ -1,31 +1,14 @@
 from __future__ import absolute_import
 
-import re
 import ssl
 import socket
 import getpass
 import imaplib
-import email.parser
-import email.header
 
 import idiokit
 from idiokit.ssl import ca_certs, match_hostname
-from cStringIO import StringIO
-from . import bot, utils
-
-
-def get_header(headers, key, default=None):
-    value = headers.get(key, None)
-    if value is None:
-        return default
-
-    bites = []
-    for string, encoding in email.header.decode_header(value):
-        if encoding is not None:
-            string = string.decode(encoding, "replace")
-        bites.append(string)
-
-    return u" ".join(bites)
+from .. import bot, utils, handlers
+from .message import message_from_string, escape_whitespace
 
 
 _DEFAULT_PORT_IMAP4 = 143
@@ -72,6 +55,7 @@ class _IMAP4_SSL(imaplib.IMAP4_SSL):
 
 
 class IMAPBot(bot.FeedBot):
+    handler = handlers.HandlerParam()
     poll_interval = bot.IntParam(default=300)
     filter = bot.Param(default="(UNSEEN)")
 
@@ -104,6 +88,8 @@ class IMAPBot(bot.FeedBot):
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
 
+        self.handler = handlers.load_handler(self.handler)
+
         if self.mail_port is None:
             if self.mail_disable_ssl:
                 self.mail_port = _DEFAULT_PORT_IMAP4
@@ -112,6 +98,7 @@ class IMAPBot(bot.FeedBot):
 
         if self.mail_password is None:
             self.mail_password = getpass.getpass("Mail password: ")
+
         self.queue = self.run_mailbox()
 
     def feed(self):
@@ -230,104 +217,32 @@ class IMAPBot(bot.FeedBot):
             yield idiokit.sleep(self.poll_interval)
 
     @idiokit.stream
-    def get_header(self, uid, section):
-        body_rex_str = r"\s*\d+\s+\(UID {0}\s+BODY\[{1}\]\s+".format(uid, section)
-        body_rex = re.compile(body_rex_str, re.I)
-
-        fetch = "(UID BODY.PEEK[{0}])".format(section)
-        result, data = yield self.call("uid", "FETCH", uid, fetch)
-
-        # Filter away parts that don't closely enough resemble tuple
-        # ("<MSGNUM> (UID <MSGUID> BODY[<SECTION>] {<SIZE>}", "<HEADERS>")
-        data = [x for x in data if isinstance(x, tuple) and len(x) >= 2]
-        data = [x[1] for x in data if body_rex.match(x[0])]
-
-        # Accept only non-empty header data
-        data = [x for x in data if x]
-        if not data:
-            idiokit.stop()
-        idiokit.stop(email.parser.Parser().parsestr(data[0], headersonly=True))
-
-    def fetcher(self, uid, path):
-        @idiokit.stream
-        def fetch():
-            fetch = "(BODY.PEEK[{0}])".format(path)
-            result, data = yield self.call("uid", "FETCH", uid, fetch)
-
-            for parts in data:
-                if not isinstance(parts, tuple) or len(parts) != 2:
-                    continue
-                idiokit.stop(StringIO(parts[1]))
-        return fetch
-
-    @idiokit.stream
-    def walk_mail(self, uid, path=(), headers=[]):
-        if not path:
-            header = yield self.get_header(uid, "HEADER")
-            if header is None:
-                return
-            if header.get_content_maintype() != "multipart":
-                yield idiokit.send("TEXT", tuple(headers + [header]))
-                return
-            headers = headers + [header]
-
-        path = list(path) + [0]
-        while True:
-            path[-1] += 1
-            path_str = ".".join(map(str, path))
-
-            header = yield self.get_header(uid, path_str + ".MIME")
-            if header is None:
-                return
-
-            if header.get_content_maintype() == "multipart":
-                yield self.walk_mail(uid, path, headers + [header])
-            else:
-                yield idiokit.send(path_str, tuple(headers + [header]))
-
-    @idiokit.stream
     def fetch_mails(self, filter):
         result, data = yield self.call("uid", "SEARCH", None, filter)
         if not data or not data[0]:
             return
 
         for uid in data[0].split():
-            collected = []
-            yield self.walk_mail(uid) | idiokit.map(collected.append)
+            result, parts = yield self.call("uid", "FETCH", uid, "(RFC822)")
+            for part in parts:
+                if isinstance(part, tuple) and len(part) >= 2:
+                    data = part[1]
+                    break
+            else:
+                continue
 
-            parts = list()
-            for path, headers in collected:
-                parts.append((headers, self.fetcher(uid, path)))
+            msg = message_from_string(data)
+            subject = escape_whitespace(msg.get_unicode("Subject", "<no subject>", errors="replace"))
+            sender = escape_whitespace(msg.get_unicode("From", "<unknown sender>", errors="replace"))
 
-            if parts:
-                top_header = parts[0][0][0]
-                subject = get_header(top_header, "Subject", "<no subject>")
-                sender = get_header(top_header, "From", "<unknown sender>")
-
-                self.log.info("Handling mail {0!r} from {1!r}".format(subject, sender))
-                yield self.handle(parts)
-                self.log.info("Done with mail {0!r} from {1!r}".format(subject, sender))
+            self.log.info(u"Handling mail '{0}' from {1}".format(subject, sender))
+            handler = self.handler(log=self.log)
+            yield handler.handle(msg)
+            self.log.info(u"Done with mail '{0}' from {1}".format(subject, sender))
 
             # UID STORE command flags have to be in parentheses, otherwise
             # imaplib quotes them, which is not allowed.
             yield self.call("uid", "STORE", uid, "+FLAGS", "(\\Seen)")
-
-    @idiokit.stream
-    def handle(self, parts):
-        handle_default = getattr(self, "handle_default", None)
-
-        for headers, fetch in parts:
-            content_type = headers[-1].get_content_type()
-            suffix = content_type.replace("-", "__").replace("/", "_")
-
-            handler = getattr(self, "handle_" + suffix, handle_default)
-            if handler is None:
-                continue
-
-            fileobj = yield fetch()
-            skip_rest = yield handler(headers, fileobj)
-            if skip_rest:
-                return
 
 
 if __name__ == "__main__":
