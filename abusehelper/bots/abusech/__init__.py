@@ -93,6 +93,7 @@ class AbuseCHFeedBot(RSSBot):
 
     def create_event(self, source, **keys):
         event = events.Event({
+            "feeder": "abuse.ch",
             "feed": self.feed_name,
             "malware family": self.feed_malware,
             "type": self.feed_type,

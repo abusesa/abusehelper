@@ -30,7 +30,7 @@ class FeodoCcBot(AbuseCHFeedBot):
                 yield host_or_ip(value)
 
         if not got_version:
-            yield "malware", "feodo"
+            yield "malware family", "feodo"
 
 
 if __name__ == "__main__":
