@@ -54,6 +54,7 @@ class VxVaultBot(bot.PollingBot):
                 event.add("domain name", netloc)
             else:
                 event.add("ip", netloc)
+            event.add("feeder", "siri urz")
             event.add("feed", "vxvault")
             event.add("feed url", self.feed_url)
             event.add("type", "malware url")
