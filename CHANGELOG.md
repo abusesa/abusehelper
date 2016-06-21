@@ -1,5 +1,10 @@
 # Changelog
 
+### Deprecations
+
+ * Removed SpyEye tracker bots. [[#65]](https://github.com/abusesa/abusehelper/pull/65)
+
+
 ## 4.0.1 (2016-05-19)
 
 ### Features
