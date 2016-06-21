@@ -27,6 +27,7 @@ class Malc0deBot(RSSBot):
             return None
 
         event = events.Event()
+        event.add("feeder", "malc0de.com")
         event.add("feed", "malc0de")
         event.add("type", "malware url")
 
