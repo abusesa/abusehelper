@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import ssl
 import time
 import heapq
 import socket
@@ -14,7 +15,7 @@ from email.header import decode_header
 from email.utils import getaddresses, formataddr
 
 import idiokit
-
+from idiokit.ssl import ca_certs, match_hostname
 from . import events, taskfarm, services, templates, bot, utils
 
 
@@ -263,6 +264,42 @@ def format_recipients(recipients):
     return join_addresses(recipients)
 
 
+# A wrapper class extending smtplib.SMTP with certificate verification and
+# hostname checks. The code is varied from the original smtplib.SMTP
+# implementation.
+class SMTP(smtplib.SMTP):
+    def __init__(self, host, port, ca_certs=None, *args, **keys):
+        smtplib.SMTP.__init__(self, host, port, *args, **keys)
+
+        self._host = host
+        self._ca_certs = ca_certs
+
+    def starttls(self, keyfile=None, certfile=None):
+        self.ehlo_or_helo_if_needed()
+        if not self.has_extn("starttls"):
+            raise smtplib.SMTPException("server doesn't support STARTTLS")
+
+        response, reply = self.docmd("STARTTLS")
+        if response == 220:
+            with ca_certs(self._ca_certs) as certs:
+                self.sock = ssl.wrap_socket(
+                    self.sock,
+                    certfile=certfile,
+                    keyfile=keyfile,
+                    ca_certs=certs,
+                    cert_reqs=ssl.CERT_REQUIRED
+                )
+            cert = self.sock.getpeercert()
+            match_hostname(cert, self._host)
+
+            self.file = smtplib.SSLFakeFile(self.sock)
+            self.helo_resp = None
+            self.ehlo_resp = None
+            self.esmtp_features = {}
+            self.does_esmtp = 0
+        return response, reply
+
+
 class MailerService(ReportBot):
     mail_sender = bot.Param("""
         from whom it looks like the mails came from
@@ -287,6 +324,9 @@ class MailerService(ReportBot):
     smtp_auth_password = bot.Param("""
         password for the authenticated SMTP service
         """, default=None)
+    smtp_ca_certs = bot.Param("""
+        custom file to look for CA certificates
+        """, default=None)
     max_retries = bot.IntParam("""
         how many times sending is retried before dropping mail
         from the send queue
@@ -305,7 +345,11 @@ class MailerService(ReportBot):
         while server is None:
             self.log.info(u"Connecting to SMTP server {0!r} port {1}".format(host, port))
             try:
-                server = yield idiokit.thread(smtplib.SMTP, host, port, timeout=self.smtp_connection_timeout)
+                server = yield idiokit.thread(
+                    SMTP, host, port,
+                    ca_certs=self.smtp_ca_certs,
+                    timeout=self.smtp_connection_timeout
+                )
             except (socket.error, smtplib.SMTPException) as exc:
                 self.log.error(u"Failed connecting to SMTP server: {0}".format(utils.format_exception(exc)))
             else:
