@@ -12,9 +12,26 @@ from abusehelper.core import utils, cymruwhois, bot, events
 OPENBL_FEED_URL = "https://www.openbl.org/lists/date_all.txt"
 
 
-def normalize_time(time):
-    seconds = int(time) - 1 * 3600  # UTC+1 to UTC
-    return _time.strftime("%Y-%m-%d %H:%M:%SZ", _time.gmtime(seconds))
+def _normalize_time(time):
+    seconds = _time.gmtime(int(time))
+    return _time.strftime("%Y-%m-%d %H:%M:%SZ", seconds)
+
+
+def _parse_line(line):
+    if line.startswith("#"):
+        return None
+
+    try:
+        ip, time = line.split()
+    except ValueError:
+        return None
+
+    time = _normalize_time(time)
+
+    event = events.Event()
+    event.add("ip", ip)
+    event.add("source time", time)
+    return event
 
 
 class OpenBLBot(bot.PollingBot):
@@ -37,12 +54,12 @@ class OpenBLBot(bot.PollingBot):
         self.log.info("Downloaded")
 
         for line in fileobj:
-            if line.startswith("#"):
+            event = _parse_line(line)
+            if event is None:
                 continue
 
             ip, time = line.split()
             time = normalize_time(time)
-
             event = events.Event()
             event.add("ip", ip)
             event.add("source time", time)
@@ -54,8 +71,10 @@ class OpenBLBot(bot.PollingBot):
                 "description",
                 "This host has most likely been performing brute-force " +
                 "attacks on one of the following services: FTP, SSH, POP3, " +
-                "IMAP, IMAPS or POP3S.")
+                "IMAP, IMAPS or POP3S."
+            )
             yield idiokit.send(event)
+
 
 if __name__ == "__main__":
     OpenBLBot.from_command_line().execute()

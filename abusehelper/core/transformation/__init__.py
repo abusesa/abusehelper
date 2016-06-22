@@ -1,7 +1,19 @@
 from __future__ import absolute_import
 
 import idiokit
-from . import events, bot, taskfarm
+
+from .. import events, bot, taskfarm
+
+
+class Handler(object):
+    def __init__(self, log):
+        self.log = log
+
+    @idiokit.stream
+    def transform(self):
+        while True:
+            event = yield idiokit.next()
+            yield idiokit.send(event)
 
 
 @idiokit.stream
@@ -80,7 +92,3 @@ class Transformation(bot.ServiceBot):
         while True:
             event = yield idiokit.next()
             yield idiokit.send(event)
-
-
-if __name__ == "__main__":
-    Transformation.from_command_line().execute()

@@ -24,10 +24,10 @@ def _rate_limiter(rate_limit):
 
 class Receiver(bot.XMPPBot):
     room = bot.Param("""
-        The room for receiving events from
+        the room for receiving events from
     """)
     rate_limit = bot.IntParam("""
-        Rate limit for the sent stream
+        rate limit for the sent stream
     """, default=None)
 
     @idiokit.stream
@@ -45,6 +45,8 @@ class Receiver(bot.XMPPBot):
 
     @idiokit.stream
     def _read_stdin(self):
+        loads = json.JSONDecoder(parse_float=unicode, parse_int=unicode).decode
+
         while True:
             yield select.select([sys.stdin], [], [])
 
@@ -54,7 +56,7 @@ class Receiver(bot.XMPPBot):
             if not line.strip():
                 continue
 
-            in_dict = json.loads(line)
+            in_dict = loads(line)
             yield idiokit.send(events.Event(in_dict))
 
 
