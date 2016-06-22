@@ -1,10 +1,12 @@
 # Changelog
 
-## 4.1.0 (not released)
+## 4.1.0 (2016-06-22)
 
 ### Features
 
  * Switch to setuptools for packaging ([#37](https://github.com/abusesa/abusehelper/pull/37))
+ * Transformation handlers ([#54](https://github.com/abusesa/abusehelper/pull/54))
+  * See pull request ([#54](https://github.com/abusesa/abusehelper/pull/54)) for details.
 
 ### Fixes
 
