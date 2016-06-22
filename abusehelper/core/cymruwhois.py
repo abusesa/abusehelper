@@ -4,7 +4,7 @@ import socket
 import idiokit
 from idiokit import dns
 
-from . import utils
+from . import utils, transformation
 
 
 def _parse_ip(string, families=(socket.AF_INET, socket.AF_INET6)):
@@ -171,3 +171,13 @@ global_whois = CymruWhois()
 
 augment = global_whois.augment
 lookup = global_whois.lookup
+
+
+class Handler(transformation.Handler):
+    def __init__(self, ip_keys=[], *args, **keys):
+        transformation.Handler.__init__(self, *args, **keys)
+
+        self.ip_keys = tuple(ip_keys)
+
+    def transform(self):
+        return augment(*self.ip_keys)

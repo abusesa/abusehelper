@@ -260,16 +260,18 @@ class RuntimeBot(bot.XMPPBot):
 class DefaultRuntimeBot(RuntimeBot):
     config = bot.Param("configuration module")
 
-    @idiokit.stream
     def configs(self):
-        follow = config.follow_config(self.config)
+        return config.follow_config(self.config) | self._follow_config()
+
+    @idiokit.stream
+    def _follow_config(self):
         while True:
-            ok, obj = yield follow.next()
+            ok, obj = yield idiokit.next()
             if not ok:
                 self.log.error(obj)
                 continue
-
             yield idiokit.send(set(obj))
+
 
 if __name__ == "__main__":
     DefaultRuntimeBot.from_command_line().execute()

@@ -1,5 +1,4 @@
 import os
-import stat
 import shutil
 import tempfile
 import unittest
@@ -38,43 +37,59 @@ class TestUniqueWritableFile(unittest.TestCase):
                 self.assertEqual(filename, os.path.join(tmp, "filename-00000003.ext"))
 
     def test_should_raise_OSError_other_than_EEXIST(self):
-        def try_to_create(tmp):
-            with archivebot._unique_writable_file(tmp, "filename", ".ext"):
+        def try_to_create(directory):
+            with archivebot._unique_writable_file(directory, "filename", ".ext"):
                 pass
 
         with tmpdir() as tmp:
-            os.chmod(os.path.join(tmp), stat.S_IREAD)
-            self.assertRaises(OSError, try_to_create, tmp)
+            non_existing_dir = os.path.join(tmp, "non-existing-dir")
+            self.assertRaises(OSError, try_to_create, non_existing_dir)
 
 
 class TestRename(unittest.TestCase):
-    def test_valid_rename(self):
-        try:
-            tmp = tempfile.NamedTemporaryFile()
-            new_tmp = archivebot._rename(tmp.name)
-            self.assertFalse(os.path.isfile(tmp.name))
-            self.assertTrue(os.path.isfile(new_tmp))
-            self.assertTrue(new_tmp.find(".compress") > 1)
-        finally:
-            for file in [tmp.name, new_tmp]:
-                if os.path.isfile(file):
-                    os.remove(file)
+    def test_should_not_go_outside_the_original_directory(self):
+        with tmpdir() as directory:
+            tmp_file = tempfile.NamedTemporaryFile(dir=directory, delete=False)
+            new_name = archivebot._rename(tmp_file.name)
+            self.assertEqual(os.path.abspath(os.path.dirname(new_name)), os.path.abspath(directory))
+
+    def test_should_move_the_original_file(self):
+        with tmpdir() as directory:
+            tmp_file = tempfile.NamedTemporaryFile(dir=directory, delete=False)
+            new_name = archivebot._rename(tmp_file.name)
+            with open(new_name, "rb") as new_file:
+                self.assertTrue(os.path.sameopenfile(new_file.fileno(), tmp_file.fileno()))
+
+    def test_should_not_keep_the_original_file(self):
+        with tmpdir() as directory:
+            tmp_file = tempfile.NamedTemporaryFile(dir=directory, delete=False)
+            archivebot._rename(tmp_file.name)
+            self.assertFalse(os.path.isfile(tmp_file.name))
+
+    def test_should_change_the_file_name(self):
+        with tmpdir() as directory:
+            tmp_file = tempfile.NamedTemporaryFile(dir=directory, delete=False)
+            new_name = archivebot._rename(tmp_file.name)
+            self.assertNotEqual(os.path.abspath(tmp_file.name), os.path.abspath(new_name))
+
+    def test_should_create_a_filename_with_the_dotcompress_suffix(self):
+        with tmpdir() as directory:
+            tmp_file = tempfile.NamedTemporaryFile(dir=directory, delete=False)
+            new_name = archivebot._rename(tmp_file.name)
+            self.assertTrue(".compress" in os.path.basename(new_name))
 
 
 class TestCompress(unittest.TestCase):
     def test_dotcompress(self):
         with tempfile.NamedTemporaryFile(prefix="roomname.compress@example") as tmp:
-            self.assertRaises(ValueError, archivebot.compress, tmp.name)
+            self.assertRaises(ValueError, archivebot._compress, tmp.name)
 
     def test_valid_compress(self):
-        try:
-            tmp = tempfile.NamedTemporaryFile(suffix=".compress-00000000", delete=False)
+        with tmpdir() as directory:
+            tmp = tempfile.NamedTemporaryFile(suffix=".compress-00000000", dir=directory, delete=False)
             tmp.write("test")
-            gz_file = archivebot.compress(tmp.name)
+            gz_file = archivebot._compress(tmp.name)
             try:
                 self.assertEqual(gz_file, tmp.name[:-18] + ".gz")
             finally:
                 os.remove(gz_file)
-        finally:
-            if os.path.isfile(tmp.name):
-                os.remove(tmp.name)
