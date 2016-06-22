@@ -6,6 +6,10 @@
 
  * Switch to setuptools for packaging ([#37](https://github.com/abusesa/abusehelper/pull/37))
 
+### Fixes
+
+ * Fixed abusehelper.bots.openbl.openblbot which failed to parse malformed lines. ([#63](https://github.com/abusesa/abusehelper/pull/63), [#64](https://github.com/abusesa/abusehelper/pull/64))
+
 ### Deprecations
 
  * Removed SpyEye tracker bots. ([#65](https://github.com/abusesa/abusehelper/pull/65))
