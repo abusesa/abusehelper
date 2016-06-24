@@ -59,7 +59,7 @@ class OpenBLBot(bot.PollingBot):
                 continue
 
             ip, time = line.split()
-            time = normalize_time(time)
+            time = _normalize_time(time)
             event = events.Event()
             event.add("ip", ip)
             event.add("source time", time)
