@@ -1,16 +1,16 @@
 FROM centos:6
 
 RUN yum -y update && \
+    yum -y install https://centos6.iuscommunity.org/ius-release.rpm && \
     yum -y install \
-        epel-release \
-        centos-release-scl \
         git
 
 # TryTLS + deps
 RUN yum -y install \
         python27 \
+        python27-pip \
     && \
-    scl enable python27 -- pip install git+git://github.com/ouspg/trytls.git
+    pip2.7 install git+git://github.com/ouspg/trytls.git
 
 # Abusehelper + deps
 RUN yum -y install \
@@ -26,4 +26,4 @@ ENV HOME /home/tester
 
 WORKDIR ${HOME}
 COPY trytls_fetch_url.py .
-CMD scl enable python27 -- trytls /usr/bin/python trytls_fetch_url.py
+CMD trytls /usr/bin/python trytls_fetch_url.py
