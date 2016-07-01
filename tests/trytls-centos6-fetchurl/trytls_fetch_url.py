@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import sys
-
 import idiokit
 from abusehelper.core.utils import fetch_url, FetchUrlFailed
 
@@ -21,9 +20,9 @@ def main():
 
     try:
         if ca_bundle:
-            foo = idiokit.main_loop(fetch_url(url, verify=ca_bundle))
+            idiokit.main_loop(fetch_url(url, verify=ca_bundle))
         else:
-            foo = idiokit.main_loop(fetch_url(url))
+            idiokit.main_loop(fetch_url(url))
     except FetchUrlFailed:
         print "VERIFY SUCCESS"
         sys.exit(0)
