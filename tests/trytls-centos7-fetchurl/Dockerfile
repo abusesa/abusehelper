@@ -1,18 +1,24 @@
 FROM centos:7
 
 RUN yum -y update && \
-    yum -y install epel-release && \
+    yum -y install https://centos7.iuscommunity.org/ius-release.rpm && \
     yum -y install \
-        git \
-        openssl \
-        python \
-        python-pip
+        git
 
 # TryTLS + deps
-RUN pip install git+git://github.com/ouspg/trytls.git
+RUN yum -y install \
+        openssl \
+        python35u \
+        python35u-pip \
+    && \
+    pip3.5 install git+git://github.com/ouspg/trytls.git
 
 # Abusehelper + deps
-RUN pip install git+git://github.com/abusesa/idiokit.git && \
+RUN yum -y install \
+        python \
+        python-pip \
+    && \
+    pip install git+git://github.com/abusesa/idiokit.git && \
     pip install git+git://github.com/abusesa/abusehelper.git
 
 RUN useradd -m -c "Testing User" tester
