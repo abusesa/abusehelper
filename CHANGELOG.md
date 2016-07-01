@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixes
+
+ * Fixed broken formatting for the Ontology document ([#67](https://github.com/abusesa/abusehelper/pull/67)).
+
 ## 4.1.0 (2016-06-22)
 
 ### Features
