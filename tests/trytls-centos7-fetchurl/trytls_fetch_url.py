@@ -3,6 +3,7 @@
 import sys
 import idiokit
 from abusehelper.core.utils import fetch_url, FetchUrlFailed
+from idiokit.ssl import SSLCertificateError
 
 
 def main():
@@ -16,7 +17,7 @@ def main():
     if len(sys.argv) == 4:
         ca_bundle = sys.argv[3]
 
-    url = "http://{0}:{1}/".format(host, port)
+    url = "https://{0}:{1}/".format(host, port)
 
     try:
         if ca_bundle:
@@ -24,6 +25,9 @@ def main():
         else:
             idiokit.main_loop(fetch_url(url))
     except FetchUrlFailed:
+        print "VERIFY SUCCESS"
+        sys.exit(0)
+    except SSLCertificateError:
         print "VERIFY SUCCESS"
         sys.exit(0)
 
