@@ -1,0 +1,9 @@
+version: '2'
+
+services:
+  trytls-centos6-fetchurl:
+      build: ./trytls-centos6-fetchurl
+      image: trytls-centos6-fetchurl
+  trytls-centos7-fetchurl:
+      build: ./trytls-centos7-fetchurl
+      image: trytls-centos7-fetchurl
