@@ -8,7 +8,7 @@ from . import DragonBot
 
 
 class DragonSshBot(DragonBot):
-    url = "http://dragonresearchgroup.org/insight/sshpwauth.txt"
+    url = "https://dragonresearchgroup.org/insight/sshpwauth.txt"
 
 
 if __name__ == "__main__":
