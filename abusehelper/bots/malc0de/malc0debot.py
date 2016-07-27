@@ -9,7 +9,7 @@ from abusehelper.bots.rssbot.rssbot import RSSBot
 
 
 class Malc0deBot(RSSBot):
-    feeds = bot.ListParam(default=["http://malc0de.com/rss/"])
+    feeds = bot.ListParam(default=["https://malc0de.com/rss/"])
 
     def is_ip(self, string):
         for addr_type in (socket.AF_INET, socket.AF_INET6):
