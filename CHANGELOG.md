@@ -1,8 +1,16 @@
 # Changelog
 
+## 4.2.0 (not released)
+
+### Features
+
+ * Convert default URLs to use HTTPS instead of HTTP in following bots: `abusehelper.bots.autoshun.autoshunbot`, `abusehelper.bots.dragonresearchgroup.ssh`, `abusehelper.bots.malc0de.malc0debot`, `abusehelper.bots.phishtank.phishtankbot`, `abusehelper.bots.spamhaus.drop` and `abusehelper.bots.malwaredomainlist` ([#70](https://github.com/abusesa/abusehelper/issues/70)).
+ * Current AbuseHelper version is published in `abusehelper.__version__` ([#69](https://github.com/abusesa/abusehelper/pull/69)).
+
 ### Fixes
 
  * Fixed broken formatting for the Ontology document ([#67](https://github.com/abusesa/abusehelper/pull/67)).
+ * `botnet` command now works in FreeBSD ([#76](https://github.com/abusesa/abusehelper/pull/76)).
 
 ## 4.1.0 (2016-06-22)
 

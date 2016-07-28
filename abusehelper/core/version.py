@@ -1,6 +1,13 @@
 from .. import __version__
 
 
+import warnings
+warnings.warn(
+    "Module abusehelper.core.version has been deprecated. Please use abusehelper.__version__ instead.",
+    DeprecationWarning
+)
+
+
 def version():
     return __version__
 
