@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.2.0 (not released)
+## 4.2.0 (2016-06-28)
 
 ### Features
 
