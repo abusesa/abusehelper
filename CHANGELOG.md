@@ -4,7 +4,7 @@
 
 ### Features
 
- * Convert default URLs to use HTTPS instead of HTTP in following bots: `abusehelper.bots.autoshun.autoshunbot`, `abusehelper.bots.dragonr searchgroup.ssh`, `abusehelper.bots.malc0de.malc0debot`, `abusehelper.bots.phishtank.phishtankbot` and `abusehelper.bots.spamhaus.drop` ([#70](https://github.com/abusesa/abusehelper/issues/70)).
+ * Convert default URLs to use HTTPS instead of HTTP in following bots: `abusehelper.bots.autoshun.autoshunbot`, `abusehelper.bots.dragonresearchgroup.ssh`, `abusehelper.bots.malc0de.malc0debot`, `abusehelper.bots.phishtank.phishtankbot`, `abusehelper.bots.spamhaus.drop` and `abusehelper.bots.malwaredomainlist` ([#70](https://github.com/abusesa/abusehelper/issues/70)).
  * Current AbuseHelper version is published in `abusehelper.__version__` ([#69](https://github.com/abusesa/abusehelper/pull/69)).
 
 ### Fixes
