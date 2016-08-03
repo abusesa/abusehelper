@@ -124,7 +124,7 @@ class HeadRequest(urllib2.Request):
 
 class PhishTankBot(bot.PollingBot):
     application_key = bot.Param("registered application key for PhishTank")
-    feed_url = bot.Param(default="http://data.phishtank.com/data/%s/online-valid.xml.bz2")
+    feed_url = bot.Param(default="https://data.phishtank.com/data/%s/online-valid.xml.bz2")
 
     def __init__(self, *args, **keys):
         bot.PollingBot.__init__(self, *args, **keys)

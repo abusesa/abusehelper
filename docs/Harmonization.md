@@ -174,7 +174,7 @@ The **type** values offer a data-backed taxonomy for classifying abuse and vulne
 |ddos infrastructure|This type refers to various parts of DDoS botnet infrastructure.|
 |ddos target|This type refers to the intended target of a DDoS attack, i.e. the intended domain name or ip address.|
 |defacement|This type refers to hacktivism, which on a technical level is an indicator of a compromised service.|
-|dropzone|Information Content Security|This IOC refers to place where the compromised machines store the stolen user data.|
+|dropzone|This type refers to a resource, which is used to store stolen user data.|
 |exploit url|An exploit or an exploit kit is often served through a malicious URL.|
 |ids alert|Alerts from a heuristic sensor network. This is a generic classification, as often the taxonomy of these types of events leave a lot to wish for in terms of consistency.|
 |malware configuration|This is a resource which updates botnet drones with a new configurations.|
