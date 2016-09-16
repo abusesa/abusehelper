@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="abusehelper",
-    version="4.1.0",
+    version="5.0.0.dev1",
     description="A framework for receiving and redistributing abuse feeds",
     long_description=(
         "AbuseHelper is a modular, scalable and robust " +

@@ -1,5 +1,8 @@
 # Changelog
 
+### Deprecations
+ * Remove ```abusehelper.core.archivebot```. Encouraging users to move to use ```abusehelper.bots.archivebot.archivebot``` instead which supports JSON archiving and daily rotation of the archives ([#23](https://github.com/abusesa/abusehelper/issues/23), [#24](https://github.com/abusesa/abusehelper/pull/24))
+
 ## 4.1.0 (2016-06-22)
 
 ### Features
