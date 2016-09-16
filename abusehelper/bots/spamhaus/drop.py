@@ -14,7 +14,7 @@ class SpamhausDropBot(bot.PollingBot):
     http_headers = bot.ListParam("a list of http header (k, v) tuples", default=[])
 
     @idiokit.stream
-    def poll(self, url="http://www.spamhaus.org/drop/drop.lasso"):
+    def poll(self, url="https://www.spamhaus.org/drop/drop.lasso"):
         request = urllib2.Request(url)
         for key, value in self.http_headers:
             request.add_header(key, value)
@@ -44,7 +44,7 @@ class SpamhausDropBot(bot.PollingBot):
 
             new = events.Event()
             new.add('netblock', netblock)
-            new.add('description url', "http://www.spamhaus.org/sbl/query/" + sbl)
+            new.add('description url', "https://www.spamhaus.org/sbl/query/" + sbl)
             new.add('feed', 'spamhaus drop list')
             new.add('type', 'hijacked network')
 

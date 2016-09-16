@@ -1,8 +1,10 @@
 from setuptools import setup, find_packages
 
+import abusehelper
+
 setup(
     name="abusehelper",
-    version="5.0.0.dev1",
+    version=abusehelper.__version__,
     description="A framework for receiving and redistributing abuse feeds",
     long_description=(
         "AbuseHelper is a modular, scalable and robust " +

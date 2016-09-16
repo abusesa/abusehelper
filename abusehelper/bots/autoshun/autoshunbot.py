@@ -1,8 +1,8 @@
 """
 Autoshun Shun List bot
-http://autoshun.org/
+https://autoshun.org/
 
-Maintainer: Codenomicon <clarified@codenomicon.com
+Maintainer: Codenomicon <clarified@codenomicon.com>
 """
 
 
@@ -11,7 +11,7 @@ import time as _time
 import calendar
 from abusehelper.core import utils, cymruwhois, bot
 
-AUTOSHUN_CSV_URL = "http://www.autoshun.org/files/shunlist.csv"
+AUTOSHUN_CSV_URL = "https://www.autoshun.org/files/shunlist.csv"
 
 # Based on analysis in VSRoom for the most common types.
 CLASSIFICATION = {

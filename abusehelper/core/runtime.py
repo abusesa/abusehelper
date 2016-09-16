@@ -4,7 +4,8 @@ import uuid
 import idiokit
 from idiokit import timer
 from idiokit.xmpp import jid
-from . import serialize, events, config, bot, services, log, version
+from . import serialize, events, config, bot, services, log
+from .. import __version__
 
 
 def iter_runtimes(obj):
@@ -175,8 +176,7 @@ class RuntimeBot(bot.XMPPBot):
 
     @idiokit.stream
     def main(self):
-        ver_str = version.version_str()
-        self.log.info("Starting bot {0!r} version {1}".format(self.bot_name, ver_str))
+        self.log.info("Starting bot {0!r} version {1}".format(self.bot_name, __version__))
         xmpp = yield self.xmpp_connect()
 
         self.log.info("Joining lobby {0!r}".format(self.service_room))

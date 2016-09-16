@@ -17,7 +17,8 @@ import cPickle as pickle
 import idiokit
 from idiokit.xmpp import connect
 
-from . import log, events, taskfarm, utils, services, version
+from . import log, events, taskfarm, utils, services
+from .. import __version__
 
 
 class ParamError(Exception):
@@ -384,8 +385,7 @@ class ServiceBot(XMPPBot):
 
     @idiokit.stream
     def _run(self):
-        ver_str = version.version_str()
-        self.log.info("Starting service {0!r} version {1}".format(self.bot_name, ver_str))
+        self.log.info("Starting service {0!r} version {1}".format(self.bot_name, __version__))
         self.xmpp = yield self.xmpp_connect()
 
         service = _Service(self, self.bot_state_file)
