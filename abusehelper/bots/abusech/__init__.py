@@ -60,7 +60,6 @@ def split_description(description):
 
 
 class AbuseCHFeedBot(RSSBot):
-    feed_name = "abuse.ch"
     feed_malware = []
     feed_type = []
 
@@ -94,8 +93,9 @@ class AbuseCHFeedBot(RSSBot):
 
     def create_event(self, source, **keys):
         event = events.Event({
+            "feeder": "abuse.ch",
             "feed": self.feed_name,
-            "malware": self.feed_malware,
+            "malware family": self.feed_malware,
             "type": self.feed_type,
             "feed url": source
         })

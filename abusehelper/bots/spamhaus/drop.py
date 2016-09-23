@@ -44,7 +44,8 @@ class SpamhausDropBot(bot.PollingBot):
 
             new = events.Event()
             new.add('netblock', netblock)
-            new.add('description url', "https://www.spamhaus.org/sbl/query/" + sbl)
+            new.add('description url', "http://www.spamhaus.org/sbl/query/" + sbl)
+            new.add('feeder', 'spamhaus')
             new.add('feed', 'spamhaus drop list')
             new.add('type', 'hijacked network')
 

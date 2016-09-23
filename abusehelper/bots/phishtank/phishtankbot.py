@@ -149,7 +149,7 @@ class PhishTankBot(bot.PollingBot):
         if not url:
             return
 
-        event = events.Event({"feed": "phishtank", "url": url})
+        event = events.Event({"feed": "phishtank", "feeder": "opendns", "url": url})
 
         domain = urlparse.urlparse(url).netloc
         if is_domain(domain):

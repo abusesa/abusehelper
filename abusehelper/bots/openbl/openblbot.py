@@ -58,6 +58,12 @@ class OpenBLBot(bot.PollingBot):
             if event is None:
                 continue
 
+            ip, time = line.split()
+            time = _normalize_time(time)
+            event = events.Event()
+            event.add("ip", ip)
+            event.add("source time", time)
+            event.add("feeder", "openbl.org")
             event.add("feed", "openbl")
             event.add("description url", self.feed_url)
             event.add("type", "brute-force")

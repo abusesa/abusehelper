@@ -1,6 +1,16 @@
 # Changelog
 
+### Fixes
+
+ * Fixed the core keys and values to conform with the DHO, Data Harmonization Ontology.
+ * Changes to "type" values:
+  * "malware" -> "malware url"
+  * "exploit" -> "exploit url"
+ * Changes to keys:
+  * "malware" -> "malware family"
+
 ### Deprecations
+
  * Remove ```abusehelper.core.archivebot```. Encouraging users to move to use ```abusehelper.bots.archivebot.archivebot``` instead which supports JSON archiving and daily rotation of the archives ([#23](https://github.com/abusesa/abusehelper/issues/23), [#24](https://github.com/abusesa/abusehelper/pull/24))
 
 ## 4.2.0 (2016-07-28)
