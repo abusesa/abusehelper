@@ -1,5 +1,7 @@
 # Changelog
 
+## 5.0.0 (2015-09-23)
+
 ### Fixes
 
  * Fixed the core keys and values to conform with the DHO, Data Harmonization Ontology.
