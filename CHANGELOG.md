@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixes
+
+ * Remove duplicate parsing code from ```abusehelper.bots.openbl.openblbot ``` ([adc6eb1] (https://github.com/abusesa/abusehelper/commit/adc6eb1868f15347384423c066b6e73afb2b05cc))
+
 ## 5.0.0 (2015-09-23)
 
 ### Fixes
