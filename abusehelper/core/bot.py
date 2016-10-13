@@ -134,6 +134,10 @@ class Bot(object):
     log_file = Param(
         "write logs to the given path (default: log to stdout)",
         default=None)
+    log_level = IntParam(
+        "logging level (default: logging.INFO)",
+        default=logging.INFO
+    )
 
     @classmethod
     def params(cls):
@@ -280,18 +284,18 @@ class Bot(object):
             name = keys.keys()[0]
             raise TypeError("got an unexpected keyword argument " + repr(name))
 
-        self.log = self.create_logger()
+        self.log = self.create_logger(self.log_level)
 
-    def create_logger(self):
+    def create_logger(self, log_level=logging.INFO):
         logger = logging.getLogger(self.bot_name)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(log_level)
 
         if self.log_file is None:
             handler = logging.StreamHandler()
         else:
             handler = logging.handlers.WatchedFileHandler(self.log_file)
         handler.setFormatter(LineFormatter())
-        handler.setLevel(logging.INFO)
+        handler.setLevel(log_level)
 
         logger.addHandler(handler)
         return log.EventLogger(logger)
