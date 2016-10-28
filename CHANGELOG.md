@@ -1,5 +1,7 @@
 # Changelog
 
+## 5.1.0 (2015-10-28)
+
 ### Features
  * Add log level option for bots ([#80](https://github.com/abusesa/abusehelper/pull/80)).
 
