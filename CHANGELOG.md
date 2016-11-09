@@ -1,5 +1,8 @@
 # Changelog
 
+### Features
+ * Add drop_older_than parameter for bots, which can be used to ignore too old events
+
 ## 5.1.0 (2015-10-28)
 
 ### Features
