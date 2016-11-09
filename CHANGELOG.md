@@ -1,7 +1,7 @@
 # Changelog
 
 ### Features
- * Add drop_older_than parameter for bots, which can be used to ignore too old events
+ * Add drop_older_than parameter for bots, which can be used to ignore too old events ([debd818] (https://github.com/abusesa/abusehelper/commit/debd818aec929864be24e580ff09b99d6abb42ea))
 
 ## 5.1.0 (2015-10-28)
 
