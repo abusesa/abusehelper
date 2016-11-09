@@ -432,6 +432,9 @@ class FeedBot(ServiceBot):
         how many XMPP stanzas the bot can send per second
         (default: no limiting)
         """, default=None)
+    drop_older_than = IntParam("""
+        drop events with source time older that given number of seconds
+        """, default=None)
 
     def __init__(self, *args, **keys):
         ServiceBot.__init__(self, *args, **keys)
@@ -449,6 +452,25 @@ class FeedBot(ServiceBot):
     def feed(self, *args, **keys):
         while True:
             yield idiokit.next()
+
+    @idiokit.stream
+    def _cutoff(self):
+        while True:
+            event = yield idiokit.next()
+
+            latest = None
+            for value in event.values("source time"):
+                try:
+                    source_time = time.strptime(value, "%Y-%m-%d %H:%M:%SZ")
+                except ValueError:
+                    continue
+                latest = max(latest, source_time)
+
+            cutoff = time.gmtime(time.time() - self.drop_older_than)
+            if latest and latest < cutoff:
+                continue
+
+            yield idiokit.send(event)
 
     @idiokit.stream
     def _output_rate_limiter(self):
@@ -490,10 +512,15 @@ class FeedBot(ServiceBot):
 
             log.open("Joined " + msg, attrs, status="joined")
             try:
+                head = self.augment()
+                if self.drop_older_than is not None:
+                    head = self._cutoff() | head
+
                 tail = self._stats(name) | room | idiokit.consume()
                 if self.xmpp_rate_limit is not None:
                     tail = self._output_rate_limiter() | tail
-                yield self.augment() | events.events_to_elements() | tail
+
+                yield head | events.events_to_elements() | tail
             finally:
                 log.close("Left " + msg, attrs, status="left")
 
