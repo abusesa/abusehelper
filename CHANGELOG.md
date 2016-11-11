@@ -1,9 +1,11 @@
 # Changelog
 
+## 5.2.0 (2016-11-11)
+
 ### Features
  * Add drop_older_than parameter for bots, which can be used to ignore too old events ([debd818] (https://github.com/abusesa/abusehelper/commit/debd818aec929864be24e580ff09b99d6abb42ea))
 
-## 5.1.0 (2015-10-28)
+## 5.1.0 (2016-10-28)
 
 ### Features
  * Add log level option for bots ([#80](https://github.com/abusesa/abusehelper/pull/80)).
@@ -12,7 +14,7 @@
 
  * Remove duplicate parsing code from ```abusehelper.bots.openbl.openblbot ``` ([adc6eb1] (https://github.com/abusesa/abusehelper/commit/adc6eb1868f15347384423c066b6e73afb2b05cc))
 
-## 5.0.0 (2015-09-23)
+## 5.0.0 (2016-09-23)
 
 ### Fixes
 
