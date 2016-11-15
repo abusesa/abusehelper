@@ -11,6 +11,8 @@ from idiokit.xmlcore import Element, Elements
 
 def _replace_non_xml_chars(unicode_obj, replacement=u"\ufffd"):
     return _NON_XML.sub(replacement, unicode_obj)
+
+
 _NON_XML = re.compile(u"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]", re.U)
 
 
@@ -63,6 +65,8 @@ def _unicode_quote(string):
     if _UNICODE_QUOTE_CHECK.search(string):
         return u'"' + _UNICODE_QUOTE.sub(r'\\\g<0>', string) + u'"'
     return string
+
+
 _UNICODE_QUOTE_CHECK = re.compile(r'[\s"\\,=]', re.U)
 _UNICODE_QUOTE = re.compile(r'["\\]', re.U)
 
@@ -77,6 +81,8 @@ def _unicode_parse_part(string, start):
     if unquoted is not None:
         return unquoted, end
     return u"", end
+
+
 _UNICODE_UNQUOTE = re.compile(r'\\(.)', re.U)
 _UNICODE_PART = re.compile(r'\s*(?:(?:"((?:\\.|[^"])*)")|([^\s"=,]+)|)\s*', re.U)
 

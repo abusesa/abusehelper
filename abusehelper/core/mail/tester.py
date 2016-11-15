@@ -146,5 +146,6 @@ def main():
             else:
                 handle_file(path)
 
+
 if __name__ == "__main__":
     main()

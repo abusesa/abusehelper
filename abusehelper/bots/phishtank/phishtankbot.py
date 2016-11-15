@@ -19,6 +19,8 @@ from abusehelper.core import bot, events, utils
 
 def _replace_non_xml_chars(unicode_obj, replacement=u"\uFFFD"):
     return _NON_XML.sub(replacement, unicode_obj)
+
+
 _NON_XML = re.compile(u"[\x00-\x08\x0B\x0C\x0E-\x1F\uD800-\uDFFF\uFFFE\uFFFF]", re.U)
 
 

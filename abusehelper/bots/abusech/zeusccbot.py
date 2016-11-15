@@ -38,5 +38,6 @@ class ZeusCcBot(AbuseCHFeedBot):
             elif key == "ip address":
                 yield "ip", value
 
+
 if __name__ == "__main__":
     ZeusCcBot.from_command_line().execute()

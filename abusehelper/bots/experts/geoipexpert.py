@@ -129,5 +129,6 @@ class GeoIPExpert(Expert):
             for augmentation in self.geomap(event, self.ip_key):
                 yield idiokit.send(eid, augmentation)
 
+
 if __name__ == "__main__":
     GeoIPExpert.from_command_line().execute()

@@ -24,5 +24,6 @@ class ZeusDropzoneBot(AbuseCHFeedBot):
                 yield "url", value
                 yield host_or_ip_from_url(value)
 
+
 if __name__ == "__main__":
     ZeusDropzoneBot.from_command_line().execute()

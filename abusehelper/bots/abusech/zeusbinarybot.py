@@ -28,5 +28,6 @@ class ZeusBinaryBot(AbuseCHFeedBot):
             elif key == "md5 hash":
                 yield "md5", value
 
+
 if __name__ == "__main__":
     ZeusBinaryBot.from_command_line().execute()

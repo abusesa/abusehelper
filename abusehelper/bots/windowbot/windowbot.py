@@ -98,5 +98,6 @@ class WindowBot(RoomBot):
             to
         )
 
+
 if __name__ == "__main__":
     WindowBot.from_command_line().execute()

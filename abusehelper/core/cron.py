@@ -401,4 +401,5 @@ class CronParser(object):
             results[unit] = ranges
         return Cron(results)
 
+
 parse = CronParser().parse

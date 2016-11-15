@@ -56,5 +56,6 @@ class SpamhausDropBot(bot.PollingBot):
 
             yield idiokit.send(new)
 
+
 if __name__ == "__main__":
     SpamhausDropBot.from_command_line().execute()

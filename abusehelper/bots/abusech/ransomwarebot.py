@@ -63,5 +63,6 @@ class RansomwareTrackerBot(bot.PollingBot):
             _parse()
         )
 
+
 if __name__ == "__main__":
     RansomwareTrackerBot.from_command_line().execute()

@@ -37,5 +37,6 @@ class PalevoCcBot(AbuseCHFeedBot):
             elif key == "ip address":
                 yield "ip", value
 
+
 if __name__ == "__main__":
     PalevoCcBot.from_command_line().execute()

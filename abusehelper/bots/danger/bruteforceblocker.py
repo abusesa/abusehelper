@@ -49,5 +49,6 @@ class BruteForceBlockerBot(bot.PollingBot):
         event.add("feed", "bruteforceblocker")
         yield event
 
+
 if __name__ == "__main__":
     BruteForceBlockerBot.from_command_line().execute()

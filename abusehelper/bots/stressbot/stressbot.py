@@ -19,5 +19,6 @@ class StressBot(bot.FeedBot):
         while True:
             yield idiokit.send(event)
 
+
 if __name__ == "__main__":
     StressBot.from_command_line().execute()

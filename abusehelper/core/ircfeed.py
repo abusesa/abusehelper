@@ -92,5 +92,6 @@ class IRCFeedService(IRCFeedBot):
 
         return event
 
+
 if __name__ == "__main__":
     IRCFeedService.from_command_line().execute()

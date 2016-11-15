@@ -112,5 +112,6 @@ class BridgeBot(bot.Bot):
         except idiokit.Signal:
             pass
 
+
 if __name__ == "__main__":
     BridgeBot.from_command_line().execute()

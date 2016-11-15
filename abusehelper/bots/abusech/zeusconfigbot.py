@@ -26,5 +26,6 @@ class ZeusConfigBot(AbuseCHFeedBot):
                 yield "url", value
                 yield host_or_ip_from_url(value)
 
+
 if __name__ == "__main__":
     ZeusConfigBot.from_command_line().execute()

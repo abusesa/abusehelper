@@ -60,5 +60,6 @@ class Malc0deBot(RSSBot):
 
         return event
 
+
 if __name__ == "__main__":
     Malc0deBot.from_command_line().execute()

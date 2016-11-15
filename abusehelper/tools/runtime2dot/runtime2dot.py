@@ -109,5 +109,6 @@ class DotBot(bot.Bot):
 
         print '}'
 
+
 if __name__ == "__main__":
     DotBot.from_command_line().execute()
