@@ -1,5 +1,9 @@
 # Changelog
 
+### Features
+
+ * Improve the DHO with the "vulnerability" key to help in correlating the vulnerable service reports and "source" to help in better describe aggregated indicators collated by a feeder.
+
 ## 5.2.0 (2016-11-11)
 
 ### Features

@@ -124,11 +124,13 @@ The idea behind the additional attributes is to denote generic metadata about an
 |malware family|A malware family name in lower case.|
 |missing data|If the harmonization is missing a known piece of data, such as an **ip** for example, the reference to this fact may be inserted here.|
 |protocol|The protocol attribute describes the application protocol on top of the transport, which relates to the observed abuse or vulnerable service. I.e. protocol=ssh for SSH brute-forcing attacks is more descriptive than protocol=tcp. In this case the transport protocol should be referenced by that key, i.e. transport ptotocol=tcp.|
+|source|Some of the aggregated feeds, i.e. feeds utilizing indicators not directly from the feeder report a source of this external information. This key can be used to denote those feeder external entities, in the case of blacklist aggregation for example.|
 |status|Observed status of the malicious resource phishing URL, dropzone, c&c, e.g. online, offline.|
 |target|Some sources such as phishing feeds denominate the target of a phishing campaign.|
 |tracking id|Some sources and applications use an identifier to denote a context for an abuse event. Previously, we denoted these with provider specific id keys, such as rtir id, misp id and so on. Since traceability is the common communicative function, we have decided to bundle all these ids under the tracking id key. Please note that the purpose of the "tracking id" key is to link the event into an aggregate context. It is not a unique identifier for a single event. For this purpose you should use the "uuid" key instead.|
 |transport protocol|Some feeds report a protocol, which often denotes the observed transport, e.g. tcp. This should be noted appropriately if the protocol attribute should denote the protocol of a vulnerable service for example.|
 |uuid|[AbuseSA](http://www.abusesa.com) and AbuseHelper are using python uuids to identify abuse events. The python UUIDs are generated based on [RFC4122](http://tools.ietf.org/html/rfc4122) using the uuid.uuid4() function. Please note that the "uuid" serves a different communicative function than the tracking id. The purpose of the uuid is to denote a unique identifier, which uniquely identifies a single event.|
+|vulnerability|Often, it is necessary to denote a short description of a vulnerable service reported by a source. This helps in correlating the vulnerabilities across sources.|
 
 ### Artifact Attributes
 
