@@ -1,7 +1,8 @@
 dependencies:
-  pre:
+  override:
     - pyenv install pypy-4.0.1
     - pyenv local 2.6.8 2.7.10 pypy-4.0.1
+    - pip install tox
 
 test:
   override:
