@@ -16,6 +16,9 @@ import cPickle as pickle
 
 import idiokit
 from idiokit.xmpp import connect
+from idiokit.xmpp.core import XMPPError
+from idiokit.socket import SocketError
+from idiokit.dns import DNSTimeout
 
 from . import log, events, taskfarm, utils, services
 from .. import __version__
@@ -390,7 +393,12 @@ class ServiceBot(XMPPBot):
     @idiokit.stream
     def _run(self):
         self.log.info("Starting service {0!r} version {1}".format(self.bot_name, __version__))
-        self.xmpp = yield self.xmpp_connect()
+        try:
+            self.xmpp = yield self.xmpp_connect()
+        except (SocketError, XMPPError, DNSTimeout) as error:
+            self.log.critical("Failed to connect to XMPP service ({0!r}): {1}".format(
+                              self.xmpp_jid, error))
+            return
 
         service = _Service(self, self.bot_state_file)
 
@@ -402,7 +410,13 @@ class ServiceBot(XMPPBot):
             return
 
         self.log.info("Joining lobby " + repr(self.service_room))
-        self.lobby = yield services.join_lobby(self.xmpp, self.service_room, self.bot_name)
+        try:
+            self.lobby = yield services.join_lobby(self.xmpp, self.service_room, self.bot_name)
+        except (SocketError, XMPPError) as error:
+            self.log.critical("Failed to join lobby ({0!r}): {1}".format(
+                              self.service_room, error))
+            return
+
         self.log.addHandler(log.RoomHandler(self.lobby))
 
         self.log.info("Offering service " + repr(self.bot_name))
