@@ -18,7 +18,7 @@ import idiokit
 from idiokit.xmpp import connect
 from idiokit.xmpp.core import XMPPError
 from idiokit.socket import SocketError
-from idiokit.dns import DNSTimeout
+from idiokit.dns import DNSTimeout, DNSError
 
 from . import log, events, taskfarm, utils, services
 from .. import __version__
@@ -395,7 +395,7 @@ class ServiceBot(XMPPBot):
         self.log.info("Starting service {0!r} version {1}".format(self.bot_name, __version__))
         try:
             self.xmpp = yield self.xmpp_connect()
-        except (SocketError, XMPPError, DNSTimeout) as error:
+        except (SocketError, XMPPError, DNSTimeout, DNSError) as error:
             self.log.critical("Failed to connect to XMPP service ({0!r}): {1}".format(
                               self.xmpp_jid, error))
             return
@@ -422,6 +422,9 @@ class ServiceBot(XMPPBot):
         self.log.info("Offering service " + repr(self.bot_name))
         try:
             yield self.lobby.offer(self.bot_name, service)
+        except (SocketError, XMPPError) as error:
+            self.log.critical("Lost lobby: {0}".format(str(error)))
+            raise services.Stop()
         finally:
             self.log.info("Retired service " + repr(self.bot_name))
 
