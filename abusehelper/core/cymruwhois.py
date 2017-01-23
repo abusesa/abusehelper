@@ -51,9 +51,10 @@ def _split(txt_results, keys):
 class ASNameLookup(object):
     _keys = (None, None, None, "as allocated", "as name")
 
-    def __init__(self, resolver=None, cache_time=4 * 60 * 60):
+    def __init__(self, resolver=None, cache_time=4 * 60 * 60, catch_error=True):
         self._resolver = resolver
         self._cache = utils.TimedCache(cache_time)
+        self._catch_error = catch_error
 
     @idiokit.stream
     def lookup(self, asn):
@@ -71,7 +72,10 @@ class ASNameLookup(object):
                 "AS{0}.asn.cymru.com".format(asn),
                 resolver=self._resolver)
         except dns.DNSError:
-            idiokit.stop(())
+            if self._catch_error:
+                idiokit.stop(())
+            else:
+                raise
 
         results = _split(txt_results, self._keys)
         self._cache.set(asn, results)
@@ -81,9 +85,10 @@ class ASNameLookup(object):
 class OriginLookup(object):
     _keys = ("asn", "bgp prefix", "cc", "registry", "bgp prefix allocated")
 
-    def __init__(self, resolver=None, cache_time=4 * 60 * 60):
+    def __init__(self, resolver=None, cache_time=4 * 60 * 60, catch_error=True):
         self._resolver = resolver
         self._cache = utils.TimedCache(cache_time)
+        self._catch_error = catch_error
 
     @idiokit.stream
     def _lookup(self, cache_key, query):
@@ -94,7 +99,10 @@ class OriginLookup(object):
         try:
             txt_results = yield dns.txt(query, resolver=self._resolver)
         except dns.DNSError:
-            idiokit.stop(())
+            if self._catch_error:
+                idiokit.stop(())
+            else:
+                raise
 
         results = []
         for result in _split(txt_results, self._keys):
