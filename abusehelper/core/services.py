@@ -274,6 +274,13 @@ class Service(object):
         self.state = dict()
 
         if state_file is not None:
+            state_dir = os.path.dirname(os.path.abspath(state_file))
+            try:
+                os.makedirs(state_dir)
+            except OSError, (code, error_str):
+                if code != errno.EEXIST:
+                    raise
+
             self.file = open_file(state_file)
             try:
                 if not lock_file_nonblocking(self.file):

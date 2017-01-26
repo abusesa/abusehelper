@@ -85,7 +85,15 @@ class Instance(object):
     @property
     def logpath(self):
         path, filename = os.path.split(self.path)
-        return os.path.join(path, "log", filename + ".log")
+
+        dir_name = os.path.join(path, "log")
+        try:
+            os.makedirs(dir_name)
+        except OSError, (code, error_str):
+            if code != errno.EEXIST:
+                raise
+
+        return os.path.join(dir_name, filename + ".log")
 
     @property
     def is_running(self):
