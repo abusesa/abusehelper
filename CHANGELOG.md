@@ -1,6 +1,6 @@
 # Changelog
 
-## 5.3.0 (Not released)
+## 5.3.0 (2017-02-17)
 
 ### Features
 
