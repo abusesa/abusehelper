@@ -4,7 +4,13 @@
 
 ### Features
 
+ * Add support for DataPlane feeds
  * Improve the DHO with the "vulnerability" key to help in correlating the vulnerable service reports and "source" to help in better describe aggregated indicators collated by a feeder.
+
+### Removed
+
+ * Remove support for Dragon Research Group's feeds
+ * Remove support for AutoShun feed
 
 ## 5.2.0 (2016-11-11)
 
