@@ -1,7 +1,7 @@
 """
 Feed handler for bruteforceblocker list in danger.rulez.sk.
 
-Maintainer: Codenomicon <clarified@codenomicon.com>
+Maintainer: AbuseSA team <contact@abusesa.com>
 """
 
 import re
