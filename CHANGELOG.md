@@ -1,5 +1,7 @@
 # Changelog
 
+## 5.3.0 (Not released)
+
 ### Features
 
  * Improve the DHO with the "vulnerability" key to help in correlating the vulnerable service reports and "source" to help in better describe aggregated indicators collated by a feeder.
@@ -7,11 +9,13 @@
 ## 5.2.0 (2016-11-11)
 
 ### Features
+
  * Add drop_older_than parameter for bots, which can be used to ignore too old events ([debd818] (https://github.com/abusesa/abusehelper/commit/debd818aec929864be24e580ff09b99d6abb42ea))
 
 ## 5.1.0 (2016-10-28)
 
 ### Features
+
  * Add log level option for bots ([#80](https://github.com/abusesa/abusehelper/pull/80)).
 
 ### Fixes
