@@ -5,6 +5,8 @@
 ### Features
 
  * Add support for DataPlane feeds
+ * Improve usability by creating required directories automatically ([#85](https://github.com/abusesa/abusehelper/pull/85))
+ * Improve robustness and add more human readable error messages ([#86](https://github.com/abusesa/abusehelper/pull/86))
  * Improve the DHO with the "vulnerability" key to help in correlating the vulnerable service reports and "source" to help in better describe aggregated indicators collated by a feeder.
 
 ### Removed
