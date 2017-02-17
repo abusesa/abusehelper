@@ -1,7 +1,7 @@
 """
 OpenBL bot
 
-Maintainer: Codenomicon <clarified@codenomicon.com>
+Maintainer: AbuseSA team <contact@abusesa.com>
 """
 
 import idiokit

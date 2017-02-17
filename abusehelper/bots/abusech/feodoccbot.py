@@ -1,7 +1,7 @@
 """
 abuse.ch Feodo RSS feed bot.
 
-Maintainer: Codenomicon <clarified@codenomicon.com>
+Maintainer: AbuseSA team <contact@abusesa.com>
 """
 
 from abusehelper.core import bot
