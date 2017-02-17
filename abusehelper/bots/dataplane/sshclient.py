@@ -12,4 +12,4 @@ class DataplaneSshclientBot(DataplaneBot):
 
 
 if __name__ == "__main__":
-    DataplaneSshclienthBot.from_command_line().execute()
+    DataplaneSshclientBot.from_command_line().execute()
