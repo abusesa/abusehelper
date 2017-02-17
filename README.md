@@ -29,4 +29,4 @@ The [AbuseHelper Community](https://bitbucket.org/ahcommunity/) repository build
 
 ## License
 
-Files are (c) respective copyright holders if named in the specific file, everything else is current (c) by Codenomicon Ltd. Everything is licensed under [MIT license](http://www.opensource.org/licenses/mit-license.php), see [LICENSE](./LICENSE).
+Files are (c) respective copyright holders if named in the specific file, everything else is current (c) by Synopsys, Inc. Everything is licensed under [MIT license](http://www.opensource.org/licenses/mit-license.php), see [LICENSE](./LICENSE).
