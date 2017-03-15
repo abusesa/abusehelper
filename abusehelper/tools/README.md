@@ -57,7 +57,7 @@ A tool that reads AbuseHelper events from an XMPP room and writes them to STDOUT
 ### Usage
 
 ```ShellSession
-$ abuseheleper.tools.receiver XMPP_JID ROOM
+$ abusehelper.tools.receiver XMPP_JID ROOM
 ```
 
 Where:
@@ -94,5 +94,5 @@ for line in sys.stdin:
 Then you can use the script to consume data from the channel like this:
 
 ```ShellSession
-$ python -m abusehelper.tools.sender user@xmpp.example.com my.room | python myconsumer.py
+$ python -m abusehelper.tools.receiver user@xmpp.example.com my.room | python myconsumer.py
 ```
