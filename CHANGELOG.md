@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.1 (2017-03-31)
+
+### Fixes
+
+ * Update the VXVault feed URL
+
 ## 5.3.0 (2017-02-17)
 
 ### Features
