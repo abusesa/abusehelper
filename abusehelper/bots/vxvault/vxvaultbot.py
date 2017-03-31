@@ -10,7 +10,7 @@ import urlparse
 from abusehelper.core import utils, bot, events
 
 
-FEED_URL = "http://vxvault.siri-urz.net/URL_List.php"
+FEED_URL = "http://vxvault.net/URL_List.php"
 
 
 def i_am_a_name(string):
