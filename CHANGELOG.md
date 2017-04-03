@@ -1,5 +1,9 @@
 # Changelog
 
+### Removed
+
+ * Remove support for abuse.ch's Palevo Tracker
+
 ## 5.3.1 (2017-03-31)
 
 ### Fixes
