@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.4.0
+
+### Features
+
+ * Add support for DataPlane's VNC RFB feed
+ 
+### Fixes
+
+ * Use "malware family" when creating description in abuse.ch's feeds
+
 ### Removed
 
  * Remove support for abuse.ch's Palevo Tracker
@@ -46,10 +56,10 @@
 
  * Fixed the core keys and values to conform with the DHO, Data Harmonization Ontology.
  * Changes to "type" values:
-  * "malware" -> "malware url"
-  * "exploit" -> "exploit url"
+   * "malware" -> "malware url"
+   * "exploit" -> "exploit url"
  * Changes to keys:
-  * "malware" -> "malware family"
+   * "malware" -> "malware family"
 
 ### Deprecations
 
