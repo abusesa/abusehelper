@@ -1,5 +1,9 @@
 # Changelog
 
+### Removed
+
+ * Remove support for OpenBL feed
+
 ## 5.4.0 (2017-05-12)
 
 ### Features
