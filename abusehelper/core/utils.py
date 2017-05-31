@@ -14,8 +14,16 @@ import collections
 import email.parser
 import cPickle as pickle
 
+try:
+    from ssl import create_default_context, CertificateError
+except ImportError:
+    create_default_context = None
+
+    class CertificateError(Exception):
+        pass
+
 import idiokit
-from idiokit.ssl import ca_certs, match_hostname
+from idiokit.ssl import ca_certs, match_hostname, SSLCertificateError
 
 from idiokit import heap
 from cStringIO import StringIO
@@ -136,13 +144,27 @@ class _CustomHTTPSConnection(httplib.HTTPConnection):
         httplib.HTTPConnection.connect(self)
 
         with ca_certs(self.ca_certs) as certs:
-            self.sock = ssl.wrap_socket(
-                self.sock,
-                certfile=self.certfile,
-                keyfile=self.keyfile,
-                cert_reqs=ssl.CERT_REQUIRED if self.require_cert else ssl.CERT_NONE,
-                ca_certs=certs
-            )
+            if create_default_context:
+                context = create_default_context(cafile=certs)
+                context.check_hostname = self.require_cert
+                context.verify_mode = ssl.CERT_REQUIRED if self.require_cert else ssl.CERT_NONE
+
+                if self.certfile and self.keyfile:
+                    context.load_cert_chain(certfile=self.certfile,
+                                            keyfile=self.keyfile)
+
+                self.sock = context.wrap_socket(
+                    self.sock,
+                    server_hostname=self.host if not self._tunnel_host else self._tunnel_host
+                )
+            else:
+                self.sock = ssl.wrap_socket(
+                    self.sock,
+                    certfile=self.certfile,
+                    keyfile=self.keyfile,
+                    cert_reqs=ssl.CERT_REQUIRED if self.require_cert else ssl.CERT_NONE,
+                    ca_certs=certs
+                )
 
         if self.require_cert:
             hostname = self.host if not self._tunnel_host else self._tunnel_host
@@ -254,6 +276,8 @@ def fetch_url(
         if _is_timeout(error):
             raise FetchUrlTimeout("fetching URL timed out")
         raise FetchUrlFailed(str(error))
+    except CertificateError as error:
+        raise SSLCertificateError(str(error))
     except httplib.HTTPException as error:
         raise FetchUrlFailed(str(error))
 
