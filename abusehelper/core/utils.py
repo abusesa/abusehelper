@@ -143,21 +143,25 @@ class _CustomHTTPSConnection(httplib.HTTPConnection):
     def connect(self):
         httplib.HTTPConnection.connect(self)
 
-        with ca_certs(self.ca_certs) as certs:
-            if create_default_context:
-                context = create_default_context(cafile=certs)
-                context.check_hostname = self.require_cert
-                context.verify_mode = ssl.CERT_REQUIRED if self.require_cert else ssl.CERT_NONE
+        if create_default_context:
+            context = create_default_context()
 
-                if self.certfile and self.keyfile:
-                    context.load_cert_chain(certfile=self.certfile,
-                                            keyfile=self.keyfile)
+            if self.ca_certs:
+                context.load_verify_locations(cafile=self.ca_certs)
 
-                self.sock = context.wrap_socket(
-                    self.sock,
-                    server_hostname=self.host if not self._tunnel_host else self._tunnel_host
-                )
-            else:
+            context.check_hostname = self.require_cert
+            context.verify_mode = ssl.CERT_REQUIRED if self.require_cert else ssl.CERT_NONE
+
+            if self.certfile and self.keyfile:
+                context.load_cert_chain(certfile=self.certfile,
+                                        keyfile=self.keyfile)
+
+            self.sock = context.wrap_socket(
+                self.sock,
+                server_hostname=self.host if not self._tunnel_host else self._tunnel_host
+            )
+        else:
+            with ca_certs(self.ca_certs) as certs:
                 self.sock = ssl.wrap_socket(
                     self.sock,
                     certfile=self.certfile,
@@ -166,10 +170,10 @@ class _CustomHTTPSConnection(httplib.HTTPConnection):
                     ca_certs=certs
                 )
 
-        if self.require_cert:
-            hostname = self.host if not self._tunnel_host else self._tunnel_host
-            cert = self.sock.getpeercert()
-            match_hostname(cert, hostname)
+            if self.require_cert:
+                hostname = self.host if not self._tunnel_host else self._tunnel_host
+                cert = self.sock.getpeercert()
+                match_hostname(cert, hostname)
 
 
 class _CustomHTTPSHandler(urllib2.HTTPSHandler):
