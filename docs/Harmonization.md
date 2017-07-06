@@ -167,7 +167,9 @@ The **type** values offer a data-backed taxonomy for classifying abuse and vulne
 
 |attribute|description|
 --- | --- |
-|backdoor|This refers to hosts, which have been compromised and backdoored with a remote access or trojan in the traditional sense.|
+|artifact|Artifacts refer to host-based indicators, such as checksums, file paths.|
+|attribution|Attribution refers to indicators, which can be attributed to malicious activity without a specific functional category such as a command and control server.|
+|backdoor|Backdoor indicators refer to hosts, which have been compromised and/or backdoored by a third party.|
 |blacklist|Some sources provide blacklists, which clearly refer to abusive behavior, such as spamming, but fail to denote the exact reason why a given identity has been blacklisted. The reason may be that the justification is anecdotal or missing entirely. This type should only be used if the typing fits the definition of a blacklist, but an event specific denomination is not possible for one reason or another.|
 |botnet drone|This is the most numerous type of abuse, as it refers to compromised computers calling out to a command and control mechanism.|
 |brute-force|This type refers to a machine, which has been observed to perform brute-force attacks over a given application protocol, e.g. ssh|
