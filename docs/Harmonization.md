@@ -134,11 +134,24 @@ The idea behind the additional attributes is to denote generic metadata about an
 
 ### Artifact Attributes
 
+Host-based artifacts do play a role in abuse handling and having means to relay those through automation in a uniform manner is essential.
+
+At present, two of the main ways of doing that seem to be:
+
+ * hashes of malicious content
+ * rule-based description of malicious content.
+
+Below, we allocate four key-value pairs with that purpose in mind:
+
+ * two for artifact content
+ * two for artifact hashes.
+
 |attribute|description|
 --- | --- |
-|artifact hash type|The hashing algorithm used for artifact hash type above, be it MD5 or SHA-* etc.|
+|artifact content|A formal or rule-based description of malicious content.|
+|artifact content type|Type of formal description for artifact content in question, e.g. a Yara rule or a Suricata rule.|
 |artifact hash|A string depicting a checksum for a file, be it a malware sample for example.|
-|artifact version|A version string for an identified artifact generation, e.g. a crime-ware kit.|
+|artifact hash type|The hashing algorithm used for artifact hash type above, be it MD5 or SHA-* etc.|
 
 ## Classification Attributes
 
