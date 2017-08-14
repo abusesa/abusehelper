@@ -134,11 +134,24 @@ The idea behind the additional attributes is to denote generic metadata about an
 
 ### Artifact Attributes
 
+Host-based artifacts do play a role in abuse handling and having means to relay those through automation in a uniform manner is essential.
+
+At present, two of the main ways of doing that seem to be:
+
+ * hashes of malicious content
+ * rule-based description of malicious content.
+
+Below, we allocate four key-value pairs with that purpose in mind:
+
+ * two for artifact content
+ * two for artifact hashes.
+
 |attribute|description|
 --- | --- |
-|artifact hash type|The hashing algorithm used for artifact hash type above, be it MD5 or SHA-* etc.|
+|artifact content|A formal or rule-based description of malicious content.|
+|artifact content type|Type of formal description for artifact content in question, e.g. a Yara rule or a Suricata rule.|
 |artifact hash|A string depicting a checksum for a file, be it a malware sample for example.|
-|artifact version|A version string for an identified artifact generation, e.g. a crime-ware kit.|
+|artifact hash type|The hashing algorithm used for artifact hash type above, be it MD5 or SHA-* etc.|
 
 ## Classification Attributes
 
@@ -167,7 +180,9 @@ The **type** values offer a data-backed taxonomy for classifying abuse and vulne
 
 |attribute|description|
 --- | --- |
-|backdoor|This refers to hosts, which have been compromised and backdoored with a remote access or trojan in the traditional sense.|
+|artifact|Artifacts refer to host-based indicators, such as checksums, file paths.|
+|attribution|Attribution refers to indicators, which can be attributed to malicious activity without a specific functional category such as a command and control server.|
+|backdoor|Backdoor indicators refer to hosts, which have been compromised and/or backdoored by a third party.|
 |blacklist|Some sources provide blacklists, which clearly refer to abusive behavior, such as spamming, but fail to denote the exact reason why a given identity has been blacklisted. The reason may be that the justification is anecdotal or missing entirely. This type should only be used if the typing fits the definition of a blacklist, but an event specific denomination is not possible for one reason or another.|
 |botnet drone|This is the most numerous type of abuse, as it refers to compromised computers calling out to a command and control mechanism.|
 |brute-force|This type refers to a machine, which has been observed to perform brute-force attacks over a given application protocol, e.g. ssh|
