@@ -68,7 +68,7 @@ class AbuseCHFeedBot(RSSBot):
         if not types:
             return
 
-        malwares = "/".join(event.values("malware") or [u"malware"])
+        malwares = "/".join(event.values("malware family") or [u"malware"])
         yield u"This host is most likely hosting a {0} {1}".format(malwares, types)
 
     def parse_link(self, link):

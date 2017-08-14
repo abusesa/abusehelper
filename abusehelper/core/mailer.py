@@ -502,6 +502,7 @@ class MailerService(ReportBot):
                         recipients=recipient_string,
                         error=utils.format_exception(exc)
                     ))
+                    server = None
                     if retries >= 1:
                         self.log.info(u"Retrying sending in 60 seconds")
                         self.requeue(60.0, retries=retries - 1)
@@ -517,7 +518,8 @@ class MailerService(ReportBot):
                         event=event.union(status="sent")
                     )
             finally:
-                yield idiokit.thread(server.quit)
+                if server:
+                    yield idiokit.thread(server.quit)
 
         idiokit.stop(sent)
 

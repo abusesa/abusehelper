@@ -104,7 +104,7 @@ class Session(Pipeable):
             return NotImplemented
         if self.service != other.service:
             return False
-        if self.path != self.path:
+        if self.path != other.path:
             return False
         return self._conf == other._conf
 
