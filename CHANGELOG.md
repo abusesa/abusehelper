@@ -4,7 +4,7 @@
 
 ### Features
 
- * Add support fot DataPlane's DNS feeds.
+ * Add support for DataPlane's DNS feeds.
  * Improve fetch_url():
    * Use ssl.create_defaut_context() when available (Python 2.7.9 or newer). This
 enables SNI support and tries to choose reasonably secure protocol and cipher
