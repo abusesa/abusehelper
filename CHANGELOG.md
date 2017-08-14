@@ -1,8 +1,26 @@
 # Changelog
 
+## 5.5.0 (2017-08-14)
+
+### Features
+
+ * Add support fot DataPlane's DNS feeds.
+ * Improve fetch_url():
+  * Use ssl.create_defaut_context() when available (Python 2.7.9 or newer). This
+enables SNI support and tries to choose reasonably secure protocol and cipher
+settings.
+  * Use Python's builtin functionality for finding and loading system's CA bundle
+when running on modern Python (2.7.9+).
+ * Improve the description of host-based artifacts in Data Harmonization Ontology.
+ 
+### Fixes
+
+ * Fix comparison of Session() objects.
+ * Fix crash in mailer if connection is lost when sending mail.
+
 ### Removed
 
- * Remove support for OpenBL feed
+ * Remove support for OpenBL feed.
 
 ## 5.4.0 (2017-05-12)
 
