@@ -26,6 +26,8 @@ class FeodoCcBot(AbuseCHFeedBot):
             if key == "version":
                 yield "malware family", "feodo." + value.strip().lower()
                 got_version = True
+            elif key == "status":
+                yield "status", value
             elif key == "host":
                 yield host_or_ip(value)
 
