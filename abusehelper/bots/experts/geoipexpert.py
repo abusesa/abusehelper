@@ -42,7 +42,7 @@ def load_geodb(path, log=None):
 
         latitude = record.location.latitude
         longitude = record.location.longitude
-        if latitude and longitude:
+        if latitude or longitude:
             result["latitude"] = [unicode(latitude)]
             result["longitude"] = [unicode(longitude)]
 
@@ -65,9 +65,9 @@ def load_geodb(path, log=None):
         if geoip_cc:
             result["geoip cc"] = [geoip_cc]
 
-        latitude = record.get("latitude", None)
-        longitude = record.get("longitude", None)
-        if latitude and longitude:
+        latitude = record.get("latitude", 0)
+        longitude = record.get("longitude", 0)
+        if latitude or longitude:
             result["latitude"] = [unicode(latitude)]
             result["longitude"] = [unicode(longitude)]
 
