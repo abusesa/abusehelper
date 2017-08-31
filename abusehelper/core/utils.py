@@ -308,7 +308,7 @@ class _CSVReader(object):
         self._lines = lines
         self._last_lines = []
         self._keys = keys
-        self._decode = force_decode if charset is None else lambda x: x.decode(charset)
+        self._decode = force_decode if charset is None else lambda x: x.decode(charset, errors="replace")
 
     def _iterlines(self):
         r"""
