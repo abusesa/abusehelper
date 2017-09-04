@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.5.2 (2017-09-04)
+
+### Fixes
+
+ * Fix CSVReader to work also using Python 2.6.
+
 ## 5.5.1 (2017-09-04)
 
 ### Fixes
