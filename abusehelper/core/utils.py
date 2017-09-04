@@ -302,6 +302,8 @@ class _CSVReader(object):
     r"""
     >>> list(_CSVReader(["\"x\",\"y\""]))
     [[u'x', u'y']]
+    >>> list(_CSVReader(["\xff,foo,bar"], charset="utf-8"))
+    [[u'\ufffd', u'foo', u'bar']]
     """
 
     def __init__(self, lines, charset=None, **keys):
