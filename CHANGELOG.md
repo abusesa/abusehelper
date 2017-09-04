@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.1 (2017-09-04)
+
+### Fixes
+
+ * Include ```status``` in abuse.ch's Feodo C&C feed.
+ * GeoIP augmentation: Add coordinates even if one of them is zero.
+ * Handle malformed input data using ```replace```mode in CSVReader.
+
 ## 5.5.0 (2017-08-14)
 
 ### Features
