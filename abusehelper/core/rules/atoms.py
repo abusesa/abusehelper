@@ -71,7 +71,10 @@ class RegExp(Atom):
         Atom.init(self)
 
         flags = re.U | re.S | (re.I if ignore_case else 0)
-        self._regexp = re.compile(pattern, flags)
+        try:
+            self._regexp = re.compile(pattern, flags)
+        except re.error as error:
+            raise ValueError(error)
 
     def unique_key(self):
         return self._regexp.pattern, bool(self._regexp.flags & re.I)
