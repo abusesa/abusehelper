@@ -65,7 +65,7 @@ class RegExp(Atom):
 
     @property
     def ignore_case(self):
-        return self._regexp.flags & re.I != 0
+        return self._regexp.flags & re.IGNORECASE != 0
 
     def init(self, pattern, ignore_case=False):
         Atom.init(self)
@@ -81,7 +81,7 @@ class RegExp(Atom):
 
     def __repr__(self):
         pattern = self._regexp.pattern
-        if self._regexp.flags & re.I == re.I:
+        if self._regexp.flags & re.IGNORECASE == re.I:
             return Atom.__repr__(self, pattern, ignore_case=True)
         return Atom.__repr__(self, pattern)
 
