@@ -6,4 +6,5 @@ dependencies:
 
 test:
   override:
-    - tox -- --junitxml=$CIRCLE_TEST_REPORTS/pytest/'$TOXENV'.xml
+    - tox -e py26,py27,pypy -- --junitxml=$CIRCLE_TEST_REPORTS/pytest/'$TOXENV'.xml
+    - tox -e flake8
