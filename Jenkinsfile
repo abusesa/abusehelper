@@ -20,7 +20,7 @@ pipeline {
     }
     stage('Linter') {
       steps {
-        sh 'tox --recreate -e flake8'
+        sh 'tox --recreate -e flake8 -- --output-file=flake8.txt'
       }
     }
     stage('Coverage') {
@@ -44,15 +44,32 @@ pipeline {
         }
         textpercentage = "Coverage: " + Math.round(percentage).toString() + "%";
         manager.addShortText(textpercentage, "black", bgcolour, "2px", "black");
+
+        if (currentBuild.getPreviousBuild()?.getResult().toString() != "SUCCESS") {
+          emailext body: '''${SCRIPT, template="abusesa-html.template"}''',
+                 recipientProviders: [[$class: 'DevelopersRecipientProvider'],
+                                      [$class: 'CulpritsRecipientProvider']],
+                 replyTo: 'vuolteen@abusesa.com',
+                 subject: '[Jenkins]: ${JOB_NAME} ${BUILD_DISPLAY_NAME} - FIXED',
+                 to: 'vuolteen@abusesa.com',
+                 mimeType: 'text/html'
+        }
       }
     }
     failure {
-      emailext body: '${BUILD_URL}', recipientProviders: [[$class: 'DevelopersRecipientProvider']], replyTo: 'vuolteen@abusesa.com', subject: 'FAILURE: ${JOB_NAME} ${BUILD_DISPLAY_NAME}', to: 'vuolteen@abusesa.com'
+      emailext body: '''${SCRIPT, template="abusesa-html.template"}''',
+               recipientProviders: [[$class: 'DevelopersRecipientProvider'],
+                                    [$class: 'CulpritsRecipientProvider']],
+               replyTo: 'vuolteen@abusesa.com',
+               subject: '[Jenkins]: ${JOB_NAME} ${BUILD_DISPLAY_NAME} - FAILURE',
+               to: 'vuolteen@abusesa.com',
+               mimeType: 'text/html'
     }
     always {
+	  sh 'if [[ -s flake8.txt ]]; then mv flake8.txt results/flake8.log; fi'
       sh 'pyenv local --unset'
       archiveArtifacts artifacts: 'results/*'
-      junit '**/results/*.xml'
+      junit '**/results/*-results.xml'
       step([$class: 'CoberturaPublisher', autoUpdateHealth: false, autoUpdateStability: false, coberturaReportFile: '**/results/cov.xml', failNoReports: false, failUnhealthy: false, failUnstable: false, maxNumberOfBuilds: 0, onlyStable: false, sourceEncoding: 'ASCII', zoomCoverageChart: false])
       deleteDir()
     }
