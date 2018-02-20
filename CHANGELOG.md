@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.5.3 (2018-02-20)
+
+### Fixes
+
+ * Raise ValueError if RegExp pattern is invalid.
+
 ## 5.5.2 (2017-09-04)
 
 ### Fixes
