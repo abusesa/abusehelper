@@ -1,18 +1,18 @@
 # Data Harmonization Ontology (TLP White)
 
-What is data harmonization? What is an ontology? The purpose of this document is to help you better deal with the complexity that arises from processing threat intelligence from heterogeneous sources. Data harmonization is a contract to call same things always by the same name, i.e. an ip address is always referred to as an **ip**.
+What is data harmonization? What is an ontology? The purpose of this document is to help you better deal with the complexity that arises from processing threat intelligence from heterogeneous sources. Data harmonization is a contract to call same things always by the same name and not to call different things by the same name. i.e. an ip address is always referred to as an **ip** and a functional **type** always represents a functional classification of abuse, vulnerability or policy violation.
 
-With data harmonization briefly visited, we move on to defining an ontology. An ontology in our case is a higher level abstraction of a language, where each lexeme addresses an observable characteristic of either an Indicator of Compromise, IoC, or a vulnerable service discovered through actively scanning the Internet. Our grammar is thus expressed as sets of key-value pairs, which are straightforward to serialize into AbuseHelper events.
+With data harmonization briefly visited, we move on to defining an ontology. An ontology in our case is a higher level abstraction of a language, where each lexeme addresses an observable characteristic of either an Indicator of Compromise, IoC, a vulnerable service discovered through actively scanning the Internet or policy violation defined by an information security policy. Our grammar is thus expressed as sets of key-value pairs, which are straightforward to serialize into events.
 
 Below, we will reference events as collections of ontology driven key-value pairs. Please note that we use the term **key** to denote an event schema and the term **attribute** to denote an ontology lexeme.
 
 ## Ontology, Schema or Taxonomy
 
-As stated above, an ontology is a higher level abstraction of the semantic characteristics of an object. A schema, on the other hand, is a technical contract to transfer or store data in a prescribed format. Both are needed, but we see schemas as derivatives of an underlying semantic representation, which in our case is an ontology. In contrast with hierarchical taxonomies, an ontology allows for lexemes outside the core language, as long as the definition does not duplicate or redefine that of an already established one, which calls for harmonization. Consequently, the traditional way of dealing with the unknown in taxonomies has been the introduction of the **other** category, which simply fails over time.
+As stated above, an ontology is a higher level abstraction of the semantic characteristics of an observable. A schema, on the other hand, is a technical contract to transfer or store data in a prescribed format. Both are needed, but we see schemas as derivatives of an underlying semantic representation, which in our case is an ontology. In contrast with hierarchical taxonomies, an ontology allows for lexemes outside the core language, as long as the definition does not duplicate or redefine that of an already established one, which calls for harmonization. Consequently, the traditional way of dealing with the unknown in taxonomies has been the introduction of the **other** category, which simply fails over time.
 
 # Core Attributes
 
-For an abuse or vulnerable service event to be actionable and able to reach the right end point recipient, various keys need to be present.
+For an abuse, vulnerable service or policy violation event to be actionable and able to reach the right end point recipient, various keys need to be present and defined in the correct manner.
 
 ## Feed Attributes
 
@@ -22,10 +22,11 @@ For an abuse or vulnerable service event to be actionable and able to reach the 
 |feed code|Alternative code name for the feed in case it cannot be shared e.g. dgfs, hsdag etc.|
 |feeder|Name of the organization providing one or more data feeds, e.g. shadowserver."|
 |feed url|The URL of a given abuse feed, where applicable.|
+|source|Often a feed may be a collection of events from various sources. In this case it may be prudent to identify the different sources, which the feed is comprised of.
 
 ## Time
 
-All the timestamps should be normalized to UTC. If the source reports only a date, please do not invent timestamps.
+All time stamps should be normalized to UTC. If the source reports only a date, you should not invent a time stamp.
 
 |attribute|description|
 --- | --- |
@@ -85,10 +86,11 @@ Since many of the sources report events related to a compromised machines, such 
 |os name|Operating system name.|
 |os version|Operating system version.|
 |user agent|Some feeds report the user agent string used by the host to access a malicious resource, such as a command and control server.|
+|username|A username of a user account.|
 
 ### Reported Identity
 
-As stated above, each abuse handling organization should define a policy, which attributes to use as the primary elements describing a given event. Often, the sources have performed their attribution, but you may choose to correlate their attributive elements against your own or those of a third party. In practice, this means that your sanitation should prefix the keys with the **reported** keyword, to denote that you have decided to perform the attribution on your own. The list below is not comprehensive, rather than a list of common things you may want to correlate yourself. Moreover, if you choose to perform your own attribution, the **observation time** will become your authoritative point of reference in relation to the correlated attributes.
+As stated above, each abuse handling organization should define a policy, which outlines the attributes used as primary elements of an observation. Often, the sources have performed their own attribution, but you may choose to correlate their attributive elements against your own or those of a third party. In practice, this means that your harmonization process should prefix the keys with the **reported** keyword, to denote that you have decided to perform the attribution on your own. The list below is not comprehensive, rather than a list of common things you may want to observe yourself. Moreover, if you choose to perform your own attribution, the **observation time** will become your authoritative point of reference in relation to the new attributes.
 
 |attribute|description|
 --- | --- |
@@ -99,7 +101,7 @@ As stated above, each abuse handling organization should define a policy, which 
 
 ### Geolocation
 
-We recognize that ip geolocation is not an exact science and analysis of the abuse data has shown that different sources attribution sources have different opinions of the geolocation of an ip. This is why we recommend to enrich the data with as many sources as you have available and make the decision which value to use for the cc attribute based on those answers.
+We recognize that ip geolocation is not an exact science and our analysis has shown that attribution sources have varying opinions about the physical location of an ip address at a given time. This is why we recommend to augment the data with as many sources as you have available and make a decision which source to use for the cc attribute based on those answers.
 
 |attribute|description|
 --- | --- |
@@ -111,7 +113,7 @@ We recognize that ip geolocation is not an exact science and analysis of the abu
 
 ## Additional Attributes
 
-The idea behind the additional attributes is to denote generic metadata about an event, which complements the identity or temporal information about the victim, vulnerable service or a piece of compromised infrastructure. The purpose of this information is to give more context to the abuse type denoted by the "type" attribute.
+The idea behind the additional attributes is to denote generic event metadata, which complements the identity or temporal information about the victim, vulnerable service or a piece of compromised infrastructure. In addition, the purpose of this information is to give more context to the abuse type denoted by the "type" attribute.
 
 |attribute|description|
 --- | --- |
@@ -130,26 +132,20 @@ The idea behind the additional attributes is to denote generic metadata about an
 |tracking id|Some sources and applications use an identifier to denote a context for an abuse event. Previously, we denoted these with provider specific id keys, such as rtir id, misp id and so on. Since traceability is the common communicative function, we have decided to bundle all these ids under the tracking id key. Please note that the purpose of the "tracking id" key is to link the event into an aggregate context. It is not a unique identifier for a single event. For this purpose you should use the "uuid" key instead.|
 |transport protocol|Some feeds report a protocol, which often denotes the observed transport, e.g. tcp. This should be noted appropriately if the protocol attribute should denote the protocol of a vulnerable service for example.|
 |uuid|[AbuseSA](http://www.abusesa.com) and AbuseHelper are using python uuids to identify abuse events. The python UUIDs are generated based on [RFC4122](http://tools.ietf.org/html/rfc4122) using the uuid.uuid4() function. Please note that the "uuid" serves a different communicative function than the tracking id. The purpose of the uuid is to denote a unique identifier, which uniquely identifies a single event.|
+|uri|Often, the feeders present URI references in their feeds instead of URLs for various technical reasons. A URI reference is often missing the scheme element, even if the authority and path elements are present as defined by the RFC3986. We use the uri attribute to denote URIs and URI references for brevity.
 |vulnerability|Often, it is necessary to denote a short description of a vulnerable service reported by a source. This helps in correlating the vulnerabilities across sources.|
 
 ### Artifact Attributes
 
-Host-based artifacts do play a role in abuse handling and having means to relay those through automation in a uniform manner is essential.
-
-At present, two of the main ways of doing that seem to be:
+Host-based artifacts do play a role in incident handling and having means to relay those through automation in a uniform manner is essential.  At present, we identify two main categories for artifacts:
 
  * hashes of malicious content
- * rule-based description of malicious content.
-
-Below, we allocate four key-value pairs with that purpose in mind:
-
- * two for artifact content
- * two for artifact hashes.
+ * rule-based descriptions of malicious content.
 
 |attribute|description|
 --- | --- |
 |artifact content|A formal or rule-based description of malicious content.|
-|artifact content type|Type of formal description for artifact content in question, e.g. a Yara rule or a Suricata rule.|
+|artifact content type|Formal description type for the artifact content in question, e.g. a Yara rule or a Suricata rule.|
 |artifact hash|A string depicting a checksum for a file, be it a malware sample for example.|
 |artifact hash type|The hashing algorithm used for artifact hash type above, be it MD5 or SHA-* etc.|
 
@@ -160,17 +156,18 @@ Having a functional ontology to work with, especially for the abuse types is imp
 
 |attribute|description|
 --- | --- |
-|threat type|At present, we have two types of threats present in the data: **ioc** (Indicators of Compromise) and **vulnerable service**s. Moreover, on a functional level IoCs may be further categorized into **victim**s and **infrastructure**s. N.B. The threat type may very well be a multi-value attribute, e.g. "threat type"=ioc, "threat type"=infrastructure. At minimum, it should denote between "threat type"=ioc or "threat type"="vulnerable service", where additional tagging complements a given threat type.|
-|type|The type is one of the most crucial pieces of information for any given threat event. The main idea of dynamic typing is to keep our ontology flexible, since we need to evolve with the evolving threatscape present in the data. Furthermore, the value data set for the type attribute should be kept as minimal as possible to avoid a **type explosion**, which in turn dilutes the business value of dynamic typing.
+|threat type|At present, we have three threat types present in the data: **ioc** (Indicators of Compromise), **vulnerable service**s and **policy violation**s. Moreover, on a functional level indicators may be further categorized into **victim**s and **infrastructure**s. N.B. The threat type may very well be a multi-value attribute, e.g. "threat type"=ioc, "threat type"=infrastructure. At minimum, we should tag an event with a single threat type, to aid in automated decision making.|
+|type|The type attribute is one of the most crucial pieces of information for any given threat event. The main idea of dynamic typing is to keep our ontology flexible, since we need to evolve with the evolving threat scape present in the data. Furthermore, the value set for the type attribute should be minimal to avoid a **type explosion**, which in turn dilutes the business value of dynamic typing.|
 
 ### Threat Type Values
 
-The idea behind the **threat type** tagging is to enable the abuse handlers automate semantic filtering based on the type of observation in question. The basic dichotomy present in the data at present is between vulnerable services and abuse. Moreover, for sensoring purposes for example, it is easier to use IoC, which represent compromised criminal infrastructure, rather than victims.
+The idea behind the **threat type** tagging is to enable the abuse handlers automate semantic filtering based on the observation type in question. In practice, distinguishing between abuse, vulnerable services, policy violations or victims will help writing rules to triage the events into the needed buckets. Since we are talking about tagging, a single event may be tagged with multiple tags. For example, a botnet drone observation will most likely need to be tagged as victim and abuse. A victim of a DDoS attack most likely hasn't been compromised, so the observation would fall under that of a victim.
 
 |attribute|description|
 --- | --- |
 |infrastructure|Infrastructure indicators, such as c&c observations should be tagged with this threat type.|
 |ioc|All abuse type events must be tagged with this threat type.|
+|policy violation|Observations, which do not directly qualify as abuse, but are against a policy.
 |victim|Botnet drone observations should be tagged with this threat type.|
 |vulnerable service|All vulnerable network service observations must be tagged with this threat type.|
 
@@ -187,6 +184,7 @@ The **type** values offer a data-backed taxonomy for classifying abuse and vulne
 |botnet drone|This is the most numerous type of abuse, as it refers to compromised computers calling out to a command and control mechanism.|
 |brute-force|This type refers to a machine, which has been observed to perform brute-force attacks over a given application protocol, e.g. ssh|
 |c&c|This is a command and control server in charge of a given number of botnet drones.|
+|compromised account|A user account, which has been compromised byt a third party.|
 |compromised server|This server or service has been compromised by a third party.|
 |ddos infrastructure|This type refers to various parts of DDoS botnet infrastructure.|
 |ddos target|This type refers to the intended target of a DDoS attack, i.e. the intended domain name or ip address.|
@@ -225,5 +223,5 @@ In summary, the underlying idea of this ontology is to provide a good basis to b
 
 # History of this Document
 
-A public version of this document has been iterated over, since 2012. Originally, it was a collaboration between numerous CSIRT actors (CERT-EU, CERT-AT, CERT-FI, CERT.PT) and Codenomicon. The current version of this document represents the practical collaboration between CSIRT teams such as [CERT-EU](http://cert.europa.eu/), [CERT-EE](http://www.cert.ee/), [NCSC-FI](https://www.viestintavirasto.fi/en/cybersecurity.html) and [Synopsys](http://www.abusesa.com), a commercial company.
+A public version of this document has been iterated over, since 2012. Originally, it was a collaboration between numerous CSIRT actors (CERT-EU, CERT-AT, CERT-FI, CERT.PT) and Codenomicon. The current version of this document represents the practical collaboration between CSIRT teams such as [CERT-EU](http://cert.europa.eu/), [CERT-EE](http://www.cert.ee/), [NCSC-FI](https://www.viestintavirasto.fi/en/cybersecurity.html) and [Arctic Security](http://www.arcticsecurity.com), a commercial company.
 
