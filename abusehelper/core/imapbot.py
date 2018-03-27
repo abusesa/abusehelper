@@ -32,6 +32,10 @@ _DEFAULT_PORT_IMAP4 = 143
 _DEFAULT_PORT_IMAP4_SSL = 993
 
 
+class SessionError(Exception):
+    pass
+
+
 class _IMAP4(imaplib.IMAP4):
     def __init__(self, host, port, timeout=None):
         self._timeout = timeout
@@ -100,6 +104,11 @@ class IMAPBot(bot.FeedBot):
         connect to the mail server using unencrypted plain
         text connections (default: use encrypted SSL connections)
         """)
+    mail_new_session_on_error = bot.BoolParam("""
+        start a new session after connection has died because of
+        temporary error, this is mainly for cases where UIDs change
+        between sessions
+        """)
 
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
@@ -152,6 +161,9 @@ class IMAPBot(bot.FeedBot):
                         yield idiokit.thread(self.disconnect, mailbox)
                         self.log.error("Lost IMAP connection ({0})".format(utils.format_exception(error)))
                         mailbox = None
+                        if self.mail_new_session_on_error:
+                            event.fail(SessionError, "lost connection", None)
+                            break
                     except imaplib.IMAP4.error as error:
                         event.fail(type(error), error, None)
                         break
@@ -226,7 +238,11 @@ class IMAPBot(bot.FeedBot):
     @idiokit.stream
     def poll(self):
         while True:
-            yield self.fetch_mails(self.filter)
+            try:
+                yield self.fetch_mails(self.filter)
+            except SessionError:
+                continue
+
             yield idiokit.sleep(self.poll_interval)
 
     @idiokit.stream
