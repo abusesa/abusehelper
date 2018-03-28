@@ -1,5 +1,12 @@
 # Changelog
 
+### Features
+
+ * Improved the harmonization document:
+  * better readability
+  * added a new functional type, compromised account
+  * added a new threat type, policy violation
+
 ## 5.5.3 (2018-02-20)
 
 ### Fixes
