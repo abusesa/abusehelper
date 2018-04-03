@@ -32,7 +32,7 @@ _DEFAULT_PORT_IMAP4 = 143
 _DEFAULT_PORT_IMAP4_SSL = 993
 
 
-class SessionError(Exception):
+class LostConnection(Exception):
     pass
 
 
@@ -162,7 +162,7 @@ class IMAPBot(bot.FeedBot):
                         self.log.error("Lost IMAP connection ({0})".format(utils.format_exception(error)))
                         mailbox = None
                         if self.mail_new_session_on_error:
-                            event.fail(SessionError, "lost connection", None)
+                            event.fail(LostConnection, "", None)
                             break
                     except imaplib.IMAP4.error as error:
                         event.fail(type(error), error, None)
@@ -230,7 +230,11 @@ class IMAPBot(bot.FeedBot):
     @idiokit.stream
     def noop(self, noop_interval=60.0):
         while True:
-            yield self.call("noop")
+            try:
+                yield self.call("noop")
+            except LostConnection:
+                continue
+
             yield idiokit.sleep(noop_interval)
 
     # Main polling
@@ -240,7 +244,7 @@ class IMAPBot(bot.FeedBot):
         while True:
             try:
                 yield self.fetch_mails(self.filter)
-            except SessionError:
+            except LostConnection:
                 continue
 
             yield idiokit.sleep(self.poll_interval)
