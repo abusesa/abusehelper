@@ -104,11 +104,6 @@ class IMAPBot(bot.FeedBot):
         connect to the mail server using unencrypted plain
         text connections (default: use encrypted SSL connections)
         """)
-    mail_new_session_on_error = bot.BoolParam("""
-        start a new session after connection has died because of
-        temporary error, this is mainly for cases where UIDs change
-        between sessions
-        """)
 
     def __init__(self, **keys):
         bot.FeedBot.__init__(self, **keys)
@@ -161,9 +156,8 @@ class IMAPBot(bot.FeedBot):
                         yield idiokit.thread(self.disconnect, mailbox)
                         self.log.error("Lost IMAP connection ({0})".format(utils.format_exception(error)))
                         mailbox = None
-                        if self.mail_new_session_on_error:
-                            event.fail(LostConnection, "", None)
-                            break
+                        event.fail(LostConnection, "", None)
+                        break
                     except imaplib.IMAP4.error as error:
                         event.fail(type(error), error, None)
                         break
