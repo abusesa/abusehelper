@@ -1,11 +1,17 @@
 # Changelog
 
+## 5.6.0 (2018-04-04)
+
 ### Features
 
  * Improved the harmonization document:
   * better readability
   * added a new functional type, compromised account
   * added a new threat type, policy violation
+
+### Fixes
+
+ * Fix IMAPBot to work correcty when UIDs change between sessions.
 
 ## 5.5.3 (2018-02-20)
 
