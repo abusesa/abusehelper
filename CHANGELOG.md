@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.7.0 (2019-02-12)
+
+### Fixes
+
+ * Fix bug in handling idna encoded domain names. Roomgraph with rules like ```"domain name" in *.example.com``` crashed if event had idna encoded domain name that didn't cleanly convert to unicode.
+
 ## 5.6.0 (2018-04-04)
 
 ### Features
