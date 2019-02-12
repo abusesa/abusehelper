@@ -1,0 +1,54 @@
+version: 2
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test-2.7
+      - test-pypy
+jobs:
+  test-2.7:
+    docker:
+      - image: circleci/python:2.7
+    steps:
+      - run:
+          command: |
+            git clone https://github.com/abusesa/abusehelper .
+      - run:
+          command: |
+            sudo pip install tox
+            sudo pip install -r requirements.txt
+            mkdir results
+      - run:
+          command: |
+            sudo tox -e flake8 abusehelper
+      - run:
+          command: |
+            sudo tox -e py27 -- abusehelper --junitxml=results/py27.xml
+      - store_test_results:
+          path: results
+      - store_artifacts:
+          path: results
+          destination: results
+  test-pypy:
+    docker:
+      - image: pypy:2-6.0
+    steps:
+      - run:
+          command: |
+            git clone https://github.com/abusesa/abusehelper .
+      - run:
+          command: |
+            pip install tox
+            pip install -r requirements.txt
+            mkdir results
+      - run:
+          command: |
+            tox -e flake8 abusehelper
+      - run:
+          command: |
+            tox -e pypy -- abusehelper --junitxml=results/pypy.xml
+      - store_test_results:
+          path: results
+      - store_artifacts:
+          path: results
+          destination: results
