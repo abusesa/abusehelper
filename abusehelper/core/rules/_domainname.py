@@ -24,7 +24,10 @@ def _parse_labels(string):
     if not all(_LABEL_REX.match(x) for x in labels):
         return None
 
-    return tuple(idna.ToUnicode(x) for x in labels)
+    try:
+        return tuple(idna.ToUnicode(x) for x in labels)
+    except UnicodeError:
+        return None
 
 
 def parse_name(string):
