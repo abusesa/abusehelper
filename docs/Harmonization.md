@@ -174,31 +174,32 @@ The idea behind the **threat type** tagging is to enable abuse or incident handl
 
 The **type** values offer a data-backed taxonomy for classifying abuse and vulnerable network service observations in a uniform manner. A concise yet functional classification system enables you to make informed decisions about the state of your network estate in real-time.
 
-|attribute|description|
---- | --- |
-|artifact|Artifacts refer to host-based indicators, such as checksums, file paths.|
-|attribution|Indicators which can be attributed to malicious activity without a specific functional category such as a command and control server.|
-|backdoor|Backdoor indicators refer to hosts which have been compromised and/or backdoored by a third party.|
-|blacklist|Some sources provide blacklists which clearly refer to abusive behavior (such as spamming) but fail to denote the exact reason why a given identity has been blacklisted. The justification may be anecdotal or missing entirely. This type should only be used if the typing fits the definition of a blacklist, but an event specific denomination is not possible for one reason or another.|
-|botnet drone|The most numerous type of abuse, as it refers to compromised computers calling out to a command and control mechanism.|
-|brute-force|A machine which has been observed to perform brute-force attacks over a given application protocol, e.g. ssh|
-|c&c|A command and control server in charge of a given number of botnet drones.|
-|compromised account|A user account which has been compromised byt a third party.|
-|compromised server|This server or service has been compromised by a third party.|
-|ddos infrastructure|This type refers to various parts of DDoS botnet infrastructure.|
-|ddos target|This type refers to the intended target of a DDoS attack: the intended domain name or IP address.|
-|defacement|This type refers to hacktivism, which on a technical level is an indicator of a compromised service.|
-|dropzone|This type refers to a resource which is used to store stolen user data.|
-|exploit url|An exploit or an exploit kit is often served through a malicious URL.|
-|ids alert|Alerts from a heuristic sensor network. This is a generic classification, as often the taxonomy of these types of events lack consistency.|
-|malware configuration|This is a resource which updates botnet drones with a new configurations.|
-|malware url|A URL is the most common resource with reference to malware binary distribution.|
-|phishing|This type most often refers to a URL which is trying to defraud the users of their credentials.|
-|ransomware|This type refers to a specific type of compromised machine, where the computer has been hijacked for ransom by the criminals.|
-|scanner|This type refers to port or vulnerability scanning attempts in general.|
-|spam infrastructure|This type refers to resources which make up a spammer's infrastructure, be it a harvester, dictionary attacker, URL, spam etc.|
-|test|Used for testing purposes.|
-|vulnerable service|This type refers to poorly configured or vulnerable network service, which may be abused by a third party. For example, these services relate to open proxies, open DNS resolvers, network time servers (NTP), character generation services (CharGen) or simple network management services (SNMP). In addition, to specify the network service and its potential abuse, one should also use the protocol, port and description attributes.|
+|attribute|description|impact|
+--- | --- | --- |
+|artifact|Artifacts refer to host-based indicators, such as checksums, file paths.|These indicators do not directly reference a compromise, rather can be used for monitoring and detection.|
+|attribution|Indicators which can be attributed to malicious activity without a specific functional category such as a command and control server.|These indicators attribute infrastructure to potential actors, but cannot be directly used for victim notification, since the nature of the compromise is often unspecified.
+|backdoor|Backdoor indicators refer to hosts which have been compromised and/or backdoored by a third party.|Threat actors may use this functionality to gain remote access to the machine or service.|
+|blacklist|Some sources provide blacklists which clearly refer to abusive behavior (such as spamming) but fail to denote the exact reason why a given identity has been blacklisted. The justification may be anecdotal or missing entirely. This type should only be used if the typing fits the definition of a blacklist, but an event specific denomination is not possible for one reason or another.|Blacklisted services will have difficulty to operate normally, as their service specific communication will be blocked by third parties.|
+|botnet drone|The most numerous type of abuse, as it refers to compromised computers calling out to a command and control mechanism.|These hosts are most likely infected by a piece of malware and controlled by the threat actors.|
+|brute-force|A machine which has been observed to perform brute-force attacks over a given application protocol, e.g. ssh|These hosts are most likely infected by malware or compromised and are trying to break into other computers or services.|
+|c&c|A command and control server in charge of a given number of botnet drones.|This computer or service is controlling a botnet and functioning as part of the threat actor infrastructure.|
+|compromised account|A user account which has been compromised byt a third party.|These compromised user accounts may lead to further unauthorized use through password re-use even if the compromised service is not part of the victim infrastructure.|
+|compromised server|This server or service has been compromised by a third party.|These hosts or services are under the threat actor control to do their bidding.|
+|ddos infrastructure|This type refers to various parts of DDoS botnet infrastructure.|These hosts or services have most likely facilitated DDoS attacks even if they have not been necessarily compromised. They may for example offer a UDP-based vulnerable service, which has been spoofed to facilitate a reflected attack against a third party. This in turn may consume the upstream bandwidth of the host during an attack.|
+|ddos target|This type refers to the intended target of a DDoS attack: the intended domain name or IP address.|This host or service will most likely be unavailable because of the DDoS attack.|
+|defacement|This type refers to hacktivism, which on a technical level is an indicator of a compromised service.|This host is compromised by a third party and very often is used for other criminal activities as well.|
+|dropzone|This type refers to a resource which is used to store stolen user data.|PII is often stored unlawfully on these hosts or services.|
+|exploitation|This type refers to attempted or successful exploitation of a vulnerable service.|A successful exploitation of a vulnerable service will lead to unauthorized use of this host or service.|
+|exploit url|An exploit or an exploit kit is often served through a malicious URL.|These URLs are used by the threat actors to spread malware. These hosts or services are often compromised to facilitate this activity.|
+|ids alert|Alerts from a heuristic sensor network. This is a generic classification, as often the taxonomy of these types of events lack consistency.|These indicators denote potential malicious activity either in the network traffic or system logs.|
+|malware configuration|This is a resource which updates botnet drones with a new configurations.|These hosts or services function as part of threat actor infrastructure and are often compromised by threat actors.|
+|malware url|A URL is the most common resource with reference to malware binary distribution.|These hosts are serving pieces of malware to infect new machines and are usually compromised by the threat actors.|
+|phishing|This type most often refers to a URL which is trying to defraud the users of their credentials.|These URLs are served to potential victims to try to steal their credentials to a third party service. These hosts are often compromised by threat actors.|
+|ransomware|This type refers to a specific type of compromised machine, where the computer has been hijacked for ransom by the criminals.|The disk resources of these hosts are encrypted by the criminals for ransom or sabotage. This may lead to the encryption of disk resources for an entire organization.|
+|scanner|This type refers to port or vulnerability scanning attempts in general.|These hosts are scanning for vulnerable services to enable threat actors to compromise them. The host doing the scanning are often compromised or infected as well.|
+|spam infrastructure|This type refers to resources which make up a spammer's infrastructure, be it a harvester, dictionary attacker, URL, spam etc.|These hosts will most likely get blacklisted because they are participating in spamming activities.|
+|test|Used for testing purposes.|These events can be used to test a victim notification pipeline for example, without impacting the functionality of the service.|
+|vulnerable service|This type refers to poorly configured or vulnerable network service, which may be abused by a third party. For example, these services relate to open proxies, open DNS resolvers, network time servers (NTP), character generation services (CharGen) or simple network management services (SNMP). In addition, to specify the network service and its potential abuse, one should also use the protocol, port and description attributes.|These services make it easy for the threat actors to perform their deeds without having to necessarily compromise a large number of hosts on the Internet.|
 
 ## Topic- or Provider-Specific Attributes
 
